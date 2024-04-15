@@ -3,26 +3,26 @@
  *
  * 서브 타입은 언제나 기반타입으로 교체가 가능해야함
  */
-abstract class Shape {
-  abstract calculateArea(): number;
-}
+// abstract class Shape {
+//   abstract calculateArea(): number;
+// }
 
-class Rectangle extends Shape {
-  constructor(private width: number, private height: number) {
-    super();
-  }
+// class Rectangle extends Shape {
+//   constructor(private width: number, private height: number) {
+//     super();
+//   }
 
-  calculateArea(): number {
-    return this.width * this.height;
-  }
-}
+//   calculateArea(): number {
+//     return this.width * this.height;
+//   }
+// }
 
-class Square extends Shape {
-  constructor(private side: number) {
-    super();
-  }
+// class Square extends Shape {
+//   constructor(private side: number) {
+//     super();
+//   }
 
-  calculateArea(): number {
-    return this.side * this.side;
-  }
-}
+//   calculateArea(): number {
+//     return this.side * this.side;
+//   }
+// }
