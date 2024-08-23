@@ -5,3 +5,4 @@ pnpm-lock.yaml
 src
 package.json
 tsconfig.json
+package-lock.json
