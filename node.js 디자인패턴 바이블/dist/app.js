@@ -1,20 +1,15 @@
 "use strict";
-const users = [
-    { id: 1, name: "ID", age: 20 },
-    { id: 2, name: "ID", age: 20 },
-    { id: 3, name: "ID", age: 20 },
-    { id: 4, name: "ID", age: 20 },
-    { id: 5, name: "ID", age: 20 },
-    { id: 6, name: "ID", age: 20 },
-    { id: 7, name: "ID", age: 20 },
-    { id: 8, name: "ID", age: 20 },
-    { id: 9, name: "ID", age: 20 },
-    { id: 10, name: "ID", age: 20 },
-];
-const tempUsers = [];
-for (let i = 0; i < users.length; i++) {
-    if (users[i].age < 30) {
-        tempUsers.push(users[i]);
-    }
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.count = void 0;
+exports.increment = increment;
+// counter.ts
+exports.count = 0;
+function increment() {
+    exports.count += 1;
 }
-console.log(tempUsers.length);
+// main.ts
+const counter_1 = require("./counter");
+console.log(exports.count); // 0
+(0, counter_1.increment)();
+console.log(exports.count); // 1
+exports.count += 1; // TypeError: Assignment to constant variable!
