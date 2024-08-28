@@ -1,5 +1,16 @@
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { readFile } from "fs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+function readJSON(
+  filename: string,
+  cb: (err: Error | unknown | null, arg?: string) => void
+) {
+  readFile(filename, "utf8", (err, data) => {
+    if (err) {
+      return cb(err);
+    }
+
+    cb(null, JSON.parse(data)); // 에러가 발생한다면?
+  });
+}
+
+readJSON("a.json", (err) => console.error(err));
