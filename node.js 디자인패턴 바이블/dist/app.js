@@ -1,15 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.count = void 0;
-exports.increment = increment;
-// counter.ts
-exports.count = 0;
-function increment() {
-    exports.count += 1;
-}
-// main.ts
-const counter_1 = require("./counter");
-console.log(exports.count); // 0
-(0, counter_1.increment)();
-console.log(exports.count); // 1
-exports.count += 1; // TypeError: Assignment to constant variable!
+const url_1 = require("url");
+const path_1 = require("path");
+const __filename = (0, url_1.fileURLToPath)(import.meta.url);
+const __dirname = (0, path_1.dirname)(__filename);

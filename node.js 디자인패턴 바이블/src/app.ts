@@ -1,12 +1,5 @@
-// counter.ts
-export let count = 0;
-export function increment() {
-  count += 1;
-}
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
-// main.ts
-import { count, increment } from "./counter";
-console.log(count); // 0
-increment();
-console.log(count); // 1
-count += 1; // TypeError: Assignment to constant variable!
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
