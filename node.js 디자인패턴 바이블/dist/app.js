@@ -1,12 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs_1 = require("fs");
-function readJSON(filename, cb) {
-    (0, fs_1.readFile)(filename, "utf8", (err, data) => {
-        if (err) {
-            return cb(err);
-        }
-        cb(null, JSON.parse(data)); // 에러가 발생한다면?
+const events_1 = require("events");
+function helloEvents() {
+    const eventEmitter = new events_1.EventEmitter();
+    setTimeout(() => {
+        eventEmitter.emit("complete", "event hello world"), 100;
     });
+    return eventEmitter;
 }
-readJSON("a.json", (err) => console.error(err));
+function helloCallback(cb) {
+    setTimeout(() => cb(null, "callback hello world"), 100);
+}
+helloEvents().on("complete", (message) => console.log(message));
+helloCallback((err, message) => console.log(message));
