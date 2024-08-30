@@ -1,37 +1,54 @@
-import EventEmitter from "events";
+import fs from "fs";
+import path from "path";
+import superagent from "superagent";
+import { mkdirp } from "mkdirp";
+import { urlToFilename } from "./utils.js";
 
-let count = 0;
-
-const tick = (emitter: EventEmitter, ms: number) => {
-  if (ms % 5 === 0) {
-    throw new Error("ms must be a multiple of 5");
-  }
-
-  count++;
-  emitter.emit("tick");
-};
-
-const ticker = (ms: number, cb: (count: number) => void) => {
-  const eventEmitter = new EventEmitter();
-
-  try {
-    tick(eventEmitter, ms);
-    const interval = setInterval(() => tick(eventEmitter, ms), 50);
-    setTimeout(() => {
-      clearInterval(interval);
-      cb(count);
-    }, ms);
-  } catch (err) {
-    eventEmitter.emit("error", err);
-  }
-
-  return eventEmitter;
-};
-
-const emitter = ticker(500, (count) => {
-  console.log(count);
-})
-  .on("tick", () => {})
-  .on("error", (err) => {
-    console.error(err);
+export function spider(
+  url: string,
+  cb: (err: Error | null, filename?: string, downloaded?: boolean) => void
+) {
+  const filename = urlToFilename(url);
+  fs.access(filename, (err) => {
+    // [1]
+    if (err && err.code === "ENOENT") {
+      console.log(`Downloading ${url} into ${filename}`);
+      superagent.get(url).end((err, res) => {
+        // [2]
+        if (err) {
+          cb(err);
+        } else {
+          saveFile(filename, res.text, (err) => {
+            if (err) {
+              cb(err);
+            } else {
+              cb(null, filename, true);
+            }
+          });
+        }
+      });
+    } else {
+      cb(null, filename, false);
+    }
   });
+}
+
+function saveFile(
+  filename: string,
+  contents: string,
+  cb: (err: Error | null) => void
+) {
+  mkdirp(path.dirname(filename), (err) => {
+    if (err) {
+      return cb(err);
+    }
+
+    fs.writeFile(filename, contents, (err) => {
+      if (err) {
+        return cb(err);
+      }
+
+      cb(null);
+    });
+  });
+}
