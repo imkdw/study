@@ -1,54 +1,51 @@
-import fs from "fs";
-import path from "path";
-import superagent from "superagent";
-import { mkdirp } from "mkdirp";
-import { urlToFilename } from "./utils.js";
+import EventEmitter from "events";
 
-export function spider(
-  url: string,
-  cb: (err: Error | null, filename?: string, downloaded?: boolean) => void
-) {
-  const filename = urlToFilename(url);
-  fs.access(filename, (err) => {
-    // [1]
-    if (err && err.code === "ENOENT") {
-      console.log(`Downloading ${url} into ${filename}`);
-      superagent.get(url).end((err, res) => {
-        // [2]
+class TaskQueue extends EventEmitter {
+  private concurrency: number; // 동시성 제한
+  private queue: any[]; // 보류중인 작업 저장
+  private running: number; // 실행중인 모든 작업 개수
+  private completed: number;
+
+  constructor(concurrency: number) {
+    super();
+
+    this.concurrency = concurrency;
+    this.queue = [];
+    this.running = 0;
+    this.completed = 0;
+  }
+
+  pushTask(task: any) {
+    this.queue.push(task);
+    process.nextTick(this.next.bind(this));
+    return this;
+  }
+
+  next() {
+    while (this.running === 0 && this.queue.length === 0) {
+      return this.emit("empty");
+    }
+
+    while (this.running < this.concurrency && this.queue.length) {
+      const task = this.queue.shift();
+      task((err: unknown) => {
         if (err) {
-          cb(err);
-        } else {
-          saveFile(filename, res.text, (err) => {
-            if (err) {
-              cb(err);
-            } else {
-              cb(null, filename, true);
-            }
-          });
+          return this.emit("error", err);
         }
+
+        this.running--;
+        process.nextTick(this.next.bind(this));
       });
-    } else {
-      cb(null, filename, false);
+      this.running++;
     }
-  });
+  }
 }
 
-function saveFile(
-  filename: string,
-  contents: string,
-  cb: (err: Error | null) => void
-) {
-  mkdirp(path.dirname(filename), (err) => {
-    if (err) {
-      return cb(err);
-    }
-
-    fs.writeFile(filename, contents, (err) => {
-      if (err) {
-        return cb(err);
-      }
-
-      cb(null);
-    });
+const queue = new TaskQueue(2);
+queue
+  .on("empty", () => {
+    console.log("all tasks are done");
+  })
+  .on("error", (err) => {
+    console.error(err);
   });
-}
