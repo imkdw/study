@@ -1,24 +1,10 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-function delay(ms) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return setTimeout(() => { }, ms);
-    });
-}
-// @ts-ignore
-function leakingLoop() {
-    // @ts-ignore
-    return delay(1).then(() => {
-        console.log(`Tick ${Date.now()}`);
-        return leakingLoop();
-    });
-}
-leakingLoop();
+Object.defineProperty(exports, "__esModule", { value: true });
+const crypto_1 = require("crypto");
+const fs_1 = require("fs");
+const filename = process.argv[2];
+const sha1Stream = (0, crypto_1.createHash)("sha1").setEncoding("hex");
+const md5Stream = (0, crypto_1.createHash)("md5").setEncoding("hex");
+const inputStream = (0, fs_1.createReadStream)(filename);
+inputStream.pipe(sha1Stream).pipe((0, fs_1.createWriteStream)(`${filename}.sha1`));
+inputStream.pipe(md5Stream).pipe((0, fs_1.createWriteStream)(`${filename}.md5`));
