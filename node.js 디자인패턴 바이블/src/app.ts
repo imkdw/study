@@ -1,21 +1,99 @@
-import { createReadStream, createWriteStream } from "fs";
-import split from "split";
+class Url {
+  constructor(
+    private protocol: string,
+    private username: string,
+    private password: string,
+    private hostname: string,
+    private port: string,
+    private pathname: string,
+    private search: string,
+    private hash: string
+  ) {
+    this.validate();
+  }
 
-const dest = process.argv[2];
-const sources = process.argv.slice(3);
-
-const destStream = createWriteStream(dest);
-
-let endCount = 0;
-for (const source of sources) {
-  const sourceStream = createReadStream(source, { highWaterMark: 16 });
-  sourceStream.on("end", () => {
-    if (++endCount === sources.length) {
-      destStream.end();
-      console.log(`${dest} 파일 병합 완료`);
+  private validate() {
+    if (!this.protocol || !this.hostname) {
+      throw new Error("protocol and hostname are required");
     }
-  });
-  sourceStream
-    .pipe(split((line: any) => line + "\n"))
-    .pipe(destStream, { end: false });
+  }
+
+  toString() {
+    return `${this.protocol}://${this.username}:${this.password}@${this.hostname}:${this.port}${this.pathname}${this.search}${this.hash}`;
+  }
 }
+
+class UrlBuilder {
+  private protocol: string;
+  private username: string;
+  private password: string;
+  private hostname: string;
+  private port: string;
+  private pathname: string;
+  private search: string;
+  private hash: string;
+
+  setProtocol(protocol: string) {
+    this.protocol = protocol;
+    return this;
+  }
+
+  setUsername(username: string) {
+    this.username = username;
+    return this;
+  }
+
+  setPassword(password: string) {
+    this.password = password;
+    return this;
+  }
+
+  setHostname(hostname: string) {
+    this.hostname = hostname;
+    return this;
+  }
+
+  setPort(port: string) {
+    this.port = port;
+    return this;
+  }
+
+  setPathname(pathname: string) {
+    this.pathname = pathname;
+    return this;
+  }
+
+  setSearch(search: string) {
+    this.search = search;
+    return this;
+  }
+
+  setHash(hash: string) {
+    this.hash = hash;
+    return this;
+  }
+
+  build() {
+    return new Url(
+      this.protocol,
+      this.username,
+      this.password,
+      this.hostname,
+      this.port,
+      this.pathname,
+      this.search,
+      this.hash
+    );
+  }
+}
+
+const url = new UrlBuilder()
+  .setProtocol("http")
+  .setHostname("localhost")
+  .setPort("8080")
+  .setPathname("/api/v1")
+  .setSearch("?key=value")
+  .setHash("#hash")
+  .build();
+
+console.log(url.toString());
