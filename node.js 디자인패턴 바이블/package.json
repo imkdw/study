@@ -12,6 +12,7 @@
   "dependencies": {
     "@types/chance": "^1.1.6",
     "@types/csv-parse": "^1.1.12",
+    "@types/level": "^6.0.3",
     "@types/mkdirp-promise": "^5.0.0",
     "@types/node": "^22.5.0",
     "@types/split": "^1.0.5",
@@ -20,6 +21,7 @@
     "csv-parse": "^5.5.6",
     "glob": "^11.0.0",
     "lazystream": "^1.0.1",
+    "level": "^8.0.1",
     "mkdirp-promise": "^5.0.1",
     "split": "^1.0.1",
     "sqlite3": "^5.1.7",

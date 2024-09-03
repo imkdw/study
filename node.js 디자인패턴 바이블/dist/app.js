@@ -1,11 +1,25 @@
 "use strict";
-class Queue {
-    constructor() {
-        this.queue = [];
+const enhancedCalculatorHandler = {
+    get(target, property) {
+        if (property === "add") {
+            return function add() {
+                // ...
+            };
+        }
+        else if (property === "minus") {
+            return function minus() {
+                // ...
+            };
+        }
+        return target[property];
+    },
+};
+class Calculator {
+    minus(a, b) {
+        return a - b;
     }
-    dequeue() {
-        return new Promise((res) => {
-            res(this.queue);
-        });
+    multiple(a, b) {
+        return a * b;
     }
 }
+const calculator = new Proxy(new Calculator(), enhancedCalculatorHandler);
