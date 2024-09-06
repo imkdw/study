@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "tsc-watch --onSuccess \"node dist/app.js\""
   },
@@ -29,6 +30,10 @@
     "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
     "tsc-watch": "^6.2.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "webpack-cli": "^5.1.4"
+  },
+  "devDependencies": {
+    "@webpack-cli/generators": "^3.0.7"
   }
 }

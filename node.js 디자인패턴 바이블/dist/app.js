@@ -1,22 +1,37 @@
 "use strict";
-const A_CHAR_CODE = 65;
-const Z_CHAR_CODE = 90;
-function createAlphabetIterator() {
-    let currCode = A_CHAR_CODE;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.statusUpdateService = void 0;
+const statusUpdates = new Map();
+exports.statusUpdateService = {
+    postUpdate(status) {
+        const id = Math.floor(Math.random() * 1000000);
+        statusUpdates.set(id, status);
+        console.log(`Posted new status update with id ${id}`);
+        return id;
+    },
+    destoryUpdate(id) {
+        statusUpdates.delete(id);
+        console.log(`Destoryed status update with id ${id}`);
+    },
+};
+function createPostStatusCommand(service, status) {
+    let postId = null;
     return {
-        next() {
-            const currChar = String.fromCharCode(currCode);
-            if (currCode > Z_CHAR_CODE) {
-                return { done: true };
+        run() {
+            postId = service.postUpdate(status);
+        },
+        undo() {
+            if (postId) {
+                service.destoryUpdate(postId);
+                postId = null;
             }
-            currCode++;
-            return { done: false, value: currChar };
+        },
+        serialize() {
+            return {
+                type: "post",
+                status,
+                action: "post",
+            };
         },
     };
-}
-const interator = createAlphabetIterator();
-let iterationResult = interator.next();
-while (!iterationResult.done) {
-    console.log(iterationResult.value);
-    iterationResult = interator.next();
 }
