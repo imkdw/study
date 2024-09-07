@@ -1,71 +1,25 @@
-import EventEmitter from "events";
+interface Product {
+  id: string;
+}
 
-class Db extends EventEmitter {
-  private connected: boolean;
-  private commandsQueue: Array<() => void>;
+const CACHE_TTL = 1000;
+const cache = new Map();
 
-  constructor() {
-    super();
-    this.connected = false;
-    this.commandsQueue = [];
-  }
+export function totalSales(product: Product) {
+  const resultPromise = cache.get(product.id);
+  cache.set(product.id, resultPromise);
 
-  async query(queryString: string) {
-    if (!this.connected) {
-      console.log("Request Queued", queryString);
-
-      return new Promise((resolve, reject) => {
-        const command = () => {
-          this.query(queryString).then(resolve, reject);
-        };
-
-        this.commandsQueue.push(command);
-      });
+  resultPromise.then(
+    () => {
+      setTimeout(() => {
+        cache.delete(product.id);
+      }, CACHE_TTL);
+    },
+    (err: unknown) => {
+      cache.delete(product.id);
+      throw err;
     }
+  );
 
-    console.log("Query executed", queryString);
-  }
-
-  connect() {
-    setTimeout(() => {
-      this.connected = true;
-      this.emit("connected");
-      this.commandsQueue.forEach((command) => command());
-      this.commandsQueue = [];
-    }, 500);
-  }
-}
-
-export const db = new Db();
-
-class InitializeState {
-  async query(queryString: string) {
-    console.log("query", queryString);
-  }
-}
-
-const METHODS_REQUIRING_CONNECTION = ["query"];
-const deactivate = Symbol("deactivate");
-class QueueingState {
-  private db: Db;
-  private commandsQueue: Array<() => void>;
-  private METHODS_REQUIRING_CONNECTION: string[];
-
-  constructor(db: Db) {
-    this.db = db;
-    this.commandsQueue = [];
-  }
-
-  METHODS_REQUIRING_CONNECTIOn.forEach((method) => {
-  (this as any)[method] = function (...args: any[]) {
-    console.log("Queueing", method, args);
-    return new Promise((resolve, reject) => {
-      const command = () => {
-        (this as any)[method](...args).then(resolve, reject);
-      };
-
-      this.commandsQueue.push(command);
-    });
-  };
-});
+  return resultPromise;
 }
