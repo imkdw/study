@@ -1,70 +1,50 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const events_1 = __importDefault(require("events"));
 const http_1 = require("http");
-class SubsetSum extends events_1.default {
-    constructor(sum, set) {
-        super();
-        this.sum = sum;
-        this.set = set;
-        this.totalSubsets = 0;
-        this.runningCombine = 0;
-    }
-    _combine(set, subset) {
-        for (let i = 0; i < set.length; i++) {
-            const newSubset = subset.concat(set[i]);
-            // this._combine(set.slice(i + 1), newSubset);
-            /**
-             * 알고리즘의 각 단계가 setImmediate를 통해서 이벤트 루프에 대기하여
-             * 실행되는 대신 보류중인 IO 요청 후 실행되도록 함
-             */
-            this._combineInterleaved(set.slice(i + 1), newSubset);
-            this._processSubset(newSubset);
-        }
-    }
-    _processSubset(subset) {
-        console.log(subset);
-        const res = subset.reduce((prev, item) => prev + item, 0);
-        if (res === this.sum) {
-            this.emit("match", subset);
-        }
-    }
-    /**
-     * 기존 _combine 함수를 setImmediate를 통해서 연기함
-     */
-    _combineInterleaved(set, subset) {
-        this.runningCombine++;
-        setImmediate(() => {
-            this._combine(set, subset);
-            if (--this.runningCombine === 0) {
-                this.emit("end");
+const os_1 = require("os");
+const cluster_1 = __importDefault(require("cluster"));
+const events_1 = require("events");
+const { pid } = process;
+if (cluster_1.default.isMaster) {
+    console.log("master", pid);
+    const availableCpus = (0, os_1.cpus)();
+    console.log("Clustering with %d CPUs", availableCpus.length);
+    availableCpus.forEach(() => cluster_1.default.fork());
+    process.on("SIGUSR2", () => __awaiter(void 0, void 0, void 0, function* () {
+        const workers = Object.values(cluster_1.default.workers);
+        for (const worker of workers) {
+            console.log("Stopping Worker: %d", worker === null || worker === void 0 ? void 0 : worker.process.pid);
+            worker === null || worker === void 0 ? void 0 : worker.disconnect();
+            yield (0, events_1.once)(worker, "exit");
+            if (!(worker === null || worker === void 0 ? void 0 : worker.exitedAfterDisconnect)) {
+                continue;
             }
-        });
-    }
-    start() {
-        this.runningCombine = 0;
-        this._combineInterleaved(this.set, []);
-        this.emit("end");
-    }
+            const newWorker = cluster_1.default.fork();
+            yield (0, events_1.once)(newWorker, "listening");
+        }
+    }));
 }
-(0, http_1.createServer)((req, res) => {
-    const url = new URL(req.url, "http://localhost");
-    if (url.pathname !== "/subsetSum") {
-        res.writeHead(200);
-        return res.end("im alive");
-    }
-    const data = JSON.parse(url.searchParams.get("data"));
-    const sum = parseInt(url.searchParams.get("sum"));
-    res.writeHead(200);
-    const subsetSum = new SubsetSum(sum, data);
-    subsetSum.on("match", (match) => {
-        res.write(`match: ${match}\n`);
+else {
+    const server = (0, http_1.createServer)((req, res) => {
+        let i = 1e7;
+        while (i > 0) {
+            i--;
+        }
+        res.end(`Hello from worker ${pid}`);
     });
-    subsetSum.on("end", () => {
-        res.end();
+    server.listen(8080, () => {
+        console.log(`Worker pid: ${pid}`);
     });
-    subsetSum.start();
-}).listen(8000, () => console.log("server running on 8000"));
+}

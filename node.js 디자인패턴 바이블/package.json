@@ -18,6 +18,7 @@
     "@types/node": "^22.5.0",
     "@types/split": "^1.0.5",
     "@types/subleveldown": "^4.1.4",
+    "autocannon": "^7.15.0",
     "chalk": "^4.1.2",
     "chance": "^1.1.12",
     "csv-parse": "^5.5.6",
