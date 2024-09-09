@@ -1,25 +1,3 @@
-interface Product {
-  id: string;
-}
+import { createServer } from "http";
 
-const CACHE_TTL = 1000;
-const cache = new Map();
-
-export function totalSales(product: Product) {
-  const resultPromise = cache.get(product.id);
-  cache.set(product.id, resultPromise);
-
-  resultPromise.then(
-    () => {
-      setTimeout(() => {
-        cache.delete(product.id);
-      }, CACHE_TTL);
-    },
-    (err: unknown) => {
-      cache.delete(product.id);
-      throw err;
-    }
-  );
-
-  return resultPromise;
-}
+const server = createServer((req, res) => {});
