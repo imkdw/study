@@ -1,0 +1,14 @@
+version: "3"
+services:
+  primary:
+    image: ubuntu:20.04
+    container_name: primary
+    command: tail -f /dev/null
+  secondary_1:
+    image: ubuntu:20.04
+    container_name: secondary_1
+    command: tail -f /dev/null
+  secondary_2:
+    image: ubuntu:20.04
+    container_name: secondary_2
+    command: tail -f /dev/null
