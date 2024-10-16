@@ -1,0 +1,49 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Dongwoo\\study\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Dongwoo\\study\\\uC774\uAC83\uC774 \uC790\uB8CC\uAD6C\uC870 \u002B \uC54C\uACE0\uB9AC\uC998\uC774\uB2E4\\\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:\uC774\uAC83\uC774 \uC790\uB8CC\uAD6C\uC870 \u002B \uC54C\uACE0\uB9AC\uC998\uC774\uB2E4\\\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md",
+              "DocumentMoniker": "C:\\Users\\Dongwoo\\study\\\uC774\uAC83\uC774 \uC790\uB8CC\uAD6C\uC870 \u002B \uC54C\uACE0\uB9AC\uC998\uC774\uB2E4\\\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md",
+              "RelativeDocumentMoniker": "\uC774\uAC83\uC774 \uC790\uB8CC\uAD6C\uC870 \u002B \uC54C\uACE0\uB9AC\uC998\uC774\uB2E4\\\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md",
+              "ToolTip": "C:\\Users\\Dongwoo\\study\\\uC774\uAC83\uC774 \uC790\uB8CC\uAD6C\uC870 \u002B \uC54C\uACE0\uB9AC\uC998\uC774\uB2E4\\\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md",
+              "RelativeToolTip": "\uC774\uAC83\uC774 \uC790\uB8CC\uAD6C\uC870 \u002B \uC54C\uACE0\uB9AC\uC998\uC774\uB2E4\\\uC54C\uC544\uB450\uBA74 \uC4F8\uB300\uC788\uB294 \uC790\uB8CC\uC870\uC640 \uC54C\uACE0\uB9AC\uC998.md",
+              "ViewState": "AgIAABsAAAAAAAAAAAAAAB8AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2024-10-16T09:45:28.179Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
