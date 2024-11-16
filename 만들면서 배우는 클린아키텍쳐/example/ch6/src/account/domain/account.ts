@@ -33,7 +33,7 @@ export default class Account {
   }
 
   calculateBalance(): Money {
-    // ...
+    return new Money();
   }
 
   withdraw(money: Money, targetAccountId: AccountId): void {
