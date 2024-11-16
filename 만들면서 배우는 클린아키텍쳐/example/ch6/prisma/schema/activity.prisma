@@ -1,0 +1,8 @@
+model activity {
+  id              Int      @id @default(autoincrement())
+  timestamp       DateTime
+  ownerAccountId  Int      @map("owner_account_id")
+  sourceAccountId Int      @map("source_account_id")
+  targetAccountId Int      @map("target_account_id")
+  amount          Int
+}
