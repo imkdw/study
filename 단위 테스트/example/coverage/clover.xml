@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1731832746547" clover="3.2.0">
+  <project timestamp="1731832746547" name="All files">
+    <metrics statements="6" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="2" coveredmethods="1" elements="8" coveredelements="4" complexity="0" loc="6" ncloc="6" packages="1" files="1" classes="1"/>
+    <file name="1-2.ts" path="/Users/imkdw/Documents/GitHub/study/단위 테스트/example/src/1-2.ts">
+      <metrics statements="6" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="2" coveredmethods="1"/>
+      <line num="1" count="1" type="stmt"/>
+      <line num="2" count="0" type="stmt"/>
+      <line num="3" count="0" type="stmt"/>
+      <line num="4" count="0" type="stmt"/>
+      <line num="7" count="1" type="stmt"/>
+      <line num="8" count="1" type="stmt"/>
+    </file>
+  </project>
+</coverage>
