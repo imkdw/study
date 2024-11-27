@@ -1,8 +1,13 @@
 import { createUser } from "./7-3.js";
 
 class UserController {
-  private readonly database: Database = new Database();
-  private readonly messageBus: MessageBus = new MessageBus();
+  private readonly database: Database;
+  private readonly messageBus: MessageBus;
+
+  constructor(database: Database, messageBus: MessageBus) {
+    this.database = database;
+    this.messageBus = messageBus;
+  }
 
   changeEmail(userId: number, newEmail: string) {
     const userData = this.database.getUserById(userId);
