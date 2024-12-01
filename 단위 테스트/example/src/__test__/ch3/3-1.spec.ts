@@ -1,4 +1,4 @@
-import Calculator from "../../3-1";
+import Calculator from "../../ch3/3-1";
 
 it("sum_of_two_numbers", () => {
   const first = 10;

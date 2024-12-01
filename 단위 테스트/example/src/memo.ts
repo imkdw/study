@@ -1,10 +1,5 @@
-/**
- * 출력 : number
- * 이름 : calculateDiscount
- * 입력 : Product[]
- * 메소드 시그니처 : calculateDiscount(products: Product[]): number
- */
-const calculateDiscount = (products: Product[]): number => {
-  const discount = products.length * 0.01;
-  return Math.min(discount, 0.02);
-};
+class Calculator {
+  static add(value1: number, value2: number): number {
+    return value1 + value2;
+  }
+}

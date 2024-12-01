@@ -23,3 +23,9 @@ export const clearDatabase = async () => {
     await prisma.$disconnect();
   }
 };
+
+describe("UserController", () => {
+  beforeEach(async () => {
+    await clearDatabase();
+  });
+});

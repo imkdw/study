@@ -1,4 +1,4 @@
-import { AuditManager, IFileSystem } from "../../6-9.js";
+import { AuditManager, IFileSystem } from "../../ch6/6-9.js";
 
 it("a_new_file_is_created_when_the_current_file_overflows", () => {
   const fileSystemMock: jest.Mocked<IFileSystem> = {

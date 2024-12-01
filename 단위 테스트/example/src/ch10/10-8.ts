@@ -9,4 +9,15 @@ describe("UserController", () => {
     repository.save(user);
     return user;
   };
+
+  it("some_user_test", () => {
+    // Given
+    const user = await createUser();
+
+    // When
+    // ...
+
+    // Then
+    // ...
+  });
 });
