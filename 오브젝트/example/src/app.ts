@@ -1,5 +1,7 @@
+import { CLIENT_RENEG_LIMIT } from "tls";
 import { DayOfWeek, PeriodCondition } from "./movie/conditions/period-condition";
 import AmountDiscountPolicy from "./movie/discount-policy/amount-discount-policy";
+import NoneDiscountPolicy from "./movie/discount-policy/none-discount-policy";
 import PercentDiscountPolicy from "./movie/discount-policy/percent-discount-policy";
 import Duration from "./movie/duration";
 import LocalTime from "./movie/local-time";
@@ -47,3 +49,12 @@ const titanic = new Movie(
   ])
 );
 console.log(titanic);
+
+// Movie {
+//   title: '스타워즈',
+//   runningTime: Duration { milliseconds: 12600000 },
+//   fee: Money { amount: 10000 },
+//   discountPolicy: NoneDiscountPolicy { conditions: [] }
+// }
+const starwars = new Movie("스타워즈", Duration.ofMinutes(210), Money.wons(10000), new NoneDiscountPolicy([]));
+console.log(starwars);
