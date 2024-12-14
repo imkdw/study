@@ -1,7 +1,4 @@
-import {
-  DayOfWeek,
-  PeriodCondition,
-} from "./movie_rdd/conditions/period-condition.js";
+import { DayOfWeek, PeriodCondition } from "./movie_rdd/conditions/period-condition.js";
 import AmountDiscountPolicy from "./movie_rdd/discount-policy/amount-discount-policy.js";
 import OverlappedDiscountPolicy from "./movie_rdd/discount-policy/overlapped-discount-poilcy.js";
 import PercentDiscountPolicy from "./movie_rdd/discount-policy/percent-discount-policy.js";
@@ -17,20 +14,23 @@ const movie = new Movie(
   Money.wons(10000),
   new OverlappedDiscountPolicy([
     new AmountDiscountPolicy(Money.wons(1000), [
-      new PeriodCondition(
-        DayOfWeek.TUESDAY,
-        LocalTime.of(10, 0),
-        LocalTime.of(12, 59)
-      ),
+      new PeriodCondition(DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(12, 59)),
       new SequenceCondition(2),
     ]),
-    new PercentDiscountPolicy(0.2, [
-      new PeriodCondition(
-        DayOfWeek.TUESDAY,
-        LocalTime.of(10, 0),
-        LocalTime.of(12, 59)
-      ),
-      new SequenceCondition(2),
-    ]),
+  ])
+);
+
+movie.setDiscountPolicy(
+  new AmountDiscountPolicy(Money.wons(1000), [
+    new PeriodCondition(DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(12, 59)),
+    new SequenceCondition(2),
+  ])
+);
+
+movie.calculateMoviePrice(
+  screening,
+  new AmountDiscountPolicy(Money.wons(1000), [
+    new PeriodCondition(DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(12, 59)),
+    new SequenceCondition(2),
   ])
 );

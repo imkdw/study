@@ -1,6 +1,4 @@
-import DiscountCondition, {
-  DiscountConditionType,
-} from "./conditions/discount-condition.js";
+import DiscountCondition, { DiscountConditionType } from "./conditions/discount-condition.js";
 import Duration from "./duration.js";
 import LocalTime from "./local-time.js";
 import Money from "./money.js";
@@ -106,12 +104,7 @@ export default class Movie {
   isDiscountable(whenScreened: LocalTime, sequence: number): boolean {
     for (const condition of this.discountConditions) {
       if (condition.getType() === DiscountConditionType.PERIOD) {
-        if (
-          condition.isDiscountable(
-            whenScreened.getDayOfWeek(),
-            whenScreened.toLocalTime()
-          )
-        ) {
+        if (condition.isDiscountable(whenScreened.getDayOfWeek(), whenScreened.toLocalTime())) {
           return true;
         }
       } else {
