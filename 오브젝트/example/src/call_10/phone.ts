@@ -1,42 +1,22 @@
-import Call from "./call";
-import Duration from "./duration";
-import Money from "./money";
+import Call from "./call.js";
+import Money from "./money.js";
 
-export default class Phone {
-  private amount: Money;
-  private seconds: Duration;
-  private calls: Call[] = [];
-  private taxRate: number;
+export default abstract class Phone {
+  private calls: Call[];
+  private taxRate: number; // 추가
 
-  constructor(amount: Money, seconds: Duration, taxRate: number) {
-    this.amount = amount;
-    this.seconds = seconds;
+  constructor(calls: Call[], taxRate: number) {
+    this.calls = calls;
     this.taxRate = taxRate;
   }
 
-  call(call: Call) {
-    this.calls.push(call);
-  }
-
-  getCalls(): Call[] {
-    return this.calls;
-  }
-
-  getAmount(): Money {
-    return this.amount;
-  }
-
-  getSeconds(): Duration {
-    return this.seconds;
-  }
-
-  calculateFee(): Money {
+  calculateFee() {
     let result = Money.ZERO;
-
     for (const call of this.calls) {
-      result = result.plus(this.amount.times(call.getDuration().getSeconds() / this.seconds.getSeconds()));
+      result = result.plus(this.calculateCallFee(call));
     }
-
     return result;
   }
+
+  protected abstract calculateCallFee(call: Call): Money;
 }
