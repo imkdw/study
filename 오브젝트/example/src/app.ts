@@ -1,36 +1,21 @@
-import { DayOfWeek, PeriodCondition } from "./movie_rdd/conditions/period-condition.js";
-import AmountDiscountPolicy from "./movie_rdd/discount-policy/amount-discount-policy.js";
-import OverlappedDiscountPolicy from "./movie_rdd/discount-policy/overlapped-discount-poilcy.js";
-import PercentDiscountPolicy from "./movie_rdd/discount-policy/percent-discount-policy.js";
-import Duration from "./movie_rdd/duration.js";
-import LocalTime from "./movie_rdd/local-time.js";
-import Money from "./movie_rdd/money.js";
-import Movie from "./movie_rdd/movie.js";
-import SequenceCondition from "./movie_rdd/sequence-condition.js";
+import { GradeLecture } from "./lecture/grade-lecture.js";
+import { Grade } from "./lecture/grade.js";
+import { Lecture } from "./lecture/lecture.js";
+import { Professor } from "./lecture/professor.js";
 
-const movie = new Movie(
-  "아바타",
-  Duration.ofMinutes(120),
-  Money.wons(10000),
-  new OverlappedDiscountPolicy([
-    new AmountDiscountPolicy(Money.wons(1000), [
-      new PeriodCondition(DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(12, 59)),
-      new SequenceCondition(2),
-    ]),
-  ])
+const professor = new Professor(
+  "다익스트라",
+  new GradeLecture(
+    "Algorithm",
+    70,
+    [
+      new Grade("A+", 100, 90),
+      new Grade("A0", 89, 80),
+      new Grade("B+", 79, 70),
+    ],
+    [81, 95, 75, 70, 45]
+  )
 );
 
-movie.setDiscountPolicy(
-  new AmountDiscountPolicy(Money.wons(1000), [
-    new PeriodCondition(DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(12, 59)),
-    new SequenceCondition(2),
-  ])
-);
-
-movie.calculateMoviePrice(
-  screening,
-  new AmountDiscountPolicy(Money.wons(1000), [
-    new PeriodCondition(DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(12, 59)),
-    new SequenceCondition(2),
-  ])
-);
+// [다익스트라] Pass: 4, Fail: 1, A+:1, A0:1, B+:2 - Avg: 73.2
+console.log(professor.complieStatistics());
