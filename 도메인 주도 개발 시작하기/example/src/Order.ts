@@ -1,15 +1,16 @@
-export class Order {
+export default class Order {
+  private number: OrderNo;
   private orderer: Orderer;
+  private shippingInfo: ShippingInfo;
 
-  constructor(orderer: Orderer) {
-    this.setOrderer(orderer);
+  constructor(number: OrderNo, orderer: Orderer, shippingInfo: ShippingInfo) {
+    this.number = number;
+    this.orderer = orderer;
+    this.shippingInfo = shippingInfo;
   }
 
-  private setOrderer(orderer: Orderer) {
-    if (!orderer) {
-      throw new Error(`Invalid orderer`);
-    }
-
-    this.orderer = orderer;
+  // 기능을 함께 제공
+  changeShippingInfo(shippingInfo: ShippingInfo) {
+    // ...
   }
 }
