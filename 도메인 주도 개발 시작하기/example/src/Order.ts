@@ -1,16 +1,16 @@
-export default class Order {
-  private number: OrderNo;
+export class Order {
   private orderer: Orderer;
-  private shippingInfo: ShippingInfo;
 
-  constructor(number: OrderNo, orderer: Orderer, shippingInfo: ShippingInfo) {
-    this.number = number;
+  constructor(orderer: Orderer) {
     this.orderer = orderer;
-    this.shippingInfo = shippingInfo;
   }
 
-  // 기능을 함께 제공
-  changeShippingInfo(shippingInfo: ShippingInfo) {
-    // ...
+  shipTo(shippingInfo: ShippingInfo, useNewSHippingAddrAsMemberAddr: boolean) {
+    verifyNotShippedYet();
+    setShippingInfo(shippingInfo);
+    if (useNewSHippingAddrAsMemberAddr) {
+      // 다른 애그리거트의 상태를 변경하는건 안됨
+      this.orderer.getMemeber().changeAddress(shippingInfo.getAddress());
+    }
   }
 }
