@@ -1,15 +1,27 @@
 export class Member {
-  private password: Password;
-
-  constructor(password: Password) {
-    this.password = password;
+  changePassword(oldPassword: string, newPassword: string) {
+    if (!this.matchPassword(oldPassword)) {
+      throw new Error("기존 비밀번호가 일치하지 않습니다.");
+      setPassword(newPassword);
+    }
   }
 
-  changePassword(currentPassword: string, newPassword: string) {
-    if (!this.password.match(currentPassword)) {
-      throw new Error("invalid password");
-    }
+  matchPassword(password: string) {
+    return this.passwordEncoder.matches(password);
+  }
 
-    this.password = new Password(newPassword);
+  private setPassword(newPassword: string) {
+    if (!newPassword) {
+      throw new Error("비밀번호를 입력해주세요.");
+    }
+    this.password = newPassword;
+  }
+}
+
+export class ChangePasswordService {
+  changePassword(memberId: string, oldPassword: string, newPassword: string) {
+    const member = this.memberRepository.findById(memberId);
+    this.checkMemberExists(member);
+    member.changePassword(oldPassword, newPassword);
   }
 }

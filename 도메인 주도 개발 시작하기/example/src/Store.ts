@@ -1,9 +1,9 @@
 export class Store {
-  createProduct(newProductId: ProductId): Product {
+  createProduct(newProductId: ProductId, productInfo: ProductInfo): Product {
     if (this.isBlocked()) {
       throw new Error("store is blocked");
     }
 
-    return new Product(newProductId, this.id);
+    return ProductFactory.create(newProductId, this.getId(), productInfo);
   }
 }
