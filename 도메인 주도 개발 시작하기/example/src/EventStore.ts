@@ -1,3 +1,6 @@
+/**
+ * 이벤트는 변경되지 않으므로 생성과 조회만 구현함
+ */
 interface EventStore {
   // 이벤트 추가
   save(event: object): void;

@@ -1,1 +1,3 @@
-export class ProductRecommendationService {
+export interface ProductRecommendationService {
+  getRecommendationsOf(): Product[];
+}
