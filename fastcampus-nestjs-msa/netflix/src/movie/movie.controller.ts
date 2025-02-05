@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { MovieService } from './movie.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
@@ -17,12 +9,14 @@ export class MovieController {
 
   @Post()
   create(@Body() createMovieDto: CreateMovieDto) {
+    console.log(createMovieDto);
+
     return this.movieService.create(createMovieDto);
   }
 
   @Get()
-  async getManyMovies() {
-    return this.movieService.getManyMovies();
+  async getManyMovies(@Query('title') title?: string) {
+    return this.movieService.getManyMovies(title);
   }
 
   @Get(':id')
@@ -37,6 +31,6 @@ export class MovieController {
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.movieService.remove(+id);
+    return this.movieService.deleteMovie(+id);
   }
 }
