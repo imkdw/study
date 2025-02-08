@@ -1,5 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseTable } from '../../common/entity/base.table';
+import { Chat } from '../../chat/entity/chat.entity';
+import { ChatRoom } from '../../chat/entity/chat-room.entity';
 
 export enum Role {
   ADMIN,
@@ -20,4 +22,10 @@ export class User extends BaseTable {
 
   @Column({ enum: Role, default: Role.USER })
   role: Role;
+
+  @OneToMany(() => Chat, (chat) => chat.author)
+  chats: Chat[];
+
+  @OneToMany(() => ChatRoom, (chatRoom) => chatRoom.users)
+  chatRooms: ChatRoom[];
 }
