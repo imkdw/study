@@ -3,7 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MovieModule } from './movie/movie.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConditionalModule, ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
 import { Movie } from './movie/entity/movie.entity';
 import { MovieDetail } from './movie/entity/movie-detail.entity';
@@ -17,9 +17,11 @@ import { User } from './user/entities/user.entity';
 import { ChatModule } from './chat/chat.module';
 import { Chat } from './chat/entity/chat.entity';
 import { ChatRoom } from './chat/entity/chat-room.entity';
-
+import { WorkerModule } from './worker/worker.module';
+import { CommonModule } from './common/common.module';
 @Module({
   imports: [
+    CommonModule,
     MovieModule,
     ConfigModule.forRoot({
       isGlobal: true,
@@ -51,6 +53,7 @@ import { ChatRoom } from './chat/entity/chat-room.entity';
     AuthModule,
     UserModule,
     ChatModule,
+    ConditionalModule.registerWhen(WorkerModule, (env: NodeJS.ProcessEnv) => env['TYPE'] === 'worker'),
   ],
   controllers: [AppController],
   providers: [AppService],
