@@ -3,6 +3,7 @@ import { CommonService } from './common.service';
 import { BullModule } from '@nestjs/bullmq';
 import { CommonController } from './common.controller';
 import { THUMBNAIL_GENERATION } from '../worker/worker.const';
+import { MulterModule } from '@nestjs/platform-express';
 @Module({
   imports: [
     BullModule.forRoot({
