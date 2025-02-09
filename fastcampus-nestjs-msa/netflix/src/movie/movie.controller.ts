@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseIntPipe, Req } from '@nestjs/common';
 import { MovieService } from './movie.service';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { MovieTitleValidationPipe } from './pipe/movie-title-validation.pipe';
+import { Request } from 'express';
 
 @Controller('movie')
 export class MovieController {
@@ -21,7 +22,8 @@ export class MovieController {
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: string) {
+  async findOne(@Param('id', ParseIntPipe) id: string, @Req() req: Request) {
+    console.log(req.session);
     return this.movieService.getMovieById(+id);
   }
 

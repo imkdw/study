@@ -31,6 +31,7 @@
     "@nestjs/platform-socket.io": "^11.0.8",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.0.8",
+    "@types/express-session": "^1.18.1",
     "@types/multer": "^1.4.12",
     "bullmq": "^5.40.2",
     "class-transformer": "^0.5.1",
