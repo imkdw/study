@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UserService } from '../user/user.service';
-import { ResgisterDto } from './dto/resgister.dto';
+import { RegisterDto } from './dto/resgister.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../user/entity/user.entity';
 import { Repository } from 'typeorm';
@@ -17,7 +17,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(rawToken: string, dto: ResgisterDto) {
+  async register(rawToken: string, dto: RegisterDto) {
     const { email, password } = this.parseBasicToken(rawToken);
 
     return this.userService.create({

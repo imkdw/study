@@ -1,6 +1,6 @@
 import { Body, Controller, Post, UseInterceptors, UsePipes, ValidationPipe } from '@nestjs/common';
 import { OrderService } from './order.service';
-import { Authorization } from '../../../user/src/auth/decorator/authorization.decorator';
+import { Authorization } from '../../../gateway/src/auth/decorator/authorization.decorator';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { EventPattern, Transport } from '@nestjs/microservices';
 import { Payload } from '@nestjs/microservices';
@@ -22,8 +22,6 @@ export class OrderController {
   @UsePipes(ValidationPipe)
   @UseInterceptors(RpcInterceptor)
   async deliveryStarted(@Payload() payload: DeliveryStartedDto) {
-    console.log('deliveryStarted', payload);
-
-    return this.orderService.changeOrderStatus(payload.orderId, OrderStatus.DELIVERY_STARTED);
+    // return this.orderService.changeOrderStatus(payload.orderId, OrderStatus.DELIVERY_STARTED);
   }
 }

@@ -1,6 +1,21 @@
 version: '3.1'
 
 services:
+  gateway:
+    build:
+      context: .
+      dockerfile: ./apps/gateway/Dockerfile
+      target: development
+
+    command: pnpm start gateway
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    env_file:
+      - ./apps/gateway/.env
+
   user:
     build:
       context: .
@@ -170,3 +185,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+
+  redis:
+    image: redis:7
