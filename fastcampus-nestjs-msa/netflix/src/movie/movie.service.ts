@@ -3,7 +3,7 @@ import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Movie } from './entity/movie.entity';
-import { DataSource, In, Like, Repository } from 'typeorm';
+import { DataSource, In, Like, QueryRunner, Repository } from 'typeorm';
 import { MovieDetail } from './entity/movie-detail.entity';
 import { Director } from '../director/entitiy/director.entity';
 import { Genre } from '../genre/entities/genre.entity';
@@ -49,11 +49,7 @@ export class MovieService {
     return movie;
   }
 
-  async create(dto: CreateMovieDto) {
-    const qr = this.dataSource.createQueryRunner();
-    await qr.connect();
-    await qr.startTransaction();
-
+  async create(dto: CreateMovieDto, qr: QueryRunner) {
     try {
       const director = await qr.manager.findOne(Director, { where: { id: dto.directorId } });
       if (!director) {
@@ -67,7 +63,7 @@ export class MovieService {
 
       const movieDetail = await qr.manager.createQueryBuilder().insert().into(Movie);
 
-      const movie = this.movieRepository.create({
+      const movie = qr.manager.create(Movie, {
         title: dto.title,
         genre: genres,
         detail: {
@@ -76,16 +72,13 @@ export class MovieService {
         director,
       });
 
-      const createdMovie = await this.movieRepository.save(movie);
+      const createdMovie = await qr.manager.save(Movie, movie);
 
       await qr.commitTransaction();
 
       return createdMovie;
     } catch (e) {
-      await qr.rollbackTransaction();
       throw e;
-    } finally {
-      await qr.release();
     }
   }
 

@@ -19,6 +19,8 @@ import { Chat } from './chat/entity/chat.entity';
 import { ChatRoom } from './chat/entity/chat-room.entity';
 import { WorkerModule } from './worker/worker.module';
 import { CommonModule } from './common/common.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ResponseTimeInterceptor } from './common/interceptor/response-time.interceptor';
 @Module({
   imports: [
     CommonModule,
@@ -57,6 +59,12 @@ import { CommonModule } from './common/common.module';
     ConditionalModule.registerWhen(WorkerModule, (env: NodeJS.ProcessEnv) => env['TYPE'] === 'worker'),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseTimeInterceptor,
+    },
+  ],
 })
 export class AppModule {}
