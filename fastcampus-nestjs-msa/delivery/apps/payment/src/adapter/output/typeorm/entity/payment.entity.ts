@@ -1,25 +1,16 @@
+import { NotificationStatus, PaymentMethod, PaymentStatus } from 'apps/payment/src/domain/payment.domain';
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-export enum PaymentStatus {
-  PENDING,
-  REJECTED,
-  APPROVED,
-}
-
-export enum PaymentMethod {
-  CREDIT_CARD,
-  KAKAO,
-}
-
-export enum NotificationStatus {
-  PENDING,
-  SENT,
-}
-
 @Entity()
-export class Payment {
+export class PaymentEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column()
+  orderId: string;
+
+  @Column()
+  userEmail: string;
 
   @Column({ enum: PaymentStatus })
   paymentStatus: PaymentStatus;

@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
 import { PaymentController } from './payment.controller';
-import { PaymentService } from './payment.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as Joi from 'joi';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Payment } from './entity/payment.entity';
+import { TypeOrmAdapter } from '../adapter/output/typeorm/typeorm.adapter';
+import { PortOneAdapter } from '../adapter/output/portone/portone.adapter';
+import { GrpcAdapter } from '../adapter/output/grpc/grpc.adapter';
+import { MongooseModule } from '@nestjs/mongoose';
+import { PaymentSchema } from '../adapter/output/mongoose/document/payment.document';
+import { PaymentDocument } from '../adapter/output/mongoose/document/payment.document';
 
 @Module({
   imports: [
@@ -24,9 +28,28 @@ import { Payment } from './entity/payment.entity';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([Payment]),
+    MongooseModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.getOrThrow('DB_URL'),
+      }),
+      inject: [ConfigService],
+    }),
+    MongooseModule.forFeature([{ name: PaymentDocument.name, schema: PaymentSchema }]),
   ],
   controllers: [PaymentController],
-  providers: [PaymentService],
+  providers: [
+    {
+      provide: 'DATABASE_OUTPUT_PORT',
+      useClass: TypeOrmAdapter,
+    },
+    {
+      provide: 'PAYMENT_OUTPUT_PORT',
+      useClass: PortOneAdapter,
+    },
+    {
+      provide: 'NETWORK_OUTPUT_PORT',
+      useClass: GrpcAdapter,
+    },
+  ],
 })
 export class PaymentModule {}
