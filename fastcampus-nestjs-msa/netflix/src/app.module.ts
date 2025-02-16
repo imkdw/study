@@ -21,6 +21,7 @@ import { WorkerModule } from './worker/worker.module';
 import { CommonModule } from './common/common.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ResponseTimeInterceptor } from './common/interceptor/response-time.interceptor';
+import { CacheModule } from '@nestjs/cache-manager';
 @Module({
   imports: [
     CommonModule,
@@ -57,6 +58,10 @@ import { ResponseTimeInterceptor } from './common/interceptor/response-time.inte
     UserModule,
     ChatModule,
     ConditionalModule.registerWhen(WorkerModule, (env: NodeJS.ProcessEnv) => env['TYPE'] === 'worker'),
+    CacheModule.register({
+      ttl: 0,
+      isGlobal: true,
+    }),
   ],
   controllers: [AppController],
   providers: [

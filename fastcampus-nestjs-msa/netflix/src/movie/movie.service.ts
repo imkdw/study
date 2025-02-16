@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateMovieDto } from './dto/create-movie.dto';
 import { UpdateMovieDto } from './dto/update-movie.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -7,6 +7,7 @@ import { DataSource, In, Like, QueryRunner, Repository } from 'typeorm';
 import { MovieDetail } from './entity/movie-detail.entity';
 import { Director } from '../director/entitiy/director.entity';
 import { Genre } from '../genre/entities/genre.entity';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class MovieService {
@@ -20,7 +21,24 @@ export class MovieService {
     @InjectRepository(Genre)
     private readonly genreRepository: Repository<Genre>,
     private readonly dataSource: DataSource,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
+  async getRecentMovies() {
+    const cacheData = await this.cacheManager.get('recentMovies');
+
+    if (cacheData) {
+      return cacheData;
+    }
+
+    const movies = await this.movieRepository.find({
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
+
+    await this.cacheManager.set('recentMovies', movies, 3000);
+
+    return movies;
+  }
 
   async findAll(title?: string) {
     const qb = this.movieRepository
