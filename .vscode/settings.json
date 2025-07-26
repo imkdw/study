@@ -4,6 +4,8 @@
   },
   "git.ignoreLimitWarning": true,
   "cSpell.words": [
+    "Langchain",
+    "Langsmith",
     "RHLF"
   ],
   "discord.enabled": true
