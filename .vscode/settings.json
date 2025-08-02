@@ -3,10 +3,6 @@
     "https://www.artillery.io/schema.json": []
   },
   "git.ignoreLimitWarning": true,
-  "cSpell.words": [
-    "Langchain",
-    "Langsmith",
-    "RHLF"
-  ],
+  "cSpell.words": ["Langchain", "Langsmith", "Pydantic", "RHLF"],
   "discord.enabled": true
 }
