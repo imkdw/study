@@ -3,6 +3,17 @@
     "https://www.artillery.io/schema.json": []
   },
   "git.ignoreLimitWarning": true,
-  "cSpell.words": ["Langchain", "Langsmith", "Pydantic", "RHLF"],
+  "cSpell.words": [
+    "Chunker",
+    "Kkma",
+    "Konlpy",
+    "Langchain",
+    "Langsmith",
+    "NLTK",
+    "punkt",
+    "Pydantic",
+    "RHLF",
+    "Tictoken"
+  ],
   "discord.enabled": true
 }
