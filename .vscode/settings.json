@@ -13,7 +13,8 @@
     "punkt",
     "Pydantic",
     "RHLF",
-    "Tictoken"
+    "Tictoken",
+    "vectorstore"
   ],
   "discord.enabled": true
 }
