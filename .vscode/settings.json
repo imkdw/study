@@ -13,6 +13,7 @@
     "punkt",
     "Pydantic",
     "RHLF",
+    "streamlit",
     "Tictoken",
     "vectorstore"
   ],
