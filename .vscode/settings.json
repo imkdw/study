@@ -10,6 +10,7 @@
     "Langchain",
     "Langsmith",
     "NLTK",
+    "Ollama",
     "punkt",
     "Pydantic",
     "RHLF",
