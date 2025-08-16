@@ -4,22 +4,30 @@
   },
   "git.ignoreLimitWarning": true,
   "cSpell.words": [
+    "BLEU",
     "Chunker",
     "DEEPL",
     "exaone",
+    "FAISS",
+    "Groundedness",
     "Kkma",
     "Konlpy",
     "Langchain",
     "Langsmith",
+    "METEOR",
+    "myrag",
     "NLTK",
     "Ollama",
+    "PDFRAG",
     "punkt",
     "Pydantic",
     "RHLF",
     "Serp",
     "streamlit",
+    "teddynote",
     "Tictoken",
-    "vectorstore"
+    "vectorstore",
+    "vectorstores"
   ],
   "discord.enabled": true
 }
