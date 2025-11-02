@@ -1,12 +1,41 @@
 version: "3.8"
 
 services:
-  postgres:
+  postgres-master:
     image: postgres:17
-    container_name: postgres
+    container_name: postgres-master
     ports:
       - "5442:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+    networks:
+      - postgres-network
+  postgres-replica-1:
+    image: postgres:17
+    container_name: postgres-replica-1
+    ports:
+      - "5443:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    networks:
+      - postgres-network
+
+  postgres-replica-2:
+    image: postgres:17
+    container_name: postgres-replica-2
+    ports:
+      - "5444:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    networks:
+      - postgres-network
+
+networks:
+  postgres-network:
+    driver: bridge
