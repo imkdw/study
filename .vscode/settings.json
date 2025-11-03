@@ -26,10 +26,13 @@
     "RHLF",
     "Serp",
     "streamlit",
+    "tablesync",
     "teddynote",
     "Tictoken",
     "vectorstore",
-    "vectorstores"
+    "vectorstores",
+    "walreceiver",
+    "walsender"
   ],
   "discord.enabled": true
 }
