@@ -9,6 +9,7 @@
     "Chunker",
     "DALL",
     "DEEPL",
+    "dumpall",
     "exaone",
     "FAISS",
     "Groundedness",
