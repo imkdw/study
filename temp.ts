@@ -1,18 +1,22 @@
-function* reverse<T>(arrLike: ArrayLike<T>): Iterator<T> {
-  let index = arrLike.length;
+const map = new Map([
+  ["a", 1],
+  ["b", 2],
+  ["c", 3],
+]);
+const mapEntries = map.entries();
 
-  while (index) {
-    yield arrLike[--index];
-  }
+console.log(mapEntries.next()); // { value: ["a", 1], done: false }
+console.log(mapEntries.next()); // { value: ["b", 2], done: false }
+console.log(mapEntries.next()); // { value: ["c", 3], done: false }
+console.log(mapEntries.next()); // { value: undefined, done: true }
+
+const mapValues = map.values();
+for (const value of mapValues) {
+  console.log(value);
 }
 
-const array = ["A", "B", "C", "D", "E", "F"];
-const reversed = reverse(array);
-
-console.log(reversed.next().value); // F
-console.log(reversed.next().value); // E
-console.log(reversed.next().value); // D
-console.log(reversed.next().value); // C
-console.log(reversed.next().value); // B
-console.log(reversed.next().value); // A
-console.log(reversed.next().value); // undefined
+const mapKeys = map.keys();
+for (const key of mapKeys) {
+  // a, b, c
+  console.log(key);
+}
