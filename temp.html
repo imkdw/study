@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <ul>
+      <li>1</li>
+      <li>2</li>
+      <li>3</li>
+      <li>4</li>
+      <li>5</li>
+    </ul>
+    <script>
+      const nodes = document.querySelectorAll("li");
+
+      /**
+       * li (1), li(2), 5
+       */
+      console.log(nodes[0], nodes[1], nodes.length);
+
+      /**
+       * Uncaught TypeError: nodes.map is not a function
+       */
+      nodes.map((node) => node.textContent);
+    </script>
+  </body>
+</html>
