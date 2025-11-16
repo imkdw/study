@@ -6,8 +6,17 @@ function* naturals(end = Infinity): IterableIterator<number> {
 }
 
 function* map<A, B>(f: (a: A) => B, iterable: Iterable<A>): IterableIterator<B> {
-  for (const a of iterable) {
-    yield f(a);
+  const iterator = iterable[Symbol.iterator]();
+
+  while (true) {
+    console.log("map");
+    const { done, value } = iterator.next();
+    if (done) {
+      break;
+    }
+    console.log(`map value f(value: ${value}) ${f(value)}`);
+
+    yield f(value);
   }
 }
 
@@ -18,10 +27,11 @@ function forEach<A>(f: (a: A) => void, iterable: Iterable<A>): void {
 }
 
 function* filter<A>(f: (a: A) => boolean, iterable: Iterable<A>): IterableIterator<A> {
-  for (const a of iterable) {
-    if (f(a)) {
-      yield a;
-    }
+  const iterator = iterable[Symbol.iterator]();
+  while (true) {
+    const { done, value } = iterator.next();
+    if (done) break;
+    if (f(value)) yield value;
   }
 }
 
@@ -51,6 +61,25 @@ function reduce<A, Acc>(f: (a: Acc | A, b: A) => Acc, accOrIterable: Acc | Itera
   } else {
     return baseReduce(f, accOrIterable as Acc, iterable[Symbol.iterator]()) as Acc;
   }
+}
+
+function* take<A>(limit: number, iterable: Iterable<A>): IterableIterator<A> {
+  const iterator = iterable[Symbol.iterator]();
+  while (true) {
+    const { done, value } = iterator.next();
+    if (done) {
+      break;
+    }
+
+    yield value;
+    if (--limit === 0) {
+      break;
+    }
+  }
+}
+
+function head<A>(iterable: Iterable<A>): A | undefined {
+  return iterable[Symbol.iterator]().next().value;
 }
 
 class FxIterable<A> {
@@ -89,16 +118,56 @@ class FxIterable<A> {
   chain<B>(f: (iterable: Iterable<A>) => Iterable<B>): FxIterable<B> {
     return fx(f(this));
   }
+
+  take(limit: number): FxIterable<A> {
+    return fx(take(limit, this));
+  }
 }
 
-function fx<A>(iterable: Iterable<A>): FxIterable<A> {
-  return new FxIterable(iterable);
+const fx = <A>(iterable: Iterable<A>): FxIterable<A> => new FxIterable(iterable);
+
+function find<A>(f: (a: A) => boolean, iterable: Iterable<A>): A | undefined {
+  return fx(iterable).filter(f).to(head);
 }
 
-const result = fx([5, 2, 3, 1, 4, 5, 3])
-  .filter((n) => n % 2 === 1)
-  .map((n) => n * 10) // [10, 30, 30, 50, 50]
-  .chain((iterable) => new Set(iterable)) // Set(3) { 10, 30, 50 }
-  .reduce((acc, n) => acc + n); // 90
+function accumulateWith<A>(
+  accumulator: (a: boolean, b: boolean) => boolean,
+  acc: boolean,
+  taking: (a: boolean) => boolean,
+  f: (a: A) => boolean,
+  iterable: Iterable<A>
+): boolean {
+  return fx(iterable).map(f).filter(taking).take(1).reduce(accumulator, acc);
+}
 
-console.log(result); // 90
+function every<A>(f: (a: A) => boolean, iterable: Iterable<A>): boolean {
+  return accumulateWith(
+    (a, b) => a && b,
+    true,
+    (a) => !a,
+    f,
+    iterable
+  );
+}
+
+function some<A>(f: (a: A) => boolean, iterable: Iterable<A>): boolean {
+  return accumulateWith(
+    (a, b) => a || b,
+    false,
+    (a) => a,
+    f,
+    iterable
+  );
+}
+
+function* concat<A>(...iterables: Iterable<A>[]): IterableIterator<A> {
+  for (const iterable of iterables) {
+    yield* iterable;
+  }
+}
+
+const arr = [3, 4, 5];
+console.log(some((n) => n < 3, arr)); // false
+
+const iter = concat([1, 2], arr);
+console.log(some((n) => n < 3, iter)); // true
