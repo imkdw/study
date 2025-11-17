@@ -7,29 +7,25 @@ type MyFile = {
 };
 
 async function getFile(name: string, size = 1000): Promise<MyFile> {
+  console.log(`${name} 파일 다운로드 시작`);
+
   return delay<MyFile>(size, { name, body: "...", size });
 }
 
-const settlePromise = <T>(promise: Promise<T>) =>
-  promise.then((value) => ({ status: "fulfilled", value })).catch((reason) => ({ status: "rejected", reason }));
+async function executeWithLimit<T>(fs: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = [];
+
+  for (let i = 0; i < fs.length; i += limit) {
+    const chunk = fs.slice(i, i + limit);
+    const chunkResults = await Promise.all(chunk.map((f) => f()));
+    results.push(...chunkResults);
+  }
+
+  return results;
+}
 
 async function init() {
   console.time("init");
-
-  const files = await Promise.any([
-    getFile("file3", 700),
-    delay(500, "dummy").then(() => Promise.reject("다운로드 실패")),
-    delay(500, "dummy").then(() => Promise.reject("다운로드 실패")),
-  ]);
-
-  // node:internal/process/promises:394
-  //  triggerUncaughtException(err, true /* fromPromise */);
-  //  ^
-
-  // [AggregateError: All promises were rejected] {
-  //   [errors]: [ '다운로드 실패', '다운로드 실패' ]
-  // }
-  console.log(files);
 
   console.timeEnd("init");
 }
