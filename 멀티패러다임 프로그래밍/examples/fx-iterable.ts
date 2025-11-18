@@ -9,12 +9,10 @@ function* map<A, B>(f: (a: A) => B, iterable: Iterable<A>): IterableIterator<B> 
   const iterator = iterable[Symbol.iterator]();
 
   while (true) {
-    console.log("map");
     const { done, value } = iterator.next();
     if (done) {
       break;
     }
-    console.log(`map value f(value: ${value}) ${f(value)}`);
 
     yield f(value);
   }
