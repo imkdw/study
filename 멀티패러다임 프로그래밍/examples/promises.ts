@@ -1,20 +1,43 @@
-function* naturals(end = Infinity): IterableIterator<number> {
-  let n = 1;
-  while (n <= end) {
-    yield n++;
+function reduceSync<A, Acc>(f: (acc: Acc, a: A) => Acc, acc: Acc, iterable: Iterable<A>): Acc {
+  for (const a of iterable) {
+    acc = f(acc, a);
   }
+  return acc;
 }
 
-function isOdd(n: number): boolean {
-  return n % 2 === 1;
+async function reduceAsync<A, Acc>(
+  f: (acc: Acc, a: A) => Acc,
+  acc: Acc,
+  asyncIterable: AsyncIterable<A>
+): Promise<Acc> {
+  for await (const a of asyncIterable) {
+    acc = f(acc, a);
+  }
+  return acc;
 }
 
-const delay = <T>(time: number, value: T): Promise<T> => new Promise((resolve) => setTimeout(resolve, time, value));
+function reduce<A, Acc>(f: (acc: Acc, a: A) => Acc, acc: Acc, iterable: Iterable<A>): Acc;
+function reduce<A, Acc>(f: (acc: Acc, a: A) => Acc, acc: Acc, asyncIterable: AsyncIterable<A>): Promise<Acc>;
+function reduce<A, Acc>(
+  f: (acc: Acc, a: A) => Acc,
+  acc: Acc,
+  iterable: Iterable<A> | AsyncIterable<A>
+): Acc | Promise<Acc> {
+  return isIterable(iterable) ? reduceSync(f, acc, iterable) : reduceAsync(f, acc, iterable);
+}
 
-async function* toAsync<T>(iterable: Iterable<T | Promise<T>>): AsyncIterableIterator<Awaited<T>> {
-  for await (const value of iterable) {
-    yield value;
-  }
+function toAsync<T>(iterable: Iterable<T | Promise<T>>): AsyncIterable<Awaited<T>> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<Awaited<T>> {
+      const iterator = iterable[Symbol.iterator]();
+      return {
+        async next() {
+          const { done, value } = iterator.next();
+          return done ? { done, value } : { done: false, value: await value };
+        },
+      };
+    },
+  };
 }
 
 function mapSync<A, B>(f: (a: A) => B, iterable: Iterable<A>): IterableIterator<B> {
@@ -30,12 +53,6 @@ function mapSync<A, B>(f: (a: A) => B, iterable: Iterable<A>): IterableIterator<
   };
 }
 
-async function* mapAsync<A, B>(f: (a: A) => B, asyncIterable: AsyncIterable<A>): AsyncIterableIterator<Awaited<B>> {
-  for await (const value of asyncIterable) {
-    yield f(value);
-  }
-}
-
 function* filterSync<A>(f: (a: A) => boolean, iterable: Iterable<A>): IterableIterator<A> {
   for (const value of iterable) {
     if (f(value)) {
@@ -44,8 +61,14 @@ function* filterSync<A>(f: (a: A) => boolean, iterable: Iterable<A>): IterableIt
   }
 }
 
+async function* mapAsync<A, B>(f: (a: A) => B, asyncIterable: AsyncIterable<A>): AsyncIterableIterator<Awaited<B>> {
+  for await (const value of asyncIterable) {
+    yield f(value);
+  }
+}
+
 async function* filterAsync<A>(
-  f: (a: A) => boolean | Promise<boolean>,
+  f: (a: A) => Promise<boolean> | boolean,
   asyncIterable: AsyncIterable<A>
 ): AsyncIterableIterator<A> {
   for await (const value of asyncIterable) {
@@ -77,6 +100,12 @@ function filter<A>(
   return isIterable(iterable) ? filterSync(f as (a: A) => boolean, iterable) : filterAsync(f, iterable);
 }
 
+function fx<A>(iterable: Iterable<A>): FxIterable<A>;
+function fx<A>(asyncIterable: AsyncIterable<A>): FxAsyncIterable<A>;
+function fx<A>(iterable: Iterable<A> | AsyncIterable<A>): FxIterable<A> | FxAsyncIterable<A> {
+  return isIterable(iterable) ? new FxIterable(iterable) : new FxAsyncIterable(iterable);
+}
+
 async function fromAsync<T>(iterable: Iterable<Promise<T>> | AsyncIterable<T>): Promise<T[]> {
   const arr: T[] = [];
   for await (const a of iterable) {
@@ -84,12 +113,6 @@ async function fromAsync<T>(iterable: Iterable<Promise<T>> | AsyncIterable<T>): 
   }
 
   return arr;
-}
-
-function fx<A>(iterable: Iterable<A>): FxIterable<A>;
-function fx<A>(asyncIterable: AsyncIterable<A>): FxAsyncIterable<A>;
-function fx<A>(iterable: Iterable<A> | AsyncIterable<A>): FxIterable<A> | FxAsyncIterable<A> {
-  return isIterable(iterable) ? new FxIterable(iterable) : new FxAsyncIterable(iterable);
 }
 
 class FxIterable<A> implements Iterable<A> {
@@ -135,43 +158,52 @@ class FxAsyncIterable<A> implements AsyncIterable<A> {
     return fx(filter(f, this));
   }
 
-  reduce<Acc>(f: (acc: Acc, a: A) => Acc | Promise<Acc>, acc: Acc) {
-    return reduce(f, acc, this);
-  }
-
   toArray() {
     return fromAsync(this);
   }
-}
 
-function reduceSync<A, Acc>(f: (acc: Acc, a: A) => Acc, acc: Acc, iterable: Iterable<A>): Acc {
-  for (const a of iterable) {
-    acc = f(acc, a);
+  reduce<Acc>(f: (acc: Acc, a: A) => Acc | Promise<Acc>, acc: Acc): Promise<Acc> {
+    return reduce(f as (acc: Acc, a: A) => Acc, acc, this);
   }
-  return acc;
 }
 
-async function reduceAsync<A, Acc>(
-  f: (acc: Acc, a: A) => Acc,
-  acc: Acc,
-  asyncIterable: AsyncIterable<A>
-): Promise<Acc> {
-  for await (const a of asyncIterable) {
-    acc = f(acc, a);
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.src = url;
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+  });
+}
+
+async function calcTotalHeight(urls: string[]) {
+  try {
+    const totalHeight = await fx(urls)
+      .toAsync()
+      .map(loadImage)
+      .map((img) => img.height)
+      .reduce((a, b) => a + b, 0);
+
+    return totalHeight;
+  } catch (error) {
+    console.error(error);
   }
-  return acc;
 }
 
-function reduce<A, Acc>(f: (acc: Acc, a: A) => Acc, acc: Acc, iterable: Iterable<A>): Acc;
-function reduce<A, Acc>(
-  f: (acc: Acc, a: A) => Acc | Promise<Acc>,
-  acc: Acc,
-  asyncIterable: AsyncIterable<A>
-): Promise<Acc>;
-function reduce<A, Acc>(
-  f: (acc: Acc, a: A) => Acc,
-  acc: Acc,
-  iterable: Iterable<A> | AsyncIterable<A>
-): Acc | Promise<Acc> {
-  return isIterable(iterable) ? reduceSync(f, acc, iterable) : reduceAsync(f, acc, iterable);
+console.log(
+  await calcTotalHeight([
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTFYqoKTu_o3Zns2yExbst2Co84Gpc2Q1RJbA&s",
+  ])
+);
+
+const getTotalHeight = (urls: string[]) =>
+  fx(toAsync(urls))
+    .map(loadImage)
+    .map((img) => img.height)
+    .reduce((a, b) => a + b, 0);
+
+try {
+  const height = await getTotalHeight([]);
+} catch (error) {
+  console.error(error);
 }
