@@ -2,6 +2,8 @@
   "yaml.schemas": {
     "https://www.artillery.io/schema.json": []
   },
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifierEnding": "auto",
   "git.ignoreLimitWarning": true,
   "cSpell.words": [
     "Agentic",
@@ -16,6 +18,7 @@
     "exaone",
     "FAISS",
     "fxts",
+    "Gimzo",
     "Groundedness",
     "Kkma",
     "Konlpy",
@@ -38,6 +41,7 @@
     "tablesync",
     "teddynote",
     "Tictoken",
+    "Unvalidated",
     "vacuumlo",
     "vectorstore",
     "vectorstores",
