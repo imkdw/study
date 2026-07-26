@@ -1,18 +1,23 @@
-const password = "외부 유출 금지";
+import http from "node:http";
 
-/**
- * Named Export 방식
- * 여러 개의 기능을 각각 내보낼 때 사용
- */
-export function printMesage(message) {
-  console.log(`[System] ${message}`);
-}
-export const version = "1.0.0";
+const server = http.createServer((req, res) => {
+  // 메인 페이지 요청 처리
+  if (req.url === "/") {
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    res.write("ㅎㅇ");
+    res.end();
+  }
 
-/**
- * Default Export 방식
- * 이 파일의 가장 대표적인 기능 하나만 딱 내보낼 떄 사용
- */
-export default function initializeLogger() {
-  console.log("Logger System Initialized");
-}
+  // API 요청 처리
+  if (req.url === "/api/courses") {
+    // DB에서 가져왔다고 가정함
+    const mockCourses = [1, 2, 3];
+
+    res.writeHead(200, { "content-type": "application/json" });
+    res.write(JSON.stringify(mockCourses));
+    res.end();
+  }
+});
+
+server.listen(9000);
+console.log("서버가 9000 포트에서 대기중");
