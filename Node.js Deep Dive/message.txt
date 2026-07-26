@@ -1,1 +1,0 @@
-파일에 동기적으로 저장하는 writeFileSync
