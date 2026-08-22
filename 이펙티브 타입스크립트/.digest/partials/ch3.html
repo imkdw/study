@@ -1,0 +1,1453 @@
+<article class="item" id="item-19" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 19</div>
+    <h3>추론 가능한 타입을 사용해 장황한 코드 방지하기</h3>
+    <p class="item-tagline">타입스크립트를 처음 쓰면 모든 곳에 타입을 적게 된다. 좋은 타입스크립트 코드는 <b>타입 구문이 적은 코드</b>다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    타입 추론이 되는 자리에 타입을 적으면 <b>가독성만 떨어지고 얻는 게 없다.</b> 대신 추론되지 않는 자리에는 반드시 적는다.
+  </div>
+
+  <h4>적지 않아도 되는 곳</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">infer.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">let a: number = 1;  // ✗ 군더더기
+const a2 = 1;       // ✓ 1 로 추론
+
+const person: { name: string; age: number } = { name: "John", age: 32 }; // ✗
+const person2 = { name: "John", age: 32 };                               // ✓</code></pre>
+  </div>
+
+  <p>함수 내부의 지역 변수도 마찬가지다. 비구조화 할당을 쓰면 모든 지역 변수의 타입이 한 번에 추론된다.</p>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">장황함</span>
+        <span class="code-tag bad">타입 세 번 반복</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">function logProduct(product: Product) {
+  const id: number = product.id;
+  const name: string = product.name;
+  const price: number = product.price;
+  console.log(id, name, price);
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">비구조화 할당</span>
+        <span class="code-tag good">추론에 맡긴다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">function logProduct(product: Product) {
+  const { id, name, price } = product;
+  console.log(id, name, price);
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">타입을 적으면 오히려 틀린다</p>
+      <p>위 왼쪽 코드에서 <code>Product.id</code> 가 <code>number</code> 에서 <code>string</code> 으로 바뀌었다고 하자. 오른쪽은 아무 수정 없이 그대로 동작하지만, 왼쪽은 <b>세 줄을 고쳐야</b> 한다. 명시적 타입은 <b>고쳐야 할 자리를 늘린다.</b></p>
+    </div>
+  </div>
+
+  <h4>반드시 적어야 하는 곳</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>자리</th><th>적는가</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>함수 매개변수</td><td class="t-ok">거의 항상</td><td>추론할 근거가 없다 (기본값이 있으면 예외)</td></tr>
+        <tr><td>객체 리터럴</td><td class="t-ok">가급적</td><td>잉여 속성 체크가 켜진다 (<a href="#item-11">아이템 11</a>)</td></tr>
+        <tr><td>함수 반환값</td><td>경우에 따라</td><td>아래 참고</td></tr>
+        <tr><td>지역 변수</td><td class="t-no">거의 안 함</td><td>추론이 정확하다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>반환 타입을 적는 게 나은 세 가지 경우</h4>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title">호출하는 쪽에 이름을 보여 주고 싶을 때</div>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">vector.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">// 추론 결과: { x: number; y: number }
+function add(a: Vector2D, b: Vector2D) {
+  return { x: a.x + b.x, y: a.y + b.y };
+}
+
+// 명시하면 호출자가 Vector2D 라는 개념을 그대로 본다
+function add2(a: Vector2D, b: Vector2D): Vector2D {
+  return { x: a.x + b.x, y: a.y + b.y };
+}</code></pre>
+      </div>
+    </li>
+    <li>
+      <div class="step-title">구현 오류가 반환 타입 오류로 드러나게 하고 싶을 때</div>
+      <p>반환 타입을 적어 두면 오류가 <b>함수 안에서</b> 잡힌다. 적지 않으면 오류가 호출하는 쪽까지 흘러가서 원인을 찾기 어려워진다.</p>
+    </li>
+    <li>
+      <div class="step-title">명명된 타입을 쓰고 싶을 때</div>
+      <p>공개 API 라면 반환 타입에 이름이 있어야 문서로서 읽힌다(<a href="#item-47">아이템 47</a>).</p>
+    </li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">린터로 강제하기 <span class="badge b-blue">보강</span></p>
+      <p><code>typescript-eslint</code> 의 <code>@typescript-eslint/no-inferrable-types</code> 규칙은 <code>const a: number = 1</code> 같은 군더더기를 자동으로 잡아 준다. 반대로 공개 API 의 반환 타입을 강제하고 싶다면 <code>explicit-module-boundary-types</code> 를 켠다. 두 규칙은 이 아이템의 앞뒤를 각각 담당한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입스크립트가 타입을 추론할 수 있다면 <b>적지 않는다.</b></li>
+      <li>이상적인 코드는 <b>함수/메서드 시그니처에는 타입이 있고, 본문의 지역 변수에는 없는</b> 형태다.</li>
+      <li>추론된 타입이 틀리거나 호출자에게 혼란을 줄 때만 명시한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-20" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 20</div>
+    <h3>다른 타입에는 다른 변수 사용하기</h3>
+    <p class="item-tagline">자바스크립트에서는 변수 하나를 여러 목적으로 재사용할 수 있다. 타입스크립트에서는 그러지 않는 편이 낫다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    변수의 <b>값은 바뀔 수 있지만 타입은 바뀌지 않는다.</b> 타입이 달라진다면 그건 다른 변수여야 한다.
+  </div>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">JavaScript</span>
+        <span class="code-tag good">문제없음</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-javascript">let id = "12-34-56";
+fetchProduct(id);
+
+id = 123456;           // 마음대로
+fetchProductBySerial(id);</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">TypeScript</span>
+        <span class="code-tag bad">막힌다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">let id = "12-34-56";  // string
+fetchProduct(id);
+
+id = 123456;
+// ~~ 'number' 형식은 'string' 형식에
+//    할당할 수 없습니다.</code></pre>
+    </div>
+  </div>
+
+  <h4>유니온으로 억지로 맞출 수는 있지만</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">union.ts</span>
+      <span class="code-tag bad">쓸 때마다 좁혀야 한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">let id: string | number = "12-34-56";
+fetchProduct(id);
+
+id = 123456;
+fetchProductBySerial(id);
+// 동작은 하지만, 이제 id 를 쓸 때마다 어느 쪽인지 확인해야 한다</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">separate.ts</span>
+      <span class="code-tag good">그냥 변수를 나눈다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const id = "12-34-56";
+fetchProduct(id);
+
+const serial = 123456;
+fetchProductBySerial(serial);</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">변수를 나누면 딸려 오는 것들</p>
+      <ul>
+        <li>서로 관련 없는 두 개념에 <b>다른 이름</b>이 생긴다 — 코드가 자기 자신을 설명한다</li>
+        <li><code>let</code> 대신 <code>const</code> 를 쓸 수 있다 — 타입 추론이 더 좁고 정확해진다(<a href="#item-21">아이템 21</a>)</li>
+        <li>타입이 단순해져서 타입 선언을 생략할 수 있다</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">가려진 변수(shadowing)와 구분할 것</p>
+      <p>다른 스코프에서 같은 이름을 다시 쓰는 건 타입스크립트 입장에서는 <b>완전히 다른 변수</b>라 문제가 없다. 하지만 읽는 사람은 헷갈린다. <code>no-shadow</code> 규칙을 켜 두는 편이 낫다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>변수의 값은 바뀔 수 있어도 <b>타입은 일반적으로 바뀌지 않는다.</b></li>
+      <li>혼란을 막기 위해 <b>타입이 다른 값을 다룰 때는 변수를 재사용하지 않는다.</b></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-21" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 21</div>
+    <h3>타입 넓히기</h3>
+    <p class="item-tagline">하나의 값으로부터 "이 변수에 들어올 수 있는 값들"을 유추하는 과정. 이걸 모르면 추론 결과가 자꾸 어긋난다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    타입스크립트는 <b>단일 값</b>을 보고 <b>가능한 값들의 집합</b>을 유추한다. 이걸 <b>넓히기(widening)</b> 라고 한다.
+  </div>
+
+  <h4>let 과 const 의 차이가 여기서 나온다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">widening.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface Vector3D { x: number; y: number; z: number; }
+
+function getComponent(vector: Vector3D, axis: keyof Vector3D) {
+  return vector[axis];
+}
+
+const v: Vector3D = { x: 1, y: 2, z: 3 };
+
+let axis1 = "x";    // string   ← 나중에 다른 문자열이 올 수 있으니까
+const axis2 = "x";  // "x"      ← 재할당이 불가능하니까
+
+getComponent(v, axis1);
+//              ~~~~~ 'string' 형식의 인수는 'keyof Vector3D' 형식의
+//                    매개 변수에 할당될 수 없습니다.
+getComponent(v, axis2); // 정상</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 190" width="560" role="img" aria-label="let 과 const 로 선언한 문자열의 추론 결과 비교">
+        <rect x="10" y="14" width="255" height="160" rx="16" class="dg-fill-soft dg-stroke" stroke-width="1.5"/>
+        <text x="137" y="44" class="dg-text dg-mono" font-size="13" font-weight="700" text-anchor="middle">let axis = "x"</text>
+        <circle cx="137" cy="108" r="46" class="venn-b"/>
+        <circle cx="137" cy="108" r="46" class="venn-b-s"/>
+        <text x="137" y="106" class="dg-text dg-mono" font-size="12.5" font-weight="700" text-anchor="middle">string</text>
+        <text x="137" y="125" class="dg-text-sub" font-size="10.5" text-anchor="middle">모든 문자열</text>
+        <rect x="295" y="14" width="255" height="160" rx="16" class="dg-fill-soft" stroke="var(--accent)" stroke-width="1.8"/>
+        <text x="422" y="44" class="dg-accent dg-mono" font-size="13" font-weight="700" text-anchor="middle">const axis = "x"</text>
+        <circle cx="422" cy="108" r="46" class="venn-b" opacity="0.1"/>
+        <circle cx="422" cy="108" r="46" class="venn-b-s" opacity="0.4"/>
+        <circle cx="422" cy="108" r="17" class="venn-a"/>
+        <circle cx="422" cy="108" r="17" class="venn-a-s"/>
+        <text x="422" y="112" class="dg-text dg-mono" font-size="11.5" font-weight="700" text-anchor="middle">"x"</text>
+        <text x="422" y="168" class="dg-text-sub" font-size="10.5" text-anchor="middle">원소 하나짜리 집합</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>재할당 가능성이 집합 크기를 정한다</b> — <code>let</code> 은 나중에 다른 문자열이 올 수 있으므로 넓게, <code>const</code> 는 그럴 수 없으므로 좁게 추론된다.</div>
+  </div>
+
+  <h4>const 라도 내부는 넓혀진다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">widening.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const mixed = [1, "x"];  // (string | number)[]
+
+const obj = { x: 1, y: "1" };
+// { x: number; y: string }  ← "1" 이 아니라 string</code></pre>
+  </div>
+
+  <p><code>const</code> 로 선언해도 <b>배열 요소와 객체 속성은 나중에 바꿀 수 있으므로</b> 넓게 추론된다. <code>obj.x = 2</code> 는 유효한 코드다.</p>
+
+  <h4>넓히기의 강도를 조절하는 세 가지 방법</h4>
+
+  <h5>1. 명시적 타입 구문</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">control.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const v: { x: 1 | 3 | 5 } = { x: 1 };
+// { x: 1 | 3 | 5 }</code></pre>
+  </div>
+
+  <h5>2. 문맥 제공</h5>
+
+  <p>함수 매개변수처럼 <b>타입이 이미 정해진 자리</b>에 값을 넣으면 그 타입이 흘러들어온다(<a href="#item-26">아이템 26</a>).</p>
+
+  <h5>3. const 단언 — as const</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">as-const.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const v1 = { x: 1, y: 2 };
+// { x: number; y: number }
+
+const v2 = { x: 1 as const, y: 2 };
+// { x: 1; y: number }        ← 부분적으로 고정
+
+const v3 = { x: 1, y: 2 } as const;
+// { readonly x: 1; readonly y: 2 }  ← 전부 고정 + readonly
+
+const a1 = [1, 2, 3];            // number[]
+const a2 = [1, 2, 3] as const;   // readonly [1, 2, 3]</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">const 와 as const 는 다른 것이다</p>
+      <p><code>const</code> 는 <b>값 공간</b>에서 변수 재할당을 막는 선언이고, <code>as const</code> 는 <b>타입 공간</b>에서 추론을 리터럴로 고정하는 단언이다(<a href="#item-8">아이템 8</a>). 전자는 얕고 후자는 깊다.</p>
+    </div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">satisfies 연산자 <span class="badge b-purple">TS 4.9+</span></p>
+      <p>"타입은 검사받되 추론은 좁게 유지하고 싶다"는 요구가 오랫동안 있었다. TypeScript 4.9 의 <code>satisfies</code> 가 그 답이다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">satisfies.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">type Palette = Record&lt;string, string | [number, number, number]&gt;;
+
+// 타입 선언 — 검사는 되지만 추론이 넓어진다
+const p1: Palette = { red: [255, 0, 0], green: "#00ff00" };
+p1.red.at(0);       // string | [number,number,number] 라 .at 을 못 쓴다
+
+// satisfies — 검사도 하고 추론도 좁게 유지한다
+const p2 = { red: [255, 0, 0], green: "#00ff00" } satisfies Palette;
+p2.red.at(0);       // number[] 로 좁혀져 있다
+p2.blue;
+// ~~~~ 'blue' 속성이 존재하지 않습니다 — 오타도 잡힌다</code></pre>
+      </div>
+      <p>설정 객체, 상수 맵, 라우트 테이블처럼 <b>"형태는 검증하되 값은 정확히 알고 싶은"</b> 경우에 <code>as const satisfies T</code> 조합이 특히 유용하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입스크립트가 넓히기를 통해 상수의 타입을 추론하는 과정을 이해해야 한다.</li>
+      <li><code>const</code>, 타입 구문, 문맥, <code>as const</code> 로 넓히기 과정을 <b>제어</b>할 수 있다.</li>
+      <li>검사는 받되 좁은 추론을 유지하고 싶다면 <code>satisfies</code> 를 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-22" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 22</div>
+    <h3>타입 좁히기</h3>
+    <p class="item-tagline">넓히기의 반대. 넓은 타입에서 <b>더 좁은 타입으로 범위를 줄이는</b> 과정이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    타입스크립트는 <b>제어 흐름</b>을 따라가며 타입을 좁힌다. 어떤 코드가 좁히기를 유발하는지 알아 두면 단언을 쓸 일이 크게 줄어든다.
+  </div>
+
+  <h4>1. null 체크</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">narrow.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const el = document.getElementById("el"); // HTMLElement | null
+if (el) {
+  el; // HTMLElement
+} else {
+  el; // null
+}
+
+// 예외를 던져 남은 코드를 좁히는 방식도 같은 원리다
+const el2 = document.getElementById("el2");
+if (!el2) throw new Error("#el2 not found");
+el2; // HTMLElement</code></pre>
+  </div>
+
+  <h4>2. instanceof</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">narrow.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function contains(text: string, search: string | RegExp) {
+  if (search instanceof RegExp) {
+    search; // RegExp
+    return !!search.exec(text);
+  }
+  search;   // string
+  return text.includes(search);
+}</code></pre>
+  </div>
+
+  <h4>3. in 연산자로 속성 확인</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">narrow.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface A { a: number; }
+interface B { b: number; }
+
+function pickAB(ab: A | B) {
+  if ("a" in ab) {
+    return ab.a; // A
+  }
+  return ab.b;   // B
+}</code></pre>
+  </div>
+
+  <h4>4. 내장 함수</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">narrow.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function contains(text: string, terms: string | string[]) {
+  const termList = Array.isArray(terms) ? terms : [terms]; // string[]
+  return termList.some((term) =&gt; text.includes(term));
+}</code></pre>
+  </div>
+
+  <p><code>Array.isArray</code> 는 <code>arg is any[]</code> 라는 <b>타입 서술(type predicate)</b>을 갖고 있어서 좁히기가 작동한다.</p>
+
+  <h4>5. 명시적 태그 — 태그된 유니온</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">narrow.ts</span>
+      <span class="code-tag good">가장 견고한 방법</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface UploadEvent {
+  type: "upload";
+  filename: string;
+  contents: string;
+}
+interface DownloadEvent {
+  type: "download";
+  filename: string;
+}
+type AppEvent = UploadEvent | DownloadEvent;
+
+function handleEvent(event: AppEvent) {
+  switch (event.type) {
+    case "upload":
+      event; // UploadEvent — contents 접근 가능
+      break;
+    case "download":
+      event; // DownloadEvent
+      break;
+  }
+}</code></pre>
+  </div>
+
+  <h4>6. 사용자 정의 타입 가드</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">guard.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function isInputElement(el: HTMLElement): el is HTMLInputElement {
+  return "value" in el;
+}
+
+function getElementContent(el: HTMLElement) {
+  if (isInputElement(el)) {
+    el;                // HTMLInputElement
+    return el.value;
+  }
+  el;                  // HTMLElement
+  return el.textContent;
+}</code></pre>
+  </div>
+
+  <p>반환 타입 <code>el is HTMLInputElement</code> 가 핵심이다. <code>boolean</code> 으로 두면 좁히기가 일어나지 않는다.</p>
+
+  <h4>실전 — undefined 걸러 내기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">filter.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const jackson5 = ["Jackie", "Tito", "Jermaine", "Marlon", "Michael"];
+
+const members1 = ["Jackie", "Janet"].map((who) =&gt;
+  jackson5.find((n) =&gt; n === who)
+);
+// (string | undefined)[]
+
+const members2 = ["Jackie", "Janet"]
+  .map((who) =&gt; jackson5.find((n) =&gt; n === who))
+  .filter((who) =&gt; who !== undefined);
+// (string | undefined)[]  ← TS 5.4 이전에는 좁혀지지 않았다
+
+function isDefined&lt;T&gt;(x: T | undefined): x is T {
+  return x !== undefined;
+}
+
+const members3 = ["Jackie", "Janet"]
+  .map((who) =&gt; jackson5.find((n) =&gt; n === who))
+  .filter(isDefined);
+// string[]  ✓</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">이제는 타입 가드 없이도 된다 <span class="badge b-purple">TS 5.5+</span></p>
+      <p>TypeScript 5.5 부터 <b>타입 서술을 자동으로 추론</b>한다. 함수가 매개변수를 좁히는 불리언 표현식을 그대로 반환하면, 컴파일러가 <code>x is T</code> 를 알아서 붙여 준다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">ts5.5.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">const members = ["Jackie", "Janet"]
+  .map((who) =&gt; jackson5.find((n) =&gt; n === who))
+  .filter((who) =&gt; who !== undefined);
+// TS 5.5+ : string[]</code></pre>
+      </div>
+      <p>다만 인라인 화살표 함수처럼 조건이 맞아야 작동하므로, 복잡한 판별이 필요하면 <code>x is T</code> 를 명시하는 편이 여전히 확실하다.</p>
+    </div>
+  </div>
+
+  <h4>좁히기가 실패하는 대표적인 두 가지</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">pitfall.ts</span>
+      <span class="code-tag bad">typeof null === "object"</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const el = document.getElementById("el"); // HTMLElement | null
+if (typeof el === "object") {
+  el; // HTMLElement | null  ← 좁혀지지 않았다
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">pitfall.ts</span>
+      <span class="code-tag bad">falsy 값들이 남는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function foo(x?: number | string | null) {
+  if (!x) {
+    x; // string | number | null | undefined
+    //   "" 와 0 도 falsy 이므로 여전히 남아 있다
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">헷갈릴 때는 편집기에 물어본다</p>
+      <p>좁혀졌다고 생각하는 자리에 마우스를 올려 실제 타입을 확인하는 게 가장 빠르다(<a href="#item-6">아이템 6</a>). 안 좁혀졌다면 단언을 붙이기 전에 <b>왜 안 좁혀졌는지</b> 먼저 본다. 거의 언제나 진짜 이유가 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>분기문 외에도 <code>instanceof</code>, <code>in</code>, <code>Array.isArray</code>, 태그된 유니온, 타입 가드로 타입을 좁힐 수 있다.</li>
+      <li>사용자 정의 타입 가드는 반환 타입을 <code>x is T</code> 형태로 쓴다.</li>
+      <li><code>typeof null === "object"</code> 와 falsy 값 때문에 좁히기가 실패하는 경우를 조심한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-23" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 23</div>
+    <h3>한꺼번에 객체 생성하기</h3>
+    <p class="item-tagline">변수의 타입은 <b>초기화 시점에 결정된다.</b> 그러니 객체는 한 번에 만드는 게 유리하다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    속성을 하나씩 추가하지 말고 <b>전개 연산자로 한 번에</b> 만든다.
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">build.ts</span>
+      <span class="code-tag bad">나눠서 만들면 막힌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const obj = {};   // {}
+obj.x = 1;
+//  ~ '{}' 형식에 'x' 속성이 없습니다.
+obj.y = 2;
+//  ~ '{}' 형식에 'y' 속성이 없습니다.</code></pre>
+  </div>
+
+  <h4>객체 전개 연산자</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">build.ts</span>
+      <span class="code-tag good">타입이 자동으로 합쳐진다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const pt = { x: 3, y: 4 };
+const id = { name: "John" };
+
+const obj = { ...pt, ...id };
+// { x: number; y: number; name: string }
+obj.name; // 정상</code></pre>
+  </div>
+
+  <h4>조건부로 속성 추가하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">conditional.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare let hasMiddle: boolean;
+
+const president = {
+  first: "John",
+  last: "Doe",
+  ...(hasMiddle ? { middle: "C" } : {}),
+};
+// { middle?: string; first: string; last: string }</code></pre>
+  </div>
+
+  <p><code>middle</code> 이 <b>선택적 속성</b>으로 추론되는 것이 핵심이다. 조건이 거짓이면 <code>{}</code> 를 펼치므로 속성이 없을 수도 있음을 타입스크립트가 안다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">conditional.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare let hasDates: boolean;
+const nameTitle = { name: "Khufu", title: "Pharaoh" };
+
+const pharaoh = {
+  ...nameTitle,
+  ...(hasDates ? { start: -2589, end: -2566 } : {}),
+};
+// { start?: number; end?: number; name: string; title: string }</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">두 속성은 함께 있거나 함께 없다</p>
+      <p>위 추론 결과는 <code>start</code> 만 있고 <code>end</code> 는 없는 상태도 허용한다. 실제로는 그럴 수 없는데도 그렇다. 이런 "동시에 존재해야 하는 속성"을 타입으로 정확히 표현하는 방법은 <a href="#item-28">아이템 28</a>에서 다룬다.</p>
+    </div>
+  </div>
+
+  <h4>헬퍼 함수로 정리하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">helper.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function addOptional&lt;T extends object, U extends object&gt;(
+  a: T,
+  b: U | null
+): T &amp; Partial&lt;U&gt; {
+  return { ...a, ...b };
+}
+
+const pharaoh = addOptional(
+  nameTitle,
+  hasDates ? { start: -2589, end: -2566 } : null
+);
+// { name: string; title: string } &amp; Partial&lt;{ start: number; end: number }&gt;</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">배열도 마찬가지 <span class="badge b-blue">보강</span></p>
+      <p>같은 원리가 배열에도 적용된다. <code>const list = []</code> 는 <code>never[]</code> 로 시작해 <code>push</code> 가 막히거나, <code>noImplicitAny</code> 아래에서 진화하는 <code>any</code> 가 된다(<a href="#item-41">아이템 41</a>). 루프 안에서 조건부로 담을 때는 <code>filter</code>·<code>flatMap</code> 으로 한 번에 만드는 편이 타입도 코드도 깔끔하다(<a href="#item-27">아이템 27</a>).</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>속성을 하나씩 추가하기보다 <b>한꺼번에 객체로 만든다.</b> 타입 추론에 유리하다.</li>
+      <li>안전한 타입으로 속성을 추가하려면 <b>객체 전개</b>를 쓴다.</li>
+      <li>조건부 속성은 <code>...(cond ? {k: v} : {})</code> 패턴으로 <b>선택적 속성</b>으로 만든다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-24" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 24</div>
+    <h3>일관성 있는 별칭 사용하기</h3>
+    <p class="item-tagline">별칭을 만드는 순간 타입스크립트의 <b>제어 흐름 분석이 끊긴다.</b> 이 아이템은 그 지점에 대한 이야기다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    별칭을 만들었으면 <b>일관되게 그것만</b> 쓴다. 더 나은 방법은 비구조화 할당이다.
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 아이템은 원문 노트가 짧아 예제를 보강했습니다 <span class="badge b-blue">보강</span></p>
+      <p>원문에는 "별칭을 남발하면 흐름 파악에 방해가 된다", "구조 분해 할당을 권장한다" 두 줄만 기록되어 있었습니다. 왜 그런지 보여 주는 표준 예제를 채웠습니다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">polygon.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface Coordinate { x: number; y: number; }
+
+interface BoundingBox {
+  x: [number, number];
+  y: [number, number];
+}
+
+interface Polygon {
+  exterior: Coordinate[];
+  holes: Coordinate[][];
+  bbox?: BoundingBox;   // 있을 수도, 없을 수도
+}</code></pre>
+  </div>
+
+  <p>다각형 안에 점이 있는지 검사한다. 경계 상자(<code>bbox</code>)가 있으면 빠르게 걸러 낼 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">polygon.ts</span>
+      <span class="code-tag bad">별칭이 흐름을 끊는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function isPointInPolygon(polygon: Polygon, pt: Coordinate) {
+  const box = polygon.bbox;          // 별칭 생성
+
+  if (polygon.bbox) {                // 원본을 검사했다
+    if (pt.x &lt; box.x[0] || pt.x &gt; box.x[1] ||
+        //   ~~~           ~~~
+        // 'box'은(는) 'undefined'일 수 있습니다.
+        pt.y &lt; box.y[0] || pt.y &gt; box.y[1]) {
+      return false;
+    }
+  }
+  // ... 무거운 검사
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">타입스크립트가 옳다</p>
+      <p><code>polygon.bbox</code> 를 검사했다고 해서 <code>box</code> 가 <code>undefined</code> 가 아니라는 보장은 없다. 사이에 <code>polygon.bbox = undefined</code> 를 넣는 코드가 들어갈 수 있기 때문이다. <b>제어 흐름 분석은 검사한 그 표현식만 좁힌다.</b></p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">polygon.ts</span>
+      <span class="code-tag good">별칭을 일관되게 쓴다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function isPointInPolygon(polygon: Polygon, pt: Coordinate) {
+  const box = polygon.bbox;
+  if (box) {                          // 별칭을 검사한다
+    if (pt.x &lt; box.x[0] || pt.x &gt; box.x[1] ||
+        pt.y &lt; box.y[0] || pt.y &gt; box.y[1]) {
+      return false;
+    }
+  }
+  // ...
+}</code></pre>
+  </div>
+
+  <p>더 나은 방법은 비구조화 할당이다. 이름이 하나로 통일되어 <b>애초에 둘을 헷갈릴 수 없다.</b></p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">polygon.ts</span>
+      <span class="code-tag good">권장</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function isPointInPolygon(polygon: Polygon, pt: Coordinate) {
+  const { bbox } = polygon;
+  if (bbox) {
+    const { x, y } = bbox;
+    if (pt.x &lt; x[0] || pt.x &gt; x[1] || pt.y &lt; y[0] || pt.y &gt; y[1]) {
+      return false;
+    }
+  }
+  // ...
+}</code></pre>
+  </div>
+
+  <h4>함수 호출이 좁히기를 무효화한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">invalidate.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function fn(p: Polygon) { /* polygon.bbox 를 지울 수도 있다 */ }
+
+polygon.bbox;        // BoundingBox | undefined
+if (polygon.bbox) {
+  polygon.bbox;      // BoundingBox
+  fn(polygon);
+  polygon.bbox;      // BoundingBox — 타입스크립트는 그대로 두지만...
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">타입 체커가 낙관적인 지점</p>
+      <p>타입스크립트는 <code>fn(polygon)</code> 이 <code>polygon.bbox</code> 를 지웠을 가능성을 <b>무시한다.</b> 매번 무효화하면 실사용이 불가능할 만큼 까다로워지기 때문에 내린 절충이다. 그래서 <b>지역 변수(비구조화 결과)를 쓰는 편이 안전</b>하다. 지역 변수라면 타입 체커가 확실히 추적할 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>별칭은 타입스크립트가 타입을 좁히는 것을 방해한다. 만들었다면 <b>일관되게 사용</b>한다.</li>
+      <li>가능하면 <b>비구조화 할당</b>으로 별칭 대신 이름을 통일한다.</li>
+      <li>함수 호출이 객체 속성의 타입 정제를 무효화할 수 있다는 점을 기억한다. <b>속성보다 지역 변수를 믿는다.</b></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-25" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 25</div>
+    <h3>비동기 코드에는 콜백 대신 async 함수 사용하기</h3>
+    <p class="item-tagline">콜백보다 프로미스, 프로미스보다 <code>async</code>/<code>await</code>. 타입 추론까지 생각하면 선택지는 하나다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>async</code> 함수는 <b>반드시 프로미스를 반환한다.</b> 이 강제성이 "때로는 동기, 때로는 비동기"라는 최악의 설계를 원천 차단한다.
+  </div>
+
+  <h4>콜백 지옥</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">callback.js</span>
+      <span class="code-tag bad">실행 순서가 위에서 아래가 아니다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-javascript">fetchURL(url1, function (res1) {
+  fetchURL(url2, function (res2) {
+    fetchURL(url3, function (res3) {
+      // ...
+    });
+  });
+});</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">async.ts</span>
+      <span class="code-tag good">순차 실행</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">async function fetchPages() {
+  const res1 = await fetch(url1);
+  const res2 = await fetch(url2);
+  const res3 = await fetch(url3);
+  // ...
+}</code></pre>
+  </div>
+
+  <h4>병렬로 돌려야 할 때 — Promise.all</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">parallel.ts</span>
+      <span class="code-tag good">타입까지 정확히 풀린다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">async function fetchPages() {
+  const [res1, res2, res3] = await Promise.all([
+    fetch(url1),
+    fetch(url2),
+    fetch(url3),
+  ]);
+  // res1, res2, res3 모두 Response 로 추론된다
+}</code></pre>
+  </div>
+
+  <p><code>Promise.all</code> 과 비구조화 할당의 조합에서 <b>세 변수의 타입이 한 번에 정확히</b> 추론되는 것이 인상적이다. 콜백으로 같은 일을 하면 타입 추론이 거의 불가능하다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>메서드</th><th>동작</th><th>쓰는 곳</th></tr></thead>
+      <tbody>
+        <tr><td><code>Promise.all</code></td><td>전부 성공하면 결과 배열, 하나라도 실패하면 reject</td><td>전부 필요할 때</td></tr>
+        <tr><td><code>Promise.race</code></td><td>가장 먼저 <b>결정된</b> 것 하나</td><td>타임아웃 구현</td></tr>
+        <tr><td><code>Promise.allSettled</code></td><td>전부 기다리고 성공/실패를 모두 보고</td><td>일부 실패를 허용할 때</td></tr>
+        <tr><td><code>Promise.any</code></td><td>가장 먼저 <b>성공</b>한 것 하나</td><td>여러 후보 중 하나면 될 때</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>타임아웃 — race 의 대표적 쓰임</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">timeout.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function timeout(millis: number): Promise&lt;never&gt; {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; reject("timeout"), millis);
+  });
+}
+
+async function fetchWithTimeout(url: string, millis: number) {
+  return Promise.race([fetch(url), timeout(millis)]);
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">반환 타입이 왜 Response 인가</p>
+      <p><code>timeout</code> 의 반환 타입이 <code>Promise&lt;never&gt;</code> 이기 때문이다. <code>Response | never</code> 의 유니온은 <code>Response</code> 로 정리된다 — 공집합과의 합집합은 원래 집합 그대로다(<a href="#item-7">아이템 7</a>). 타입 구문을 하나도 추가하지 않고도 정확한 타입이 나온다.</p>
+    </div>
+  </div>
+
+  <h4>가장 중요한 이유 — 일관성</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">inconsistent.ts</span>
+      <span class="code-tag bad">때로는 동기, 때로는 비동기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const cache: { [url: string]: string } = {};
+
+function fetchWithCache(url: string, callback: (text: string) =&gt; void) {
+  if (url in cache) {
+    callback(cache[url]);   // 동기적으로 즉시 호출
+    return;
+  }
+  fetch(url)
+    .then((r) =&gt; r.text())
+    .then((text) =&gt; {
+      cache[url] = text;
+      callback(text);       // 비동기적으로 나중에 호출
+    });
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">이런 함수는 쓰기가 극도로 어렵다</p>
+      <p>캐시가 있을 때와 없을 때 <b>콜백이 호출되는 시점이 다르다.</b> 호출하는 쪽에서는 상태 갱신 순서가 상황에 따라 뒤집히므로, 재현하기 어려운 버그가 생긴다. <code>async</code> 로 바꾸면 이 문제 자체가 사라진다 — 캐시 히트든 아니든 <b>항상 프로미스</b>다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consistent.ts</span>
+      <span class="code-tag good">언제나 비동기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const cache: { [url: string]: string } = {};
+
+async function fetchWithCache(url: string) {
+  if (url in cache) {
+    return cache[url];   // 값을 반환해도 Promise&lt;string&gt; 이 된다
+  }
+  const response = await fetch(url);
+  const text = await response.text();
+  cache[url] = text;
+  return text;
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">중복 요청까지 막고 싶다면 <span class="badge b-blue">보강</span></p>
+      <p>위 코드는 같은 URL 에 대한 동시 요청이 여러 번 나갈 수 있다. 캐시에 <b>값 대신 프로미스를 저장</b>하면 해결된다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">dedupe.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">const cache: { [url: string]: Promise&lt;string&gt; } = {};
+
+function fetchWithCache(url: string): Promise&lt;string&gt; {
+  if (!(url in cache)) {
+    cache[url] = fetch(url).then((r) =&gt; r.text());
+  }
+  return cache[url];
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>콜백보다 프로미스가 <b>코드 작성과 타입 추론 모두</b>에 유리하다.</li>
+      <li>가능하면 프로미스를 직접 만들기보다 <code>async</code>/<code>await</code> 를 쓴다. 간결하고 오류 처리가 자연스럽다.</li>
+      <li>어떤 함수가 프로미스를 반환한다면 <code>async</code> 로 선언한다.</li>
+      <li><code>async</code> 함수는 <b>항상</b> 프로미스를 반환하므로, 동기와 비동기가 섞이는 최악의 설계를 막아 준다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-26" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 26</div>
+    <h3>타입 추론에 문맥이 어떻게 사용되는지 이해하기</h3>
+    <p class="item-tagline">타입스크립트는 값만 보지 않고 <b>그 값이 놓인 자리</b>도 본다. 값을 상수로 분리하는 순간 그 자리가 사라진다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    값을 변수로 뽑아내면 <b>문맥이 소실</b>되어 추론이 넓어진다. 해결책은 <code>as const</code>, 타입 선언, 또는 시그니처 완화 셋 중 하나다.
+  </div>
+
+  <h4>문제의 형태 — 인라인일 때는 되는데 분리하면 안 된다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">language.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">type Language = "JavaScript" | "TypeScript" | "Python";
+function setLanguage(lang: Language) { /* ... */ }
+
+setLanguage("JavaScript"); // 정상 — 문맥에서 Language 로 추론
+
+let language = "JavaScript"; // string 으로 넓혀졌다
+setLanguage(language);
+//          ~~~~~~~~ 'string' 형식의 인수는 'Language' 형식의
+//                   매개 변수에 할당될 수 없습니다.</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">language.ts</span>
+      <span class="code-tag good">두 가지 해법</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// 1. const 로 선언해 리터럴 타입 유지
+const language1 = "JavaScript";
+setLanguage(language1);
+
+// 2. 타입을 명시해 문맥을 되살린다
+let language2: Language = "JavaScript";
+setLanguage(language2);</code></pre>
+  </div>
+
+  <h4>튜플에서 생기는 문제</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">tuple.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function panTo(where: [number, number]) { /* ... */ }
+
+panTo([10, 20]); // 정상
+
+const loc = [10, 20]; // number[]  ← 길이 정보가 사라졌다
+panTo(loc);
+//    ~~~ 'number[]' 형식의 인수는 '[number, number]' 형식의
+//        매개 변수에 할당될 수 없습니다.
+
+const loc2 = [10, 20] as const; // readonly [10, 20]
+panTo(loc2);
+//    ~~~~ 'readonly [10, 20]' 형식의 인수는 '[number, number]' 형식의
+//         매개 변수에 할당될 수 없습니다.
+//         'readonly' 형식은 변경 가능한 형식에 할당할 수 없습니다.</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">as const 만으로는 부족하다</p>
+      <p><code>as const</code> 가 길이는 고정했지만 이번엔 <code>readonly</code> 가 걸린다. <code>panTo</code> 는 매개변수를 바꿀 수 있는 타입을 요구하기 때문이다. 진짜 해법은 <b>함수 시그니처를 고치는 것</b>이다 — <a href="#item-17">아이템 17</a>의 결론과 정확히 같다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">tuple.ts</span>
+      <span class="code-tag good">시그니처를 고친다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function panTo(where: readonly [number, number]) { /* ... */ }
+
+const loc = [10, 20] as const;
+panTo(loc);      // 정상
+panTo([10, 20]); // 여전히 정상</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">as const 의 오류는 엉뚱한 곳에서 난다</p>
+      <p><code>const loc = [10] as const</code> 처럼 <b>값 자체가 틀린 경우</b>, 오류는 선언한 자리가 아니라 <code>panTo(loc)</code> 호출부에서 난다. 값과 오류 위치가 떨어져 있어 원인을 찾기 어렵다. 특히 중첩된 객체에서 심해진다.</p>
+    </div>
+  </div>
+
+  <h4>객체에서 생기는 문제</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">object.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface GovernedLanguage {
+  language: Language;
+  org: string;
+}
+function complain(language: GovernedLanguage) { /* ... */ }
+
+complain({ language: "TypeScript", org: "Microsoft" }); // 정상
+
+const ts = { language: "TypeScript", org: "Microsoft" };
+// { language: string; org: string }  ← language 가 넓혀졌다
+complain(ts);
+//       ~~ '{ language: string; org: string; }' 형식의 인수는
+//          'GovernedLanguage' 형식의 매개 변수에 할당될 수 없습니다.
+
+// 해법 1 — as const
+const ts2 = { language: "TypeScript", org: "Microsoft" } as const;
+complain(ts2); // 정상
+
+// 해법 2 — 타입 선언 (오류가 선언한 자리에서 난다)
+const ts3: GovernedLanguage = { language: "TypeScript", org: "Microsoft" };
+complain(ts3); // 정상</code></pre>
+  </div>
+
+  <h4>콜백에서 생기는 문제</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">callback.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function callWithRandomNumbers(fn: (n1: number, n2: number) =&gt; void) {
+  fn(Math.random(), Math.random());
+}
+
+// 인라인이면 문맥에서 타입이 흘러들어온다
+callWithRandomNumbers((n1, n2) =&gt; {
+  n1; // number
+  n2; // number
+});
+
+// 분리하면 문맥이 사라진다
+const callback = (n1, n2) =&gt; { /* ... */ };
+//                ~~  ~~ 'n1', 'n2' 매개 변수에 암시적으로 'any' 형식이 있습니다.
+callWithRandomNumbers(callback);
+
+// 해법 1 — 매개변수에 타입을 적는다
+const callback2 = (n1: number, n2: number) =&gt; { /* ... */ };
+callWithRandomNumbers(callback2);
+
+// 해법 2 — 함수 전체에 타입을 붙인다 (아이템 12)
+type RandomFn = (n1: number, n2: number) =&gt; void;
+const callback3: RandomFn = (n1, n2) =&gt; { /* ... */ };
+callWithRandomNumbers(callback3);</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>원문 노트의 마지막 줄이 <code>callWithRandomNumbers(callback)</code> 으로 되어 있는데, 타입을 명시한 <code>callback2</code> 를 넘겨야 의도가 맞다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입 추론에서 <b>문맥이 어떻게 쓰이는지</b> 주의해서 살펴야 한다.</li>
+      <li>변수를 뽑아내서 별도로 선언했을 때 오류가 발생한다면, <b>문맥 소실</b>이 원인일 가능성이 높다.</li>
+      <li>변수에 타입 선언을 추가하거나 <code>as const</code> 를 쓴다. 가능하다면 <b>함수 시그니처를 완화</b>하는 것이 가장 깔끔하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-27" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 27</div>
+    <h3>함수형 기법과 라이브러리로 타입 흐름 유지하기</h3>
+    <p class="item-tagline">자바스크립트에서 서드파티 라이브러리는 취향의 문제였다. <b>타입스크립트에서는 손익 계산이 달라진다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    직접 루프를 돌리면 타입 구문을 계속 붙여야 한다. 라이브러리 함수를 쓰면 <b>타입이 알아서 흘러간다.</b>
+  </div>
+
+  <h4>CSV 파싱 — 세 단계로 줄여 보기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">1단계 — 직접 루프</span>
+      <span class="code-tag bad">row 의 타입이 {} 라 막힌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const rows = rawRows.slice(1).map((rowStr) =&gt; {
+  const row = {};
+  rowStr.split(",").forEach((val, i) =&gt; {
+    row[headers[i]] = val;
+    // ~~~~~~~~~~~~ '{}' 형식에 인덱스 시그니처가 없으므로
+    //              요소에 암시적으로 'any' 형식이 있습니다.
+  });
+  return row;
+});</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">2단계 — reduce</span>
+      <span class="code-tag bad">짧아졌지만 타입 구문이 붙었다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const rows = rawRows
+  .slice(1)
+  .map((rowStr) =&gt;
+    rowStr.split(",").reduce(
+      (row, val, i) =&gt; ((row[headers[i]] = val), row),
+      {} as { [k: string]: string }   // ← 단언이 필요해졌다
+    )
+  );</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">3단계 — lodash zipObject</span>
+      <span class="code-tag good">타입 구문 0개</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { zipObject } from "lodash";
+
+const rows = rawRows
+  .slice(1)
+  .map((rowStr) =&gt; zipObject(headers, rowStr.split(",")));
+// { [key: string]: string }[] 로 정확히 추론된다</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>원문 1단계 코드의 <code>row[headers[j]]</code> 에서 <code>j</code> 는 선언되지 않은 변수였다. <code>forEach</code> 의 인덱스 매개변수 <code>index</code>(위에서는 <code>i</code>)를 써야 한다.</p>
+    </div>
+  </div>
+
+  <h4>팀별 최고 연봉 선수 찾기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">명령형</span>
+      <span class="code-tag bad">타입 선언 두 개 + 중간 변수 두 개</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface BasketballPlayer {
+  name: string;
+  team: string;
+  salary: number;
+}
+declare const allPlayers: BasketballPlayer[];
+
+interface TeamToPlayers {
+  [team: string]: BasketballPlayer[];
+}
+
+const teamToPlayers: TeamToPlayers = {};
+for (const player of allPlayers) {
+  const { team } = player;
+  teamToPlayers[team] = teamToPlayers[team] || [];
+  teamToPlayers[team].push(player);
+}
+
+for (const players of Object.values(teamToPlayers)) {
+  players.sort((a, b) =&gt; b.salary - a.salary);
+}
+
+const bestPaid = Object.values(teamToPlayers).map((players) =&gt; players[0]);
+bestPaid.sort((a, b) =&gt; b.salary - a.salary);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">lodash 체인</span>
+      <span class="code-tag good">타입 구문 0개</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import _ from "lodash";
+
+const bestPaid = _(allPlayers)
+  .groupBy((player) =&gt; player.team)
+  .mapValues((players) =&gt; _.maxBy(players, (p) =&gt; p.salary)!)
+  .values()
+  .sortBy((p) =&gt; -p.salary)
+  .value();
+// BasketballPlayer[]</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>원문의 <code>.map((players, team) =&gt; players.sortBy("salary").first())</code> 는 실행되지 않는다. <code>players</code> 는 일반 배열이라 <code>sortBy</code> 메서드가 없다. 위 코드는 <code>mapValues</code> + <code>_.maxBy</code> 로 같은 결과를 내는 형태로 고친 것이다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">여기서 <code>!</code> 하나가 필요한 이유</p>
+      <p><code>_.maxBy</code> 는 빈 배열을 받으면 <code>undefined</code> 를 반환할 수 있어서 반환 타입이 <code>Player | undefined</code> 다. <code>groupBy</code> 의 결과에는 빈 배열이 있을 수 없지만 타입 시스템은 그걸 모른다. 이럴 때가 <a href="#item-9">아이템 9</a> 가 말하는 "개발자가 더 잘 아는 상황"이다.</p>
+    </div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">이제는 표준 문법으로도 상당 부분 <span class="badge b-purple">최신 반영</span></p>
+      <p>책이 나온 뒤 자바스크립트 표준에 편입된 것들이 있다. <code>Object.groupBy</code>(ES2024)와 <code>Array.prototype.flatMap</code>(ES2019)이 대표적이다. 라이브러리 없이도 타입 흐름을 유지할 수 있는 범위가 넓어졌다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">modern.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">// ES2024 — lib 을 "es2024" 이상으로 설정해야 한다
+const byTeam = Object.groupBy(allPlayers, (p) =&gt; p.team);
+// Partial&lt;Record&lt;string, BasketballPlayer[]&gt;&gt;
+
+// flatMap 은 map + filter 를 한 번에 처리한다
+const names = allPlayers.flatMap((p) =&gt; (p.salary &gt; 1e7 ? [p.name] : []));
+// string[]</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입 흐름을 개선하고, 가독성을 높이고, 명시적 타입 구문을 줄이기 위해 <b>내장 함수형 기법과 lodash 같은 라이브러리</b>를 쓴다.</li>
+      <li>직접 루프를 구현하면 타입 안전성을 잃기 쉽다. 라이브러리 함수는 <b>이미 정확한 타입 선언을 갖고 있다.</b></li>
+      <li>같은 코드라도 자바스크립트에서보다 타입스크립트에서 <b>라이브러리를 쓸 이유가 하나 더 있다.</b></li>
+    </ul>
+  </div>
+</article>

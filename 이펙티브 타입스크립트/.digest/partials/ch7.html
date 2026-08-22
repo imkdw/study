@@ -1,0 +1,798 @@
+<article class="item" id="item-53" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 53</div>
+    <h3>타입스크립트 기능보다는 ECMAScript 기능을 사용하기</h3>
+    <p class="item-tagline">타입스크립트에는 <b>타입 공간에만 있어야 할 것</b>과 <b>코드를 생성하는 것</b>이 섞여 있다. 후자는 피한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    TC39 는 런타임 기능을, 타입스크립트 팀은 타입 기능만 발전시킨다는 <b>명확한 분업</b>이 있다. 이 원칙보다 먼저 만들어진 기능들은 쓰지 않는다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph A["TC39 — 런타임 기능"]
+    A1["class, 모듈, async/await<br>표준 데코레이터"]
+  end
+  subgraph B["TypeScript 팀 — 타입 기능"]
+    B1["타입 주석, 제네릭<br>조건부 타입, satisfies"]
+  end
+  subgraph C["초기의 유산 — 둘 다 아님"]
+    C1["enum · 매개변수 속성<br>namespace · 레거시 데코레이터"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세 번째 상자만 문제다</b> — 타입스크립트가 자바스크립트에 모듈 시스템도 클래스도 없던 시절에 직접 만든 기능들이다. 지금은 표준이 그 자리를 차지했다.</div>
+  </div>
+
+  <h4>1. 열거형(enum)</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">enum.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">enum Flavor {
+  VANILLA = 0,
+  CHOCOLATE = 1,
+  STRAWBERRY = 2,
+}
+
+let flavor = Flavor.CHOCOLATE; // Flavor.CHOCOLATE
+Flavor[0];                     // "VANILLA"</code></pre>
+  </div>
+
+  <h5>문제 1 — 숫자 열거형은 역매핑을 만든다</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">enum.ts</span>
+      <span class="code-tag bad">범위 밖도 조용히 통과</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">console.log(Flavor[0]); // "VANILLA"
+console.log(Flavor[3]); // undefined — 오류 없음</code></pre>
+  </div>
+
+  <p>이 역매핑은 원래 <b>비트 플래그</b> 구조를 위해 설계된 것이다. 일반적인 상수 집합에는 필요 없고, 위험만 남긴다.</p>
+
+  <h5>문제 2 — const enum 은 런타임에서 완전히 사라진다</h5>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">입력</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">const enum Flavor {
+  VANILLA = 0,
+  CHOCOLATE = 1,
+}
+console.log(Flavor.CHOCOLATE);</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">출력</span>
+        <span class="code-tag bad">숫자로 인라인된다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-javascript">"use strict";
+console.log(1 /* Flavor.CHOCOLATE */);</code></pre>
+    </div>
+  </div>
+
+  <p><code>Flavor</code> 라는 객체는 <b>어디에도 존재하지 않는다.</b> <code>preserveConstEnums</code> 를 켜면 객체는 남지만, 참조는 여전히 숫자로 인라인된다. <b>같은 문법이 설정에 따라 다르게 동작하는 것</b> 자체가 문제다.</p>
+
+  <h5>문제 3 — 문자열 열거형은 명목적 타이핑을 쓴다</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">enum.ts</span>
+      <span class="code-tag bad">타입스크립트 안에서만 통하는 규칙</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">enum Flavor {
+  VANILLA = "vanilla",
+  CHOCOLATE = "chocolate",
+}
+
+let flavor = Flavor.VANILLA;
+flavor = "chocolate";
+//       ~~~~~~~~~~~ '"chocolate"' 형식은 'Flavor' 형식에
+//                   할당할 수 없습니다.</code></pre>
+  </div>
+
+  <p>값이 같은데도 할당이 막힌다. 타입스크립트의 다른 모든 곳은 <b>구조적 타이핑</b>인데(<a href="#item-4">아이템 4</a>) 여기만 예외다. 그리고 이 라이브러리를 자바스크립트에서 쓰면 <code>"vanilla"</code> 를 그냥 넘기게 되므로 <b>두 언어에서 동작이 다르다.</b></p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">flavor.ts</span>
+      <span class="code-tag good">리터럴 유니온을 쓴다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">type Flavor = "vanilla" | "chocolate" | "strawberry";
+
+let flavor: Flavor = "vanilla";
+flavor = "chocolate";  // 정상
+flavor = "mint";
+//       ~~~~~~ '"mint"' 형식은 'Flavor' 형식에 할당할 수 없습니다.</code></pre>
+  </div>
+
+  <p>열거형만큼 안전하고, <b>자바스크립트와 호환되며</b>, 자동완성도 그대로 동작한다. 코드도 생성하지 않는다.</p>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">enum 을 둘러싼 최근 변화 <span class="badge b-purple">최신 반영</span></p>
+      <ul>
+        <li><b>TS 5.0</b> — 모든 열거형이 유니온 열거형으로 통일되어 동작이 조금 일관되어졌다. 그래도 위 문제들은 남는다.</li>
+        <li><b><code>isolatedModules</code></b> — <code>const enum</code> 은 파일 하나만 보고 변환할 수 없어 금지된다. esbuild·SWC·Babel 을 쓰면 자동으로 걸린다.</li>
+        <li><b><code>erasableSyntaxOnly</code>(TS 5.8)</b> — <code>enum</code> 을 아예 오류로 잡는다. Node.js 네이티브 실행에서는 쓸 수 없다.</li>
+      </ul>
+      <p>즉 <b>생태계가 enum 을 점점 더 밀어내고 있다.</b> 꼭 상수 객체가 필요하다면 <code>as const</code> 객체가 대안이다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">alternative.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">const Flavor = {
+  VANILLA: "vanilla",
+  CHOCOLATE: "chocolate",
+} as const;
+
+type Flavor = (typeof Flavor)[keyof typeof Flavor];
+// "vanilla" | "chocolate"</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4>2. 매개변수 속성 (parameter property)</h4>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">표준 문법</span>
+        <span class="code-tag good">어디서나 동작한다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">class Person {
+  name: string;
+  constructor(name: string) {
+    this.name = name;
+  }
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">매개변수 속성</span>
+        <span class="code-tag bad">TS 고유 문법</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">class Person {
+  constructor(public name: string) {}
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문제</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>코드가 늘어난다</td><td>타입스크립트 컴파일은 보통 코드를 <b>줄이는데</b>, 이건 늘린다</td></tr>
+        <tr><td>안 쓰는 것처럼 보인다</td><td>런타임에서는 쓰이지만 소스상으로는 참조가 없어 보인다</td></tr>
+        <tr><td>섞으면 혼란스럽다</td><td>일반 속성과 매개변수 속성이 함께 있으면 어디에 무엇이 있는지 흩어진다</td></tr>
+        <tr><td>지울 수 없는 문법</td><td><code>erasableSyntaxOnly</code>·Node 네이티브 실행에서 금지된다 (<a href="#item-3">아이템 3</a>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">매개변수 속성만 있는 클래스라면</p>
+      <p>클래스일 이유가 없다. <b>인터페이스와 객체 리터럴</b>로 충분하다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">simpler.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">interface Person { name: string; }
+const person: Person = { name: "Mark" };</code></pre>
+      </div>
+      <p>다만 NestJS·Angular 처럼 <b>생성자 주입을 쓰는 프레임워크</b>에서는 매개변수 속성이 사실상 관용구다. 이 아이템의 조언은 그런 프레임워크 밖의 일반 코드에 적용된다.</p>
+    </div>
+  </div>
+
+  <h4>3. namespace 와 삼중 슬래시 임포트</h4>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">과거</span>
+        <span class="code-tag bad">쓰지 않는다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">namespace foo {
+  export function bar() {}
+}
+
+/// &lt;reference path="other.ts" /&gt;
+foo.bar();</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">현재</span>
+        <span class="code-tag good">ECMAScript 모듈</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">import { bar } from "./other";
+bar();</code></pre>
+    </div>
+  </div>
+
+  <p>ES2015 이전에는 자바스크립트에 공식 모듈 시스템이 없었다. <code>namespace</code> 는 그 공백을 메우려던 시도이고, <b>지금은 호환성을 위해 남아 있을 뿐</b>이다.</p>
+
+  <h4>4. 데코레이터</h4>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">여기는 상황이 바뀌었다 <span class="badge b-purple">최신 반영</span></p>
+      <p>책이 쓰인 시점에는 데코레이터가 <code>experimentalDecorators</code> 아래의 비표준 기능이었다. 지금은 두 종류가 공존한다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>레거시 데코레이터</th><th>표준 데코레이터</th></tr></thead>
+          <tbody>
+            <tr><td>활성화</td><td><code>experimentalDecorators: true</code></td><td>별도 설정 없이 (TS 5.0+)</td></tr>
+            <tr><td>근거</td><td>오래된 제안서</td><td>TC39 Stage 3 제안</td></tr>
+            <tr><td><code>emitDecoratorMetadata</code></td><td>지원</td><td class="t-no">미지원</td></tr>
+            <tr><td>쓰는 곳</td><td>Angular, NestJS, TypeORM</td><td>새 코드</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>표준 데코레이터도 <b>아직 ECMAScript 정식 스펙은 아니다</b>(Stage 3). 그래도 방향은 정해졌다. 기존 프레임워크가 레거시 데코레이터에 의존한다면 그대로 두고, 새 코드라면 표준 쪽을 쓴다. 어느 쪽이든 <b>코드를 생성하는 기능</b>이므로 <code>erasableSyntaxOnly</code> 환경에서는 쓸 수 없다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>일반적으로 타입스크립트 코드에서 모든 타입 정보를 제거하면 자바스크립트가 되지만, <b>열거형·매개변수 속성·삼중 슬래시 임포트·데코레이터는 그렇지 않다.</b></li>
+      <li>타입스크립트의 역할을 <b>명확하게 하려면</b> 위 기능들을 사용하지 않는 것이 좋다.</li>
+      <li>기존 코드베이스가 이미 쓰고 있다면 무리해서 걷어낼 필요는 없다. 다만 <b>새로 쓰지 않는다.</b></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-54" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 54</div>
+    <h3>객체를 순회하는 노하우</h3>
+    <p class="item-tagline"><code>for-in</code> 의 키가 <code>string</code> 인 것은 <b>버그가 아니라 정확한 추론</b>이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    키와 값이 모두 필요하면 <code>Object.entries</code>, 키의 타입이 중요하면 <code>let k: keyof T</code> 를 선언한다.
+  </div>
+
+  <h4>왜 오류가 나는가</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">iterate.ts</span>
+      <span class="code-tag bad">키 타입이 어긋난다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const obj = { one: 1, two: 2, three: 3 };
+
+for (const k in obj) {
+  // k: string
+  console.log(obj[k]);
+  //          ~~~~~~ 'string' 형식의 식을 '{ one: number; two: number;
+  //                 three: number; }' 인덱스 형식에 사용할 수 없으므로
+  //                 요소에 암시적으로 'any' 형식이 있습니다.
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">타입스크립트가 옳다</p>
+      <p><code>keyof obj</code> 는 <code>"one" | "two" | "three"</code> 인데 <code>for-in</code> 이 주는 <code>k</code> 는 <code>string</code> 이다. 구조적 타이핑 때문에(<a href="#item-4">아이템 4</a>) <code>obj</code> 에는 <b>선언되지 않은 속성이 더 있을 수 있고</b>, 그 값이 <code>number</code> 라는 보장이 없다. <code>for-in</code> 은 상속된 열거 가능 속성까지 돌기도 한다.</p>
+    </div>
+  </div>
+
+  <h4>해법 1 — 키의 타입을 선언한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">iterate.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const obj = { one: 1, two: 2, three: 3 };
+
+let k: keyof typeof obj;
+for (k in obj) {
+  const v = obj[k]; // number
+  console.log(k, v);
+}</code></pre>
+  </div>
+
+  <p>다만 이건 <b>런타임을 보장하지 않는 약속</b>이다. 실제로 다른 키가 들어오면 타입은 거짓말이 된다. <a href="#item-18">아이템 18</a>의 <code>shouldUpdate</code> 처럼 <b>대상이 확실할 때</b> 쓴다.</p>
+
+  <h4>해법 2 — Object.entries</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">iterate.ts</span>
+      <span class="code-tag good">가장 무난하다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const obj = { one: 1, two: 2, three: 3 };
+
+for (const [k, v] of Object.entries(obj)) {
+  k; // string
+  v; // number
+  console.log(k, v);
+}
+// one 1
+// two 2
+// three 3</code></pre>
+  </div>
+
+  <p><code>k</code> 가 <code>string</code> 인 것은 여전하지만, 이번엔 <b>값 <code>v</code> 의 타입이 정확하다.</b> 대부분의 경우 이걸로 충분하다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">순회 방법 정리 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>필요한 것</th><th>방법</th><th>키 타입</th></tr></thead>
+          <tbody>
+            <tr><td>키와 값</td><td><code>Object.entries(obj)</code></td><td><code>string</code></td></tr>
+            <tr><td>값만</td><td><code>Object.values(obj)</code></td><td>—</td></tr>
+            <tr><td>키만, 타입 정확히</td><td><code>let k: keyof typeof obj</code> + <code>for-in</code></td><td><code>keyof T</code></td></tr>
+            <tr><td>키만, 안전하게</td><td><code>Object.keys(obj) as (keyof T)[]</code></td><td>단언이 필요하다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>Object.keys</code> 가 <code>string[]</code> 을 반환하는 것도 <b>같은 이유</b>다. 타입스크립트 팀은 이를 의도적인 설계로 유지하고 있다. 정말 키의 집합이 고정되어야 한다면 객체 대신 <code>Map</code> 을 쓰는 것도 방법이다(<a href="#item-58">아이템 58</a>).</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>객체를 순회할 때, 키가 어떤 타입인지 <b>정확히 파악</b>하고 있다면 <code>let k: keyof T</code> 와 <code>for-in</code> 을 쓴다.</li>
+      <li>객체를 순회하며 <b>키와 값을 얻는 가장 일반적인 방법</b>은 <code>Object.entries</code> 다.</li>
+      <li><code>for-in</code> 의 키가 <code>string</code> 인 것은 구조적 타이핑의 결과이지 실수가 아니다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-55" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 55</div>
+    <h3>DOM 계층 구조 이해하기</h3>
+    <p class="item-tagline">"Element 형식에 value 속성이 없습니다" 라는 오류를 만나는 이유. <b>계층을 알면 전부 설명된다.</b></p>
+  </header>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 아이템은 원문 노트가 비어 있어 새로 작성했습니다 <span class="badge b-blue">보강</span></p>
+      <p>원본에는 "DOM 부분은 일단 패스"라고만 되어 있었습니다. 내용은 MDN 과 <code>lib.dom.d.ts</code> 를 기준으로 정리했습니다.</p>
+    </div>
+  </div>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    DOM 타입은 <b>상속 계층</b>을 이룬다. 내가 지금 어느 층에 있는지 알아야 어떤 속성을 쓸 수 있는지 안다.
+  </div>
+
+  <h4>노드 계층</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  ET["EventTarget<br>addEventListener / dispatchEvent"] --> N["Node<br>childNodes / parentNode / textContent"]
+  N --> E["Element<br>classList / getAttribute / querySelector"]
+  N --> T["Text"]
+  N --> C["Comment"]
+  N --> D["Document"]
+  E --> H["HTMLElement<br>style / dataset / innerText"]
+  E --> S["SVGElement"]
+  H --> I["HTMLInputElement<br>value / checked"]
+  H --> B["HTMLButtonElement"]
+  H --> P["HTMLParagraphElement"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>아래로 내려갈수록 구체적이고 속성이 많다</b> — <code>value</code> 는 <code>HTMLInputElement</code> 층에서야 등장한다. 그 위에서 <code>value</code> 를 쓰려 하면 오류가 나는 것이 당연하다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타입</th><th>여기서 처음 생기는 것</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td><code>EventTarget</code></td><td><code>addEventListener</code>, <code>removeEventListener</code></td><td><code>window</code>, <code>XMLHttpRequest</code></td></tr>
+        <tr><td><code>Node</code></td><td><code>childNodes</code>, <code>parentNode</code>, <code>textContent</code></td><td>텍스트 노드, 주석</td></tr>
+        <tr><td><code>Element</code></td><td><code>classList</code>, <code>getAttribute</code>, <code>querySelector</code></td><td><code>&lt;svg&gt;</code> 요소</td></tr>
+        <tr><td><code>HTMLElement</code></td><td><code>style</code>, <code>dataset</code>, <code>innerText</code></td><td><code>&lt;p&gt;</code>, <code>&lt;div&gt;</code></td></tr>
+        <tr><td><code>HTMLInputElement</code></td><td><code>value</code>, <code>checked</code>, <code>disabled</code></td><td><code>&lt;input&gt;</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>어떤 API 가 무엇을 돌려주는가</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dom.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">document.getElementById("my-div");     // HTMLElement | null
+document.querySelector("#my-div");     // Element | null
+document.querySelector("div");         // HTMLDivElement | null  ← 태그 이름이면 정확하다
+document.getElementsByTagName("input"); // HTMLCollectionOf&lt;HTMLInputElement&gt;
+document.createElement("input");       // HTMLInputElement       ← 정확하다
+
+const el = document.querySelector("#name");
+el.value;
+// ~~~~~ 'Element' 형식에 'value' 속성이 없습니다.</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 어떤 건 정확하고 어떤 건 아닌가</p>
+      <p><code>querySelector("div")</code> 처럼 <b>태그 이름을 그대로 넘기면</b> 타입스크립트가 <code>HTMLElementTagNameMap</code> 을 조회해 정확한 타입을 준다. <code>"#name"</code> 같은 셀렉터는 <b>런타임에야 알 수 있는 정보</b>라 <code>Element</code> 로만 알려 준다.</p>
+    </div>
+  </div>
+
+  <h4>해결하는 세 가지 방법</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dom.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// 1. 제네릭 인수로 알려 준다 (권장)
+const input = document.querySelector&lt;HTMLInputElement&gt;("#name");
+input?.value; // string
+
+// 2. 타입 단언 (아이템 9)
+const input2 = document.getElementById("name") as HTMLInputElement;
+
+// 3. 런타임 검사 — 가장 안전하다
+const el = document.getElementById("name");
+if (el instanceof HTMLInputElement) {
+  el.value; // string
+}</code></pre>
+  </div>
+
+  <p>세 번째가 가장 안전하다. <code>HTMLInputElement</code> 는 <b>클래스이자 타입</b>이므로(<a href="#item-8">아이템 8</a>) <code>instanceof</code> 로 런타임 검사가 되고, 그 결과가 타입 좁히기로 이어진다.</p>
+
+  <h4>이벤트에도 계층이 있다</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  EV["Event<br>target / currentTarget / preventDefault"] --> UI["UIEvent<br>view / detail"]
+  UI --> M["MouseEvent<br>clientX / clientY / button"]
+  M --> W["WheelEvent<br>deltaY"]
+  UI --> K["KeyboardEvent<br>key / code / shiftKey"]
+  UI --> TE["TouchEvent<br>touches"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 문제가 이벤트에서도 반복된다</b> — <code>clientX</code> 를 쓰려면 <code>MouseEvent</code> 여야 하고, <code>key</code> 를 쓰려면 <code>KeyboardEvent</code> 여야 한다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">event.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function addDragHandler(el: HTMLElement) {
+  // 문자열 리터럴로 이벤트 이름을 주면 e 의 타입이 정확히 추론된다
+  el.addEventListener("mousedown", (e) =&gt; {
+    e.clientX; // number — e 는 MouseEvent
+  });
+
+  // 콜백을 분리하면 문맥이 사라진다 (아이템 26)
+  const onDown = (e) =&gt; { /* ... */ };
+  //              ~ 'e' 매개 변수에 암시적으로 'any' 형식이 있습니다.
+
+  const onDown2 = (e: MouseEvent) =&gt; { /* ... */ }; // 직접 적는다
+}</code></pre>
+  </div>
+
+  <h4>target 과 currentTarget</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>의미</th><th>타입</th></tr></thead>
+      <tbody>
+        <tr><td><code>e.target</code></td><td>이벤트가 <b>실제로 발생한</b> 요소 (자식일 수 있다)</td><td><code>EventTarget | null</code></td></tr>
+        <tr><td><code>e.currentTarget</code></td><td>리스너가 <b>붙어 있는</b> 요소</td><td><code>EventTarget | null</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>둘 다 <code>EventTarget</code> 이라 <code>value</code> 나 <code>classList</code> 를 바로 쓸 수 없다. <code>instanceof</code> 로 좁히는 것이 정석이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">event.ts</span>
+      <span class="code-tag good">좁히고 쓴다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">form.addEventListener("input", (e) =&gt; {
+  if (e.target instanceof HTMLInputElement) {
+    console.log(e.target.value);
+  }
+});</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>DOM 에는 <b>타입 계층 구조</b>가 있다. 자바스크립트에서는 신경 쓰지 않았겠지만 타입스크립트에서는 중요하다.</li>
+      <li><code>Node</code>, <code>Element</code>, <code>HTMLElement</code>, <code>EventTarget</code> 의 차이와 <code>Event</code>, <code>MouseEvent</code> 의 차이를 알아야 한다.</li>
+      <li>DOM 요소와 이벤트에는 <b>가능한 한 정확한 타입</b>을 사용한다. 제네릭 인수, 단언, <code>instanceof</code> 순으로 검토한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-56" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 56</div>
+    <h3>정보를 감추는 목적으로 private 사용하지 않기</h3>
+    <p class="item-tagline"><code>private</code> 는 <b>컴파일하면 사라지는 약속</b>이다. 진짜로 감추려면 다른 수단이 필요하다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>private</code> 는 타입 시스템의 규칙일 뿐이다. 실제로 감추려면 <b><code>#</code> 비공개 필드</b>(표준)나 클로저를 쓴다.
+  </div>
+
+  <h4>private 가 감추지 못하는 것</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">private.ts</span>
+      <span class="code-tag bad">단언 한 번이면 뚫린다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Diary {
+  private secret = "cheated on my English test";
+}
+
+const diary = new Diary();
+diary.secret;
+//    ~~~~~~ 'secret' 속성은 private이며 'Diary' 클래스 내에서만
+//           액세스할 수 있습니다.
+
+(diary as any).secret;  // 통과
+console.log(JSON.stringify(diary)); // {"secret":"cheated on my English test"}</code></pre>
+  </div>
+
+  <p>컴파일된 자바스크립트에는 <code>private</code> 라는 흔적조차 없다. 언더스코어(<code>_secret</code>) 관례와 <b>강제력 면에서는 똑같다.</b></p>
+
+  <h4>방법 1 — 클로저</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">closure.ts</span>
+      <span class="code-tag good">진짜로 접근할 수 없다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare function hash(text: string): string;
+
+class PasswordChecker {
+  checkPassword: (password: string) =&gt; boolean;
+
+  constructor(passwordHash: string) {
+    this.checkPassword = (password: string) =&gt; {
+      return hash(password) === passwordHash;
+    };
+  }
+}
+
+const checker = new PasswordChecker(hash("s3cret"));
+checker.checkPassword("s3cret"); // true
+// passwordHash 에 접근할 방법이 없다</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">대가가 두 가지 있다</p>
+      <ol>
+        <li><code>passwordHash</code> 가 <b>생성자 스코프</b>에 있으므로, 그것에 접근하는 <b>모든 메서드를 생성자 안에 정의</b>해야 한다.</li>
+        <li>메서드가 프로토타입이 아니라 인스턴스에 붙으므로 <b>인스턴스마다 함수 복사본</b>이 생긴다. 인스턴스가 많으면 메모리 낭비다.</li>
+      </ol>
+    </div>
+  </div>
+
+  <h4>방법 2 — # 비공개 필드 (권장)</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">private-field.ts</span>
+      <span class="code-tag good">표준이고, 프로토타입 메서드를 쓸 수 있다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class PasswordChecker {
+  #passwordHash: string;
+
+  constructor(passwordHash: string) {
+    this.#passwordHash = passwordHash;
+  }
+
+  checkPassword(password: string): boolean {
+    return hash(password) === this.#passwordHash;
+  }
+}
+
+const checker = new PasswordChecker(hash("s3cret"));
+checker.checkPassword("s3cret");  // true
+checker.checkPassword("wrong");   // false
+
+checker.#passwordHash;
+//      ~~~~~~~~~~~~~ 'PasswordChecker' 클래스 외부에서는 프라이빗
+//                    식별자이므로 '#passwordHash'에 액세스할 수 없습니다.</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">이제는 정식 표준이다 <span class="badge b-purple">최신 반영</span></p>
+      <p>원문 노트에는 "2021년 기준 Stage 3" 로 적혀 있는데, <b>비공개 클래스 필드는 ES2022 에서 정식 표준이 되었다.</b> 모든 최신 브라우저와 Node.js 12+ 가 네이티브로 지원한다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th><code>private</code></th><th><code>#field</code></th></tr></thead>
+          <tbody>
+            <tr><td>런타임 강제</td><td class="t-center t-no">✗</td><td class="t-center t-ok">✓</td></tr>
+            <tr><td><code>as any</code> 로 우회</td><td class="t-center t-no">가능</td><td class="t-center t-ok">불가능</td></tr>
+            <tr><td><code>JSON.stringify</code> 에 노출</td><td class="t-center t-no">노출됨</td><td class="t-center t-ok">제외됨</td></tr>
+            <tr><td>서브클래스에서 접근</td><td class="t-center">불가 (<code>protected</code> 는 가능)</td><td class="t-center">불가</td></tr>
+            <tr><td>구조적 타이핑</td><td>영향 있음 — 호환이 깨진다</td><td>영향 있음</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>#</code> 필드가 있는 클래스는 <b>외부 객체 리터럴로 흉내 낼 수 없다</b>(<a href="#item-4">아이템 4</a>). 상표 기법(<a href="#item-37">아이템 37</a>) 없이도 명목적 타이핑 효과가 딸려 온다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">그럼 private 은 쓸모없나</p>
+      <p>아니다. <b>"이 속성은 외부에서 쓰지 말라"는 설계 의도를 표현</b>하는 데는 여전히 유효하다. 자동완성에서 가려지고, 실수로 건드리면 컴파일 오류가 난다. 이 아이템의 요지는 <b>보안 수단으로 착각하지 말라</b>는 것이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>public</code>, <code>protected</code>, <code>private</code> 접근 제어자는 <b>타입 시스템에서만</b> 강제된다. 런타임에는 소용이 없고 단언으로 뚫린다.</li>
+      <li>확실하게 데이터를 감추고 싶다면 <b>클로저</b>나 <b><code>#</code> 비공개 필드</b>를 쓴다.</li>
+      <li><code>#</code> 필드는 ES2022 표준이며, 프로토타입 메서드와 함께 쓸 수 있어 클로저보다 실용적이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-57" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 57</div>
+    <h3>소스맵을 사용하여 타입스크립트 디버깅하기</h3>
+    <p class="item-tagline">실행되는 것은 컴파일된 자바스크립트다. <b>디버깅은 원본 타입스크립트로</b> 하고 싶다면 소스맵이 필요하다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>sourceMap: true</code> 한 줄로 <b>원본 코드에 중단점을 찍을 수 있다.</b> 다만 프로덕션에 노출되지 않게 관리해야 한다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  TS["app.ts<br>내가 쓴 코드"] --> C["tsc"]
+  C --> JS["app.js<br>실제 실행되는 코드"]
+  C --> MAP["app.js.map<br>위치 대응표"]
+  JS -.->|"//# sourceMappingURL"| MAP
+  MAP -.->|"디버거가 되돌린다"| TS
+      </pre>
+    </div>
+    <div class="figure-cap"><b>소스맵은 위치 대응표다</b> — "출력의 12번째 줄 5번째 열은 원본의 8번째 줄 3번째 열"이라는 정보를 담는다. 디버거가 이를 읽어 원본을 보여 준다.</div>
+  </div>
+
+  <h4>켜는 법</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">tsconfig.json</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "compilerOptions": {
+    "sourceMap": true
+  }
+}</code></pre>
+  </div>
+
+  <p>컴파일하면 <code>outDir</code> 아래에 <code>*.js</code> 와 함께 <code>*.js.map</code> 이 생기고, <code>.js</code> 파일 끝에 <code>//# sourceMappingURL=app.js.map</code> 주석이 붙는다. 브라우저 개발자 도구나 Node 디버거가 이 주석을 보고 맵을 불러온다.</p>
+
+  <h4>주의할 점</h4>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">소스맵이 일반 사용자에게 로딩되지 않게 한다</p>
+      <ul>
+        <li>개발자 도구를 열지 않으면 로드되지 않으므로 <b>성능 저하는 없다.</b></li>
+        <li>하지만 소스맵에는 <b>원본 소스 전체</b>가 들어 있을 수 있다. 내부 주석, 미공개 로직, 심지어 지워야 했던 키가 그대로 노출된다.</li>
+        <li>공개 서버에 <code>.map</code> 파일을 올리지 않거나, Sentry 같은 오류 추적 도구에만 <b>비공개로 업로드</b>한다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">소스맵 관련 옵션들 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>옵션</th><th>효과</th></tr></thead>
+          <tbody>
+            <tr><td><code>sourceMap</code></td><td>별도 <code>.js.map</code> 파일 생성</td></tr>
+            <tr><td><code>inlineSourceMap</code></td><td>맵을 <code>.js</code> 안에 base64 로 삽입 (파일 수는 줄지만 크기가 커진다)</td></tr>
+            <tr><td><code>inlineSources</code></td><td>원본 소스까지 맵 안에 포함 (편하지만 <b>노출 위험이 커진다</b>)</td></tr>
+            <tr><td><code>declarationMap</code></td><td><code>.d.ts</code> 의 소스맵. <b>"정의로 이동"이 원본 <code>.ts</code> 로 간다</b> — 모노레포에서 특히 유용</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>번들러(webpack, Vite, esbuild)를 쓴다면 <b>타입스크립트가 만든 맵과 번들러가 만든 맵이 이어져야</b> 한다. 대부분 자동으로 처리하지만, 중단점이 엉뚱한 줄에 걸린다면 이 연결이 끊어진 것을 의심한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>원본 코드가 아닌 <b>변환된 자바스크립트 코드를 디버깅하지 않는다.</b> 소스맵으로 원본을 본다.</li>
+      <li>소스맵이 <b>최종적으로 변환된 코드에 완전히 매핑되었는지</b> 확인한다. 번들러를 거치면 맵이 끊길 수 있다.</li>
+      <li>소스맵에 원본 코드가 그대로 포함되도록 설정되어 있을 수 있다. <b>공개되지 않도록 관리한다.</b></li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,1097 @@
+<article class="item" id="item-45" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 45</div>
+    <h3>devDependencies에 typescript와 @types 추가하기</h3>
+    <p class="item-tagline">타입은 런타임에 존재하지 않는다. 그러니 <b>런타임 의존성이 아니다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>typescript</code> 와 <code>@types/*</code> 는 언제나 <code>devDependencies</code> 에 넣는다. 그리고 타입스크립트는 <b>전역이 아니라 프로젝트 단위</b>로 설치한다.
+  </div>
+
+  <h4>package.json 의 세 가지 의존성</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>언제 필요한가</th><th>예</th></tr></thead>
+      <tbody>
+        <tr><td><code>dependencies</code></td><td>프로젝트를 <b>실행</b>하는 데 필수</td><td><code>lodash</code>, <code>react</code></td></tr>
+        <tr><td><code>devDependencies</code></td><td>개발과 테스트에만 필요. 런타임에는 불필요</td><td><code>jest</code>, <code>typescript</code>, <code>@types/*</code></td></tr>
+        <tr><td><code>peerDependencies</code></td><td>런타임에 필요하지만 <b>버전 선택을 사용자에게 맡김</b></td><td>플러그인이 요구하는 호스트 라이브러리</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">peerDependencies 가 쓰이는 곳</p>
+      <p>jQuery 플러그인이나 React 컴포넌트 라이브러리가 대표적이다. 플러그인이 자기 버전의 React 를 함께 설치해 버리면 <b>React 인스턴스가 두 개</b>가 되어 훅이 깨진다. 그래서 "당신 프로젝트의 React 를 쓰겠다"고 선언하는 것이다. 애플리케이션을 만들 때는 거의 쓸 일이 없다.</p>
+    </div>
+  </div>
+
+  <h4>1. 타입스크립트 자체를 프로젝트 의존성으로</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-tag good">권장</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">npm install --save-dev typescript
+npx tsc --version</code></pre>
+  </div>
+
+  <ul>
+    <li>팀원들이 <b>모두 같은 버전</b>을 쓴다는 보장이 생긴다. 버전이 다르면 오류 여부가 사람마다 달라진다.</li>
+    <li>프로젝트 셋업이 <code>npm install</code> 한 줄로 끝난다.</li>
+    <li>CI 와 로컬이 같은 버전으로 돌아간다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">편집기도 같은 버전을 쓰게 한다 <span class="badge b-blue">보강</span></p>
+      <p>VS Code 는 기본적으로 <b>자체 내장 타입스크립트</b>로 파일을 검사한다. 프로젝트 버전과 다르면 편집기와 <code>tsc</code> 의 결과가 어긋난다. <code>Cmd+Shift+P</code> → "TypeScript: Select TypeScript Version" → <b>Use Workspace Version</b> 으로 맞춰 둔다. 팀 전체에 적용하려면 <code>.vscode/settings.json</code> 에 <code>"typescript.tsdk": "node_modules/typescript/lib"</code> 를 넣는다.</p>
+    </div>
+  </div>
+
+  <h4>2. 타입 의존성(@types)</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">npm install react                    # dependencies
+npm install --save-dev @types/react  # devDependencies</code></pre>
+  </div>
+
+  <p>라이브러리가 자바스크립트로 만들어져 타입이 없다면 <b>DefinitelyTyped</b> 에 공개된 타입 정의를 쓴다. npm 레지스트리의 <code>@types</code> 스코프에 있다. 실제 라이브러리가 <code>dependencies</code> 에 있어도 <b>타입 정보는 devDependencies</b> 다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["라이브러리 설치"] --> B{"타입이<br>함께 오는가?"}
+  B -->|"TS 로 작성됨"| C["그대로 사용<br>추가 설치 불필요"]
+  B -->|"JS 로 작성됨"| D{"@types 가<br>있는가?"}
+  D -->|"있음"| E["npm i -D @types/xxx"]
+  D -->|"없음"| F["직접 .d.ts 작성<br>또는 미러 타입"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>새 라이브러리를 도입할 때의 판단 순서</b> — 마지막 갈래는 <a href="#item-51">아이템 51</a>의 미러 타입으로 이어진다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입스크립트를 <b>시스템 레벨로 설치하지 않는다.</b> 프로젝트의 <code>devDependencies</code> 에 넣어 팀 전체가 같은 버전을 쓰게 한다.</li>
+      <li><code>@types</code> 의존성은 <code>dependencies</code> 가 아니라 <code>devDependencies</code> 에 포함한다.</li>
+      <li>편집기가 쓰는 타입스크립트 버전도 프로젝트 버전에 맞춘다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-46" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 46</div>
+    <h3>타입 선언과 관련된 세 가지 버전 이해하기</h3>
+    <p class="item-tagline">타입스크립트에서는 의존성 하나에 <b>세 개의 버전</b>이 딸려 온다. 하나만 어긋나도 이상한 오류가 난다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>라이브러리 버전 / 타입 선언(@types) 버전 / 타입스크립트 버전</b> 세 가지를 함께 본다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 210" width="560" role="img" aria-label="라이브러리, 타입 선언, 타입스크립트 세 버전의 관계">
+        <rect x="18" y="24" width="150" height="72" rx="14" fill="var(--blue-weak)" stroke="var(--blue)" stroke-width="1.6"/>
+        <text x="93" y="54" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">라이브러리</text>
+        <text x="93" y="74" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">jest@29.7.0</text>
+        <rect x="205" y="24" width="150" height="72" rx="14" fill="var(--green-weak)" stroke="var(--green)" stroke-width="1.6"/>
+        <text x="280" y="54" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">타입 선언</text>
+        <text x="280" y="74" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">@types/jest@29.5.12</text>
+        <rect x="392" y="24" width="150" height="72" rx="14" fill="var(--purple-weak)" stroke="var(--purple)" stroke-width="1.6"/>
+        <text x="467" y="54" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">TypeScript</text>
+        <text x="467" y="74" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">typescript@5.9</text>
+        <path d="M168 60 L205 60" stroke="var(--border-strong)" stroke-width="1.6"/>
+        <path d="M355 60 L392 60" stroke="var(--border-strong)" stroke-width="1.6"/>
+        <text x="186" y="52" class="dg-text-sub" font-size="10" text-anchor="middle">?</text>
+        <text x="373" y="52" class="dg-text-sub" font-size="10" text-anchor="middle">?</text>
+        <text x="280" y="140" class="dg-text-sub" font-size="12" text-anchor="middle">세 버전이 독립적으로 올라간다</text>
+        <text x="280" y="166" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">하나라도 어긋나면 원인을 알기 어려운 오류가 난다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>버전이 세 개다</b> — 자바스크립트라면 왼쪽 하나만 신경 쓰면 됐다. 이 복잡성이 타입스크립트를 쓰는 비용의 일부다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">npm install jest
+npm install --save-dev @types/jest</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">package.json</span>
+      <span class="code-tag bad">버전이 정확히 일치하지 않는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "dependencies": { "jest": "^29.7.0" },
+  "devDependencies": { "@types/jest": "^29.5.12" }
+}</code></pre>
+  </div>
+
+  <p><code>@types</code> 는 <b>메이저·마이너까지만</b> 라이브러리를 따라가고 패치 번호는 독립적이다. 시맨틱 버저닝을 잘 지키면 대체로 괜찮지만, 보장은 없다.</p>
+
+  <h4>어긋나는 네 가지 상황과 대응</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상황</th><th>증상</th><th>대응</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>라이브러리만 최신</td>
+          <td>신기능을 쓸 때마다 "속성이 없습니다" 오류</td>
+          <td>타입 보강으로 임시 대응(<a href="#item-43">아이템 43</a>) → 커뮤니티에 PR</td>
+        </tr>
+        <tr>
+          <td>타입만 최신</td>
+          <td>없는 API 를 있다고 믿는다. <b>런타임에 터진다</b></td>
+          <td>버전을 맞춘다 (올리거나 내린다)</td>
+        </tr>
+        <tr>
+          <td>타입 선언이 요구하는 TS 가 더 최신</td>
+          <td>타입 선언 파일 자체가 컴파일되지 않는다</td>
+          <td>TS 를 올리거나, <code>@types/lodash@ts3.1</code> 처럼 <b>버전 태그</b>를 쓴다</td>
+        </tr>
+        <tr>
+          <td><code>@types</code> 의존성 중복</td>
+          <td>"식별자가 중복되었습니다" 오류</td>
+          <td>양쪽 <code>@types</code> 를 호환되는 버전으로 맞춘다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">node_modules 구조</span>
+      <span class="code-tag bad">전역 네임스페이스에서는 이게 안 통한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">node_modules/
+  @types/
+    foo/index.d.ts        # @1.2.3
+    bar/
+      node_modules/
+        @types/
+          foo/index.d.ts  # @2.3.4  ← 중첩 설치로 격리</code></pre>
+  </div>
+
+  <p>npm 은 버전이 충돌하면 중첩 폴더로 격리한다. 하지만 <b>전역 네임스페이스를 쓰는 타입 선언</b>(<code>declare global</code>, 전역 <code>interface</code>)은 격리할 수 없어서 중복 선언 오류가 난다.</p>
+
+  <h4>타입을 라이브러리에 번들할 때의 네 가지 문제</h4>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title">TS 버전을 고를 수 없다</div>
+      <p><code>@types</code> 라면 라이브러리 버전에 맞춰 타입만 따로 고를 수 있다. 번들된 타입은 그럴 수 없어서, <b>타입 선언 하나 때문에 TS 업그레이드가 막힐 수 있다.</b></p>
+    </li>
+    <li>
+      <div class="step-title">내 타입이 외부 라이브러리에 의존할 때</div>
+      <p>타입 선언이 <code>@types/xxx</code> 를 참조하는데 그게 <code>devDependencies</code> 에 있다면, <b>사용자에게는 설치되지 않는다.</b> 자바스크립트 사용자에게는 아예 필요 없는 것을 <code>dependencies</code> 에 넣게 되는 딜레마가 생긴다.</p>
+    </li>
+    <li>
+      <div class="step-title">과거 버전에 패치를 낼 수 없다</div>
+      <p>구버전의 타입만 고치려면 그 버전으로 돌아가 릴리스해야 한다. DefinitelyTyped 는 버전별 폴더를 두어 이 문제를 해결한다.</p>
+    </li>
+    <li>
+      <div class="step-title">패치 업데이트가 느려진다</div>
+      <p>DefinitelyTyped 는 커뮤니티가 관리해 반응이 빠르다. 개인 관리 저장소가 같은 속도를 내기는 어렵다.</p>
+    </li>
+  </ol>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">공식 권장</p>
+      <ul>
+        <li>라이브러리가 <b>타입스크립트로 작성되었다면</b> 타입 선언을 <b>내부에 포함</b>한다. 컴파일러가 자동으로 뽑아 주므로 유지보수가 쉽다.</li>
+        <li>라이브러리가 <b>자바스크립트로 작성되었다면</b> 타입 선언을 <b>DefinitelyTyped 에 공개</b>해 커뮤니티가 관리하게 한다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">요즘 도구들 <span class="badge b-blue">보강</span></p>
+      <p><b>Are the types wrong?</b>(<code>attw</code>) 는 패키지의 타입 선언이 ESM/CJS 양쪽에서 제대로 해석되는지 검사한다. 라이브러리를 배포한다면 CI 에 넣어 둘 만하다. 또 <code>package.json</code> 의 <code>exports</code> 필드로 <b>조건별 타입 진입점</b>을 지정하는 것이 <code>types</code> 필드 하나보다 정확하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>@types</code> 의존성과 관련된 <b>세 가지 버전</b>이 있다. 라이브러리, <code>@types</code>, 타입스크립트.</li>
+      <li>라이브러리를 업데이트하면 <b><code>@types</code> 도 함께 업데이트</b>한다.</li>
+      <li>타입스크립트로 작성된 라이브러리는 타입 선언을 자체 포함하고, 자바스크립트 라이브러리는 DefinitelyTyped 에 공개한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-47" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 47</div>
+    <h3>공개 API에 등장하는 모든 타입을 익스포트하기</h3>
+    <p class="item-tagline">숨겨 봐야 소용없다. <b>어차피 뽑아낼 수 있으니</b> 처음부터 내보내는 게 낫다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    공개 함수의 시그니처에 등장하는 타입은 <b>이미 공개된 것</b>이다. 사용자가 억지로 추출하게 만들지 말자.
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">santa.ts</span>
+      <span class="code-tag bad">타입을 숨겼다고 생각하지만</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface SecretName {
+  first: string;
+  last: string;
+}
+
+interface SecretSanta {
+  name: SecretName;
+  gift: string;
+}
+
+export function getGift(name: SecretName, gift: string): SecretSanta {
+  // ...
+}</code></pre>
+  </div>
+
+  <p>두 인터페이스는 <code>export</code> 되지 않았다. 하지만 <code>getGift</code> 는 공개되어 있고, 그 시그니처에 두 타입이 등장한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">사용자 쪽에서 얼마든지 꺼낸다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { getGift } from "./santa";
+
+type MySanta = ReturnType&lt;typeof getGift&gt;;       // SecretSanta
+type MyName = Parameters&lt;typeof getGift&gt;[0];     // SecretName</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">그러니 그냥 내보낸다</p>
+      <p>타입을 숨기는 것은 <b>보안이 아니라 불편</b>일 뿐이다. 사용자는 <code>ReturnType</code>/<code>Parameters</code> 로 추출하거나, 최악의 경우 손으로 다시 정의한다. 그리고 그 손으로 정의한 타입은 <b>내 라이브러리가 바뀌어도 따라오지 않는다.</b></p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">실천 <span class="badge b-blue">보강</span></p>
+      <ul>
+        <li>공개 API 를 <code>index.ts</code> 하나로 모으고, 거기서 함수와 타입을 <b>함께</b> 내보낸다.</li>
+        <li><code>export type { Foo }</code> 문법을 쓰면 <b>타입만 내보낸다</b>는 의도가 분명해지고, <code>isolatedModules</code>/<code>verbatimModuleSyntax</code> 환경에서도 안전하다.</li>
+        <li>내부 구현 타입까지 전부 내보낼 필요는 없다. 기준은 <b>"공개 시그니처에 등장하는가"</b> 하나다.</li>
+      </ul>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">index.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">export { getGift } from "./santa";
+export type { SecretName, SecretSanta } from "./santa";</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>공개 메서드에 등장한 어떤 형태의 타입이든 <b>익스포트한다.</b> 어차피 사용자가 추출할 수 있으니 편의를 제공하는 편이 낫다.</li>
+      <li><code>Parameters</code>, <code>ReturnType</code> 같은 유틸리티 타입을 알아 두면 남의 라이브러리를 쓸 때도 도움이 된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-48" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 48</div>
+    <h3>API 주석에 TSDoc 사용하기</h3>
+    <p class="item-tagline">주석을 쓸 거라면 <b>편집기가 보여 주는 형식</b>으로 쓴다. 같은 노력에 효과가 다르다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>//</code> 인라인 주석은 툴팁에 나오지 않는다. <code>/** ... */</code> 형식만 나온다.
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">greet.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">/**
+ * 인사말을 생성한다.
+ *
+ * @param name 인사할 사람의 이름
+ * @returns 사람이 보기 좋은 형태의 인사말
+ */
+function greet(name: string): string {
+  return `Hello, ${name}!`;
+}</code></pre>
+  </div>
+
+  <div class="ide">
+    <div class="ide-body">
+<pre><span class="hljs-title">greet</span>(<span class="hljs-string">"imkdw"</span>);</pre>
+      <div class="hovercard">
+        <div class="hovercard-sig"><span class="kw">function</span> <span class="fn">greet</span>(name: <span class="typ">string</span>): <span class="typ">string</span></div>
+        <div class="hovercard-doc">인사말을 생성한다.<br><br><b>@param</b> <code>name</code> — 인사할 사람의 이름<br><b>@returns</b> — 사람이 보기 좋은 형태의 인사말</div>
+      </div>
+    </div>
+    <div class="ide-caption">호출하는 자리에서 바로 보인다. <b>문서를 찾으러 갈 필요가 없다.</b></div>
+  </div>
+
+  <h4>타입과 속성에도 붙는다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">game.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">/** 게임의 장르 */
+type GameGenre = "FPS" | "MMORPG";
+
+/** 메이플스토리에 대한 정보 */
+interface MapleStory {
+  genre: GameGenre;
+
+  /** 출시 연도 */
+  releaseYear: number;
+}</code></pre>
+  </div>
+
+  <p><a href="#item-33">아이템 33</a>에서 본 것처럼, 타입에 붙인 주석은 <b>그 타입을 쓰는 모든 자리</b>에 따라다닌다. 한 번 쓰고 여러 번 읽히는 문서다.</p>
+
+  <h4>주석에 쓰지 말아야 할 것</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>쓰지 않는다</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>타입 정보</td><td>이미 시그니처에 있다 (<a href="#item-30">아이템 30</a>)</td></tr>
+        <tr><td><code>@param {string} name</code> 처럼 JSDoc 타입 표기</td><td>타입스크립트에서는 무의미하고 어긋날 수 있다</td></tr>
+        <tr><td>장황한 산문</td><td>툴팁 공간은 좁다. 짧게 쓴다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">알아 두면 좋은 태그 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>태그</th><th>효과</th></tr></thead>
+          <tbody>
+            <tr><td><code>@deprecated</code></td><td>편집기가 <s>취소선</s>으로 표시한다. 마이그레이션 유도에 매우 효과적</td></tr>
+            <tr><td><code>@example</code></td><td>툴팁에 사용 예를 보여 준다</td></tr>
+            <tr><td><code>@see</code></td><td>관련 항목으로 연결</td></tr>
+            <tr><td><code>@throws</code></td><td>어떤 예외를 던지는지</td></tr>
+            <tr><td><code>@internal</code></td><td>공개 API 가 아님을 표시 (문서 생성 도구가 제외한다)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>주석 안에서 <b>마크다운</b>이 동작한다. 굵게, 코드 블록, 목록을 쓸 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>익스포트된 함수, 클래스, 타입에 주석을 달 때는 <b>JSDoc/TSDoc 형식</b>을 쓴다. 편집기가 툴팁으로 보여 준다.</li>
+      <li><code>@param</code>, <code>@returns</code>, <code>@deprecated</code> 같은 규칙을 활용한다.</li>
+      <li>주석에 <b>타입 정보를 포함하지 않는다.</b></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-49" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 49</div>
+    <h3>콜백에서 this에 대한 타입 제공하기</h3>
+    <p class="item-tagline"><code>this</code> 는 <b>정의된 방식이 아니라 호출된 방식</b>에 따라 결정된다. 콜백 API 를 만든다면 그 사실을 타입으로 알려야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    콜백 타입의 <b>첫 번째 매개변수로 <code>this</code></b> 를 선언하면, 타입스크립트가 <code>this</code> 의 타입을 검사하고 추론해 준다.
+  </div>
+
+  <h4>먼저 — this 는 왜 헷갈리는가</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">this-basics.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class C {
+  values = [1, 2, 3];
+
+  logSquares() {
+    this.values.forEach(function (val) {
+      console.log(val * val);
+    });
+  }
+}
+
+const c1 = new C();
+c1.logSquares(); // 1, 4, 9
+
+const c2 = new C();
+const method = c2.logSquares;
+method();
+// TypeError: Cannot read properties of undefined (reading 'values')</code></pre>
+  </div>
+
+  <p><code>c1.logSquares()</code> 는 <b>두 가지 일</b>을 한다. <code>C.prototype.logSquares</code> 를 호출하고, <code>this</code> 를 <code>c1</code> 로 바인딩한다. 참조만 꺼내 호출하면 <b>두 번째가 빠진다.</b></p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">this-basics.ts</span>
+      <span class="code-tag good">call 로 명시적으로 바인딩</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const c3 = new C();
+const method3 = c3.logSquares;
+method3.call(c3); // 1, 4, 9</code></pre>
+  </div>
+
+  <h4>클래스에서의 두 가지 선언 방식</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">button.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class ResetButton {
+  // 메서드 — 호출 시점에 this 가 결정된다
+  onClick1() {
+    console.log("Reset:", this);
+  }
+
+  // 화살표 필드 — 선언 시점(인스턴스 생성 시)에 this 가 고정된다
+  onClick2 = () =&gt; {
+    console.log("Reset:", this);
+  };
+}
+
+const btn = new ResetButton();
+
+const m1 = btn.onClick1;
+m1(); // Reset: undefined
+
+const m2 = btn.onClick2;
+m2(); // Reset: ResetButton {}</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>메서드 <code>onClick1()</code></th><th>화살표 필드 <code>onClick2 = () =&gt; {}</code></th></tr></thead>
+      <tbody>
+        <tr><td><code>this</code> 결정 시점</td><td>호출 시점</td><td>인스턴스 생성 시점</td></tr>
+        <tr><td>위치</td><td><code>prototype</code> (인스턴스 간 공유)</td><td>인스턴스마다 하나씩</td></tr>
+        <tr><td>메모리</td><td>효율적</td><td>인스턴스 수만큼 함수 생성</td></tr>
+        <tr><td>콜백으로 넘길 때</td><td class="t-no">바인딩이 필요하다</td><td class="t-ok">안전하다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>본론 — 콜백 타입에 this 를 선언하기</h4>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 아이템의 제목에 해당하는 부분을 보강했습니다 <span class="badge b-blue">보강</span></p>
+      <p>원문 노트는 <code>this</code> 바인딩의 기초까지만 기록되어 있었습니다. 아래는 "<b>콜백에서 this 에 대한 타입을 제공</b>"하는 방법입니다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">listener.ts</span>
+      <span class="code-tag bad">this 의 타입을 알 수 없다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function addKeyListener(
+  el: HTMLElement,
+  fn: (e: KeyboardEvent) =&gt; void
+) {
+  el.addEventListener("keydown", (e) =&gt; {
+    fn.call(el, e); // 호출할 때 el 을 this 로 넘기고 있지만
+  });               // 타입에는 그 정보가 없다
+}
+
+addKeyListener(el, function (e) {
+  this.innerHTML = "";
+  // ~~~~ 'this'에 암시적으로 'any' 형식이 있습니다.
+});</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">listener.ts</span>
+      <span class="code-tag good">this 를 첫 매개변수로 선언</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function addKeyListener(
+  el: HTMLElement,
+  fn: (this: HTMLElement, e: KeyboardEvent) =&gt; void
+) {
+  el.addEventListener("keydown", (e) =&gt; {
+    fn.call(el, e);
+  });
+}
+
+addKeyListener(el, function (e) {
+  this.innerHTML = ""; // this 가 HTMLElement 로 추론된다
+});</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">얻는 것이 두 가지다</p>
+      <ol>
+        <li>콜백 안에서 <code>this</code> 가 <b>정확한 타입</b>으로 추론된다.</li>
+        <li>구현부에서 <code>fn(e)</code> 로 잘못 호출하면 <b>컴파일 오류</b>가 난다. <code>this</code> 를 넘기는 것을 잊을 수 없다.</li>
+      </ol>
+      <p><code>this</code> 매개변수는 <b>가짜 매개변수</b>다. 컴파일하면 사라지고, 호출할 때 인수로 세지 않는다.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">화살표 함수로는 받을 수 없다</p>
+      <p>콜백을 화살표 함수로 넘기면 <code>this</code> 가 <b>바깥 스코프의 것</b>으로 고정되므로 위 타입이 무의미해진다. <code>this</code> 를 쓰는 콜백은 <code>function</code> 키워드로 쓴다. 반대로, <code>this</code> 를 쓰지 않을 거라면 화살표 함수가 언제나 더 안전하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>this</code> 바인딩이 동작하는 원리를 이해해야 한다. <b>호출된 방식</b>이 결정한다.</li>
+      <li>콜백 함수에서 <code>this</code> 를 쓴다면, <b>타입 정보를 명시</b>하기 위해 <code>this</code> 를 콜백 타입의 첫 매개변수로 선언한다.</li>
+      <li>클래스 메서드를 콜백으로 넘길 때는 화살표 필드로 선언하거나 <code>bind</code> 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-50" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 50</div>
+    <h3>오버로딩 타입보다는 조건부 타입을 사용하기</h3>
+    <p class="item-tagline">유니온 매개변수 때문에 오버로딩을 쓰고 있다면, <b>조건부 타입으로 바꿔 본다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    오버로딩은 각 선언을 <b>독립적으로</b> 처리하지만, 조건부 타입은 유니온에 <b>분배</b>되어 더 정확한 결과를 낸다.
+  </div>
+
+  <h4>문제 — 오버로딩으로는 관계를 표현할 수 없다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">double.ts</span>
+      <span class="code-tag bad">반환 타입이 뭉개진다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function double(x: number | string): number | string;
+function double(x: any) {
+  return x + x;
+}
+
+const num = double(100);     // number | string
+const str = double("hello"); // number | string</code></pre>
+  </div>
+
+  <p><code>double(100)</code> 이 <code>string</code> 을 반환할 리 없는데 타입은 그렇게 말한다. 오버로딩 선언을 나눠 봐도 문제가 남는다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">double.ts</span>
+      <span class="code-tag bad">유니온을 넘길 수 없게 된다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function double(x: number): number;
+function double(x: string): string;
+function double(x: any) { return x + x; }
+
+const num = double(100);     // number ✓
+const str = double("hello"); // string ✓
+
+function f(x: number | string) {
+  return double(x);
+  //            ~ 'string | number' 형식의 인수는
+  //              'number' 형식의 매개 변수에 할당될 수 없습니다.
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">왜 막히나</p>
+      <p>타입스크립트는 오버로딩 목록을 <b>위에서부터 하나씩 시도</b>한다. <code>string | number</code> 는 <code>number</code> 에도 <code>string</code> 에도 통째로는 맞지 않으므로 <b>어느 선언도 매칭되지 않는다.</b> 세 번째 오버로딩을 추가할 수는 있지만, 그러면 다시 반환 타입이 유니온으로 뭉개진다.</p>
+    </div>
+  </div>
+
+  <h4>해법 — 조건부 타입</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">double.ts</span>
+      <span class="code-tag good">모든 경우가 정확하다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function double&lt;T extends number | string&gt;(
+  x: T
+): T extends string ? string : number;
+function double(x: any) {
+  return x + x;
+}
+
+const num = double(100);     // number
+const str = double("hello"); // string
+
+function f(x: number | string) {
+  return double(x); // string | number ✓
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">분배 법칙이 핵심이다</p>
+      <p>조건부 타입은 유니온을 만나면 <b>각 갈래에 따로 적용된 뒤 다시 합쳐진다.</b></p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">distribute.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">// T = string | number 일 때
+(string | number) extends string ? string : number
+// ↓ 분배된다
+(string extends string ? string : number) |
+(number extends string ? string : number)
+// ↓
+string | number</code></pre>
+      </div>
+      <p>이 성질 덕분에 <b>오버로딩을 세 개 쓰던 것을 하나로</b> 줄일 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">구현부 시그니처는 여전히 any 다</p>
+      <p><code>function double(x: any)</code> 라는 구현 시그니처는 <b>외부에 노출되지 않는다.</b> 호출자는 조건부 타입 시그니처만 본다. 즉 <a href="#item-40">아이템 40</a>과 같은 구조다 — <b>단언과 any 를 함수 안에 가둔다.</b></p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>오버로딩 타입보다 <b>조건부 타입</b>을 쓰는 것이 좋다. 유니온에 분배되어 더 정확하다.</li>
+      <li>조건부 타입은 <b>추가적인 오버로딩 없이</b> 유니온 타입을 지원할 수 있다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-51" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 51</div>
+    <h3>의존성 분리를 위해 미러 타입 사용하기</h3>
+    <p class="item-tagline">필요한 <b>모양만</b> 선언하면, 남의 타입 패키지에 의존하지 않아도 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    구조적 타이핑(<a href="#item-4">아이템 4</a>) 덕분에, <b>필요한 메서드만 가진 인터페이스</b>를 선언해도 실제 객체가 그대로 들어맞는다.
+  </div>
+
+  <h4>문제 — Buffer 하나 때문에 @types/node 에 의존한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">parse-csv.ts</span>
+      <span class="code-tag bad">모두에게 Node 타입을 강요한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">type CSVResult = { [column: string]: string }[];
+
+function parseCSV(contents: string | Buffer): CSVResult {
+  if (typeof contents === "object") {
+    return parseCSV(contents.toString("utf8"));
+  }
+  // ...
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">누가 곤란해지나</p>
+      <ul>
+        <li><b><code>@types</code> 와 무관한 자바스크립트 개발자</b> — 필요도 없는 타입 패키지가 설치된다</li>
+        <li><b>Node.js 와 무관한 타입스크립트 웹 개발자</b> — 브라우저 코드에 Node 전역 타입이 딸려 온다</li>
+      </ul>
+      <p><code>Buffer</code> 는 <b>Node.js 를 쓰는 사용자에게만</b> 필요하다.</p>
+    </div>
+  </div>
+
+  <h4>해법 — 필요한 부분만 미러링한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">parse-csv.ts</span>
+      <span class="code-tag good">의존성 0</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface CSVBuffer {
+  toString(encoding?: string): string;
+}
+
+type CSVResult = { [column: string]: string }[];
+
+function parseCSV(contents: string | CSVBuffer): CSVResult {
+  if (typeof contents === "object") {
+    return parseCSV(contents.toString("utf8"));
+  }
+  // ...
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">Node 사용자는 그대로 Buffer 를 넘긴다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const buffer = Buffer.from("a,b,c\n1,2,3", "utf-8");
+parseCSV(buffer); // 정상 — Buffer 가 CSVBuffer 를 만족한다</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>원문 노트의 <code>new Buffer("", "utf-8")</code> 은 Node.js 6 부터 <b>사용이 권장되지 않는</b> 생성자다(보안 문제로 deprecated). <code>Buffer.from()</code> 또는 <code>Buffer.alloc()</code> 을 쓴다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">언제 미러링하고 언제 하지 않나</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>상황</th><th>선택</th></tr></thead>
+          <tbody>
+            <tr><td>메서드 한두 개만 쓴다</td><td class="t-ok">미러 타입</td></tr>
+            <tr><td>타입 대부분을 써야 한다</td><td class="t-no"><code>@types</code> 를 정식 의존성으로</td></tr>
+            <tr><td>내가 <b>라이브러리</b> 작성자다</td><td class="t-ok">미러링을 적극 고려</td></tr>
+            <tr><td>내가 <b>애플리케이션</b> 작성자다</td><td>굳이 할 필요 없다. 어차피 내 프로젝트 안이다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>이 기법은 <a href="#item-4">아이템 4</a>의 <code>DB</code> 인터페이스 예제와 정확히 같은 원리다. <b>필요한 만큼만 요구하면 테스트도 쉬워진다.</b></p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>필수가 아닌 의존성을 분리할 때는 <b>구조적 타이핑</b>을 사용한다.</li>
+      <li>자바스크립트 사용자가 <code>@types</code> 를 설치하지 않게, 웹 개발자가 Node 타입을 설치하지 않게 한다.</li>
+      <li>다른 라이브러리의 타입 선언 <b>대부분</b>을 추출해야 한다면, 차라리 정식 의존성을 추가한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-52" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 52</div>
+    <h3>테스팅 타입의 함정에 주의하기</h3>
+    <p class="item-tagline">타입도 테스트해야 한다. 그런데 <b>순진하게 테스트하면 통과하는 오답</b>이 잔뜩 생긴다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    변수 할당으로 타입을 테스트하면 <b>"같은가"가 아니라 "할당 가능한가"</b>를 테스트하게 된다. 전용 도구를 쓴다.
+  </div>
+
+  <h4>출발점 — 호출만 하는 테스트</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">map.test.ts</span>
+      <span class="code-tag bad">반환 타입을 전혀 확인하지 않는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare function map&lt;U, V&gt;(array: U[], fn: (u: U) =&gt; V): V[];
+
+map(["1", "2", "3"], (v) =&gt; +v); // 실행만 된다</code></pre>
+  </div>
+
+  <h4>1단계 — 변수에 할당해 본다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">map.test.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const lengths: number[] = map(["a", "aa"], (s) =&gt; s.length); // 통과
+
+const wrong: string[] = map(["a", "aa"], (s) =&gt; s.length);
+//    ~~~~~ 'number[]' 형식은 'string[]' 형식에 할당할 수 없습니다.</code></pre>
+  </div>
+
+  <p>동작하지만 <b>쓰지 않는 변수</b>가 생긴다. 린터가 경고하고, 억제 주석이 늘어난다. 헬퍼 함수로 바꾼다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">map.test.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function assertType&lt;T&gt;(x: T) {}
+
+assertType&lt;number[]&gt;(map(["a", "aa"], (s) =&gt; s.length)); // 통과</code></pre>
+  </div>
+
+  <h4>함정 1 — 할당 가능성만 검사한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">trap.ts</span>
+      <span class="code-tag bad">타입이 달라도 통과한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const n = 12;              // 타입은 12
+assertType&lt;number&gt;(n);     // 통과 — 12 는 number 의 서브타입이니까
+
+assertType&lt;{ name: string }[]&gt;(
+  map(["a", "b"], (v) =&gt; ({ name: v, hello: "world" }))
+); // 통과 — hello 속성은 검사되지 않는다</code></pre>
+  </div>
+
+  <p>우리가 알고 싶은 것은 "타입이 <b>정확히</b> <code>{name: string}[]</code> 인가"인데, 실제로 검사된 것은 "<b>할당 가능한가</b>"다. 잉여 속성 체크(<a href="#item-11">아이템 11</a>)도 여기서는 작동하지 않는다.</p>
+
+  <h4>함정 2 — 매개변수가 적은 함수는 언제나 할당 가능하다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">trap.ts</span>
+      <span class="code-tag bad">둘 다 통과한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const add = (a: number, b: number) =&gt; a + b;
+assertType&lt;(a: number, b: number) =&gt; number&gt;(add);    // 통과 (기대대로)
+
+const double = (x: number) =&gt; x * 2;
+assertType&lt;(a: number, b: number) =&gt; number&gt;(double); // 통과 (?!)</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">이건 버그가 아니라 필수 기능이다</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">why.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">[1, 2, 3].map((item) =&gt; item * 2);
+// map 의 콜백 타입은 (value, index, array) =&gt; U 인데
+// 우리는 매개변수 하나만 쓴다</code></pre>
+      </div>
+      <p>매개변수가 적은 함수를 할당할 수 없다면 <b>거의 모든 콜백 코드가 컴파일되지 않는다.</b> 그래서 타입스크립트는 이걸 허용한다. 타입 테스트에서만 문제가 되는 것이다.</p>
+    </div>
+  </div>
+
+  <h4>매개변수와 반환 타입을 분리해서 검사하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">trap.ts</span>
+      <span class="code-tag good">이제 잡힌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const double = (x: number) =&gt; x * 2;
+
+let p: Parameters&lt;typeof double&gt; = null!;
+assertType&lt;[number, number]&gt;(p);
+//                           ~ '[x: number]' 형식의 인수는
+//                             '[number, number]' 형식의 매개 변수에 ...
+
+let r: ReturnType&lt;typeof double&gt; = null!;
+assertType&lt;number&gt;(r); // 통과</code></pre>
+  </div>
+
+  <h4>함정 3 — this 가 있는 콜백</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">this-test.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare function map&lt;U, V&gt;(
+  array: U[],
+  fn: (this: U[], u: U, i: number, array: U[]) =&gt; V
+): V[];
+
+const names = ["john", "jane", "joe"];
+assertType&lt;number[]&gt;(
+  map(names, function (name, i, array) {
+    assertType&lt;string&gt;(name);
+    assertType&lt;number&gt;(i);
+    assertType&lt;string[]&gt;(array);
+    assertType&lt;string[]&gt;(this);   // this 타입도 검사한다
+    return name.length;
+  })
+);</code></pre>
+  </div>
+
+  <p>콜백의 <code>this</code> 까지 테스트하려면 <code>map</code> 의 시그니처가 <code>this</code> 매개변수를 선언해야 한다(<a href="#item-49">아이템 49</a>).</p>
+
+  <h4>절대 하면 안 되는 것 — 모듈 선언</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">danger.d.ts</span>
+      <span class="code-tag bad">모든 테스트가 통과한다. 아무것도 검사하지 않으니까</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare module "overbar";</code></pre>
+  </div>
+
+  <p>이 한 줄은 해당 모듈 <b>전체를 <code>any</code></b> 로 만든다. 테스트는 전부 초록불이 되지만 아무 의미가 없다. <b>타입 시스템 내부에서 암시적 any 를 발견하는 것은 매우 어렵다</b>는 것이 이 아이템의 마지막 교훈이다.</p>
+
+  <h4>결론 — 전용 도구를 쓴다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dtslint 스타일</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const names = ["john", "jane", "joe"];
+map(
+  names,
+  function (
+    name,  // $ExpectType string
+    index, // $ExpectType number
+    array  // $ExpectType string[]
+  ) {
+    this;  // $ExpectType string[]
+    return name.length;
+  }
+); // $ExpectType number[]</code></pre>
+  </div>
+
+  <p><code>dtslint</code> 는 <b>타입 체커와 독립적으로</b> 동작한다. 편집기가 표시하는 타입 문자열을 그대로 비교하므로 할당 가능성 문제를 피한다. 다만 문자열 비교라서 <code>string|number</code> 와 <code>number|string</code> 을 다르게 볼 수 있다.</p>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">요즘 쓰는 도구들 <span class="badge b-purple">최신 반영</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>도구</th><th>특징</th></tr></thead>
+          <tbody>
+            <tr><td><code>expect-type</code></td><td><code>expectTypeOf(x).toEqualTypeOf&lt;T&gt;()</code>. <b>정확한 일치</b>를 검사한다. Vitest 에 내장되어 있다</td></tr>
+            <tr><td><code>tsd</code></td><td><code>expectType&lt;T&gt;(x)</code>. 라이브러리 배포용 <code>.test-d.ts</code> 작성에 적합</td></tr>
+            <tr><td><code>@ts-expect-error</code></td><td>"여기서 오류가 나야 한다"를 별도 도구 없이 검사 (<a href="#item-38">아이템 38</a>)</td></tr>
+            <tr><td><code>@arethetypeswrong/cli</code></td><td>패키지 타입 진입점이 ESM/CJS 에서 제대로 해석되는지</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">map.test-d.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">import { expectTypeOf } from "expect-type";
+
+expectTypeOf(map(["a", "aa"], (s) =&gt; s.length)).toEqualTypeOf&lt;number[]&gt;();
+
+// 할당 가능성이 아니라 정확한 일치를 본다
+expectTypeOf(12).toEqualTypeOf&lt;number&gt;();
+//               ~~~~~~~~~~~~~ 12 와 number 는 다르다 → 실패</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입을 테스트할 때는 <b>함수 타입의 동일성(identity)과 할당 가능성(assignability)의 차이</b>를 알아야 한다.</li>
+      <li>콜백이 있는 함수를 테스트할 때는 <b>콜백 매개변수의 추론된 타입</b>을 확인한다. <code>this</code> 도 잊지 않는다.</li>
+      <li>테스트 자체에 <code>any</code> 를 쓰지 않도록 조심한다. <code>declare module</code> 이 대표적인 함정이다.</li>
+      <li><code>expect-type</code>, <code>tsd</code>, <code>dtslint</code> 같은 <b>전용 도구</b>를 사용하는 것이 좋다.</li>
+    </ul>
+  </div>
+</article>

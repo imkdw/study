@@ -1,0 +1,135 @@
+{
+  "title": "이펙티브 타입스크립트",
+  "subtitle": "62 items · 학습 정리본",
+  "mark": "TS",
+  "eyebrow": "STUDY DIGEST",
+  "description": "이펙티브 타입스크립트 62개 아이템 학습 정리본. 타입 시스템, 타입 추론, 타입 설계, any 다루기, 타입 선언, 마이그레이션까지.",
+  "lead": "공부하며 남긴 노트 62편을 한 권으로 엮었습니다. 원문의 흐름은 그대로 두고, IDE 스크린샷은 다시 그렸으며, 책 출간 이후 바뀐 것은 <b>TypeScript 5.x 기준</b>으로 덧붙였습니다.",
+  "footer": "Dan Vanderkam, <b>Effective TypeScript</b> 를 읽고 남긴 개인 학습 노트를 정리한 문서입니다. 검증은 TypeScript Handbook / Release Notes / MDN / Node.js Docs 기준.",
+  "stats": [
+    { "val": "62", "unit": "개", "label": "아이템" },
+    { "val": "8", "unit": "개", "label": "챕터" },
+    { "val": "13", "unit": "개", "label": "재현한 도해" },
+    { "val": "5.x", "label": "반영한 TS 버전" }
+  ],
+  "chapters": [
+    {
+      "id": "ch1", "short": "CH 1", "navTitle": "타입스크립트 알아보기",
+      "title": "타입스크립트 알아보기", "file": "ch1.html",
+      "lead": "타입스크립트가 자바스크립트와 어떤 관계인지, 컴파일러가 무슨 일을 하는지, 타입이 <b>왜 런타임에 사라지는지</b>부터 잡고 갑니다. 나머지 61개 아이템이 전부 이 챕터의 전제 위에 서 있습니다.",
+      "items": [
+        { "id": "item-1", "idx": "1", "title": "타입스크립트와 자바스크립트의 관계 이해하기", "keywords": "superset 슈퍼셋 상위집합 타입체커 런타임 모델링 type stripping" },
+        { "id": "item-2", "idx": "2", "title": "타입스크립트 설정 이해하기", "keywords": "tsconfig noImplicitAny strictNullChecks strict compilerOptions tsc --init" },
+        { "id": "item-3", "idx": "3", "title": "코드 생성과 타입이 관계없음을 이해하기", "keywords": "transpile emit noEmitOnError instanceof 태그 tagged union 런타임 erasableSyntaxOnly" },
+        { "id": "item-4", "idx": "4", "title": "구조적 타이핑에 익숙해지기", "keywords": "structural typing duck typing 덕타이핑 sealed 봉인 테스트 모킹" },
+        { "id": "item-5", "idx": "5", "title": "any 타입 지양하기", "keywords": "any gradual optional 점진적 선택적 자동완성 리팩터링 unknown" }
+      ]
+    },
+    {
+      "id": "ch2", "short": "CH 2", "navTitle": "타입스크립트의 타입 시스템",
+      "title": "타입스크립트의 타입 시스템", "file": "ch2.html",
+      "lead": "타입을 <b>값들의 집합</b>으로 보는 관점을 세우는 챕터입니다. 이 관점 하나로 할당 가능성, 유니온, 인터섹션, extends, 잉여 속성 체크가 전부 한 줄로 설명됩니다.",
+      "items": [
+        { "id": "item-6", "idx": "6", "title": "편집기를 사용하여 타입 시스템 탐색하기", "keywords": "editor IDE 추론 hover 툴팁 go to definition 타입 정의" },
+        { "id": "item-7", "idx": "7", "title": "타입이 값들의 집합이라고 생각하기", "keywords": "집합 set never unit literal union intersection extends 부분집합 keyof" },
+        { "id": "item-8", "idx": "8", "title": "타입 공간과 값 공간의 심벌 구분하기", "keywords": "type space value space typeof class this 심벌 declaration" },
+        { "id": "item-9", "idx": "9", "title": "타입 단언보다는 타입 선언을 사용하기", "keywords": "as assertion declaration 화살표 함수 non-null !" },
+        { "id": "item-10", "idx": "10", "title": "객체 래퍼 타입 피하기", "keywords": "String Number Boolean Symbol BigInt wrapper 래퍼 primitive" },
+        { "id": "item-11", "idx": "11", "title": "잉여 속성 체크의 한계 인지하기", "keywords": "excess property check 객체 리터럴 fresh 임시변수 할당 가능성" },
+        { "id": "item-12", "idx": "12", "title": "함수 표현식에 타입 적용하기", "keywords": "function expression 함수 타입 typeof fetch 시그니처 재사용" },
+        { "id": "item-13", "idx": "13", "title": "타입과 인터페이스의 차이점 알기", "keywords": "type interface 선언 병합 declaration merging 유니온 확장" },
+        { "id": "item-14", "idx": "14", "title": "타입 연산과 제네릭 사용으로 반복 줄이기", "keywords": "DRY Pick Omit Partial Record keyof typeof ReturnType 제네릭" },
+        { "id": "item-15", "idx": "15", "title": "동적 데이터에 인덱스 시그니처 사용하기", "keywords": "index signature Record 동적 데이터 CSV 매핑 타입" },
+        { "id": "item-16", "idx": "16", "title": "number 인덱스 시그니처보다 Array, 튜플, ArrayLike 사용하기", "keywords": "number index signature Array Tuple ArrayLike for-in for-of" },
+        { "id": "item-17", "idx": "17", "title": "변경 관련된 오류 방지를 위해 readonly 사용하기", "keywords": "readonly ReadonlyArray const 얕은 shallow 불변" },
+        { "id": "item-18", "idx": "18", "title": "매핑된 타입을 사용하여 값을 동기화하기", "keywords": "mapped type 매핑된 타입 리렌더링 shouldUpdate 동기화" }
+      ]
+    },
+    {
+      "id": "ch3", "short": "CH 3", "navTitle": "타입 추론",
+      "title": "타입 추론", "file": "ch3.html",
+      "lead": "타입을 <b>언제 적고 언제 적지 않을지</b>를 다룹니다. 좋은 타입스크립트 코드는 타입 구문이 적은 코드입니다. 추론이 어디까지 해주는지 알아야 그 선을 그을 수 있습니다.",
+      "items": [
+        { "id": "item-19", "idx": "19", "title": "추론 가능한 타입을 사용해 장황한 코드 방지하기", "keywords": "inference 추론 명시적 타입 구문 반환 타입 시그니처" },
+        { "id": "item-20", "idx": "20", "title": "다른 타입에는 다른 변수 사용하기", "keywords": "변수 재사용 유니온 const let 스코프" },
+        { "id": "item-21", "idx": "21", "title": "타입 넓히기", "keywords": "widening 넓히기 const as const 리터럴 satisfies" },
+        { "id": "item-22", "idx": "22", "title": "타입 좁히기", "keywords": "narrowing 좁히기 type guard 타입 가드 instanceof in 태그된 유니온 is" },
+        { "id": "item-23", "idx": "23", "title": "한꺼번에 객체 생성하기", "keywords": "객체 생성 스프레드 spread 조건부 속성 헬퍼" },
+        { "id": "item-24", "idx": "24", "title": "일관성 있는 별칭 사용하기", "keywords": "alias 별칭 구조분해 destructuring 제어 흐름 분석" },
+        { "id": "item-25", "idx": "25", "title": "비동기 코드에는 콜백 대신 async 함수 사용하기", "keywords": "async await Promise 콜백지옥 race 병렬" },
+        { "id": "item-26", "idx": "26", "title": "타입 추론에 문맥이 어떻게 사용되는지 이해하기", "keywords": "contextual typing 문맥 as const 튜플 상수 분리" },
+        { "id": "item-27", "idx": "27", "title": "함수형 기법과 라이브러리로 타입 흐름 유지하기", "keywords": "함수형 lodash map flatMap 체이닝 타입 흐름" }
+      ]
+    },
+    {
+      "id": "ch4", "short": "CH 4", "navTitle": "타입 설계",
+      "title": "타입 설계", "file": "ch4.html",
+      "lead": "이 책에서 가장 값어치가 큰 챕터입니다. <b>타입을 잘 설계하면 코드는 자연스럽게 따라옵니다.</b> 잘못된 상태를 표현할 수 없게 만드는 것이 핵심입니다.",
+      "items": [
+        { "id": "item-28", "idx": "28", "title": "유효한 상태만 표현하는 타입을 지향하기", "keywords": "유효한 상태 invalid state 태그된 유니온 discriminated union 상태 설계" },
+        { "id": "item-29", "idx": "29", "title": "사용할 때는 너그럽게, 생성할 때는 엄격하게", "keywords": "포스텔의 법칙 robustness 매개변수 반환 타입 느슨한 엄격한" },
+        { "id": "item-30", "idx": "30", "title": "문서에 타입 정보를 쓰지 않기", "keywords": "주석 문서 JSDoc 중복 readonly 단위 이름" },
+        { "id": "item-31", "idx": "31", "title": "타입 주변에 null 값 배치하기", "keywords": "null undefined strictNullChecks 클래스 초기화 반환값" },
+        { "id": "item-32", "idx": "32", "title": "유니온의 인터페이스보다 인터페이스의 유니온 사용하기", "keywords": "union of interfaces 태그된 유니온 layer 레이어 함께 정의" },
+        { "id": "item-33", "idx": "33", "title": "string 타입보다 더 구체적인 타입 사용하기", "keywords": "string 남용 유니온 리터럴 keyof 자동완성 문서화" },
+        { "id": "item-34", "idx": "34", "title": "부정확한 타입보다는 미완성 타입을 사용하기", "keywords": "부정확 imprecise GeoJSON 자동완성 타입 정밀도" },
+        { "id": "item-35", "idx": "35", "title": "데이터가 아닌 API와 명세를 보고 타입 만들기", "keywords": "명세 spec GraphQL GeoJSON 코드 생성 apollo quicktype" },
+        { "id": "item-36", "idx": "36", "title": "해당 분야의 용어로 타입 이름 짓기", "keywords": "네이밍 도메인 용어 ubiquitous language INFO DATA" },
+        { "id": "item-37", "idx": "37", "title": "공식 명칭에는 상표를 붙이기", "keywords": "branded type 상표 nominal typing 명목적 타이핑 절대경로" }
+      ]
+    },
+    {
+      "id": "ch5", "short": "CH 5", "navTitle": "any 다루기",
+      "title": "any 다루기", "file": "ch5.html",
+      "lead": "any 를 아예 안 쓰기는 어렵습니다. 대신 <b>피해 반경을 좁히는 법</b>을 배웁니다. 좁은 범위, 구체적인 형태, 함수 안에 숨기기, 그리고 unknown.",
+      "items": [
+        { "id": "item-38", "idx": "38", "title": "any 타입은 가능한 한 좁은 범위에서만 사용하기", "keywords": "any 범위 as any 지역 ts-ignore ts-expect-error" },
+        { "id": "item-39", "idx": "39", "title": "any를 구체적으로 변형해서 사용하기", "keywords": "any[] object Record 구체적 any 함수 시그니처" },
+        { "id": "item-40", "idx": "40", "title": "함수 안으로 타입 단언문 감추기", "keywords": "단언문 감추기 캐시 shallowEqual 시그니처" },
+        { "id": "item-41", "idx": "41", "title": "any의 진화를 이해하기", "keywords": "evolving any 진화 암시적 any noImplicitAny 배열" },
+        { "id": "item-42", "idx": "42", "title": "모르는 타입의 값에는 any 대신 unknown 사용하기", "keywords": "unknown never 타입 가드 이중 단언 안전" },
+        { "id": "item-43", "idx": "43", "title": "몽키 패치보다는 안전한 타입을 사용하기", "keywords": "monkey patch 몽키패치 declare global window 보강 augmentation" },
+        { "id": "item-44", "idx": "44", "title": "타입 커버리지를 추적하여 타입 안전성 유지하기", "keywords": "type-coverage 커버리지 any 추적 노이즈" }
+      ]
+    },
+    {
+      "id": "ch6", "short": "CH 6", "navTitle": "타입 선언과 @types",
+      "title": "타입 선언과 @types", "file": "ch6.html",
+      "lead": "라이브러리를 쓰는 쪽과 <b>만드는 쪽</b>의 이야기입니다. 의존성 세 갈래, 타입 선언 버전 문제, TSDoc, this 타입, 조건부 타입까지.",
+      "items": [
+        { "id": "item-45", "idx": "45", "title": "devDependencies에 typescript와 @types 추가하기", "keywords": "dependencies devDependencies peerDependencies @types DefinitelyTyped" },
+        { "id": "item-46", "idx": "46", "title": "타입 선언과 관련된 세 가지 버전 이해하기", "keywords": "버전 라이브러리 @types 타입스크립트 번들 declaration" },
+        { "id": "item-47", "idx": "47", "title": "공개 API에 등장하는 모든 타입을 익스포트하기", "keywords": "export 공개 API Parameters ReturnType 추출" },
+        { "id": "item-48", "idx": "48", "title": "API 주석에 TSDoc 사용하기", "keywords": "TSDoc JSDoc @param @returns 마크다운 툴팁" },
+        { "id": "item-49", "idx": "49", "title": "콜백에서 this에 대한 타입 제공하기", "keywords": "this 바인딩 call apply bind 화살표 함수 ThisType" },
+        { "id": "item-50", "idx": "50", "title": "오버로딩 타입보다는 조건부 타입을 사용하기", "keywords": "오버로딩 overload 조건부 타입 conditional type 유니온 분배" },
+        { "id": "item-51", "idx": "51", "title": "의존성 분리를 위해 미러 타입 사용하기", "keywords": "mirror type 미러 타입 구조적 타이핑 @types 의존성" },
+        { "id": "item-52", "idx": "52", "title": "테스팅 타입의 함정에 주의하기", "keywords": "타입 테스트 dtslint expectType 매개변수 개수 할당 가능성" }
+      ]
+    },
+    {
+      "id": "ch7", "short": "CH 7", "navTitle": "코드를 작성하고 실행하기",
+      "title": "코드를 작성하고 실행하기", "file": "ch7.html",
+      "lead": "타입 시스템 바깥의 이야기입니다. TS 고유 기능 중 <b>쓰지 말아야 할 것</b>, 객체 순회, DOM 계층, private, 소스맵 디버깅.",
+      "items": [
+        { "id": "item-53", "idx": "53", "title": "타입스크립트 기능보다는 ECMAScript 기능을 사용하기", "keywords": "enum 열거형 parameter property 매개변수 속성 namespace 데코레이터" },
+        { "id": "item-54", "idx": "54", "title": "객체를 순회하는 노하우", "keywords": "for-in Object.keys Object.entries keyof 순회 프로토타입" },
+        { "id": "item-55", "idx": "55", "title": "DOM 계층 구조 이해하기", "keywords": "DOM EventTarget Node Element HTMLElement Event 계층" },
+        { "id": "item-56", "idx": "56", "title": "정보를 감추는 목적으로 private 사용하지 않기", "keywords": "private 클로저 # 비공개 필드 접근 제어자" },
+        { "id": "item-57", "idx": "57", "title": "소스맵을 사용하여 타입스크립트 디버깅하기", "keywords": "source map 소스맵 sourceMap 디버깅 디버거 번들러" }
+      ]
+    },
+    {
+      "id": "ch8", "short": "CH 8", "navTitle": "타입스크립트로 마이그레이션하기",
+      "title": "타입스크립트로 마이그레이션하기", "file": "ch8.html",
+      "lead": "실무에서 가장 자주 부딪치는 챕터입니다. 모던 JS 로 먼저 옮기고, @ts-check 로 간을 보고, allowJs 로 공존시키고, 의존성 역순으로 전환한 뒤, <b>noImplicitAny 로 마무리</b>합니다.",
+      "items": [
+        { "id": "item-58", "idx": "58", "title": "모던 자바스크립트로 작성하기", "keywords": "ESM var let const 화살표 함수 클래스 async await 프로토타입" },
+        { "id": "item-59", "idx": "59", "title": "타입스크립트 도입 전에 @ts-check와 JSDoc으로 시험해보기", "keywords": "@ts-check JSDoc checkJs 시험 마이그레이션" },
+        { "id": "item-60", "idx": "60", "title": "allowJs로 타입스크립트와 자바스크립트 같이 사용하기", "keywords": "allowJs 공존 번들러 웹팩 jest 점진적" },
+        { "id": "item-61", "idx": "61", "title": "의존성 관계에 따라 모듈 단위로 전환하기", "keywords": "의존성 madge 순서 리프 leaf 선언 병합 마이그레이션" },
+        { "id": "item-62", "idx": "62", "title": "마이그레이션의 완성을 위해 noImplicitAny 설정하기", "keywords": "noImplicitAny strict 완성 오류 점진적 활성화" }
+      ]
+    }
+  ]
+}

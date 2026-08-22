@@ -1,0 +1,952 @@
+<article class="item" id="item-38" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 38</div>
+    <h3>any 타입은 가능한 한 좁은 범위에서만 사용하기</h3>
+    <p class="item-tagline">any 를 쓸 수밖에 없다면, <b>퍼지는 반경을 최소로</b> 만든다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>const x: any</code> 는 <b>변수가 사는 내내</b> any 이고, <code>x as any</code> 는 <b>그 줄에서만</b> any 다. 후자를 쓴다.
+  </div>
+
+  <h4>변수를 any 로 만들지 말고, 표현식을 단언한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">scope.ts</span>
+      <span class="code-tag bad">원래 오류</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface Foo { foo: string; }
+interface Bar { bar: string; }
+
+declare function expressionReturningFoo(): Foo;
+declare function processBar(b: Bar): void;
+
+function f() {
+  const x = expressionReturningFoo();
+  processBar(x);
+  //         ~ 'Foo' 형식의 인수는 'Bar' 형식의 매개 변수에
+  //           할당될 수 없습니다.
+}</code></pre>
+  </div>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">해법 1</span>
+        <span class="code-tag bad">범위가 넓다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">function f1() {
+  const x: any = expressionReturningFoo();
+  processBar(x);
+  return x;  // 이 함수를 쓰는 모든 곳이
+             // any 로 오염된다
+}
+
+const value = f1(); // any</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">해법 2</span>
+        <span class="code-tag good">한 줄에 갇힌다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">function f2() {
+  const x = expressionReturningFoo(); // Foo
+  processBar(x as any);
+  return x;  // 여전히 Foo
+}
+
+const value = f2(); // Foo</code></pre>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">반환 타입을 적으면 방어벽이 하나 더 생긴다</p>
+      <p>함수 반환 타입을 명시하면(<a href="#item-19">아이템 19</a>) 내부에서 <code>any</code> 를 쓰더라도 <b>바깥으로 새어 나가지 않는다.</b> 함수가 <code>any</code> 의 격리 경계가 되는 셈이다.</p>
+    </div>
+  </div>
+
+  <h4>객체는 통째로 단언하지 말고 문제되는 속성만</h4>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">나쁨</span>
+        <span class="code-tag bad">a, b 검사까지 꺼진다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">const config: Config = {
+  a: 1,
+  b: 2,
+  c: {
+    key: value,
+  },
+} as any;</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">좋음</span>
+        <span class="code-tag good">key 만 꺼진다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">const config: Config = {
+  a: 1,
+  b: 2,
+  c: {
+    key: value as any,
+  },
+};</code></pre>
+    </div>
+  </div>
+
+  <h4>@ts-ignore 대신 @ts-expect-error</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">suppress.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function getLength(str: string) {
+  return str.length;
+}
+
+const a = 1;
+
+getLength(a);
+//        ~ 'number' 형식의 인수는 'string' 형식의 매개 변수에
+//          할당될 수 없습니다.
+
+// @ts-ignore
+getLength(a); // 오류가 사라진다</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">@ts-expect-error 가 더 낫다 <span class="badge b-purple">TS 3.9+</span></p>
+      <p><code>@ts-ignore</code> 는 <b>오류가 사라져도 조용하다.</b> 코드를 고쳐 오류가 없어져도 주석이 그대로 남아, 나중에 진짜 오류가 생기면 그것까지 삼킨다.</p>
+      <p><code>@ts-expect-error</code> 는 <b>오류가 없으면 그 자체가 오류</b>다. "여기 오류가 있을 것"이라고 선언하는 것이므로, 문제가 해결되면 컴파일러가 "이제 이 주석을 지우라"고 알려 준다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">suppress.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">// @ts-expect-error 3rd-party 타입 선언이 잘못됨. issue #123
+getLength(a);
+
+// 나중에 타입이 고쳐지면:
+// ~~~~~~~~~~~~~~~~~ 처리되지 않은 '@ts-expect-error' 지시어입니다.</code></pre>
+      </div>
+      <p>둘 다 <b>이유를 주석으로 남기는 것</b>이 전제다. 이유 없는 억제는 언젠가 반드시 문제가 된다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>의도치 않은 타입 안전성 손실을 피하기 위해 <b>any 의 사용 범위를 최소한으로</b> 좁힌다.</li>
+      <li>함수의 반환 타입이 <code>any</code> 인 경우 타입 안전성이 <b>전염된다.</b> 반환 타입을 명시해 막는다.</li>
+      <li>강제로 타입 오류를 제거해야 한다면 <code>@ts-expect-error</code> 를 이유와 함께 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-39" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 39</div>
+    <h3>any를 구체적으로 변형해서 사용하기</h3>
+    <p class="item-tagline">any 를 써야 한다면 <b>더 구체적인 any</b> 가 없는지 본다. 조금만 좁혀도 얻는 게 많다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>any</code> 대신 <code>any[]</code>, <code>Record&lt;string, any&gt;</code>, <code>(...args: any[]) =&gt; any</code> 처럼 <b>형태만이라도 알려 준다.</b>
+  </div>
+
+  <h4>배열이라는 것만 알려도</h4>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">any</span>
+        <span class="code-tag bad">아무 검사도 없다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">function getLengthBad(arr: any) {
+  return arr.length; // any
+}
+
+getLengthBad(/123/); // 통과. 결과는 undefined</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-file">any[]</span>
+        <span class="code-tag good">셋을 얻는다</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-typescript">function getLengthGood(arr: any[]) {
+  return arr.length; // number
+}
+
+getLengthGood(/123/);
+//            ~~~~~ 'RegExp' 형식의 인수는
+//            'any[]' 형식의 매개 변수에
+//            할당될 수 없습니다.</code></pre>
+    </div>
+  </div>
+
+  <ol>
+    <li>함수 안에서 <code>arr.length</code> 가 <b>실제로 검사된다.</b></li>
+    <li>반환 타입이 <code>any</code> 가 아니라 <code>number</code> 로 추론된다.</li>
+    <li>호출할 때 <b>배열인지 확인</b>한다.</li>
+  </ol>
+
+  <h4>객체일 때 — 세 단계의 선택지</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타입</th><th>키 열거</th><th>값 접근</th><th>쓸 곳</th></tr></thead>
+      <tbody>
+        <tr><td><code>any</code></td><td class="t-center t-ok">✓</td><td class="t-center t-ok">✓</td><td class="t-no">쓰지 않는다</td></tr>
+        <tr><td><code>{[key: string]: any}</code></td><td class="t-center t-ok">✓</td><td class="t-center t-ok">✓</td><td>객체이고 값에 접근해야 할 때</td></tr>
+        <tr><td><code>object</code></td><td class="t-center t-ok">✓</td><td class="t-center t-no">✗</td><td>키만 필요할 때</td></tr>
+        <tr><td><code>unknown</code></td><td class="t-center t-no">✗</td><td class="t-center t-no">✗</td><td>정말 아무것도 모를 때 (<a href="#item-42">아이템 42</a>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">object.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function hasTwelveLetterKey1(o: { [key: string]: any }) {
+  for (const key in o) {
+    if (key.length === 12) {
+      console.log(key, o[key]); // 값 접근 가능
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasTwelveLetterKey2(o: object) {
+  for (const key in o) {
+    if (key.length === 12) {
+      console.log(key, o[key]);
+      //               ~~~~~~ 'string' 형식의 식을 '{}' 인덱스 형식에
+      //                      사용할 수 없으므로 요소에 암시적으로
+      //                      'any' 형식이 있습니다.
+      return true;
+    }
+  }
+  return false;
+}</code></pre>
+  </div>
+
+  <p><code>object</code> 는 <b>키는 열거할 수 있지만 값에는 접근할 수 없다.</b> 값이 필요 없다면 <code>object</code> 가 <code>{[key: string]: any}</code> 보다 안전하다.</p>
+
+  <h4>함수 타입도 세 단계로 구체화한다</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">fn.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">type Fn0 = () =&gt; any;              // 매개변수 없이 호출 가능한 함수
+type Fn1 = (arg: any) =&gt; any;      // 매개변수 1개
+type FnN = (...args: any[]) =&gt; any; // 매개변수 개수 무관 (= Function)
+
+const numArgsBad = (...args: any) =&gt; args.length;    // any 를 반환
+const numArgsGood = (...args: any[]) =&gt; args.length; // number 를 반환</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">Function 타입은 피한다 <span class="badge b-blue">보강</span></p>
+      <p><code>Function</code> 은 <b>어떤 함수든</b> 받고, 호출하면 <code>any</code> 를 반환하며, 매개변수 검사도 하지 않는다. <code>typescript-eslint</code> 의 <code>no-unsafe-function-type</code> 규칙이 이걸 경고한다. <code>(...args: any[]) =&gt; any</code> 로 쓰거나, 가능하면 실제 시그니처를 적는다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>any</code> 를 쓸 때는 <b>정말로 모든 값이 허용되어야 하는지</b> 다시 생각한다.</li>
+      <li><code>any[]</code>, <code>{[id: string]: any}</code>, <code>() =&gt; any</code> 처럼 <b>더 구체적인 형태</b>를 쓴다.</li>
+      <li>키만 필요하면 <code>object</code>, 아무것도 모르면 <code>unknown</code> 을 고려한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-40" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 40</div>
+    <h3>함수 안으로 타입 단언문 감추기</h3>
+    <p class="item-tagline">단언을 아예 안 쓸 수는 없다. 대신 <b>정확한 시그니처를 가진 함수 안에 가둔다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    함수 <b>바깥으로 드러나는 타입은 정확하게</b>, 내부 구현은 필요하면 단언을 쓴다. 단언이 코드 여기저기 흩어지는 것보다 훨씬 낫다.
+  </div>
+
+  <h4>예 1 — 마지막 호출을 캐싱하는 래퍼</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">cache.ts</span>
+      <span class="code-tag bad">타입 체커가 T 와 연결짓지 못한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">declare function shallowEqual(a: any, b: any): boolean;
+
+function cacheLast&lt;T extends Function&gt;(fn: T): T {
+  let lastArgs: any[] | null = null;
+  let lastResult: any;
+
+  return function (...args: any[]) {
+  //     ~~~~~~~~~~~~~~~~~~~~~~~~ '(...args: any[]) =&gt; any' 형식은
+  //                              'T' 형식에 할당할 수 없습니다.
+    if (!lastArgs || !shallowEqual(lastArgs, args)) {
+      lastResult = fn(...args);
+      lastArgs = args;
+    }
+    return lastResult;
+  };
+}</code></pre>
+  </div>
+
+  <p>사람이 보기에는 명백하다. 반환하는 함수는 <b><code>fn</code> 과 같은 매개변수로 호출되고 같은 값을 돌려준다.</b> 타입 체커는 그걸 증명할 수 없을 뿐이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">cache.ts</span>
+      <span class="code-tag good">단언은 안에, 시그니처는 정확하게</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function cacheLast&lt;T extends Function&gt;(fn: T): T {
+  let lastArgs: any[] | null = null;
+  let lastResult: any;
+
+  return function (...args: any[]) {
+    if (!lastArgs || !shallowEqual(lastArgs, args)) {
+      lastResult = fn(...args);
+      lastArgs = args;
+    }
+    return lastResult;
+  } as unknown as T;
+}</code></pre>
+  </div>
+
+  <p>단언은 함수 <b>안에</b> 한 번 있고, <code>cacheLast</code> 를 쓰는 쪽에서는 <code>T</code> 를 그대로 받는다. <b>호출자는 단언의 존재조차 모른다.</b></p>
+
+  <h4>예 2 — 얕은 객체 비교</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">equal.ts</span>
+      <span class="code-tag bad">인덱스 접근이 막힌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function shallowObjectEqual&lt;T extends object&gt;(a: T, b: T): boolean {
+  for (const [k, aVal] of Object.entries(a)) {
+    if (!(k in b) || aVal !== b[k]) {
+      //                      ~~~~ 'string' 형식의 식을 '{}' 인덱스
+      //                           형식에 사용할 수 없으므로 ...
+      return false;
+    }
+  }
+  return Object.keys(a).length === Object.keys(b).length;
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">equal.ts</span>
+      <span class="code-tag good">검증한 뒤의 단언</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function shallowObjectEqual&lt;T extends object&gt;(a: T, b: T): boolean {
+  for (const [k, aVal] of Object.entries(a)) {
+    if (!(k in b) || aVal !== (b as any)[k]) {
+      return false;
+    }
+  }
+  return Object.keys(a).length === Object.keys(b).length;
+}</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">이 단언이 안전한 이유</p>
+      <p><code>k in b</code> 를 <b>바로 앞에서 확인</b>했다. 단축 평가 덕분에 <code>(b as any)[k]</code> 는 <code>k</code> 가 <code>b</code> 에 있을 때만 실행된다. 타입스크립트가 <code>in</code> 검사 결과를 인덱스 접근까지 이어 주지 못할 뿐, <b>논리적으로는 증명되어 있다.</b></p>
+      <p>단언을 쓸 때 스스로에게 물어야 할 질문이 바로 이것이다. <b>"내가 타입 체커보다 더 아는 근거가 코드에 있는가?"</b></p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>타입 선언문은 일반적으로 타입을 위험하게 만들지만, <b>상황에 따라 필요하고 현실적</b>이다.</li>
+      <li>불가피하게 사용해야 한다면 <b>정확한 정의를 가지는 함수 안으로 숨긴다.</b></li>
+      <li>단언 옆에는 <b>왜 안전한지</b>에 대한 근거가 있어야 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-41" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 41</div>
+    <h3>any의 진화를 이해하기</h3>
+    <p class="item-tagline">일반적으로 변수의 타입은 선언할 때 결정된다. <b>암시적 any 만은 예외다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>const x = []</code> 처럼 <b>암시적으로</b> any 가 된 변수는 값을 할당할 때마다 타입이 진화한다. <code>: any</code> 를 <b>명시하면 진화하지 않는다.</b>
+  </div>
+
+  <h4>진화 1 — 분기마다 다른 타입</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">evolve.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">let val;              // any
+
+if (Math.random() &lt; 0.5) {
+  val = /hello/;
+  val;                // RegExp
+} else {
+  val = 12;
+  val;                // number
+}
+
+val;                  // RegExp | number</code></pre>
+  </div>
+
+  <h4>진화 2 — 배열</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">evolve.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const result = [];    // any[]
+result.push(1);
+result;               // number[]
+result.push("hello");
+result;               // (string | number)[]</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이건 유니온이 아니라 진화다</p>
+      <p>일반적인 타입 좁히기와 다르다. 좁히기는 <b>선언된 타입 안에서 범위를 줄이는</b> 것이고, 진화는 <b>타입 자체가 넓어지는</b> 것이다. 진화하는 <code>any</code> 는 오직 <code>noImplicitAny</code> 가 켜진 상태에서 <b>암시적 any</b> 로 시작한 변수에만 일어난다.</p>
+    </div>
+  </div>
+
+  <h4>진화하지 않는 경우</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">no-evolve.ts</span>
+      <span class="code-tag bad">함수 호출을 거치면 멈춘다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function range(start: number, limit: number) {
+  const out = [];
+  for (let i = start; i &lt; limit; i++) {
+    out.push(i);
+  }
+  return out;         // number[] — 정상적으로 진화했다
+}
+
+function makeSquares(start: number, limit: number) {
+  const out = [];
+  //    ~~~ 'out' 변수는 형식을 확인할 수 없는 경우
+  //        암시적으로 'any[]' 형식입니다.
+  range(start, limit).forEach((i) =&gt; {
+    out.push(i * i);  // 콜백 안에서의 push 는 진화를 일으키지 못한다
+  });
+  return out;
+  //     ~~~ 'out' 변수에는 암시적으로 'any[]' 형식이 포함됩니다.
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">왜 콜백 안에서는 안 되나</p>
+      <p>진화는 <b>같은 스코프의 제어 흐름을 따라</b> 일어난다. 콜백은 언제 실행될지 알 수 없으므로 타입스크립트가 순서를 보장할 수 없다. 그래서 진화를 포기한다.</p>
+      <p>또 하나 — 진화하는 <code>any</code> 는 <b>값을 할당할 때만</b> 진화한다. 할당 전에 읽으면 그대로 오류다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">explicit.ts</span>
+      <span class="code-tag good">그냥 타입을 적는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function makeSquares(start: number, limit: number): number[] {
+  const out: number[] = [];
+  range(start, limit).forEach((i) =&gt; {
+    out.push(i * i);
+  });
+  return out;
+}
+
+// 더 나은 방법 — 애초에 만들지 않는다 (아이템 27)
+function makeSquares2(start: number, limit: number): number[] {
+  return range(start, limit).map((i) =&gt; i * i);
+}</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>일반적인 타입은 <b>정제되기만</b> 하지만, 암시적 <code>any</code> 와 <code>any[]</code> 는 <b>진화한다.</b></li>
+      <li>이 동작을 <b>알아 두되 의존하지는 않는다.</b> 오류 없이 진화하는 코드는 읽는 사람에게 혼란스럽다.</li>
+      <li>진화를 기대하기보다 <b>명시적 타입 구문</b>을 쓰는 것이 안전하고 명확하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-42" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 42</div>
+    <h3>모르는 타입의 값에는 any 대신 unknown 사용하기</h3>
+    <p class="item-tagline"><code>unknown</code> 은 "아직 모른다"를 정직하게 표현하는 타입이다. <code>any</code> 는 "신경 쓰지 마"라고 말한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>unknown</code> 은 <b>어떤 값이든 받지만, 확인하기 전에는 아무것도 못 하게</b> 만든다. 이 비대칭이 핵심이다.
+  </div>
+
+  <h4>세 타입의 위치</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 580 220" width="580" role="img" aria-label="unknown, any, never 의 할당 방향 비교">
+        <rect x="14" y="16" width="266" height="188" rx="16" class="dg-fill-soft dg-stroke" stroke-width="1.5"/>
+        <text x="147" y="44" class="dg-text" font-size="13.5" font-weight="700" text-anchor="middle">unknown</text>
+        <text x="147" y="80" class="dg-text-sub" font-size="12" text-anchor="middle">모든 값 → unknown</text>
+        <text x="147" y="100" class="dg-text-sub dg-mono" font-size="11.5" text-anchor="middle">할당 가능 ✓</text>
+        <text x="147" y="134" class="dg-text-sub" font-size="12" text-anchor="middle">unknown → 다른 타입</text>
+        <text x="147" y="154" class="dg-text-sub dg-mono" font-size="11.5" text-anchor="middle">할당 불가 ✗</text>
+        <text x="147" y="184" class="dg-accent" font-size="11.5" font-weight="700" text-anchor="middle">확인해야 쓸 수 있다</text>
+        <rect x="300" y="16" width="266" height="188" rx="16" class="dg-fill-soft dg-stroke" stroke-width="1.5"/>
+        <text x="433" y="44" class="dg-text" font-size="13.5" font-weight="700" text-anchor="middle">any</text>
+        <text x="433" y="80" class="dg-text-sub" font-size="12" text-anchor="middle">모든 값 → any</text>
+        <text x="433" y="100" class="dg-text-sub dg-mono" font-size="11.5" text-anchor="middle">할당 가능 ✓</text>
+        <text x="433" y="134" class="dg-text-sub" font-size="12" text-anchor="middle">any → 다른 타입</text>
+        <text x="433" y="154" class="dg-text-sub dg-mono" font-size="11.5" text-anchor="middle">할당 가능 ✓</text>
+        <text x="433" y="184" class="dg-text-sub" font-size="11.5" font-weight="700" text-anchor="middle">검사를 통째로 무력화</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>딱 한 칸이 다르다</b> — <code>unknown</code> 은 나가는 방향을 막았고, <code>any</code> 는 양방향으로 열려 있다. 그 한 칸이 타입 안전성의 전부다. (<code>never</code> 는 정반대로, 어떤 값도 들어갈 수 없지만 어디로든 나갈 수 있다.)</div>
+  </div>
+
+  <h4>YAML 파서 — any 버전의 문제</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">yaml.ts</span>
+      <span class="code-tag bad">조용히 통과한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function parseYAML(yaml: string): any { /* ... */ }
+
+interface Book { title: string; author: string; }
+
+const book: Book = parseYAML(`
+  name: Wuthering Heights
+  author: Emily Brontë
+`);
+// title 이 아니라 name 을 넣었는데도 오류가 없다
+console.log(book.title.toUpperCase()); // 런타임: undefined 접근</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">yaml.ts</span>
+      <span class="code-tag good">unknown 이면 확인을 강제한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function parseYAML(yaml: string): unknown { /* ... */ }
+
+const book1 = parseYAML("...");
+console.log(book1.title);
+//          ~~~~~ 'book1'은(는) 'unknown' 형식입니다.
+
+// 방법 1 — 단언 (책임은 개발자에게)
+const book2 = parseYAML("...") as Book;
+console.log(book2.title); // 정상</code></pre>
+  </div>
+
+  <h4>방법 2 — 타입 가드로 좁히기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">yaml.ts</span>
+      <span class="code-tag good">런타임 검증까지 함께</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function isBook(obj: unknown): obj is Book {
+  return (
+    typeof obj === "object" &amp;&amp;
+    obj !== null &amp;&amp;
+    "title" in obj &amp;&amp;
+    "author" in obj
+  );
+}
+
+const book = parseYAML("...");
+if (isBook(book)) {
+  console.log(book.title);  // Book 으로 좁혀졌다
+  console.log(book.author);
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>원문 노트의 <code>isBook</code> 은 <code>"name" in obj</code> 를 검사하고 있었다. <code>Book</code> 인터페이스에는 <code>name</code> 이 없으므로 항상 <code>false</code> 가 되어 타입 가드가 무의미해진다. <code>"title" in obj</code> 가 맞다.</p>
+      <p>덧붙이면, <code>obj !== null</code> 검사가 반드시 앞에 와야 한다. <code>typeof null === "object"</code> 이기 때문이다(<a href="#item-22">아이템 22</a>).</p>
+    </div>
+  </div>
+
+  <h4>방법 3 — 제네릭 (권장하지 않음)</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">yaml.ts</span>
+      <span class="code-tag bad">단언을 예쁘게 포장한 것뿐</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function parseYAML&lt;T&gt;(yaml: string): T {
+  return {} as T;   // 결국 안에서 단언한다
+}
+
+const book = parseYAML&lt;Book&gt;("...");</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">기능은 같지만 정직하지 않다</p>
+      <p>제네릭 버전은 <b>안전해 보이지만 실제로는 단언과 똑같다.</b> 런타임 검증은 어디에도 없다. 차라리 <code>unknown</code> 을 반환하고 호출자가 명시적으로 단언하거나 검증하게 하는 편이 <b>위험이 눈에 보인다.</b></p>
+    </div>
+  </div>
+
+  <h4>비슷하지만 다른 타입들</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타입</th><th>포함하는 값</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td><code>unknown</code></td><td>모든 값</td><td>가장 넓다. 기본 선택지</td></tr>
+        <tr><td><code>{}</code></td><td><code>null</code>, <code>undefined</code> 를 <b>제외한</b> 모든 값</td><td><code>unknown</code> 보다 아주 조금 좁다</td></tr>
+        <tr><td><code>object</code></td><td>모든 비기본형 — 객체와 배열</td><td><code>true</code>, <code>12</code>, <code>"foo"</code> 는 제외</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">catch 절의 e <span class="badge b-purple">TS 4.4+</span></p>
+      <p><code>useUnknownInCatchVariables</code>(<code>strict</code> 에 포함)가 켜지면 <code>catch (e)</code> 의 <code>e</code> 가 <code>any</code> 가 아니라 <code>unknown</code> 이 된다. 자바스크립트는 <b>무엇이든 던질 수 있으므로</b> 이게 정직한 타입이다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">catch.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">try {
+  // ...
+} catch (e) {
+  e.message;
+  // ~ 'e'은(는) 'unknown' 형식입니다.
+
+  if (e instanceof Error) {
+    console.error(e.message); // 정상
+  } else {
+    console.error(String(e));
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>unknown</code> 은 <code>any</code> 대신 쓸 수 있는 <b>안전한 타입</b>이다. 어떤 값이 있지만 그 타입을 모를 때 쓴다.</li>
+      <li>사용자가 <b>타입 단언문이나 타입 검사를 하도록 강제</b>하려면 <code>unknown</code> 을 쓴다.</li>
+      <li><code>{}</code>, <code>object</code>, <code>unknown</code> 의 차이를 알아 둔다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-43" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 43</div>
+    <h3>몽키 패치보다는 안전한 타입을 사용하기</h3>
+    <p class="item-tagline">자바스크립트는 아무 객체에나 속성을 붙일 수 있다. <b>붙일 수 있다고 붙여도 되는 건 아니다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    전역 객체를 확장해야 한다면 <code>declare global</code> 로 <b>선언하거나</b>, 확장한 타입으로 <b>단언한다.</b> <code>as any</code> 는 마지막 선택지다.
+  </div>
+
+  <h4>왜 몽키 패치가 문제인가</h4>
+
+  <ul>
+    <li>타입스크립트가 <b>추가된 속성을 알지 못한다.</b></li>
+    <li>전역으로 동작하므로 <b>모듈 사이에 숨은 의존성</b>이 생긴다. 실행 순서에 따라 있을 수도 없을 수도 있다.</li>
+    <li>부수 효과의 범위를 추적하기 어렵다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">monkey.ts</span>
+      <span class="code-tag bad">오류가 두 번 난다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">document.monkey = "Tamarin";
+//       ~~~~~~ 'Document' 형식에 'monkey' 속성이 없습니다.
+
+(document as any).monkey = "Tamarin"; // 통과하지만
+console.log(document.monkey);
+//                   ~~~~~~ 'Document' 형식에 'monkey' 속성이 없습니다.
+//                          단언이 저장되지 않는다</code></pre>
+  </div>
+
+  <h4>해법 1 — 타입 보강 (declaration merging)</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">global.d.ts</span>
+      <span class="code-tag good">타입이 프로젝트 전체에 반영된다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export {}; // 이 파일을 모듈로 만든다
+
+declare global {
+  interface Document {
+    /** 몽키 패치 속. 원숭이 이름 */
+    monkey: string;
+  }
+}
+
+document.monkey = "Tamarin"; // 정상, 자동완성도 된다</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>장점</th><th>단점</th></tr></thead>
+      <tbody>
+        <tr><td><code>any</code> 보다 안전하다</td><td>모듈 <b>전 영역</b>에 적용된다</td></tr>
+        <tr><td>자동완성과 문서(TSDoc)가 붙는다</td><td>코드 실행 시점의 <b>시간 순서</b>는 표현하지 못한다</td></tr>
+        <tr><td>몽키 패치가 어디에 쓰였는지 추적된다</td><td>페이지 로드 중에는 <code>undefined</code> 인데 타입은 <code>string</code> 이다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">시간 문제를 타입으로 표현하려면</p>
+      <p><code>monkey: string | undefined</code> 로 선언하면 정직해지지만, 쓸 때마다 검사해야 해서 번거로워진다. 이 트레이드오프 자체가 <b>몽키 패치가 나쁜 설계라는 증거</b>다.</p>
+    </div>
+  </div>
+
+  <h4>해법 2 — 구체적인 타입 단언</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">monkey.ts</span>
+      <span class="code-tag good">영향 범위가 좁다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface MonkeyDocument extends Document {
+  /** 몽키 패치 속. 원숭이 이름 */
+  monkey: string;
+}
+
+(document as MonkeyDocument).monkey = "Macaque";</code></pre>
+  </div>
+
+  <p><code>Document</code> 자체를 건드리지 않으므로 <b>모듈 영역 문제가 없다.</b> 몽키 패치가 일어나는 곳에서만 <code>MonkeyDocument</code> 를 임포트하면 되고, 단언이 <code>as any</code> 보다 훨씬 구체적이다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">Window 를 확장하는 실전 예 <span class="badge b-blue">보강</span></p>
+      <p>분석 스크립트나 개발용 디버깅 훅처럼 <code>window</code> 에 무언가를 붙여야 할 때가 실제로 있다.</p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">window.d.ts</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-typescript">export {};
+
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    __APP_DEBUG__?: { store: unknown; version: string };
+  }
+}</code></pre>
+      </div>
+      <p><b>선택적 속성(<code>?</code>)으로 선언</b>하는 것이 요령이다. 존재 여부가 실행 시점에 달려 있다는 사실을 타입이 정직하게 말해 준다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>전역 변수나 DOM 에 데이터를 저장하지 말고 <b>데이터를 분리해서 사용</b>하는 것이 가장 좋다.</li>
+      <li>내장 타입에 데이터를 저장해야 한다면 <b>안전한 타입 접근법</b>(보강 또는 사용자 정의 인터페이스 단언)을 쓴다.</li>
+      <li>보강의 <b>모듈 영역 문제</b>를 이해해야 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-44" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 44</div>
+    <h3>타입 커버리지를 추적하여 타입 안전성 유지하기</h3>
+    <p class="item-tagline"><code>noImplicitAny</code> 를 켜도 <code>any</code> 는 남는다. <b>얼마나 남았는지 측정</b>하지 않으면 관리할 수 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>any</code> 는 수치로 추적할 수 있다. <code>type-coverage</code> 로 <b>측정하고, 임계값을 CI 에 걸어 되돌아가지 않게</b> 만든다.
+  </div>
+
+  <h4>noImplicitAny 를 켜도 남는 두 종류</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>종류</th><th>예</th><th>대응</th></tr></thead>
+      <tbody>
+        <tr><td>명시적 <code>any</code></td><td><code>any[]</code>, <code>{[k: string]: any}</code>, <code>as any</code></td><td>내 코드다. 하나씩 줄인다 (<a href="#item-39">아이템 39</a>)</td></tr>
+        <tr><td>서드파티 타입 선언</td><td><code>@types</code> 가 반환하는 <code>any</code></td><td>추적이 어렵다. 감싸거나 PR 을 보낸다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>두 번째가 특히 성가시다. <code>@types</code> 에서 흘러나온 <code>any</code> 는 <b><code>noImplicitAny</code> 오류를 내지 않으면서</b> 내 코드로 조용히 퍼진다.</p>
+
+  <h4>측정하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ npx type-coverage
+(1 / 5) 20.00%
+type-coverage success.
+
+$ npx type-coverage --detail
+src/app.ts:1:14: a
+src/app.ts:1:22: b
+src/app.ts:2:10: a
+src/app.ts:2:14: b
+(1 / 5) 20.00%</code></pre>
+  </div>
+
+  <p><code>--detail</code> 이 <b>어떤 식별자가 any 인지 위치까지</b> 알려 준다. 이 목록이 곧 개선 작업 목록이 된다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">CI 에 걸어 두기 <span class="badge b-blue">보강</span></p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">package.json</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-json">{
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "type-coverage": "type-coverage --at-least 95 --strict --ignore-catch"
+  }
+}</code></pre>
+      </div>
+      <ul>
+        <li><code>--at-least 95</code> — 커버리지가 95% 미만이면 <b>0 이 아닌 종료 코드</b>로 실패한다</li>
+        <li><code>--strict</code> — <code>any[]</code> 같은 것도 엄격하게 센다</li>
+        <li><code>--detail</code> — 실패한 위치를 출력</li>
+      </ul>
+      <p>핵심은 <b>수치를 100% 로 만드는 것이 아니라 후퇴를 막는 것</b>이다. 임계값을 현재 수치보다 조금 낮게 잡고, 개선될 때마다 올린다. <a href="#item-62">아이템 62</a>의 점진적 마이그레이션과 같은 전략이다.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">any 를 찾아서 무엇을 할 것인가</p>
+      <p>발견한 <code>any</code> 마다 이유가 다르다.</p>
+      <ul>
+        <li><b>마이그레이션 잔재</b> → 이제 타입을 붙일 수 있다</li>
+        <li><b>@types 가 부실함</b> → 미러 타입으로 감싸거나(<a href="#item-51">아이템 51</a>) DefinitelyTyped 에 PR 을 보낸다</li>
+        <li><b>당시엔 표현할 수 없었던 타입</b> → 타입스크립트가 그동안 발전했다. 지금은 될 수 있다</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>noImplicitAny</code> 가 설정되어 있어도 명시적 <code>any</code> 와 서드파티 선언의 <code>any</code> 는 <b>여전히 존재한다.</b></li>
+      <li>작성한 프로그램의 <b>타입이 얼마나 잘 선언되었는지 추적</b>해야 한다.</li>
+      <li>추적함으로써 <code>any</code> 의 사용을 줄여 가고, 타입 안전성을 <b>점진적으로 높일 수 있다.</b></li>
+    </ul>
+  </div>
+</article>
