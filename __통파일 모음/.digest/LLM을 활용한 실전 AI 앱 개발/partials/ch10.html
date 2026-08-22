@@ -1,0 +1,634 @@
+<article class="item" id="item-10-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-1</div>
+    <h3>텍스트 임베딩 이해하기</h3>
+    <p class="item-tagline">의미를 숫자로 바꾸는 방법의 역사 — 원핫에서 워드투벡까지.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>임베딩은 데이터의 의미를 압축한 숫자 배열</b>이다. 의미가 숫자가 되는 순간, "비슷한가?"라는 질문이 거리 계산으로 바뀐다.
+  </div>
+
+  <h4>텍스트 임베딩이란</h4>
+  <p>여러 문장의 텍스트를 임베딩 벡터로 변환하는 방식을 <b>텍스트 임베딩</b> 또는 <b>문장 임베딩</b>이라 부른다. 데이터의 의미를 숫자로 표현할 수 있다면 <b>서로 유사한지, 관련이 있는지</b> 같은 중요한 정보를 활용할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">embedding.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+smodel = SentenceTransformer('snunlp/KR-SBERT-V40K-klueNLI-augSTS')
+dense_embeddings = smodel.encode(['학교', '공부', '운동'])
+
+'''
+          학교        공부        운동
+학교  [0.9999999  0.5950744  0.32537562]
+공부  [0.5950744  1.         0.5459569 ]
+운동  [0.32537562 0.5459569  0.9999998 ]
+'''
+print(cosine_similarity(dense_embeddings))</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>쌍</th><th>코사인 유사도</th><th>해석</th></tr></thead>
+      <tbody>
+        <tr><td>학교 ↔ 공부</td><td class="t-center t-ok">0.595</td><td>"배움"이라는 공통 의미가 잡혔다</td></tr>
+        <tr><td>공부 ↔ 운동</td><td class="t-center">0.546</td><td>둘 다 "하는 활동"이라는 점에서 중간</td></tr>
+        <tr><td>학교 ↔ 운동</td><td class="t-center t-no">0.325</td><td>가장 멀다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 <i>"공부, 운동은 0.325 만큼 유사함"</i> 이라고 적었지만, 출력 행렬에서 <code>0.325</code> 는 <b>학교 ↔ 운동</b> 값이다(1행 3열 / 3행 1열). <b>공부 ↔ 운동</b> 은 <code>0.546</code>(2행 3열)이다. 행렬을 읽을 때 <b>i행 j열 = i번째와 j번째 문장의 유사도</b> 이며, 대각선이 1.0 인 대칭 행렬이라는 점을 기억하면 헷갈리지 않는다.</p>
+    </div>
+  </div>
+
+  <h4>원핫 인코딩</h4>
+  <p>범주형 데이터 사이에 <b>의도하지 않은 관계가 담기는 것을 방지</b>한다는 장점이 있다. 하지만 충분히 관련 있는 단어 사이의 관계조차 표현할 수 없다는 치명적 단점이 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">onehot.py</span>
+      <span class="code-tag bad">모든 쌍이 0</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+word_dict = {
+    "school":  np.array([[1, 0, 0]]),
+    "study":   np.array([[0, 1, 0]]),
+    "workout": np.array([[0, 0, 1]]),
+}
+
+# [[0.]]
+cosine_school_study = cosine_similarity(word_dict["school"], word_dict["study"])
+
+# [[0.]]
+cosine_workout_study = cosine_similarity(word_dict["workout"], word_dict["study"])</code></pre>
+  </div>
+
+  <p>"학교"와 "공부" 사이에는 <b>무언가 배운다</b>는 공통점이 있지만, 원핫 인코딩에서는 그 의미를 전혀 살릴 수 없다. 서로 다른 축에 놓인 벡터라 모든 쌍의 유사도가 기계적으로 0 이 된다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 200" width="460" role="img" aria-label="원핫 인코딩은 세 단어가 서로 직교하는 축에 놓여 유사도가 모두 0, 밀집 임베딩은 의미가 가까운 단어가 가까이 놓인다">
+        <text x="105" y="24" class="dg-text dg-mono" font-size="12" text-anchor="middle">원핫 인코딩 (직교)</text>
+        <line x1="45" y1="160" x2="175" y2="160" class="dg-stroke"/>
+        <line x1="45" y1="160" x2="45" y2="45" class="dg-stroke"/>
+        <line x1="45" y1="160" x2="128" y2="118" class="dg-stroke"/>
+        <circle cx="175" cy="160" r="4" class="dg-accent"/>
+        <circle cx="45" cy="45" r="4" class="dg-accent"/>
+        <circle cx="128" cy="118" r="4" class="dg-accent"/>
+        <text x="180" y="176" class="dg-text-sub dg-mono" font-size="11">school</text>
+        <text x="45" y="38" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">study</text>
+        <text x="140" y="112" class="dg-text-sub dg-mono" font-size="11">workout</text>
+        <text x="105" y="192" class="dg-text-sub" font-size="11" text-anchor="middle">모든 쌍의 유사도 = 0</text>
+
+        <line x1="230" y1="40" x2="230" y2="180" class="dg-stroke" stroke-dasharray="4 4"/>
+
+        <text x="350" y="24" class="dg-text dg-mono" font-size="12" text-anchor="middle">밀집 임베딩 (의미 공간)</text>
+        <circle cx="310" cy="80" r="5" class="dg-accent"/>
+        <circle cx="352" cy="100" r="5" class="dg-accent"/>
+        <circle cx="418" cy="150" r="5" class="dg-accent"/>
+        <line x1="310" y1="80" x2="352" y2="100" class="dg-stroke"/>
+        <line x1="352" y1="100" x2="418" y2="150" class="dg-stroke" stroke-dasharray="3 3"/>
+        <text x="300" y="72" class="dg-text-sub dg-mono" font-size="11" text-anchor="end">학교</text>
+        <text x="362" y="96" class="dg-text-sub dg-mono" font-size="11">공부</text>
+        <text x="428" y="152" class="dg-text-sub dg-mono" font-size="11">운동</text>
+        <text x="325" y="97" class="dg-text-sub dg-mono" font-size="10">0.595</text>
+        <text x="350" y="140" class="dg-text-sub dg-mono" font-size="10">0.546</text>
+        <text x="350" y="192" class="dg-text-sub" font-size="11" text-anchor="middle">거리가 곧 의미의 차이</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>원핫은 모든 단어를 등거리에 놓고, 밀집 임베딩은 의미에 따라 거리를 다르게 준다</b> — 이것이 임베딩이 필요한 이유 전부다.</div>
+  </div>
+
+  <h4>백오브워즈</h4>
+  <p><b>비슷한 단어가 많이 나오면 비슷한 문서</b>라는 가정으로 문서를 숫자로 바꾼다. 단어의 <b>순서와 관계없이</b> 등장한 단어와 그 횟수만 집계한다.</p>
+  <ul>
+    <li>아이디어가 직관적이고 구현이 간단한데도 잘 작동해, 문서의 의미를 표현하는 방법으로 오랫동안 쓰였다.</li>
+    <li>하지만 <b>많이 나온 단어가 문서의 의미를 대표하지 않는 경우</b>가 있다. 한국어 기사에는 <code>은/는/이/가/을/를</code> 가 항상 가장 많이 나온다.</li>
+  </ul>
+
+  <h4>TF-IDF</h4>
+  <p>어느 문서에나 나오는 단어 문제를 보완하기 위해, <b>많은 문서에 등장하는 단어의 중요도를 낮추는</b> 수식을 쓴다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기호</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>TF(w)</code></td><td>특정 단어 <code>w</code> 가 <b>이 문서에 등장한 횟수</b></td></tr>
+        <tr><td><code>DF(w)</code></td><td>특정 단어 <code>w</code> 가 <b>등장한 문서의 수</b></td></tr>
+        <tr><td><code>N</code></td><td>전체 문서 수</td></tr>
+        <tr><td><code>TF-IDF(w)</code></td><td><code>TF(w) × log(N / DF(w))</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><code>log(N / DF(w))</code> 는 특정 단어가 여러 문서에 등장할수록 작아진다. <b><code>N</code> 개 문서 전부에 존재하면 <code>log(1) = 0</code></b> 이 되어 그 단어의 점수는 완전히 사라진다 — 조사가 걸러지는 원리다.</p>
+
+  <p>이 방식은 백오브워즈의 문제를 해결했고, <b>BM25 같은 변형</b>은 현재까지도 가장 보편적인 연관도 점수 계산 방식으로 쓰인다. BM25 는 <a href="#item-10-4">10-4</a> 에서 다시 다룬다.</p>
+
+  <h4>워드투벡</h4>
+  <p><b>단어가 함께 등장하는 빈도 정보</b>를 활용해 단어의 의미를 압축하는 단어 임베딩 방법이다. 학습 방식은 두 가지다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>입력 → 출력</th></tr></thead>
+      <tbody>
+        <tr><td><b>CBOW</b></td><td>주변 단어들 → 가운데 단어를 예측</td></tr>
+        <tr><td><b>스킵그램</b>(Skip-gram)</td><td>가운데 단어 → 주변 단어들을 예측</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">워드투벡의 한계, 그리고 다음 절 <span class="badge b-blue">보강</span></p>
+      <p>워드투벡은 단어 하나에 벡터 하나를 <b>고정</b> 할당한다. 그래서 "배를 타다 / 배가 아프다 / 배를 먹다"의 "배"가 전부 같은 벡터가 된다(문맥 독립). BERT 이후의 모델은 문장 전체를 보고 <b>같은 단어라도 문맥에 따라 다른 벡터</b>를 만든다. 다음 절에서 다루는 문장 임베딩이 필요한 배경이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>임베딩 = 의미를 압축한 숫자 배열.</b> 유사도 판단이 거리 계산이 된다.</li>
+      <li><b>원핫</b>: 관계를 전혀 표현 못 함 → 모든 쌍의 유사도가 0.</li>
+      <li><b>백오브워즈</b>: 등장 횟수만 셈 → 조사/불용어가 지배.</li>
+      <li><b>TF-IDF</b>: <code>TF × log(N/DF)</code> 로 흔한 단어의 가중치를 깎음. BM25 의 조상.</li>
+      <li><b>워드투벡</b>: 함께 등장하는 빈도로 의미를 학습(CBOW / 스킵그램). 단, 문맥 독립.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-2</div>
+    <h3>문장 임베딩 방식</h3>
+    <p class="item-tagline">교차 인코더는 정확하고, 바이 인코더는 확장된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>바이 인코더는 각 문장을 독립적으로 임베딩</b>하므로 미리 계산해 저장할 수 있다. 검색 시에는 쿼리 하나만 인코딩하면 되니 문서가 백만 개여도 BERT 연산은 1회다.
+  </div>
+
+  <h4>왜 문장 임베딩인가</h4>
+  <p>워드투벡은 단어를 임베딩 벡터로 바꿔 <b>단어 사이의 관계</b>를 판단할 길을 열었다. 하지만 실제로 텍스트를 다룰 때는 단어가 아니라 <b>문장이나 문단</b> 같은 더 큰 단위를 쓴다. 여러 단어가 합쳐진 문장을 임베딩 벡터로 바꾸는 방법이 필요하다.</p>
+
+  <p>트랜스포머 인코더 구조를 활용한 <b>BERT</b> 모델은 입력 문장을 임베딩으로 변환하는 데 뛰어난 성능을 보였다. 그 위에서 문장 사이의 관계를 계산하는 방법이 두 가지로 갈린다.</p>
+
+  <h4>교차 인코더</h4>
+  <ul>
+    <li>하나의 BERT 모델에 <b>검색 쿼리 문장과 검색 대상 문장을 함께 넣고</b> 유사도 점수를 계산한다.</li>
+    <li>두 텍스트 사이의 관계를 전부 계산하므로 <b>정확도가 높다</b>.</li>
+    <li>하지만 다른 문장과의 유사도를 알려면 <b>동일한 연산을 처음부터 다시</b> 해야 한다.</li>
+    <li>1,000개 문장 중 A 와 가장 유사한 것을 찾으려면 1,000번 전부 계산해야 한다.</li>
+    <li>BERT 의 어텐션 연산은 계산량이 많은 무거운 연산이라 가급적 적게 수행하는 게 좋다.</li>
+    <li>결국 <b>확장성이 떨어진다</b>.</li>
+  </ul>
+
+  <h4>바이 인코더</h4>
+  <ul>
+    <li>각 문장이 <b>동일한 모델을 각각 통과</b>해 문장별 임베딩으로 변환된다.</li>
+    <li>변환된 임베딩끼리 <b>코사인 유사도</b> 같은 가벼운 계산으로 최종 점수를 낸다.</li>
+    <li>각 문장의 임베딩이 <b>독립적</b>이므로, 비교 대상이 바뀌어도 추가 BERT 연산이 필요 없다.</li>
+    <li>새로운 문장 B 와 가까운 문장을 검색할 때 <b>B 에 대해서만</b> BERT 연산을 하면 되므로 계산량이 줄고 확장성이 높다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph CE["교차 인코더 — 정확하지만 O(N)"]
+    Q1["쿼리"] --> B1["BERT"]
+    D1["문서 i"] --> B1
+    B1 --> S1["유사도 점수"]
+    S1 -.->|"문서마다 반복"| B1
+  end
+  subgraph BE["바이 인코더 — 미리 계산 가능"]
+    D2["문서 전체"] -->|"사전 1회"| B2["BERT"]
+    B2 --> V["저장된 임베딩"]
+    Q2["쿼리"] -->|"요청마다 1회"| B3["BERT"]
+    B3 --> E["쿼리 임베딩"]
+    V --> C["코사인 유사도<br>가벼운 연산"]
+    E --> C
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>차이는 "BERT 를 몇 번 돌리느냐"에 있다</b> — 교차 인코더는 문서 수만큼, 바이 인코더는 쿼리당 1번.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>교차 인코더</th><th>바이 인코더</th></tr></thead>
+      <tbody>
+        <tr><td>입력</td><td>두 문장을 함께</td><td>각 문장을 따로</td></tr>
+        <tr><td>정확도</td><td class="t-center t-ok">높음</td><td class="t-center">보통</td></tr>
+        <tr><td>임베딩 사전 계산</td><td class="t-center t-no">불가</td><td class="t-center t-ok">가능</td></tr>
+        <tr><td>1,000개 검색 시 BERT 호출</td><td class="t-center t-no">1,000회</td><td class="t-center t-ok">1회</td></tr>
+        <tr><td>주 용도</td><td>순위 재정렬</td><td>대규모 1차 검색</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>바이 인코더 모델 구조</h4>
+  <p>Sentence-Transformers 의 바이 인코더는 <b>트랜스포머 층 + 풀링 층</b>을 이어 붙인 구조다. 풀링 층이 토큰별 출력 여러 개를 <b>문장 하나의 벡터</b>로 압축한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bi_encoder.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import SentenceTransformer, models
+
+# BERT 모델 (트랜스포머 층)
+word_embedding_model = models.Transformer('klue/roberta-base')
+
+# 풀링 층 — 입력 차원만 알려주면 된다
+pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension())
+
+# 두 모듈 결합
+model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
+
+'''
+SentenceTransformer(
+    (0): Transformer({'max_seq_length': 512, 'do_lower_case': False})
+         with Transformer model: RobertaModel,
+    (1): Pooling({
+        'word_embedding_dimension': 768,
+        'pooling_mode_cls_token': False,
+        'pooling_mode_mean_tokens': True,      ← 기본값은 평균 모드
+        'pooling_mode_max_tokens': False,
+        'pooling_mode_mean_sqrt_len_tokens': False,
+        'pooling_mode_weightedmean_tokens': False,
+        'pooling_mode_lasttoken': False,
+        'include_prompt': True
+    })
+)
+'''
+print(model)</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>풀링 모드</th><th>동작</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td><code>pooling_mode_cls_token</code><br>클래스 모드</td><td>첫 번째 토큰 <code>[CLS]</code> 의 출력 임베딩을 문장 임베딩으로 사용</td><td>BERT 의 원래 설계 의도</td></tr>
+        <tr><td><code>pooling_mode_mean_tokens</code><br>평균 모드</td><td>문장 내 모든 토큰의 임베딩을 평균</td><td class="t-ok">일반적으로 가장 많이 쓴다</td></tr>
+        <tr><td><code>pooling_mode_max_tokens</code><br>최대 모드</td><td>문장 길이 방향으로 각 차원의 최댓값을 취함</td><td>특정 신호가 강한 경우</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Sentence-Transformers 로 임베딩 생성</h4>
+
+  <h5>텍스트 임베딩</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">text_emb.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import SentenceTransformer, util
+
+model = SentenceTransformer('snunlp/KR-SBERT-V40K-klueNLI-augSTS')
+
+embeddings = model.encode(['잠이 안옵니다', '졸음이 옵니다', '기차가 옵니다'])
+cos_scores = util.cos_sim(embeddings, embeddings)
+
+'''
+tensor([[1.0000, 0.6039, 0.1658],
+        [0.6039, 1.0000, 0.2730],
+        [0.1658, 0.2730, 1.0000]])
+
+- '잠' 과 '졸음' 은 0.60 으로 유사하다
+- '잠' 과 '기차' 는 0.17 로 유사하지 않다
+  → "옵니다" 라는 같은 단어를 공유하는데도 낮게 나온다
+'''
+print(cos_scores)</code></pre>
+  </div>
+
+  <p>이 예제가 재미있는 이유는 <b>세 문장이 모두 "옵니다"로 끝난다</b>는 데 있다. 키워드 기반이라면 셋 다 비슷하다고 판정했을 텐데, 문장 임베딩은 "잠"과 "졸음"이 가깝고 "기차"는 멀다는 것을 안다.</p>
+
+  <h5>이미지 임베딩 — CLIP</h5>
+  <p>CLIP 모델을 쓰면 <b>이미지와 텍스트를 같은 벡터 공간</b>에 놓을 수 있다. 이미지 벡터와 텍스트 벡터를 직접 비교하는 게 가능해진다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">image_emb.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from PIL import Image
+from sentence_transformers import SentenceTransformer, util
+
+model = SentenceTransformer('clip-ViT-B-32')
+
+img_embs  = model.encode([Image.open('dog.jpg'), Image.open('cat.jpg')])
+text_embs = model.encode(['A dog on grass', 'Brown cat on yellow background'])
+
+'''
+                  "A dog..."  "Brown cat..."
+강아지 이미지  [[  0.2965,      0.1280],
+고양이 이미지   [  0.1924,      0.2422]]
+
+- 강아지 이미지: 강아지 텍스트 0.29 > 고양이 텍스트 0.13
+- 고양이 이미지: 고양이 텍스트 0.24 > 강아지 텍스트 0.19
+  → 각 행에서 올바른 짝이 가장 높다
+'''
+print(util.cos_sim(img_embs, text_embs))</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">CLIP 의 절대값은 낮게 나온다 <span class="badge b-blue">보강</span></p>
+      <p>위 점수가 0.2~0.3 대로 작아 보이지만 정상이다. CLIP 은 이미지와 텍스트라는 <b>서로 다른 모달리티</b>를 맞춘 모델이라 절대 유사도의 스케일이 작다. 중요한 건 <b>같은 행 안에서 어느 쪽이 더 큰가</b>이지 값 자체가 아니다. 이 성질은 <a href="#item-12-5">12-5</a> 의 멀티 모달 검색에서 다시 확인할 수 있다(0.37 vs 0.37 로 상위권이 촘촘하다). CLIP 자체는 <a href="#item-14-2">14-2</a> 에서 자세히 다룬다.</p>
+    </div>
+  </div>
+
+  <h4>오픈소스와 상업용 임베딩 모델 비교</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>상업용</th><th>오픈소스</th></tr></thead>
+      <tbody>
+        <tr><td>성능</td><td>대량 데이터로 학습돼 뛰어남</td><td>모델/도메인에 따라 편차</td></tr>
+        <tr><td>비용</td><td>LLM 텍스트 생성보다 훨씬 저렴</td><td>자체 인프라 비용</td></tr>
+        <tr><td>미세 조정</td><td class="t-center t-no">임베딩 모델은 지원하지 않음</td><td class="t-center t-ok">내 데이터에 맞춰 가능</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>일부 텍스트 생성 모델은 파인튜닝을 지원하지만, <b>임베딩 모델에 대한 파인튜닝은 지원하지 않는다</b>. 내 데이터에 맞춘 임베딩 모델을 만들고 싶다면 오픈소스로 가야 한다 — <a href="#ch11">11장</a>이 그 이야기다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>교차 인코더</b>: 두 문장을 함께 넣어 정확하지만, 비교 대상마다 재계산 → 확장성 없음.</li>
+      <li><b>바이 인코더</b>: 문장별 독립 임베딩 → 사전 계산 가능, 검색 시 쿼리만 인코딩.</li>
+      <li>바이 인코더 = 트랜스포머 층 + 풀링 층. 풀링 모드는 CLS / 평균 / 최대이며 <b>평균이 기본</b>.</li>
+      <li>CLIP 을 쓰면 이미지와 텍스트가 같은 공간에 놓여 서로 비교된다.</li>
+      <li>상업용 임베딩 모델은 성능이 좋지만 <b>미세 조정이 안 된다</b>.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-3</div>
+    <h3>의미 검색 구현하기</h3>
+    <p class="item-tagline">키워드가 하나도 겹치지 않아도 찾는다 — 그리고 가끔 엉뚱한 걸 찾는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    의미 검색은 <b>키워드가 겹치지 않아도 찾는</b> 대신, <b>고유명사가 정확히 겹쳐야 하는 질문에는 약하다</b>. 이 두 성질이 다음 절의 하이브리드 검색을 부른다.
+  </div>
+
+  <h4>의미 검색이란</h4>
+  <p>단순 키워드 매칭이 아니라, <b>밀집 임베딩을 이용해 문장이나 문서의 의미를 고려한 검색</b>을 수행하는 것이다. 구현은 간단하다 — 검색 쿼리를 문장 임베딩으로 바꿔 인덱스에서 찾으면 된다.</p>
+
+  <h5>성공 사례</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">semantic_search.py</span>
+      <span class="code-tag good">키워드 없이 찾아냄</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from datasets import load_dataset
+from sentence_transformers import SentenceTransformer
+import faiss
+
+# 1,000건만 선택
+klue_mrc_dataset = load_dataset('klue', 'mrc', split='train') \
+    .train_test_split(train_size=1000, shuffle=False)['train']
+sentence_model = SentenceTransformer('snunlp/KR-SBERT-V40K-klueNLI-augSTS')
+
+# 문장 임베딩으로 변환
+embeddings = sentence_model.encode(klue_mrc_dataset['context'])
+
+# 인덱스 생성 — RDBMS 의 테이블처럼 벡터를 담아두는 공간
+index = faiss.IndexFlatL2(embeddings.shape[1])
+index.add(embeddings)
+
+# 검색 쿼리를 문장 임베딩으로 변환
+query = '이번 연도에는 언제 비가 많이 올까?'
+query_embedding = sentence_model.encode([query])
+
+# 인덱스에서 검색 (3 = 가져올 개수)
+distances, indices = index.search(query_embedding, 3)
+
+'''
+(정답) 올여름 장마가 17일 제주도에서 시작됐다. 서울 등 중부지방은 예년보다 사나흘 정도 늦은
+(오답) 연구 결과에 따르면, 오리너구리의 눈은 대부분의 포유류보다는 어류인 칠성장어나 먹장어, 그
+(오답) 연구 결과에 따르면, 오리너구리의 눈은 대부분의 포유류보다는 어류인 칠성장어나 먹장어, 그
+'''
+for inx in indices[0]:
+    print(klue_mrc_dataset['context'][inx][:50])</code></pre>
+  </div>
+
+  <p>쿼리에 "장마"라는 단어가 없다. "언제 비가 많이 올까?"만으로 장마 기사를 1위로 찾아냈다. <b>키워드 검색으로는 불가능한 결과</b>다.</p>
+
+  <h5>실패 사례 — 의미 검색의 한계</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">semantic_search_fail.py</span>
+      <span class="code-tag bad">고유명사가 있는데 3위</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python"># 로버트 헨리 딕이 1946년에 매사추세츠 연구소에서 개발한 것은 무엇인가?
+query = klue_mrc_dataset[3]['question']
+query_embedding = sentence_model.encode([query])
+
+distances, indices = index.search(query_embedding, 3)
+
+'''
+(오답) 태평양 전쟁 중 뉴기니 방면에서 진공 작전을 실시해 온 더글러스 맥아더 장군을 사령관으로
+(오답) 태평양 전쟁 중 뉴기니 방면에서 진공 작전을 실시해 온 더글러스 맥아더 장군을 사령관으로
+(정답) 미국 세인트루이스에서 태어났고, 프린스턴 대학교에서 학사 학위를 마치고 1939년에 로체스
+'''
+for inx in indices[0]:
+    print(klue_mrc_dataset['context'][inx][:50])</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">왜 실패했나</p>
+      <p>쿼리에는 <b>"로버트 헨리 딕"</b> 이라는 결정적인 고유명사가 들어 있다. 그런데 임베딩은 이 이름 대신 "장군 / 1940년대 / 연구소" 같은 <b>전반적인 분위기</b>를 잡아버렸다. 밀집 임베딩은 의미를 압축하는 과정에서 <b>희귀한 고유명사의 신호를 흐린다</b>. 반대로 키워드 검색이라면 "로버트 헨리 딕"이 들어간 문서를 즉시 1위로 올렸을 것이다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 170" width="460" role="img" aria-label="의미 검색과 키워드 검색이 서로 반대의 강점을 가진다는 벤 다이어그램">
+        <circle cx="185" cy="85" r="80" class="venn-a"/>
+        <circle cx="275" cy="85" r="80" class="venn-b"/>
+        <circle cx="185" cy="85" r="80" class="venn-a-s"/>
+        <circle cx="275" cy="85" r="80" class="venn-b-s"/>
+        <text x="128" y="52" class="dg-text dg-mono" font-size="12" text-anchor="middle">의미 검색</text>
+        <text x="128" y="86" class="dg-text-sub" font-size="11" text-anchor="middle">동의어 / 의역</text>
+        <text x="128" y="102" class="dg-text-sub" font-size="11" text-anchor="middle">"비가 많이" → 장마</text>
+        <text x="332" y="52" class="dg-text dg-mono" font-size="12" text-anchor="middle">키워드 검색</text>
+        <text x="332" y="86" class="dg-text-sub" font-size="11" text-anchor="middle">고유명사 / 코드</text>
+        <text x="332" y="102" class="dg-text-sub" font-size="11" text-anchor="middle">"로버트 헨리 딕"</text>
+        <text x="230" y="82" class="dg-text dg-mono" font-size="11" text-anchor="middle">하이브리드</text>
+        <text x="230" y="98" class="dg-text-sub" font-size="10" text-anchor="middle">둘 다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>두 검색은 강점이 정확히 어긋나 있다</b> — 그래서 합치는 것이 자연스러운 다음 수순이다.</div>
+  </div>
+
+  <h4>라마인덱스에서 Sentence-Transformers 사용하기</h4>
+  <p>라마인덱스는 기본적으로 OpenAI 의 <code>text-embedding-ada-002</code> 를 쓴다(API 키만 설정하면 자동 적용). <code>HuggingFaceEmbedding</code> 에 모델 저장소 이름을 넘기면 오픈소스 모델로 바꿀 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">llamaindex_st.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from datasets import load_dataset
+from llama_index.core import VectorStoreIndex, ServiceContext, Document
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+embed_model = HuggingFaceEmbedding(model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS")
+service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=None)
+
+# 로컬 모델을 자동 선택하는 방법
+# service_context = ServiceContext.from_defaults(embed_model="local")
+
+klue_mrc_dataset = load_dataset('klue', 'mrc', split='train') \
+    .train_test_split(train_size=1000, shuffle=False)['train']
+text_list = klue_mrc_dataset[:100]['context']
+documents = [Document(text=t) for t in text_list]
+
+index_llama = VectorStoreIndex.from_documents(documents, service_context=service_context)</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">현행 API <span class="badge b-purple">최신 반영</span></p>
+      <p><code>ServiceContext</code> 는 제거되었으므로 <code>Settings.embed_model = embed_model</code> 로 쓴다(<a href="#item-9-1">9-1 콜아웃</a> 참고). 또한 OpenAI 임베딩을 쓴다면 기본값인 <code>text-embedding-ada-002</code> 대신 <b><code>text-embedding-3-small</code></b> 을 권한다 — 2024년 1월 공개 이후 성능이 더 좋고 가격은 1/5 수준이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>의미 검색 = 쿼리를 임베딩으로 바꿔 인덱스에서 가까운 벡터를 찾는 것.</li>
+      <li><code>faiss.IndexFlatL2</code> 는 전수 비교(KNN) 인덱스다. 정확하지만 데이터가 커지면 느려진다(<a href="#item-12-2">12-2</a>).</li>
+      <li><b>강점</b>: "언제 비가 많이 올까" → 장마 기사. 키워드가 안 겹쳐도 찾는다.</li>
+      <li><b>약점</b>: 고유명사가 결정적인 질문에서 엉뚱한 문서를 올린다.</li>
+      <li>이 약점을 메우는 것이 <b>하이브리드 검색</b>이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-4</div>
+    <h3>검색 방식을 조합해 성능 높이기</h3>
+    <p class="item-tagline">점수를 더하지 말고 순위를 더한다 — 상호 순위 조합.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    BM25 점수와 임베딩 유사도는 <b>분포가 다르므로 그냥 더하면 한쪽이 지배</b>한다. 그래서 점수 대신 <b>순위</b>를 합친다.
+  </div>
+
+  <h4>왜 조합하는가</h4>
+  <p>키워드 검색은 <b>동일한 키워드가 많이 포함될수록 유사도를 높게</b> 평가한다. 의미 검색과는 장단점이 정확히 반대다. 각자의 단점을 서로 메우기 위해 두 방식을 합치는 것이 <b>하이브리드 검색</b>이다.</p>
+
+  <h4>키워드 검색 방식 — BM25</h4>
+  <ul>
+    <li><b>TF-IDF 와 유사한 통계 기반 스코어링</b>에 <b>문서 길이 가중치</b>를 추가한 알고리즘이다.</li>
+    <li>간단하고 계산량이 적으면서도 성능이 뛰어나, 대표적인 검색 엔진인 <b>Elasticsearch 의 기본 알고리즘</b>으로 쓰인다.</li>
+    <li>기본 로직은 TF-IDF 와 같다 — 많은 문서에 등장하는 토큰은 중요도를 낮게, 특정 문서에 많이 등장하는 토큰은 높게 본다.</li>
+    <li>차이는 두 가지다: <b>단어 빈도 항의 포화 효과</b>와 <b>문서 길이의 영향</b>을 고려한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">포화 효과와 길이 정규화가 하는 일 <span class="badge b-blue">보강</span></p>
+      <p><b>포화 효과</b>: TF-IDF 에서 단어가 100번 나오면 점수도 100배다. 하지만 "장마"가 10번 나온 기사와 100번 나온 기사가 10배 더 관련 있지는 않다. BM25 는 TF 가 커질수록 증가폭이 완만해져 어느 지점에서 사실상 상한에 수렴한다.<br>
+      <b>길이 정규화</b>: 긴 문서는 단순히 길다는 이유로 모든 단어의 빈도가 높다. BM25 는 문서 길이를 평균 길이로 나눠 보정해, 짧고 정확한 문서가 길고 산만한 문서에 밀리지 않게 한다.</p>
+    </div>
+  </div>
+
+  <h4>상호 순위 조합 이해하기</h4>
+  <p>하이브리드 검색을 하려면 <b>통계 기반 점수와 임베딩 유사도 점수를 하나로 합쳐야</b> 한다. 문제는 <b>두 점수의 분포가 다르다</b>는 것이다. 그냥 더하면 둘 중 하나의 영향이 훨씬 크게 반영된다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>점수</th><th>범위</th><th>성질</th></tr></thead>
+      <tbody>
+        <tr><td>BM25</td><td>0 ~ 상한 없음</td><td>문서/쿼리에 따라 스케일이 크게 요동친다</td></tr>
+        <tr><td>코사인 유사도</td><td>−1 ~ 1 (보통 0 ~ 1)</td><td>범위가 고정돼 있고 변동이 작다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>이 문제를 해결하기 위해 <b>상호 순위 조합</b>(RRF, Reciprocal Rank Fusion)은 점수 자체가 아니라 <b>각 검색에서의 순위</b>를 활용해 최종 점수를 산출한다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q["쿼리"] --> BM["BM25 검색"]
+  Q --> SE["의미 검색"]
+  BM --> R1["순위 목록 A<br>1위 / 2위 / 3위 ..."]
+  SE --> R2["순위 목록 B<br>1위 / 2위 / 3위 ..."]
+  R1 --> RRF["상호 순위 조합<br>순위의 역수를 합산"]
+  R2 --> RRF
+  RRF --> F["최종 순위"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>RRF 는 점수를 버리고 순위만 쓴다</b> — 스케일 정규화라는 까다로운 문제를 아예 우회하는 방식이다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">RRF 의 실제 계산 <span class="badge b-blue">보강</span></p>
+      <p>문서 <code>d</code> 의 최종 점수는 각 검색기에서의 순위 <code>r</code> 에 대해 <code>Σ 1 / (k + r)</code> 로 계산한다(<code>k</code> 는 보통 60). 순위의 <b>역수</b>이므로 <b>상위권의 차이는 크게, 하위권의 차이는 작게</b> 반영된다 — 1위와 2위의 기여 차이가 50위와 51위의 차이보다 훨씬 크다. 두 검색 모두에서 상위권인 문서가 자연스럽게 위로 올라오는 구조다.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">노트 상태 안내</p>
+      <p>원문 노트의 <b>10-5 「하이브리드 검색 구현하기」</b> 는 제목만 있고 본문이 "패스"로 비어 있어 이 정리본에서는 아이템으로 만들지 않았다. BM25 구현과 RRF 결합 코드가 그 자리에 들어갈 내용이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>키워드 검색과 의미 검색은 <b>장단점이 반대</b>라서 합치는 게 이득이다.</li>
+      <li><b>BM25</b> = TF-IDF + 포화 효과 + 문서 길이 정규화. Elasticsearch 의 기본값.</li>
+      <li>두 점수는 <b>분포가 달라</b> 단순 합산이 안 된다.</li>
+      <li><b>RRF</b> 는 점수 대신 순위의 역수를 합산해 이 문제를 우회한다.</li>
+    </ul>
+  </div>
+</article>

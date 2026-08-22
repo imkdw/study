@@ -1,0 +1,808 @@
+<article class="item" id="item-7-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7-1</div>
+    <h3>도커 컴포즈 파일의 구조</h3>
+    <p class="item-tagline">컴포즈 파일은 "이 앱이 다 떠 있을 때 어떤 모습이어야 하는가"를 적은 문서다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    컴포즈 파일은 절차가 아니라 <b>원하는 상태(desired state)</b> 를 기술한다.
+    <code>docker run</code> 에 붙이던 플래그들이 전부 YAML 의 필드로 옮겨 온 것이라고 보면 된다.
+  </div>
+
+  <h4>Docker Compose 란</h4>
+  <ul>
+    <li>앱의 원하는 상태, 즉 모든 컴포넌트가 실행 중일 때 어떤 상태여야 하는지를 기술하는 파일이다.</li>
+    <li><code>docker run</code> 에서 지정해야 하는 모든 옵션을 모아 놓은 단순한 형식의 파일이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose.yml</span>
+      <span class="code-tag bad">노트 원본 (구형 문법)</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-yaml">version: "3.7"
+
+services:
+  todo-web:
+    image: diamol/ch06-todo-list
+    ports:
+      - "8020:80"
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    external:
+      name: nat</code></pre>
+  </div>
+
+  <h4>주요 블록</h4>
+
+  <h5>version</h5>
+  <ul>
+    <li>도커 컴포즈 파일 형식의 버전을 나타낸다.</li>
+    <li>노트에는 <b>"24.10.27 기준 deprecated 될 예정"</b> 이라고 기록되어 있다.</li>
+  </ul>
+
+  <h5>services</h5>
+  <ul>
+    <li>앱을 구성하는 모든 컴포넌트를 열거하는 부분이다.</li>
+    <li>실제 컨테이너가 아닌 <b>서비스</b> 개념을 단위로 삼는다.</li>
+    <li>하나의 서비스를 같은 이미지로 여러 개의 컨테이너에서 실행할 수 있다.</li>
+  </ul>
+
+  <h5>networks</h5>
+  <ul>
+    <li>서비스 컨테이너가 연결될 도커 네트워크를 열거하는 부분이다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">위 두 문법은 현재 버전에서 경고가 뜬다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        노트의 예측대로 <code>version</code> 은 정리됐고, <code>external</code> 아래에
+        <code>name</code> 을 중첩하는 형태도 함께 바뀌었다. 로컬(Compose v5.1.2)에서 위 파일을 그대로
+        <code>config</code> 에 넣어 확인한 결과다.
+      </p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">verify</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-bash">$ docker compose -f docker-compose.yml config
+
+<span class="err-line">warning: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion</span>
+<span class="err-line">warning: networks.app-net: external.name is deprecated. Please set name and external: true</span></code></pre>
+      </div>
+      <p>
+        공식 문서도 <code>version</code> 을 "informative 할 뿐이며 쓰면 obsolete 경고가 뜬다"고 명시한다.
+        컴포즈는 이 값을 무시하고 항상 최신 스키마로 검증한다. 아래가 지금의 권장 형태다.
+      </p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">compose.yaml</span>
+          <span class="code-tag good">현재 권장</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-yaml">services:
+  todo-web:
+    image: diamol/ch06-todo-list
+    ports:
+      - "8020:80"
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    external: true
+    name: nat</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4>도커 컴포즈를 통한 컨테이너 실행</h4>
+  <ul>
+    <li><code>external</code> 필드는 이미 존재하는 네트워크가 있으니 새로 만들지 말라는 뜻이다.
+      윈도우는 도커 설치 시 <code>nat</code> 네트워크가 자동 생성되어 그것을 쓴다.</li>
+    <li><code>docker-compose up</code> 으로 서비스를 구동할 수 있다. <code>docker-compose.yml</code> 파일을 찾아 그 내용대로 컨테이너가 뜬다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 리눅스는 기본 nat 네트워크가 없으니 만들어 준다
+$ docker network create nat
+06c43e2120053bdbd3ebfd598ed7682dc1eb4c5f9b0dc8e36eb866bbd29b242e
+
+# 도커 컴포즈 실행
+$ docker-compose up
+
+[+] Running 1/0
+ ✔ Container todo-list-todo-web-1  Created                                      0.1s
+Attaching to todo-web-1
+todo-web-1  | warn: Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository[60]
+todo-web-1  |       Storing keys in a directory '/root/.aspnet/DataProtection-Keys' that may not be
+todo-web-1  |       persisted outside of the container. Protected data will be unavailable when
+todo-web-1  |       container is destroyed.
+todo-web-1  | info: Microsoft.Hosting.Lifetime[0]
+todo-web-1  |       Now listening on: http://[::]:80
+todo-web-1  | info: Microsoft.Hosting.Lifetime[0]
+todo-web-1  |       Application started. Press Ctrl+C to shut down.
+todo-web-1  | info: Microsoft.Hosting.Lifetime[0]
+todo-web-1  |       Hosting environment: Production
+todo-web-1  | info: Microsoft.Hosting.Lifetime[0]
+todo-web-1  |       Content root path: /app</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 260" width="560" role="img" aria-label="8020 포트가 외부에 공개되고 todo-web 컨테이너의 80 포트로 연결되며, 컨테이너는 app-net 네트워크에 속한다">
+        <ellipse cx="130" cy="42" rx="52" ry="30" class="dg-fill-soft dg-stroke"/>
+        <text x="130" y="48" class="dg-text dg-mono" font-size="15" font-weight="700" text-anchor="middle">8020</text>
+        <text x="212" y="40" class="dg-accent" font-size="11.5">외부에는 8020 포트로 공개</text>
+
+        <path d="M130 74 L 130 108" fill="none" class="dg-stroke" marker-end="url(#c-arr)"/>
+        <text x="142" y="96" class="dg-text-sub dg-mono" font-size="11">80</text>
+
+        <rect x="58" y="112" width="144" height="52" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="130" y="144" class="dg-text dg-mono" font-size="13" text-anchor="middle">todo-web</text>
+        <text x="212" y="144" class="dg-accent" font-size="11.5">단일 컨테이너 구성</text>
+
+        <path d="M130 166 L 130 194" fill="none" class="dg-stroke" marker-end="url(#c-arr)"/>
+
+        <rect x="34" y="198" width="192" height="46" rx="18" class="dg-fill-soft dg-stroke"/>
+        <text x="130" y="226" class="dg-text dg-mono" font-size="12.5" text-anchor="middle">net: app-net</text>
+        <text x="240" y="226" class="dg-accent" font-size="11.5">지정한 네트워크에 속함</text>
+
+        <defs>
+          <marker id="c-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>컴포즈 파일 한 장이 곧 이 그림이다</b> — <code>ports</code> 가 위쪽 화살표를,
+      <code>networks</code> 가 아래쪽 연결을 만든다.
+    </div>
+  </div>
+
+  <h4>도커 컴포즈의 장점</h4>
+  <ul>
+    <li>README 에 포트나 구동 방법을 일일이 적지 않아도 명령어 한 줄로 앱을 띄울 수 있다.</li>
+    <li>특히 여러 서비스로 구성된 앱에서는 컴포즈 파일을 통해 훨씬 원활하게 작업할 수 있다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title"><code>docker-compose</code> 대신 <code>docker compose</code> <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        노트 전반에 나오는 하이픈 있는 <code>docker-compose</code> 는 파이썬으로 만들어진 Compose V1 이고,
+        <b>2023년 7월 이후 지원이 종료</b>되어 새 Docker Desktop 에는 포함되지 않는다.
+        지금은 도커 CLI 플러그인인 <b>Compose V2</b>, 즉 <b>공백으로 쓰는 <code>docker compose</code></b> 가 표준이다.
+        하위 명령과 옵션은 대부분 그대로라, 이 정리본의 실습 명령은 하이픈만 공백으로 바꾸면 그대로 동작한다.
+        파일명도 <code>docker-compose.yml</code> 과 <code>compose.yaml</code> 을 모두 인식하며,
+        새 프로젝트는 <code>compose.yaml</code> 이 권장 이름이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컴포즈 파일은 절차가 아니라 원하는 상태를 적는다. <code>docker run</code> 플래그가 YAML 필드가 된 것.</li>
+      <li>단위는 컨테이너가 아니라 <b>서비스</b>다. 서비스 하나가 컨테이너 여러 개일 수 있다.</li>
+      <li><code>version</code> 은 이제 obsolete, <code>external.name</code> 은 deprecated. <code>external: true</code> + <code>name:</code> 으로 쓴다.</li>
+      <li>명령은 <code>docker compose</code>(공백)가 표준이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7-2</div>
+    <h3>도커 컴포즈를 사용해서 여러 컨테이너로 구성된 앱 실행하기</h3>
+    <p class="item-tagline">한 명령으로 세 서비스를 띄우고, 원하는 것만 골라 스케일 아웃한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    컴포즈는 <b>파일에 적힌 상태를 실현</b>할 뿐이다. CLI 로 손댄 변경(스케일 아웃 등)은 파일에 없으므로,
+    다음 <code>up</code> 에서 파일 기준으로 되돌아간다.
+  </div>
+
+  <h4>여러 개의 앱 동시에 실행</h4>
+  <p><code>depends_on</code> 을 통해 <code>image-gallery</code> 는 <code>iotd</code>, <code>accesslog</code> 가 모두 실행되고 나서 시작된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose.yml</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-yaml">services:
+  accesslog:
+    image: diamol/ch04-access-log
+    networks:
+      - app-net
+
+  iotd:
+    image: diamol/ch04-image-of-the-day
+    ports:
+      - "80"
+    networks:
+      - app-net
+
+  image-gallery:
+    image: diamol/ch04-image-gallery
+    ports:
+      - "8010:80"
+    depends_on:
+      - accesslog
+      - iotd
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    external:
+      name: nat</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker-compose up
+
+[+] Running 3/0
+ ✔ Container image-of-the-day-iotd-1           Created                          0.1s
+ ✔ Container image-of-the-day-accesslog-1      Created                          0.1s
+ ✔ Container image-of-the-day-image-gallery-1  Created                          0.0s
+Attaching to accesslog-1, image-gallery-1, iotd-1
+accesslog-1      | info: restify listening at http://[::]:80
+iotd-1           |
+iotd-1           |   .   ____          _            __ _ _
+iotd-1           |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+iotd-1           | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+iotd-1           |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+iotd-1           |   '  |____| .__|_| |_|_| |_\__, | / / / /
+iotd-1           |  =========|_|==============|___/=/_/_/_/
+iotd-1           |  :: Spring Boot ::        (v2.1.3.RELEASE)
+iotd-1           |
+iotd-1           | 2024-10-27 03:40:53.569  INFO 1 --- [main] iotd.Application : Starting Application v0.1.0 on 2b61929f6efa with PID 1
+iotd-1           | 2024-10-27 03:40:53.570  INFO 1 --- [main] iotd.Application : No active profile set, falling back to default profiles: default</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 — <code>depends_on</code> 은 "실행됨"까지만 보장한다 <span class="badge b-red">원문 교정</span></p>
+      <p>
+        노트에는 "<code>depends_on</code> 을 통해 iotd, accesslog 가 <b>모두 실행되고 나서</b> 진행된다"고 적혀 있는데,
+        여기서 말하는 "실행"은 <b>컨테이너가 시작된 상태</b>일 뿐 <b>앱이 요청을 받을 준비가 된 상태가 아니다</b>.
+        스프링 부트가 부팅되는 몇 초 동안 <code>image-gallery</code> 는 이미 떠서 요청을 보낼 수 있다.
+        이 간극이 바로 <a href="#item-8-2">8장의 디펜던시 체크</a>가 필요한 이유다.
+      </p>
+      <p>
+        현재 컴포즈에서는 긴 문법으로 조건을 붙여 <b>헬스체크 통과까지</b> 기다리게 할 수 있다.
+        공식 문서가 지원하는 조건은 <code>service_started</code>, <code>service_healthy</code>,
+        <code>service_completed_successfully</code> 세 가지다.
+      </p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">compose.yaml</span>
+          <span class="code-tag good">개선</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-yaml">  image-gallery:
+    depends_on:
+      iotd:
+        condition: service_healthy      # 헬스체크를 통과할 때까지 대기
+      accesslog:
+        condition: service_started      # 기본값 &mdash; 시작만 확인</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4>도커 컴포즈 도식화</h4>
+  <p>
+    <code>docker-compose.yml</code> 파일로 앱의 구조를 도식화할 수 있다 &mdash;
+    <a href="https://github.com/pmsipilot/docker-compose-viz" target="_blank" rel="noopener">pmsipilot/docker-compose-viz</a>
+  </p>
+
+  <h4>스케일 아웃 하기</h4>
+  <p>도커 컴포즈로 원하는 컨테이너만 골라 스케일 아웃할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker-compose up -d --scale iotd=3
+
+[+] Running 5/5
+ ✔ Container image-of-the-day-iotd-3           Started                          0.3s
+ ✔ Container image-of-the-day-iotd-1           Started                          0.5s
+ ✔ Container image-of-the-day-iotd-2           Started                          0.4s
+ ✔ Container image-of-the-day-accesslog-1      Started                          0.3s
+ ✔ Container image-of-the-day-image-gallery-1  Started                          0.6s
+
+# 1, 2, 3 총 3개의 컨테이너에 골고루 로그가 분산됐다
+$ docker-compose logs --tail=1 iotd
+iotd-2  | 2024-10-27 03:52:26.734  INFO 1 --- [main] iotd.Application : Started Application in 2.181 seconds
+iotd-1  | 2024-10-27 03:52:38.608  INFO 1 --- [nio-80-exec-1] iotd.ImageController : Fetched new APOD image from NASA
+iotd-3  | 2024-10-27 03:52:26.743  INFO 1 --- [main] iotd.Application : Started Application in 2.293 seconds</code></pre>
+  </div>
+
+  <h4>도커 컴포즈 중단</h4>
+  <ul>
+    <li><code>docker-compose stop</code> 으로 종료할 수 있다.</li>
+    <li>리소스가 완전히 삭제되지 않고, CPU / 메모리만 점유하지 않는 상태가 된다.</li>
+    <li><code>docker-compose start</code> 로 다시 시작할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 도커 컴포즈로 서비스 시작
+$ docker-compose up -d
+[+] Running 3/3
+ ✔ Container image-of-the-day-accesslog-1      Started                          0.2s
+ ✔ Container image-of-the-day-iotd-1           Started                          0.2s
+ ✔ Container image-of-the-day-image-gallery-1  Started                          0.3s
+
+# 서비스들 중단
+$ docker-compose stop
+[+] Stopping 3/3
+ ✔ Container image-of-the-day-image-gallery-1  Stopped                          0.1s
+ ✔ Container image-of-the-day-iotd-1           Stopped                          0.2s
+ ✔ Container image-of-the-day-accesslog-1      Stopped                         10.2s
+
+# 삭제되지 않고 Exited 상태로 남아 있다
+$ docker container ls --all
+CONTAINER ID   IMAGE                          COMMAND                   CREATED         STATUS                        NAMES
+294fb49b0859   diamol/ch04-image-gallery      "/web/server"             1 minute ago    Exited (2) 16 seconds ago     image-of-the-day-image-gallery-1
+6a02c736028a   diamol/ch04-access-log         "docker-entrypoint.s…"    1 minute ago    Exited (137) 5 seconds ago    image-of-the-day-accesslog-1
+0c5555e872f7   diamol/ch04-image-of-the-day   "java -jar /app/iotd…"    1 minute ago    Exited (143) 15 seconds ago   image-of-the-day-iotd-1
+
+# 종료됐던 서비스 재시작 — CREATED 컬럼을 보면 새로 만든 게 아니라 기존 컨테이너를 되살린 것
+$ docker-compose start
+[+] Running 3/3
+ ✔ Container image-of-the-day-accesslog-1      Started                          0.2s
+ ✔ Container image-of-the-day-iotd-1           Started                          0.2s
+ ✔ Container image-of-the-day-image-gallery-1  Started                          0.1s</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>stop</code> / <code>down</code> / <code>down -v</code> <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>명령</th><th>컨테이너</th><th>네트워크</th><th>볼륨</th></tr></thead>
+          <tbody>
+            <tr><td class="dg-mono">stop</td><td>정지만 (남음)</td><td class="t-center t-ok">유지</td><td class="t-center t-ok">유지</td></tr>
+            <tr><td class="dg-mono">down</td><td class="t-no">삭제</td><td class="t-no">삭제</td><td class="t-center t-ok">유지</td></tr>
+            <tr><td class="dg-mono">down -v</td><td class="t-no">삭제</td><td class="t-no">삭제</td><td class="t-no">삭제</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>down -v</code> 는 DB 데이터까지 날린다. 실습 초기화 외에는 쓰지 않는다.</p>
+    </div>
+  </div>
+
+  <h4>주의점</h4>
+  <ul>
+    <li>도커 컴포즈로 앱을 관리한다면 내부적으로는 도커 API 에 명령을 보내는 방식이다.</li>
+    <li>컴포즈 파일을 수정하거나 도커 CLI 로 직접 앱을 손대면, 앱이 컴포즈 파일에 기술된 구조와 어긋날 수 있다.</li>
+    <li>예를 들어 앞서 스케일 아웃했던 서비스가, 컴포즈를 재시작하면 다시 1개로 줄어든다.</li>
+    <li>도커 컴포즈로 리소스를 관리해야 앱이 파일과 일치한 상태로 유지된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-tag bad">스케일 아웃이 되돌아간다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># iotd 가 3개에서 1개가 되어 버림
+$ docker-compose up
+[+] Running 3/0
+ ✔ Container image-of-the-day-accesslog-1      Created                          0.1s
+ ✔ Container image-of-the-day-iotd-1           Created                          0.1s
+ ✔ Container image-of-the-day-image-gallery-1  Created                          0.0s
+Attaching to accesslog-1, image-gallery-1, iotd-1</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">되돌아가는 게 버그가 아니라 설계다</p>
+      <p>
+        컴포즈는 매번 "파일에 적힌 상태"로 수렴시킨다. CLI 로 임시로 3개를 띄운 것은 파일에 없는 상태이므로
+        다음 <code>up</code> 에서 정리된다. 스케일 값을 유지하고 싶다면 파일의
+        <code>deploy.replicas</code> 에 적어 두거나 매번 <code>--scale</code> 을 함께 넘겨야 한다.
+        <b>원하는 상태는 항상 파일에 적혀 있어야 한다</b>는 원칙이 여기서도 그대로 적용된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>up</code> 한 번으로 여러 서비스가 뜨고, <code>--scale</code> 로 골라서 늘릴 수 있다.</li>
+      <li><code>depends_on</code> 은 기동 순서만 보장한다. 준비 완료를 기다리려면 <code>condition: service_healthy</code> 를 쓴다.</li>
+      <li><code>stop</code> 은 정지, <code>down</code> 은 삭제, <code>down -v</code> 는 볼륨까지 삭제.</li>
+      <li>CLI 로 만든 상태는 파일에 없으므로 다음 <code>up</code> 에서 되돌아간다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7-3</div>
+    <h3>도커 컨테이너 간 통신</h3>
+    <p class="item-tagline">컨테이너 IP 는 바뀐다. 그래서 IP 가 아니라 이름으로 부른다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    도커에는 <b>DNS 서버가 내장</b>되어 있어 서비스 이름을 IP 로 풀어 준다.
+    스케일 아웃한 서비스는 여러 개의 IP 가 돌아오므로, 앱 쪽에서 그것으로 로드밸런싱을 할 수 있다.
+  </div>
+
+  <h4>DNS 디스커버리</h4>
+  <ul>
+    <li>모든 컨테이너는 고유의 IP 주소를 갖는다.</li>
+    <li>컨테이너가 교체되면 IP 도 바뀌는데, 그래도 문제가 없도록 도커는 DNS 디스커버리 기능을 제공한다.</li>
+    <li>도커에는 DNS 서비스가 내장돼 있으며, 컨테이너 이름을 도메인 삼아 조회하면 IP 주소를 찾아 준다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker-compose up -d --scale iotd=3
+
+[+] Running 5/5
+ ✔ Container image-of-the-day-accesslog-1      Started                          0.2s
+ ✔ Container image-of-the-day-iotd-1           Started                          0.5s
+ ✔ Container image-of-the-day-iotd-2           Started                          0.2s
+ ✔ Container image-of-the-day-iotd-3           Started                          0.4s
+ ✔ Container image-of-the-day-image-gallery-1  Started                          0.6s
+
+# 컨테이너에 접속해서 이름으로 조회해 본다
+$ docker exec -it image-of-the-day-image-gallery-1 sh
+
+/web # nslookup accesslog
+Name:      accesslog
+Address 1: 192.168.97.2 image-of-the-day-accesslog-1.nat
+
+/web # exit</code></pre>
+  </div>
+
+  <h4>도커 컴포즈를 통한 로드밸런싱</h4>
+  <ul>
+    <li>하나의 서비스에 대해 여러 개의 IP 주소가 조회될 수 있다.</li>
+    <li>앞서 <code>--scale</code> 로 iotd 를 3개 실행했으므로 3개가 조회된다.</li>
+    <li>애플리케이션에서 이 방식으로 로드밸런싱을 구현할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">/web # nslookup iotd
+
+Name:      iotd
+Address 1: 192.168.97.3 image-of-the-day-iotd-2.nat
+Address 2: 192.168.97.5 image-of-the-day-iotd-1.nat
+Address 3: 192.168.97.4 image-of-the-day-iotd-3.nat</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  GAL["image-gallery"] -->|"nslookup iotd"| DNS["도커 내장 DNS (127.0.0.11)"]
+  DNS -->|"IP 3개 반환"| GAL
+  GAL -->|"앱이 골라서 호출"| I1["iotd-1 (192.168.97.5)"]
+  GAL --> I2["iotd-2 (192.168.97.3)"]
+  GAL --> I3["iotd-3 (192.168.97.4)"]
+      </pre>
+    </div>
+    <div class="figure-cap">
+      <b>도커는 목록을 주고, 고르는 것은 앱의 몫이다</b> — 이 방식은 프록시가 없는 "클라이언트 사이드
+      로드밸런싱"이다. 스웜의 오버레이 네트워크가 IP 하나만 돌려주는 방식과 대비된다
+      (<a href="#item-12-4">12-4</a>).
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 로드밸런싱의 한계 <span class="badge b-blue">보강</span></p>
+      <p>
+        도커 DNS 는 응답 순서를 매번 섞어 반환하지만, 이것만으로는 부하가 고르게 나뉜다는 보장이 없다.
+        많은 HTTP 클라이언트가 <b>첫 번째 IP 만 쓰거나 DNS 결과를 캐싱</b>하기 때문이다.
+        JVM 은 기본 DNS 캐시 정책이 특히 길어서, 컨테이너가 교체돼 IP 가 바뀌어도
+        옛 IP 로 계속 붙는 사고가 잘 생긴다. 실제 분산이 필요하면 프록시를 두거나
+        스웜/쿠버네티스의 가상 IP 방식을 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컨테이너 IP 는 교체될 때마다 바뀌므로 서비스 이름으로 부른다.</li>
+      <li>도커 내장 DNS 가 이름을 IP 로 풀어 주고, 스케일 아웃된 서비스는 IP 목록을 돌려준다.</li>
+      <li>고르는 것은 앱이다. 클라이언트의 DNS 캐싱 때문에 실제 분산은 보장되지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7-4</div>
+    <h3>도커 컴포즈로 앱 설정값 지정하기</h3>
+    <p class="item-tagline">SQLite 로 돌던 앱을 코드 수정 없이 Postgres 로 갈아 끼운다. 바뀐 것은 설정뿐이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>패키징된 앱과 설정값을 분리</b>할 수 있다는 것이 도커의 핵심 장점 중 하나다.
+    개발 환경에서 검증을 마친 <b>바로 그 이미지</b>를 운영에서도 그대로 쓸 수 있게 된다.
+  </div>
+
+  <h4>도커 컴포즈로 설정값 지정</h4>
+  <ul>
+    <li>환경 변수는 주로 클러스터 환경에서 쿠버네티스나 도커 스웜 같은 컨테이너 플랫폼을 통해 제공된다.</li>
+    <li>다만 단일 PC 에서 구동하는 경우는 파일로 제공해도 무방하다.</li>
+    <li>패키징된 앱과 설정값을 분리할 수 있다는 게 도커의 핵심 장점 중 하나다.
+      개발 환경에서 계속 테스트하고 검증한 이미지를 그대로 프로덕션에서도 쓸 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose.yml</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-yaml">services:
+  todo-db:
+    image: diamol/postgres:11.5
+    ports:
+      - "5433:5432"
+    networks:
+      - app-net
+
+  todo-web:
+    image: diamol/ch06-todo-list
+    ports:
+      - "8030:80"
+    environment:
+      - Database:Provider=Postgres
+    depends_on:
+      - todo-db
+    networks:
+      - app-net
+    secrets:
+      - source: postgres-connection
+        target: /app/config/secrets.json
+
+networks:
+  app-net:
+
+secrets:
+  postgres-connection:
+    file: ./config/secrets.json</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">config/secrets.json</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "ConnectionStrings": {
+    "ToDoDb": "Server=todo-db;Database=todo;User Id=postgres;Password=postgres;"
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">커넥션 스트링의 <code>Server=todo-db</code> <span class="badge b-blue">보강</span></p>
+      <p>
+        호스트명 자리에 IP 가 아니라 <b>컴포즈의 서비스 이름</b>이 그대로 들어가 있다.
+        <a href="#item-7-3">7-3</a> 의 DNS 디스커버리가 이것을 풀어 주기 때문에,
+        DB 컨테이너가 교체돼 IP 가 바뀌어도 이 설정 파일은 손댈 필요가 없다.
+      </p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker-compose up -d
+[+] Running 3/3
+ ✔ Network todo-list-postgres_app-net       Created                             0.0s
+ ✔ Container todo-list-postgres-todo-db-1   Started                             0.2s
+ ✔ Container todo-list-postgres-todo-web-1  Started                             0.2s
+
+# db와 웹서버 2개가 활성화된다
+$ docker-compose ps
+NAME                            IMAGE                   SERVICE    STATUS         PORTS
+todo-list-postgres-todo-db-1    diamol/postgres:11.5    todo-db    Up 6 seconds   0.0.0.0:5433-&gt;5432/tcp
+todo-list-postgres-todo-web-1   diamol/ch06-todo-list   todo-web   Up 6 seconds   0.0.0.0:8030-&gt;80/tcp</code></pre>
+  </div>
+
+  <h4>SQLite 대신 Postgres</h4>
+  <p>실제로 추가한 데이터가 도커로 실행한 Postgres 에 저장된다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 210" width="640" role="img" aria-label="8030 포트의 웹 화면에 postgres todo 항목이 보이고, pgAdmin 에서 같은 행이 ToDos 테이블에 저장되어 있다">
+        <rect x="8" y="8" width="300" height="194" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="8" y="8" width="300" height="26" rx="8" class="dg-fill-soft"/>
+        <line x1="8" y1="34" x2="308" y2="34" class="dg-stroke"/>
+        <text x="24" y="26" class="dg-accent dg-mono" font-size="10.5">localhost:8030/list</text>
+        <rect x="8" y="34" width="66" height="168" class="dg-fill-soft"/>
+        <text x="41" y="56" class="dg-text-sub" font-size="8" text-anchor="middle">DIAMOL</text>
+        <text x="41" y="88" class="dg-text-sub" font-size="8.5" text-anchor="middle">Home</text>
+        <text x="41" y="112" class="dg-text-sub" font-size="8.5" text-anchor="middle">New item</text>
+        <text x="41" y="136" class="dg-accent" font-size="8.5" text-anchor="middle" font-weight="700">To-do list</text>
+        <text x="92" y="66" class="dg-text" font-size="16" font-weight="800">TODO List</text>
+        <line x1="92" y1="106" x2="292" y2="106" class="dg-stroke"/>
+        <text x="92" y="122" class="dg-text" font-size="10" font-weight="700">Item</text>
+        <text x="212" y="122" class="dg-text" font-size="10" font-weight="700">Date Added</text>
+        <line x1="92" y1="130" x2="292" y2="130" class="dg-stroke"/>
+        <text x="92" y="148" class="dg-accent dg-mono" font-size="10.5">postgres todo</text>
+        <text x="212" y="148" class="dg-text-sub" font-size="9.5">27 October 2024</text>
+
+        <path d="M312 105 L 336 105" fill="none" class="dg-stroke" marker-end="url(#pg-arr)"/>
+        <defs>
+          <marker id="pg-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+
+        <rect x="342" y="8" width="290" height="194" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="342" y="8" width="290" height="26" rx="8" class="dg-fill-soft"/>
+        <line x1="342" y1="34" x2="632" y2="34" class="dg-stroke"/>
+        <text x="358" y="26" class="dg-text-sub dg-mono" font-size="10">public.ToDos/todo/postgres@localhost:5433</text>
+        <rect x="356" y="46" width="262" height="42" rx="5" class="dg-fill-soft dg-stroke"/>
+        <text x="368" y="64" class="dg-mono" font-size="10.5"><tspan fill="var(--purple)">SELECT</tspan> <tspan class="dg-text">*</tspan> <tspan fill="var(--purple)">FROM</tspan> <tspan class="dg-accent">public.&quot;ToDos&quot;</tspan></text>
+        <text x="368" y="80" class="dg-mono" font-size="10.5"><tspan fill="var(--purple)">ORDER BY</tspan> <tspan class="dg-accent">&quot;ToDoId&quot;</tspan> <tspan fill="var(--purple)">ASC</tspan></text>
+        <line x1="356" y1="112" x2="618" y2="112" class="dg-stroke"/>
+        <text x="366" y="128" class="dg-text" font-size="9.5" font-weight="700">ToDoId</text>
+        <text x="424" y="128" class="dg-text" font-size="9.5" font-weight="700">Item</text>
+        <text x="524" y="128" class="dg-text" font-size="9.5" font-weight="700">DateAdded</text>
+        <line x1="356" y1="136" x2="618" y2="136" class="dg-stroke"/>
+        <text x="366" y="154" class="dg-text-sub dg-mono" font-size="9.5">1</text>
+        <text x="424" y="154" class="dg-accent dg-mono" font-size="9.5">postgres todo</text>
+        <text x="524" y="154" class="dg-text-sub dg-mono" font-size="9">2024-10-27</text>
+        <text x="487" y="184" class="dg-text-sub" font-size="10" text-anchor="middle">웹에서 넣은 항목이 실제 Postgres 테이블에 들어가 있다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>앱 이미지는 그대로, 저장소만 바뀌었다</b> — 코드를 고치지 않고
+      <code>environment</code> 와 비밀값 파일만 바꿔 SQLite 에서 Postgres 로 전환했다.
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">여기의 비밀값은 진짜 비밀이 아니다 <span class="badge b-blue">보강</span></p>
+      <p>
+        컴포즈의 <code>secrets</code> 는 파일 내용을 컨테이너 안의 지정 경로에 얹어 줄 뿐,
+        <b>암호화하지 않는다</b>. 원본은 여전히 <code>./config/secrets.json</code> 평문 파일이다.
+        실제 암호화 저장은 스웜의 <code>docker secret</code> 이나 쿠버네티스 Secret,
+        외부 볼트가 담당한다. 그래도 <code>environment</code> 로 넘기는 것보다는 낫다.
+        환경 변수는 <code>docker inspect</code> 와 프로세스 목록에 그대로 노출되지만,
+        파일로 얹은 값은 그렇지 않기 때문이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>같은 이미지에 설정만 갈아 끼워 저장소를 바꿨다. 앱과 설정의 분리가 실제로 작동하는 모습이다.</li>
+      <li>커넥션 스트링의 호스트명 자리에 서비스 이름을 그대로 쓴다. DNS 가 풀어 준다.</li>
+      <li>민감한 값은 <code>environment</code> 보다 <code>secrets</code>(파일 주입)가 낫다. 다만 암호화는 아니다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7-5</div>
+    <h3>도커 컴포즈도 만능은 아니다</h3>
+    <p class="item-tagline">컴포즈는 상태를 <b>만들어</b> 주지만 <b>지켜</b> 주지는 않는다. 그 차이가 프로덕션의 경계다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    컴포즈에는 <b>앱이 정의된 상태를 계속 유지하게 하는 기능이 없다</b>.
+    컨테이너가 죽으면 죽은 채로 남는다. 이것이 컴포즈와 오케스트레이터를 가르는 결정적 차이다.
+  </div>
+
+  <h4>도커 컴포즈의 역할</h4>
+  <ul>
+    <li>도커 컴포즈는 쿠버네티스나 도커 스웜 같은 완전한 컨테이너 플랫폼이 아니다.</li>
+    <li>앱이 지속적으로 정의된 상태를 유지하도록 하는 기능이 없다.</li>
+    <li>다만 컨테이너 클러스터를 운영할 계획이 없는 소규모 앱이라면 도커 컴포즈로도 충분하다.</li>
+  </ul>
+
+  <h4>앱 운영의 어떤 과정에서 써야 할까</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>단계</th><th>컴포즈의 역할</th><th>적합도</th></tr></thead>
+      <tbody>
+        <tr><td><b>Dev / E2E Test</b></td><td>E2E 테스트를 위한 서비스 구성이 필요할 때 앱을 실행</td><td class="t-center t-ok">✓</td></tr>
+        <tr><td><b>CI 파이프라인</b></td><td>빌드 및 자동화된 테스트에 컴포즈로 앱을 실행</td><td class="t-center t-ok">✓</td></tr>
+        <tr><td><b>Test / QA</b></td><td>단일 서버에서 앱을 실행해 테스트. 테스트 환경을 최소한으로 유지</td><td class="t-center t-ok">✓</td></tr>
+        <tr><td><b>프로덕션</b></td><td>도커 스웜이나 쿠버네티스를 쓰는 게 옳다. 다만 앱 정의에는 컴포즈 파일 포맷을 여전히 쓴다</td><td class="t-center t-no">✗</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">그래도 프로덕션에서 굴려야 한다면 <span class="badge b-blue">보강</span></p>
+      <p>
+        컴포즈에도 <code>restart</code> 정책이 있어서 <b>컨테이너가 종료됐을 때 다시 띄우는 것</b>까지는 된다
+        (<code>restart: always</code> / <code>unless-stopped</code>). 여기에
+        <a href="#item-8-4">8-4</a> 의 헬스체크를 더하면 단일 서버 수준의 자동 복구는 흉내 낼 수 있다.
+      </p>
+      <p>
+        하지만 이것은 <b>한 대 안에서만</b> 유효하다. 그 서버 자체가 죽으면 앱도 함께 죽고,
+        다른 노드로 옮겨 붙일 방법이 없다. 여러 대에 걸쳐 상태를 지켜 주는 것이
+        <a href="#item-12-1">12장</a> 의 오케스트레이터가 하는 일이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컴포즈는 상태를 만들지만 유지하지는 않는다. 죽은 컨테이너를 되살리는 건 오케스트레이터의 몫이다.</li>
+      <li>개발 / CI / QA 에는 컴포즈로 충분하고, 프로덕션은 스웜이나 쿠버네티스로 간다.</li>
+      <li>플랫폼이 바뀌어도 앱 정의 포맷은 컴포즈 파일 형식을 계속 쓴다.</li>
+    </ul>
+  </div>
+</article>

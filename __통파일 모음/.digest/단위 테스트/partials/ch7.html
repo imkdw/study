@@ -1,0 +1,888 @@
+<article class="item" id="item-7-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-1</div>
+    <h3>리팩터링할 코드 식별하기</h3>
+    <p class="item-tagline">복잡도 및 도메인 유의성 × 협력자 수. 두 축이면 충분하다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>코드가 더 중요해지거나 복잡해질수록 협력자는 더 적어야 한다.</b> 그 반대 지점에 있는 코드가 리팩터링 대상이다.
+  </div>
+
+  <h4>코드의 4가지 유형</h4>
+
+  <p>모든 제품 코드는 두 개의 차원으로 분류된다.</p>
+
+  <h5>복잡도(code complexity)</h5>
+  <p>코드 내 의사 결정(분기) 지점의 수로 정의한다. 순환 복잡도는 <code>1 + 분기점 수</code> 로 계산한다.</p>
+
+  <h5>도메인 유의성(domain significance)</h5>
+  <p>코드가 프로젝트의 문제 도메인에 대해 얼마나 의미 있는지를 나타낸다. 도메인 계층의 코드는 최종 유저의 목표와 직접 연결되므로 도메인 유의성이 높다. <b>복잡하거나 도메인 유의성이 높은 코드가 단위 테스트에서 제일 이롭다.</b></p>
+
+  <h5>협력자 수</h5>
+  <p>여기서 협력자란 가변 의존성이거나 프로세스 외부 의존성, 또는 둘 다인 것을 뜻한다. 유지 보수성 지표가 테스트 크기에 따라 달라지므로, <b>협력자가 많은 코드는 테스트 비용이 많이 든다.</b></p>
+
+  <p>협력자의 <b>유형</b>도 중요하다. 도메인 모델이라면 프로세스 외부 협력자를 사용해서는 안 된다. 또 리팩터링 내성을 지키려면 목을 아주 신중하게 써야 하는데, 목은 <b>앱 경계를 넘는 상호작용</b>에만 쓸 수 있다. 따라서 프로세스 외부 의존성과의 통신은 모두 도메인 계층 바깥의 클래스에 위임하는 것이 좋다.</p>
+
+  <h4>4가지 코드 유형</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 540 330" width="540" role="img" aria-label="복잡도 및 도메인 유의성과 협력자 수를 축으로 하는 코드의 네 가지 유형 사분면">
+        <line x1="96" y1="34" x2="96" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <line x1="96" y1="278" x2="500" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M92 42 L96 32 L100 42" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M492 274 L502 278 L492 282" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+
+        <rect x="118" y="52" width="340" height="208" class="dg-fill-soft dg-stroke" stroke-width="1.8"/>
+        <line x1="288" y1="52" x2="288" y2="260" class="dg-stroke" stroke-width="1.4"/>
+        <line x1="118" y1="156" x2="458" y2="156" class="dg-stroke" stroke-width="1.4"/>
+
+        <text x="203" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">도메인 모델</text>
+        <text x="203" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">및 알고리즘</text>
+        <text x="373" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">지나치게</text>
+        <text x="373" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">복잡한 코드</text>
+        <text x="203" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">간단한 코드</text>
+        <text x="373" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">컨트롤러</text>
+
+        <text x="52" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">복잡도 및</text>
+        <text x="52" y="164" class="dg-text-sub" font-size="11" text-anchor="middle">도메인 유의성</text>
+        <text x="288" y="302" class="dg-text-sub" font-size="11.5" text-anchor="middle">협력자 수</text>
+
+        <text x="180" y="38" fill="var(--green)" class="dg-text" font-size="11" text-anchor="middle" font-weight="700">단위 테스트가 제일 이로움</text>
+        <text x="400" y="38" fill="var(--red)" class="dg-text" font-size="11" text-anchor="middle" font-weight="700">테스트가 제일 어려움</text>
+        <text x="190" y="322" fill="var(--text-muted)" class="dg-text" font-size="11" text-anchor="middle">테스트할 필요 없음 (가치가 0 에 가까움)</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>지나치게 복잡한 코드는 도메인 모델과 컨트롤러로 쪼개야 한다</b> — 왼쪽 위는 테스트하고, 오른쪽 아래는 통합 테스트로 얇게 덮고, 왼쪽 아래는 그냥 둔다.</div>
+  </div>
+
+  <p>지나치게 복잡한 코드를 피하고 도메인 모델과 알고리즘만 테스트하는 것이, 가치 있고 유지 보수하기 쉬운 테스트 스위트로 가는 길이다. 오른쪽 위에 있는 코드는 <b>도메인 모델 및 알고리즘</b>과 <b>컨트롤러</b>로 나눠서 리팩터링한다.</p>
+
+  <h4>험블 객체 패턴으로 복잡한 코드 분할</h4>
+
+  <p>지나치게 복잡한 코드를 쪼개는 도구가 <b>험블 객체(Humble Object)</b> 패턴이다.</p>
+
+  <p>테스트하기 어려운 의존성의 예로는 비동기 또는 멀티스레드 실행, 유저 인터페이스, 프로세스 외부 의존성과의 통신 등이 있다. 로직이 이런 의존성과 한 덩어리로 붙어 있으면 로직만 따로 테스트할 방법이 없다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  T1["테스트"] --> X["지나치게 복잡한 코드<br>테스트하기 어려운 의존성 + 로직"]
+  H["험블 객체<br>얇은 래퍼"] --> DEP["테스트하기 어려운 의존성"]
+  H --> LOGIC["로직"]
+  T2["테스트"] --> LOGIC
+      </pre>
+    </div>
+    <div class="figure-cap"><b>테스트 가능한 부분을 먼저 추출하고, 남은 껍데기를 험블 래퍼로 만든다</b> — 래퍼는 어려운 의존성과 추출된 구성 요소를 붙이기만 할 뿐 자체 로직이 거의 없어서 테스트할 필요가 없다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>두 축은 <b>복잡도 및 도메인 유의성</b>과 <b>협력자 수</b>다.</li>
+      <li>도메인 모델 및 알고리즘 = 테스트 최고 가치. 간단한 코드 = 테스트 불필요.</li>
+      <li>지나치게 복잡한 코드를 도메인 모델과 컨트롤러로 쪼갠다.</li>
+      <li>험블 객체는 로직을 뽑아낸 뒤 남는 <b>로직 없는 얇은 래퍼</b>다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-2</div>
+    <h3>가치 있는 단위 테스트를 위한 리팩터링하기</h3>
+    <p class="item-tagline">CRM 하나를 네 단계에 걸쳐 사분면 위에서 이동시킨다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    앱 서비스의 역할은 <b>오케스트레이션</b>뿐이다. 복잡도나 도메인 유의성이 있는 로직은 하나도 남아 있으면 안 된다.
+  </div>
+
+  <h4>고객 관리 시스템 소개</h4>
+
+  <p>CRM 이고, 모든 사용자가 디비에 저장된다. 현재 지원하는 유스케이스는 <b>유저 이메일 변경</b> 하나뿐이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag bad">지나치게 복잡한 코드</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">enum UserType {
+  CUSTOMER,
+  EMPLOYEE,
+}
+
+class User {
+  userId: number;
+  email: string;
+  type: UserType;
+
+  changeEmail(userId: number, newEmail: string) {
+    // 디비에서 사용자 검색
+    const data = Database.getUserById(userId);
+    this.userId = userId;
+    this.email = data[1];
+    this.type = data[2];
+
+    if (this.email === newEmail) {
+      return;
+    }
+
+    // 조직의 도메인명과 사원 수 검색
+    const companyData = Database.getCompany();
+    const companyDomainName = companyData[0];
+    const numberOfEmployees = companyData[1];
+
+    // 새 이메일의 도메인 이름에 따라 사용자 유형을 설정
+    const emailDomain = newEmail.split("@")[1];
+    const isEmailCorporate = emailDomain === companyDomainName;
+    const newType = isEmailCorporate ? UserType.EMPLOYEE : UserType.CUSTOMER;
+
+    // 필요한 경우 조직원 수를 업데이트
+    if (this.type !== newType) {
+      const delta = newType === UserType.EMPLOYEE ? 1 : -1;
+      Database.saveCompany(numberOfEmployees + delta);
+    }
+
+    this.email = newEmail;
+    this.type = newType;
+
+    Database.saveUser(this);
+    MessageBus.sendEmailChangedMessage(userId, newEmail);
+  }
+}</code></pre>
+  </div>
+
+  <ul>
+    <li><b>암시적 의존성</b> — <code>Database</code>, <code>MessageBus</code></li>
+    <li><b>명시적 의존성</b> — <code>userId</code>, <code>newEmail</code></li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">Active Record 패턴</p>
+      <p>도메인 클래스가 스스로 디비를 검색하고 다시 저장하는 패턴을 <b>Active Record</b> 라고 한다. 초기에는 편하지만 확장이 어렵다. <b>비즈니스 로직과 프로세스 외부 의존성과의 통신 사이에 분리가 없기 때문</b>이다.</p>
+    </div>
+  </div>
+
+  <h4>1단계 — 암시적 의존성을 명시적으로 만들기</h4>
+
+  <p>테스트 용이성을 개선하는 일반적인 첫 수는 암시적 의존성을 명시적으로 바꾸는 것이다. <code>Database</code> 와 <code>MessageBus</code> 를 인터페이스로 뽑아 <code>User</code> 의 생성자에 주입하고, 테스트에서는 목으로 처리한다.</p>
+
+  <p>하지만 이것으로는 부족하다. 도메인 모델이 여전히 프로세스 외부 의존성과 <b>직접</b> 통신하기 때문이다.</p>
+
+  <h4>2단계 — 앱 서비스 계층 도입</h4>
+
+  <p>도메인 모델이 외부 시스템과 직접 통신하는 문제를 극복하려면 그 책임을 다른 클래스, 즉 <b>험블 컨트롤러</b>로 옮겨야 한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-tag bad">아직 문제가 남았다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  private readonly database: Database = new Database();
+  private readonly messageBus: MessageBus = new MessageBus();
+
+  changeEmail(userId: number, newEmail: string) {
+    const data = this.database.getUserById(userId);
+    const email = data[1];
+    const type = data[2];
+    const user = new User(userId, email, type);
+
+    const companyData = this.database.getCompany();
+    const companyDomainName = companyData[0];
+    const numberOfEmployees = companyData[1];
+
+    const newNumberOfEmployees = user.changeEmail(
+      newEmail,
+      companyDomainName,
+      numberOfEmployees
+    );
+
+    this.database.saveCompany(newNumberOfEmployees);
+    this.database.saveUser(user);
+    this.messageBus.sendEmailChangedMessage(userId, newEmail);
+  }
+}</code></pre>
+  </div>
+
+  <h5>남아 있는 문제점</h5>
+
+  <ol class="steps">
+    <li><div class="step-title">외부 의존성을 주입받지 않고 직접 인스턴스화한다</div><p>이 클래스를 위해 작성할 통합 테스트에서 문제가 된다.</p></li>
+    <li><div class="step-title">디비에서 받은 원시 데이터를 User 인스턴스로 재구성한다</div><p>이는 복잡한 로직이며 앱 서비스에 속하면 안 된다. <b>앱 서비스의 역할은 오케스트레이션뿐</b>이다.</p></li>
+    <li><div class="step-title">회사 데이터를 다루는 책임이 잘못 놓여 있다</div><p>회사 직원 수는 특정 사용자와 아무 관련이 없다.</p></li>
+    <li><div class="step-title">새 이메일이 기존과 다른지 확인하지 않는다</div><p>같은 이메일이어도 무조건 저장하고 메세지를 발행한다.</p></li>
+  </ol>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">협력자가 사라진 User</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  userId: number;
+  email: string;
+  type: UserType;
+
+  changeEmail(
+    newEmail: string,
+    companyDomainName: string,
+    numberOfEmployees: number
+  ) {
+    if (this.email === newEmail) {
+      return numberOfEmployees;
+    }
+
+    const emailDomain = newEmail.split("@")[1];
+    const isEmailCorporate = emailDomain === companyDomainName;
+    const newType = isEmailCorporate ? UserType.EMPLOYEE : UserType.CUSTOMER;
+
+    if (this.type !== newType) {
+      const delta = newType === UserType.EMPLOYEE ? 1 : -1;
+      numberOfEmployees = numberOfEmployees + delta;
+    }
+
+    this.email = newEmail;
+    this.type = newType;
+
+    return numberOfEmployees;
+  }
+}</code></pre>
+  </div>
+
+  <p>이제 <code>User</code> 는 프로세스 외부 의존성과 통신할 필요가 없다. 프로세스 내부에도 외부에도 <b>협력자가 하나도 없다.</b></p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 540 330" width="540" role="img" aria-label="2단계 리팩터링 후 User 와 UserController 가 사분면에서 이동한 위치">
+        <line x1="96" y1="34" x2="96" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <line x1="96" y1="278" x2="500" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M92 42 L96 32 L100 42" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M492 274 L502 278 L492 282" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+
+        <rect x="118" y="52" width="340" height="208" class="dg-fill-soft dg-stroke" stroke-width="1.8"/>
+        <line x1="288" y1="52" x2="288" y2="260" class="dg-stroke" stroke-width="1.4"/>
+        <line x1="118" y1="156" x2="458" y2="156" class="dg-stroke" stroke-width="1.4"/>
+
+        <text x="203" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">도메인 모델</text>
+        <text x="203" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">및 알고리즘</text>
+        <text x="373" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">지나치게</text>
+        <text x="373" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">복잡한 코드</text>
+        <text x="203" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">간단한 코드</text>
+        <text x="373" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">컨트롤러</text>
+
+        <circle cx="132" cy="60" r="7" fill="none" stroke="var(--red)" stroke-width="2"/>
+        <line x1="140" y1="56" x2="184" y2="40" stroke="var(--red)" stroke-width="1.5"/>
+        <text x="216" y="38" fill="var(--red)" class="dg-text dg-mono" font-size="11.5" text-anchor="middle" font-weight="700">User</text>
+
+        <circle cx="316" cy="156" r="7" fill="none" stroke="var(--red)" stroke-width="2"/>
+        <line x1="324" y1="154" x2="392" y2="146" stroke="var(--red)" stroke-width="1.5"/>
+        <text x="454" y="144" fill="var(--red)" class="dg-text dg-mono" font-size="11.5" text-anchor="middle" font-weight="700">UserController</text>
+
+        <text x="52" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">복잡도 및</text>
+        <text x="52" y="164" class="dg-text-sub" font-size="11" text-anchor="middle">도메인 유의성</text>
+        <text x="288" y="302" class="dg-text-sub" font-size="11.5" text-anchor="middle">협력자 수</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>2단계 이후 — 아직 경계에 걸쳐 있다</b> — <code>User</code> 는 도메인 모델 쪽으로 왔지만, <code>UserController</code> 는 여전히 "지나치게 복잡한 코드" 와 "컨트롤러" 사이에 걸쳐 있다.</div>
+  </div>
+
+  <h4>3단계 — 앱 서비스 복잡도 낮추기</h4>
+
+  <p>컨트롤러에 남아 있는 "원시 데이터 → 인스턴스 재구성" 로직을 뽑아내야 컨트롤러 사분면에 확실히 자리 잡는다. 보통은 ORM 이 이 일을 해주고, 불가능하다면 팩토리를 만들면 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-factory.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export const createUser = (data: unknown[]) =&gt; {
+  const id = data[0] as number;
+  const email = data[1] as string;
+  const type = data[2] as UserType;
+
+  return new User(id, email, type);
+};</code></pre>
+  </div>
+
+  <h4>4단계 — 새로운 Company 클래스</h4>
+
+  <p><code>User.changeEmail</code> 이 <b>업데이트된 직원 수를 반환한다</b>는 점이 이상하다. 이는 책임을 잘못 뒀다는 신호이자, <b>추상화가 빠져 있다</b>는 신호다. 회사 관련 로직과 데이터를 함께 묶는 도메인 클래스 <code>Company</code> 를 만들어야 한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">company.ts</span>
+      <span class="code-tag good">빠져 있던 추상화</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Company {
+  constructor(
+    public domainName: string,
+    public numberOfEmployees: number
+  ) {}
+
+  changeNumberOfEmployees(delta: number) {
+    if (this.numberOfEmployees + delta &lt; 0) {
+      throw new Error("Invalid number of employees");
+    }
+
+    this.numberOfEmployees += delta;
+  }
+
+  isEmailCorporate(email: string) {
+    const emailDomain = email.split("@")[1];
+    return emailDomain === this.domainName;
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-tag good">리팩터링 후</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  constructor(
+    private readonly database: Database,
+    private readonly messageBus: MessageBus
+  ) {}
+
+  changeEmail(userId: number, newEmail: string) {
+    const userData = this.database.getUserById(userId);
+    const user = createUser(userData);
+
+    const companyData = this.database.getCompany();
+    const company = createCompany(companyData);
+
+    user.changeEmail(newEmail, company);
+
+    this.database.saveCompany(company);
+    this.database.saveUser(user);
+    this.messageBus.sendEmailChangedMessage(userId, newEmail);
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">리팩터링 후</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  constructor(
+    public userId: number,
+    public email: string,
+    public type: UserType
+  ) {}
+
+  changeEmail(newEmail: string, company: Company) {
+    if (this.email === newEmail) {
+      return;
+    }
+
+    const newType = company.isEmailCorporate(newEmail)
+      ? UserType.EMPLOYEE
+      : UserType.CUSTOMER;
+
+    if (this.type !== newType) {
+      const delta = newType === UserType.EMPLOYEE ? 1 : -1;
+      company.changeNumberOfEmployees(delta); // 책임을 Company 에 위임
+    }
+
+    this.email = newEmail;
+    this.type = newType;
+  }
+}</code></pre>
+  </div>
+
+  <p>이제 <code>User</code> 는 회사 데이터를 직접 다루지 않고 <code>Company</code> 인스턴스에 책임을 위임한다. 협력자가 하나 생긴 만큼 테스트가 조금 어려워졌지만, 아주 조금이다. <code>Company</code> 는 프로세스 외부 의존성이 아닌 <b>도메인 협력자</b>이기 때문이다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 540 330" width="540" role="img" aria-label="4단계 리팩터링 후 도메인 클래스들과 UserController 가 각자 자리를 잡은 사분면">
+        <line x1="96" y1="34" x2="96" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <line x1="96" y1="278" x2="500" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M92 42 L96 32 L100 42" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M492 274 L502 278 L492 282" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+
+        <rect x="118" y="52" width="340" height="208" class="dg-fill-soft dg-stroke" stroke-width="1.8"/>
+        <line x1="288" y1="52" x2="288" y2="260" class="dg-stroke" stroke-width="1.4"/>
+        <line x1="118" y1="156" x2="458" y2="156" class="dg-stroke" stroke-width="1.4"/>
+
+        <text x="203" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">도메인 모델</text>
+        <text x="203" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">및 알고리즘</text>
+        <text x="373" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">지나치게</text>
+        <text x="373" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">복잡한 코드</text>
+        <text x="203" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">간단한 코드</text>
+        <text x="373" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">컨트롤러</text>
+
+        <circle cx="152" cy="70" r="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+        <circle cx="240" cy="70" r="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+        <line x1="152" y1="61" x2="176" y2="42" stroke="var(--green)" stroke-width="1.5"/>
+        <line x1="240" y1="61" x2="256" y2="46" stroke="var(--green)" stroke-width="1.5"/>
+        <text x="150" y="34" fill="var(--green)" class="dg-text dg-mono" font-size="10.5" text-anchor="middle" font-weight="700">Company, UserFactory,</text>
+        <text x="150" y="48" fill="var(--green)" class="dg-text dg-mono" font-size="10.5" text-anchor="middle" font-weight="700">CompanyFactory</text>
+        <text x="300" y="40" fill="var(--green)" class="dg-text dg-mono" font-size="11.5" text-anchor="middle" font-weight="700">User</text>
+
+        <circle cx="373" cy="242" r="7" fill="none" stroke="var(--green)" stroke-width="2"/>
+        <line x1="381" y1="242" x2="428" y2="248" stroke="var(--green)" stroke-width="1.5"/>
+        <text x="466" y="266" fill="var(--green)" class="dg-text dg-mono" font-size="11" text-anchor="middle" font-weight="700">UserController</text>
+
+        <text x="52" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">복잡도 및</text>
+        <text x="52" y="164" class="dg-text-sub" font-size="11" text-anchor="middle">도메인 유의성</text>
+        <text x="288" y="302" class="dg-text-sub" font-size="11.5" text-anchor="middle">협력자 수</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>4단계 이후 — 모두 제자리를 찾았다</b> — 도메인 클래스와 팩토리는 왼쪽 위로, <code>UserController</code> 는 컨트롤러 사분면 안쪽으로 완전히 들어왔다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Active Record 는 비즈니스 로직과 외부 통신을 분리하지 않아 확장되지 않는다.</li>
+      <li>1단계 암시적 → 명시적 의존성, 2단계 앱 서비스(험블 컨트롤러) 도입.</li>
+      <li>3단계 팩토리로 재구성 로직 추출, 4단계 빠진 추상화(<code>Company</code>) 도입.</li>
+      <li>"이상한 반환값" 은 대개 <b>책임이 잘못 놓였거나 추상화가 빠졌다</b>는 신호다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-3</div>
+    <h3>최적의 단위 테스트 커버리지 분석</h3>
+    <p class="item-tagline">네 사분면 중 왼쪽 위만 단위 테스트로 촘촘히 덮는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    도메인 유의성이 있는 전제 조건은 테스트한다. <b>도메인 유의성이 없는 전제 조건은 테스트하지 않는다.</b>
+  </div>
+
+  <h4>도메인 계층과 유틸리티 코드 테스트</h4>
+
+  <p>사분면의 좌측 상단을 대상으로 하는 테스트가 비용 편익 측면에서 최상의 결과를 준다. 복잡도나 도메인 유의성이 높아 <b>회귀 방지가 뛰어나고</b>, 협력자가 거의 없어 <b>유지비가 가장 낮다.</b></p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("change_email_from_non_corporate_to_corporate", () =&gt; {
+  const company = new Company("mycorp.com", 1);
+  const sut = new User(1, "user@gmail.com", UserType.CUSTOMER);
+
+  sut.changeEmail("new@mycorp.com", company);
+
+  expect(company.numberOfEmployees).toBe(2);
+  expect(sut.email).toBe("new@mycorp.com");
+  expect(sut.type).toBe(UserType.EMPLOYEE);
+});</code></pre>
+  </div>
+
+  <h5>커버리지를 만족하기 위한 추가 테스트</h5>
+
+  <ul>
+    <li><code>change_email_from_corporate_to_non_corporate</code></li>
+    <li><code>change_email_without_changing_user_type</code></li>
+    <li><code>change_email_to_the_same_one</code></li>
+  </ul>
+
+  <p>이 테스트들의 코드는 훨씬 짧을 것이고, 매개변수화된 테스트로 여러 케이스를 묶을 수도 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">company.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it.each([
+  ["mycorp.com", "email@mycorp.com", true],
+  ["mycorp.com", "email@gmail.com", false],
+])(
+  "differentiates_a_corporate_email_from_non_corporate",
+  (domain, email, expectedResult) =&gt; {
+    const sut = new Company(domain, 0);
+
+    const isEmailCorporate = sut.isEmailCorporate(email);
+
+    expect(isEmailCorporate).toBe(expectedResult);
+  }
+);</code></pre>
+  </div>
+
+  <h4>나머지 세 사분면에 대한 코드 테스트</h4>
+
+  <p>팩토리 클래스 같은 코드는 너무 간단해서 굳이 테스트를 만들 필요가 없다. 만들어봐야 <b>회귀 방지가 떨어지는</b> 테스트만 늘어난다.</p>
+
+  <h4>전제 조건을 테스트해야 되는가</h4>
+
+  <p>일반적인 지침은 <b>도메인 유의성이 있는 모든 전제 조건을 테스트하라</b>는 것이다. <code>Company</code> 에서 직원 수가 음수가 되면 안 된다는 요구 사항이 여기 해당한다. 반대로 도메인 유의성이 없는 방어적 검사는 테스트할 필요가 없다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">company.spec.ts</span>
+      <span class="code-tag good">도메인 유의성이 있는 전제 조건</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("number_of_employees_cannot_become_negative", () =&gt; {
+  const sut = new Company("mycorp.com", 0);
+
+  expect(() =&gt; sut.changeNumberOfEmployees(-1)).toThrow(
+    "Invalid number of employees"
+  );
+});</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>사분면 좌측 상단이 비용 편익 최고 지점이다.</li>
+      <li>팩토리 같은 간단한 코드는 테스트하지 않는다.</li>
+      <li><b>도메인 유의성이 있는 전제 조건만</b> 테스트한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-4</div>
+    <h3>컨트롤러에서 조건부 로직 처리</h3>
+    <p class="item-tagline">테스트 유의성 / 컨트롤러 단순성 / 성능. 셋 중 둘만 가질 수 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    성능은 협상 불가, 도메인 모델에 외부 의존성 주입도 불가. 그러니 <b>컨트롤러의 복잡도만 완화</b>하는 쪽으로 간다.
+  </div>
+
+  <h4>비즈니스와 오케스트레이션 분리</h4>
+
+  <p>비즈니스 연산은 아래 순서일 때 가장 깔끔하다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">저장소에서 데이터 검색</div></li>
+    <li><div class="step-title">비즈니스 로직 실행</div></li>
+    <li><div class="step-title">데이터를 다시 저장소에 저장</div></li>
+  </ol>
+
+  <p>여기서 개발자는 세 가지 특성의 균형을 맞춰야 한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>특성</th><th>결정 요인</th></tr></thead>
+      <tbody>
+        <tr><td><b>도메인 모델 테스트 유의성</b></td><td>도메인 클래스의 협력자 수와 유형</td></tr>
+        <tr><td><b>컨트롤러 단순성</b></td><td>의사 결정(분기) 지점이 있는지</td></tr>
+        <tr><td><b>성능</b></td><td>프로세스 외부 의존성에 대한 호출 수</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>3개 중 2개만 챙기기</h5>
+
+  <ul>
+    <li>세 가지를 모두 만족하는 해법은 없다.</li>
+    <li>대부분의 소프트웨어에서 <b>성능은 협상 대상이 아니다.</b> 무조건 챙긴다.</li>
+    <li>도메인 모델에 외부 의존성을 주입하면 테스트가 힘들어진다. 이것도 피해야 한다.</li>
+    <li>남은 것은 <b>컨트롤러가 복잡해지는 것</b>인데, 이것만은 완화할 방법이 있다.</li>
+  </ul>
+
+  <h4>CanExecute / Execute 패턴</h4>
+
+  <p>컨트롤러 복잡도를 완화하는 첫 번째 방법이자, <b>비즈니스 로직이 도메인 모델에서 컨트롤러로 유출되는 것을 방지</b>하는 방법이다.</p>
+
+  <p>예를 들어 "이메일은 사용자가 확인(confirm)하기 전까지만 변경할 수 있다" 는 규칙이 추가됐다고 하자.</p>
+
+  <h4>예제 1 — User 에 새로운 속성 추가</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  // 기존 속성...
+  isEmailConfirmed: boolean;
+
+  changeEmail(newEmail: string, company: Company): string | null {
+    if (this.isEmailConfirmed) {
+      return "이메일이 이미 확인되었습니다.";
+    }
+    // ...
+    return null;
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-tag good">의사 결정을 도메인에 남김</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  changeEmail(userId: number, newEmail: string) {
+    const userData = this.database.getUserById(userId);
+    const user = createUser(userData);
+
+    const companyData = this.database.getCompany();
+    const company = createCompany(companyData);
+
+    // 의사 결정은 도메인 모델이 한다
+    const error = user.changeEmail(newEmail, company);
+    if (error !== null) {
+      return error;
+    }
+
+    this.database.saveCompany(company);
+    this.database.saveUser(user);
+    this.messageBus.sendEmailChangedMessage(userId, newEmail);
+
+    return "OK";
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>if (!error) { return error; }</code> 로 적혀 있는데, 이러면 <b>에러가 없을 때</b> 조기 반환하게 되어 정상 흐름이 통째로 건너뛰어진다. 조건은 <code>if (error !== null)</code> 이어야 한다.</p>
+    </div>
+  </div>
+
+  <p>단점은 성능이다. <code>user.changeEmail()</code> 을 호출하려면 확인 여부와 무관하게 <b>항상 <code>Company</code> 를 디비에서 가져와야</b> 한다.</p>
+
+  <h4>예제 2 — 컨트롤러에서 isEmailConfirmed 확인</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-tag bad">캡슐화 저하</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  changeEmail(userId: number, newEmail: string) {
+    const userData = this.database.getUserById(userId);
+    const user = createUser(userData);
+
+    // 의사 결정 로직이 컨트롤러로 이동했다
+    if (user.isEmailConfirmed) {
+      return "ERROR_EMAIL_CONFIRMED";
+    }
+
+    const companyData = this.database.getCompany();
+    const company = createCompany(companyData);
+
+    user.changeEmail(newEmail, company);
+
+    this.database.saveCompany(company);
+    this.database.saveUser(user);
+    this.messageBus.sendEmailChangedMessage(userId, newEmail);
+
+    return "OK";
+  }
+}</code></pre>
+  </div>
+
+  <p>성능은 그대로 유지된다. 대신 <b>도메인 모델의 캡슐화가 떨어진다.</b> 이런 파편화는 비즈니스 로직과 오케스트레이션의 분리를 방해하고, 컨트롤러를 "지나치게 복잡한 코드" 위험 영역으로 밀어 넣는다.</p>
+
+  <h4>예제 3 — User 에 모든 책임 맡기기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">CanExecute / Execute</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  // ...
+
+  canChangeEmail(): boolean {
+    return !this.isEmailConfirmed;
+  }
+
+  changeEmail(newEmail: string, company: Company) {
+    if (!this.canChangeEmail()) {
+      throw new Error("이메일이 이미 확인되었습니다.");
+    }
+
+    // ...
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>changeEmail</code> 안에서 <code>if (!this.changeEmail())</code> 를 호출하는데, 자기 자신을 다시 부르는 <b>무한 재귀</b>가 된다. 호출해야 하는 것은 <code>this.canChangeEmail()</code> 이다.</p>
+    </div>
+  </div>
+
+  <p>이제 도메인 계층이 모든 결정을 통합한다. 컨트롤러는 <code>canChangeEmail()</code> 을 먼저 물어보기만 하면 되고, <b>의사 결정 지점은 사라진다.</b></p>
+
+  <h4>도메인 이벤트를 사용해 도메인 모델 변경 사항 추적</h4>
+
+  <p>도메인 모델을 현재 상태로 만든 단계를 되짚기 어려울 때가 많다. 하지만 앱에서 정확히 무슨 일이 일어났는지 외부 시스템에 알려야 하므로 그 단계를 아는 것이 중요할 수 있다.</p>
+
+  <p>이럴 때는 도메인 모델에서 <b>중요한 변경 사항을 추적</b>하고, 비즈니스 연산이 끝난 뒤 그것을 프로세스 외부 의존성 호출로 변환하면 된다. <b>도메인 이벤트</b>가 그 도구다.</p>
+
+  <p>기존 로직의 문제는 이메일이 기존과 동일해도 디비에 다시 저장하고 이벤트를 발행한다는 점이었다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">도메인 이벤트 도입</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">/**
+ * 도메인 이벤트는 항상 "이미 발생한 일" 을 나타낸다.
+ * 그러므로 항상 과거 시제로 명명한다.
+ */
+class EmailChangedEvent {
+  constructor(
+    public readonly userId: number,
+    public readonly newEmail: string
+  ) {}
+}
+
+class User {
+  userId: number;
+  email: string;
+  type: UserType;
+  emailChangedEvents: EmailChangedEvent[] = [];
+  private isEmailConfirmed: boolean;
+
+  private canChangeEmail() {
+    return !this.isEmailConfirmed;
+  }
+
+  changeEmail(newEmail: string, company: Company) {
+    if (!this.canChangeEmail()) {
+      throw new Error("이메일이 이미 확인되었습니다.");
+    }
+
+    if (this.email === newEmail) {
+      return;
+    }
+
+    const newType = company.isEmailCorporate(newEmail)
+      ? UserType.EMPLOYEE
+      : UserType.CUSTOMER;
+
+    if (this.type !== newType) {
+      const delta = newType === UserType.EMPLOYEE ? 1 : -1;
+      company.changeNumberOfEmployees(delta);
+    }
+
+    this.email = newEmail;
+    this.type = newType;
+    this.emailChangedEvents.push(new EmailChangedEvent(this.userId, newEmail));
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-tag good">이벤트를 메세지로 변환</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  changeEmail(userId: number, newEmail: string) {
+    const userData = this.database.getUserById(userId);
+    const user = createUser(userData);
+
+    if (!user.canChangeEmail()) {
+      return "ERROR_EMAIL_CONFIRMED";
+    }
+
+    const companyData = this.database.getCompany();
+    const company = createCompany(companyData);
+
+    user.changeEmail(newEmail, company);
+
+    this.database.saveCompany(company);
+    this.database.saveUser(user);
+    for (const event of user.emailChangedEvents) {
+      this.messageBus.sendEmailChangedMessage(event.userId, event.newEmail);
+    }
+
+    return "OK";
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">디비 저장은 왜 그대로 두는가</p>
+      <p>디비의 <b>최종 상태만 올바르면</b> 호출 횟수는 크게 중요하지 않다. ORM 을 쓰면 변경점이 없을 때 실제 쿼리가 나가지도 않는다. 반면 메세지 버스는 비관리 의존성이라 <b>발행 여부 자체가 외부에서 보이는 동작</b>이므로, 이벤트로 정확히 통제해야 한다. 필요하다면 별도의 <b>이벤트 디스패처</b>를 두어도 된다.</p>
+    </div>
+  </div>
+
+  <h5>테스트 리팩터링</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.spec.ts</span>
+      <span class="code-tag good">목 없이 이벤트를 검증</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("changing_email_from_corporate_to_non_corporate", () =&gt; {
+  const company = new Company("mycorp.com", 1);
+  const sut = new User(1, "user@mycorp.com", UserType.EMPLOYEE, false);
+
+  sut.changeEmail("new@gmail.com", company);
+
+  expect(company.numberOfEmployees).toBe(0);
+  expect(sut.email).toBe("new@gmail.com");
+  expect(sut.type).toBe(UserType.CUSTOMER);
+  expect(sut.emailChangedEvents).toEqual([
+    new EmailChangedEvent(1, "new@gmail.com"),
+  ]);
+});</code></pre>
+  </div>
+
+  <p>도메인 이벤트는 컨트롤러에서 의사 결정 책임을 제거하고 그 책임을 도메인 모델로 되돌린다. 덕분에 <b>외부 시스템과의 통신도 단위 테스트에서 간결하게</b> 검증할 수 있다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트 유의성 / 컨트롤러 단순성 / 성능 중 둘만 가질 수 있다.</li>
+      <li>성능과 도메인 모델의 순수성을 지키고, <b>컨트롤러 복잡도만 완화</b>한다.</li>
+      <li><code>CanExecute</code> / <code>Execute</code> 로 의사 결정을 도메인에 남긴다.</li>
+      <li>도메인 이벤트는 "무슨 일이 있었는가" 를 값으로 만들어 컨트롤러가 실어 나르게 한다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,533 @@
+<article class="item" id="item-10-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-1</div>
+    <h3>데이터베이스 테스트를 위한 전제 조건</h3>
+    <p class="item-tagline">스키마를 코드처럼 다루고, 개발자마다 인스턴스를 주고, 마이그레이션으로 배포한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    운영 릴리스 이후에는 <b>마이그레이션 기반 배포</b>가 정답이다. 상태 기반 방식은 <b>데이터 모션</b> 문제를 다룰 수 없기 때문이다.
+  </div>
+
+  <h4>디비를 형상 관리 시스템에 유지</h4>
+
+  <p>첫 단계는 디비 스키마를 <b>일반 코드로 취급</b>하는 것이다. 그러면 스키마를 과거의 특정 시점으로 되돌릴 수 있어 운영 환경의 버그를 재현하는 데 유용하다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원천 정보는 하나여야 한다</p>
+      <p>형상 관리의 스키마와 실제 운영 디비를 <b>둘 다</b> 손으로 관리하면 복수의 원천 정보가 생겨 부담이 가중된다. 형상 관리로 스키마를 관리하기로 했다면 <b>외부에서 디비 구조를 직접 수정해서는 안 된다.</b></p>
+    </div>
+  </div>
+
+  <h4>참조 데이터도 디비 스키마다</h4>
+
+  <p>참조 데이터는 앱이 제대로 작동하도록 <b>미리 채워야 하는</b> 데이터다. 앱의 필수 사항이므로 다른 디비 자료들과 함께 SQL <code>INSERT</code> 형태로 관리해야 한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>앱에서 수정</th><th>관리 위치</th></tr></thead>
+      <tbody>
+        <tr><td>일반 데이터</td><td class="t-center t-ok">가능</td><td>디비 (런타임에 생성됨)</td></tr>
+        <tr><td>참조 데이터</td><td class="t-center t-no">불가능</td><td>형상 관리 (마이그레이션 스크립트)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>모든 개발자를 위한 별도의 디비 인스턴스</h4>
+
+  <p>개발자마다 별도의 디비 인스턴스를 쓰는 것이 좋다. 하나를 공유하면 두 가지 문제가 생긴다.</p>
+
+  <ul>
+    <li>서로 다른 개발자가 실행한 테스트가 서로 간섭한다.</li>
+    <li>하위 호환성이 없는 변경 하나가 다른 개발자의 작업을 막는다.</li>
+  </ul>
+
+  <h4>상태 기반 디비 배포와 마이그레이션 기반 디비 배포</h4>
+
+  <h5>상태 기반</h5>
+  <p>개발 사이클 내내 유지 보수하는 <b>모델 디비</b>가 따로 있다. 배포 시점에 비교 도구가 운영 디비를 모델 디비와 대조해 스크립트를 자동 생성하고 최신 상태로 맞춘다. 이때 비교 도구는 운영 디비의 상태와 상관없이 불필요한 테이블을 삭제하고 컬럼명을 바꾸는 등 동기화에 필요한 모든 작업을 수행한다.</p>
+
+  <h5>마이그레이션 기반</h5>
+  <p>디비를 어떤 버전에서 다른 버전으로 전환하는 <b>명시적인 마이그레이션</b>을 작성한다. 자동화 도구로 동기화할 수 없고 업그레이드 스크립트를 직접 써야 한다. 형상 관리에 저장하는 산출물이 디비 <b>상태</b>가 아니라 <b>마이그레이션 코드</b>(보통 SQL)라는 점이 핵심이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>디비 상태</th><th>마이그레이션 메커니즘</th></tr></thead>
+      <tbody>
+        <tr><td>상태 기반 방식</td><td class="t-center">명시적</td><td class="t-center">암묵적</td></tr>
+        <tr><td>마이그레이션 기반 방식</td><td class="t-center">암묵적</td><td class="t-center">명시적</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>왜 마이그레이션 기반을 선호하는가</h5>
+
+  <p><b>데이터 모션(data motion)</b> 문제 때문이다. 데이터 모션은 새 스키마를 준수하도록 <b>기존 데이터의 형태를 변경</b>하는 과정을 말한다.</p>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">Name 을 FirstName / LastName 으로 쪼갠다면</p>
+      <p>스키마 변경만 보면 "컬럼 1개 삭제, 2개 추가" 지만, 기존 <code>Name</code> 값을 어떤 규칙으로 나눌지는 <b>비교 도구가 알 수 없다.</b> 디비 스키마는 객관적이지만 데이터는 상황에 따라 달라지기 때문이다.</p>
+    </div>
+  </div>
+
+  <p>개발 초기 단계에는 상태 기반도 괜찮지만, <b>운영 릴리스 이후에는 마이그레이션 기반</b>을 쓰는 것이 좋다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>디비 스키마를 형상 관리에 두고 원천 정보를 하나로 유지한다.</li>
+      <li>참조 데이터도 스키마의 일부다. 마이그레이션으로만 제어한다.</li>
+      <li>개발자마다 별도의 디비 인스턴스를 준다.</li>
+      <li>운영 릴리스 이후에는 <b>마이그레이션 기반</b> 배포. 데이터 모션 때문이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-2</div>
+    <h3>디비 트랜잭션 관리</h3>
+    <p class="item-tagline">레포지토리는 데이터를 다루고, 트랜잭션은 커밋과 롤백을 다룬다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    통합 테스트에서는 준비 / 실행 / 검증 <b>구절마다 별도의 트랜잭션</b>을 쓴다. 운영 환경의 동작을 그대로 재현하기 위해서다.
+  </div>
+
+  <h4>제품 코드에서 트랜잭션 관리</h4>
+
+  <p>읽기 전용 연산에는 여러 트랜잭션을 열어도 괜찮다. 하지만 <b>변경 연산이 포함되면</b> 모순을 피하기 위해 그 연산의 모든 업데이트가 원자적이어야 한다.</p>
+
+  <h5>디비 트랜잭션에서 디비 연결 분리하기</h5>
+
+  <p>업데이트할 데이터를 정하는 일과, 그 업데이트를 유지할지 롤백할지 정하는 일은 서로 다른 책임이다. 이를 두 클래스로 나눈다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>클래스</th><th>책임</th><th>수명</th></tr></thead>
+      <tbody>
+        <tr><td><b>Repository</b></td><td>디비의 데이터에 접근하고 수정한다</td><td>연산 단위마다</td></tr>
+        <tr><td><b>Transaction</b></td><td>데이터 업데이트를 완전히 커밋하거나 롤백한다</td><td>비즈니스 연산 전체</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">repository.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserRepository {
+  // 레포지토리는 스스로 디비를 호출할 수 없다
+  constructor(private readonly transaction: Transaction) {}
+
+  // ...
+}
+
+class Transaction {
+  commit(): void {
+    // ...
+  }
+
+  rollback(): void {
+    // ...
+  }
+}</code></pre>
+  </div>
+
+  <h5>작업 단위로 트랜잭션 업그레이드 하기</h5>
+
+  <p><b>작업 단위(Unit of Work)</b> 는 디비를 변경하기 위해 해야 할 모든 업데이트를 파악하고, 이를 하나의 단위로 실행한다. 트랜잭션과 달리 작업 단위는 <b>비즈니스 연산이 끝나는 시점에</b> 모든 업데이트를 한꺼번에 실행한다. 대부분의 ORM 프레임워크가 이 패턴을 구현하고 있다.</p>
+
+  <h4>통합 테스트에서 디비 트랜잭션 관리하기</h4>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">테스트 구절 간에 트랜잭션을 재사용하지 않는다</p>
+      <p>운영 환경에서는 각 비즈니스 연산마다 전용 인스턴스가 있고, 컨트롤러 호출 직전에 생성되어 직후에 폐기된다. 통합 테스트도 그래야 하므로 <b>준비 / 실행 / 검증마다 별도의</b> 트랜잭션이나 작업 단위를 쓴다.</p>
+    </div>
+  </div>
+
+  <p>구절 간에 하나를 재사용하면, 실행 구절이 만든 변경 사항이 아직 커밋되지 않은 채 검증 구절에서 <b>메모리 캐시로</b> 읽히는 일이 생긴다. 그러면 저장이 실제로 이뤄졌는지 확인할 수 없다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>변경 연산의 모든 업데이트는 원자적이어야 한다.</li>
+      <li>데이터 접근은 <b>Repository</b>, 커밋/롤백은 <b>Transaction</b> 이 책임진다.</li>
+      <li>작업 단위는 연산 종료 시점에 업데이트를 몰아서 실행한다. ORM 이 대개 구현한다.</li>
+      <li>통합 테스트는 <b>구절마다 별도의</b> 트랜잭션을 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-3</div>
+    <h3>테스트 데이터 생명주기</h3>
+    <p class="item-tagline">순차 실행하고, 테스트 시작 시점에 정리한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    데이터 정리는 <b>테스트 시작 시점</b>에 한다. 빠르고, 일관성이 있으며, 실수로 건너뛸 수도 없다.
+  </div>
+
+  <p>공유 디비를 쓰면 통합 테스트를 서로 분리할 수 없다. 통합 테스트를 순차적으로 실행해야 하고, 실행 간에 남은 데이터를 제거해야 한다. 원칙은 하나다. <b>테스트는 디비 상태에 의존해서는 안 되고, 스스로 디비를 원하는 조건으로 만들어야 한다.</b></p>
+
+  <h4>병렬 테스트 실행과 순차적 테스트 실행</h4>
+
+  <p>통합 테스트를 병렬로 실행하려면 상당한 노력이 필요하다. 성능 향상에 시간을 허비하기보다 <b>순차 실행이 더 실용적</b>이다.</p>
+
+  <p>대부분의 테스트 프레임워크는 별도의 테스트 모음을 정의하고 일부에 대해 병렬 처리를 비활성화할 수 있다. 두 개의 테스트군을 만들고 통합 테스트군만 병렬 처리를 끈다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">jest.config.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export default {
+  projects: [
+    {
+      displayName: "unit",
+      testMatch: ["**/*.spec.ts"],
+    },
+    {
+      displayName: "integration",
+      testMatch: ["**/*.integration.spec.ts"],
+      maxWorkers: 1, // 통합 테스트는 순차 실행
+    },
+  ],
+};</code></pre>
+  </div>
+
+  <h4>테스트 실행 간 데이터 정리</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방법</th><th>평가</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>각 테스트 전 <b>디비 백업 복원</b></td>
+          <td class="t-no">가장 느리다. 컨테이너를 쓰더라도 인스턴스를 지우고 새로 만드는 데 보통 몇 초가 걸려 전체 실행 시간이 빠르게 늘어난다</td>
+        </tr>
+        <tr>
+          <td><b>테스트 종료 시점</b>에 정리</td>
+          <td class="t-no">빠르지만 단계를 건너뛰기 쉽다. 테스트가 도중에 실패하거나 중단되면 입력 데이터가 남아 다음 실행에 영향을 준다</td>
+        </tr>
+        <tr>
+          <td>각 테스트를 <b>트랜잭션에 래핑</b>하고 커밋하지 않기</td>
+          <td class="t-no">자동 롤백은 되지만, 추가 트랜잭션 때문에 <b>운영 환경과 다른 설정</b>이 만들어진다. 작업 단위를 재사용할 때와 같은 문제다</td>
+        </tr>
+        <tr>
+          <td><b>테스트 시작 시점</b>에 정리</td>
+          <td class="t-ok">가장 좋다. 빠르고, 일관성 없는 동작을 만들지 않으며, 실수로 건너뛸 수 없다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>디비 정리 스크립트 작성</h5>
+
+  <p>삭제 스크립트는 일반 데이터를 모두 제거하되 <b>참조 데이터는 건드리지 않아야</b> 한다. 나머지 디비 스키마와 참조 데이터는 오직 마이그레이션으로만 제어한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">clear-database.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export const clearDatabase = async () =&gt; {
+  await prisma.$executeRaw`SET FOREIGN_KEY_CHECKS = 0;`;
+
+  const tables = Object.keys(prisma).filter(
+    (key) =&gt;
+      typeof prisma[key] === "object" &amp;&amp;
+      prisma[key] !== null &amp;&amp;
+      "deleteMany" in prisma[key]
+  );
+
+  await Promise.all(tables.map((table) =&gt; prisma[table].deleteMany()));
+
+  await prisma.$executeRaw`SET FOREIGN_KEY_CHECKS = 1;`;
+};
+
+describe("UserController", () =&gt; {
+  beforeEach(async () =&gt; {
+    await clearDatabase(); // 시작 시점에 정리
+  });
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 스크립트는 MySQL 전용이다 <span class="badge b-blue">보강</span></p>
+      <p><code>SET FOREIGN_KEY_CHECKS</code> 는 MySQL 문법이다. PostgreSQL 이라면 <code>TRUNCATE ... RESTART IDENTITY CASCADE</code> 를 한 문장으로 실행하는 편이 훨씬 빠르고 안전하다. 어느 쪽이든 <b>참조 데이터 테이블은 목록에서 제외</b>해야 한다는 점은 같다.</p>
+    </div>
+  </div>
+
+  <h4>인-메모리 디비 피하기</h4>
+
+  <p>통합 테스트를 서로 분리하는 또 다른 방법으로 SQLite 같은 인메모리 디비로 교체하는 선택지가 있다. 속도가 빨라지고 테스트 데이터를 제어할 필요도 줄어든다.</p>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">그래도 쓰지 않는다</p>
+      <p>인메모리 디비는 실제 운영 디비와 <b>기능적으로 일관성이 없다.</b> 그러면 통합 테스트가 통과해도 운영 환경에서 실패할 수 있고, 반대로 운영에서는 멀쩡한 것이 테스트에서 실패할 수도 있다. 통합 테스트의 존재 이유 자체가 무너진다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>통합 테스트는 순차 실행이 실용적이다. 테스트군을 나눠 병렬을 끈다.</li>
+      <li>정리는 <b>테스트 시작 시점</b>에 한다. 나머지 세 방법은 각각 결함이 있다.</li>
+      <li>정리 스크립트는 일반 데이터만 지우고 참조 데이터는 남긴다.</li>
+      <li>인메모리 디비는 운영 디비와 동작이 달라 쓰지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-4</div>
+    <h3>테스트 구절에서 코드 재사용하기</h3>
+    <p class="item-tagline">비즈니스와 무관한 기술적인 부분만 헬퍼로 뽑는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    통합 테스트는 <b>짧게 하되 결합도와 가독성을 해치지 않는</b> 선에서 줄인다. 뽑아낼 대상은 언제나 기술적인 부분이다.
+  </div>
+
+  <h4>준비 구절에서 코드 재사용하기</h4>
+
+  <p>가장 좋은 방법은 <a href="#item-3-3">3-3</a> 과 마찬가지로 <b>비공개 팩토리 메소드</b>를 도입하는 것이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.integration.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">describe("UserController", () =&gt; {
+  const createUser = async (
+    email: string,
+    type: UserType,
+    isEmailConfirmed: boolean
+  ) =&gt; {
+    const user = new User(0, email, type, isEmailConfirmed);
+    const repository = new UserRepository();
+    await repository.save(user);
+    return user;
+  };
+
+  it("some_user_test", async () =&gt; {
+    // Given
+    const user = await createUser("user@mycorp.com", UserType.EMPLOYEE, false);
+
+    // When
+    // ...
+
+    // Then
+    // ...
+  });
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">기본값을 주면 더 짧아진다 <span class="badge b-blue">보강</span></p>
+      <p>인수마다 기본값을 두면 각 테스트가 <b>자기 시나리오에 중요한 값만</b> 지정하게 된다. 이것이 <a href="#item-3-1">3-1</a> 에서 언급한 <b>오브젝트 마더</b> / <b>테스트 데이터 빌더</b> 패턴의 핵심이다. 어떤 값이 이 테스트의 관심사인지가 코드에 그대로 드러난다.</p>
+    </div>
+  </div>
+
+  <h4>실행 구절에서 코드 재사용하기</h4>
+
+  <p>실행 구절도 어떤 컨트롤러 기능을 호출해야 하는지에 대한 정보가 담긴 <b>대리자(delegate)</b> 를 받는 메소드로 묶을 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.integration.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// 컨트롤러 생성이라는 기술적인 부분만 감춘다
+const execute = (
+  func: (controller: UserController) =&gt; string,
+  messageBus: IMessageBus,
+  logger: IDomainLogger
+): string =&gt; {
+  const controller = new UserController(messageBus, logger);
+  return func(controller);
+};
+
+describe("UserController", () =&gt; {
+  let messageBus: jest.Mocked&lt;IMessageBus&gt;;
+  let logger: jest.Mocked&lt;IDomainLogger&gt;;
+
+  beforeEach(() =&gt; {
+    messageBus = { sendEmailChangedMessage: jest.fn() };
+    logger = { userTypeHasChanged: jest.fn() };
+  });
+
+  it("should_change_email", () =&gt; {
+    const result = execute(
+      (controller) =&gt; controller.changeEmail(1, "new@gmail.com"),
+      messageBus,
+      logger
+    );
+
+    expect(result).toBe("ok");
+    expect(messageBus.sendEmailChangedMessage).toHaveBeenCalledTimes(1);
+  });
+});</code></pre>
+  </div>
+
+  <h4>검증 구절에서 코드 재사용하기</h4>
+
+  <p>검증 구절도 재사용할 수 있다. 디비 조회 로직을 헬퍼로 뽑거나, 플루언트 인터페이스로 검증 자체를 묶는다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.integration.spec.ts</span>
+      <span class="code-tag good">디비 조회 로직 재사용</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("some_user_test", () =&gt; {
+  // 준비 / 실행 ...
+
+  // 검증
+  const userFromDb = queryUser(user.userId);
+  expect(userFromDb.email).toBe("some@email.com");
+
+  const companyFromDb = queryCompany(company.id);
+  expect(companyFromDb.name).toBe("some company");
+});</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-assertions.ts</span>
+      <span class="code-tag good">검증 로직 재사용</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserAssertions {
+  constructor(private readonly user: User | null) {}
+
+  shouldExist(): UserAssertions {
+    expect(this.user).not.toBeNull();
+    return this;
+  }
+
+  withEmail(email: string): UserAssertions {
+    expect(this.user?.email).toBe(email);
+    return this;
+  }
+}
+
+const assertUser = (user: User | null) =&gt; new UserAssertions(user);
+
+it("some_user_test", () =&gt; {
+  // 준비 / 실행 ...
+
+  // 검증
+  assertUser(queryUser(user.userId)).shouldExist().withEmail("some@email.com");
+});</code></pre>
+  </div>
+
+  <h4>테스트가 디비 트랜잭션을 너무 많이 만드는가</h4>
+
+  <p>디비 컨텍스트를 구절마다 추가하면 테스트가 느려지는 것은 사실이다. 하지만 할 수 있는 일이 많지 않다. 이는 <b>빠른 피드백과 유지 보수성 간의 절충</b>이며, 유지 보수성을 위해 성능을 양보하는 쪽이 낫다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>비즈니스와 무관한 <b>기술적인 부분</b>만 헬퍼로 뽑는다.</li>
+      <li>준비는 팩토리 메소드, 실행은 대리자를 받는 헬퍼, 검증은 조회 헬퍼와 플루언트 인터페이스.</li>
+      <li>기본값을 둬서 각 테스트가 <b>중요한 값만</b> 지정하게 한다.</li>
+      <li>트랜잭션이 늘어 느려지는 것은 유지 보수성을 위한 의도된 절충이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-5</div>
+    <h3>디비 테스트에 대한 일반적인 질문</h3>
+    <p class="item-tagline">쓰기는 철저히, 읽기는 임계치를 높게, 레포지토리는 직접 테스트하지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>쓰기 테스트는 철저하게, 읽기 테스트는 임계치를 높게.</b> 위험의 크기가 다르기 때문이다.
+  </div>
+
+  <h4>읽기 테스트를 해야 할까</h4>
+
+  <h5>쓰기 테스트의 중요성</h5>
+  <p>쓰기 테스트는 매우 철저하게 해야 한다. <b>위험이 크기 때문</b>이다. 쓰기 작업이 손상되면 데이터가 망가지고, 그 영향이 디비뿐 아니라 외부 앱까지 미친다. 쓰기를 다루는 테스트는 그런 실수에 대한 보호책이므로 아주 가치 있다.</p>
+
+  <h5>읽기 테스트는</h5>
+  <ul>
+    <li>읽기 작업에는 보통 해로운 문제가 없으므로 테스트 임계치가 <b>쓰기보다 높아야</b> 한다.</li>
+    <li>가장 복잡하거나 중요한 읽기 작업만 테스트하고 나머지는 무시하는 편이 좋다.</li>
+    <li>읽기에는 추상화 계층이 거의 없어서 <b>단위 테스트가 아무 소용이 없다.</b> 테스트한다면 실제 디비와 결합한 통합 테스트로 한다.</li>
+  </ul>
+
+  <h4>레포지토리를 테스트해야 될까</h4>
+
+  <p>레포지토리는 디비 위에 유용한 추상화를 제공한다. 도메인 객체를 디비에 어떻게 매핑하는지 테스트하는 것이 유익해 보이고, 실제로 실수할 여지도 상당하다. 하지만 결론은 <b>하지 않는다</b> 이다. 유지비가 높고 회귀 방지가 떨어져 테스트 스위트에 손실이 생기기 때문이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>측면</th><th>레포지토리 테스트</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>높은 유지비</b></td>
+          <td>복잡도는 거의 없는데 프로세스 외부 의존성인 디비와 통신한다. 부담은 일반 통합 테스트와 비슷하다</td>
+        </tr>
+        <tr>
+          <td><b>낮은 회귀 방지</b></td>
+          <td>레포지토리는 복잡하지 않고, 그 회귀 방지 효과가 일반 통합 테스트가 주는 이점과 <b>겹친다</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">결론</p>
+      <p>레포지토리는 직접 테스트하지 말고, <b>포괄적인 통합 테스트 스위트의 일부</b>로 취급한다. 통합 테스트가 컨트롤러를 지나갈 때 레포지토리도 함께 실행되므로 이미 덮여 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>쓰기 테스트는 철저하게. 데이터 손상은 외부 앱까지 영향을 미친다.</li>
+      <li>읽기 테스트는 임계치를 높게. 가장 복잡하거나 중요한 것만 한다.</li>
+      <li>읽기는 단위 테스트로 이득이 없다. 통합 테스트로 한다.</li>
+      <li>레포지토리는 직접 테스트하지 않고 통합 테스트에 묻어간다.</li>
+    </ul>
+  </div>
+</article>

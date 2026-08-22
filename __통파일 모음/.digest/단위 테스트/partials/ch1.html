@@ -1,0 +1,378 @@
+<article class="item" id="item-1-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-1</div>
+    <h3>단위 테스트 현황</h3>
+    <p class="item-tagline">질문은 "테스트를 써야 하나" 에서 "좋은 테스트란 뭔가" 로 옮겨왔다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    테스트를 작성하는 것 자체는 이미 논쟁거리가 아니다. 남은 문제는 <b>노력 대비 최대의 이익을 내는 방식</b>으로 쓰는 법이다.
+  </div>
+
+  <p>단위 테스트는 이미 업계 표준에 가깝게 자리 잡았다. 프로젝트에 따라 제품 코드와 테스트 코드의 비율이 1:1 에서 1:10 까지 다양하게 나타나고, 그 비율 자체는 좋고 나쁨을 말해주지 않는다.</p>
+
+  <p>문제는 그 다음이다. 테스트가 있는데도 개발자들이 원하는 결과를 얻지 못하는 경우가 많다. 배포가 여전히 무섭고, 리팩터링은 여전히 망설여진다. 그래서 지금 던져야 할 질문은 이렇게 바뀐다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">질문의 이동</p>
+      <p>"단위 테스트를 작성해야 되는가?" <b>→</b> "좋은 단위 테스트를 작성하는 건 어떤 의미인가?"</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트 코드의 양이나 비율은 품질을 말해주지 않는다.</li>
+      <li>단순한 테스트 작성이 아니라 <b>노력 대비 이익</b>을 기준으로 삼는다.</li>
+      <li>이 책 전체가 "무엇이 좋은 테스트인가" 에 대한 판단 기준을 세우는 과정이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-1-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-2</div>
+    <h3>단위 테스트 목표</h3>
+    <p class="item-tagline">목표는 좋은 설계가 아니라 소프트웨어 프로젝트의 지속 가능한 성장이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    단위 테스트의 목표는 <b>소프트웨어 프로젝트의 지속 가능한 성장</b>이다. 좋은 설계는 그 과정에서 따라오는 사이드 이펙트일 뿐이다.
+  </div>
+
+  <p>코드베이스에 대해 단위 테스트를 작성하다 보면 일반적으로 더 나은 설계로 이어진다. 테스트하기 어려운 코드는 대개 결합도가 높은 코드이기 때문이다. 다만 이것을 단위 테스트의 <em>주된</em> 목표로 두면 방향을 잃는다. 좋은 설계는 좋은 사이드 이펙트일 뿐이다.</p>
+
+  <p>진짜 목표는 성장 곡선에 있다. 초기에는 테스트 작성으로 시간이 더 걸리지만, 시간이 갈수록 효율이 역전된다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 300" width="560" role="img" aria-label="테스트가 없을 때와 있을 때의 진척도 대비 작업 소요 시간 그래프">
+        <line x1="66" y1="26" x2="66" y2="258" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <line x1="66" y1="258" x2="520" y2="258" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M62 32 L66 24 L70 32" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M514 254 L522 258 L514 262" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+
+        <path d="M78 236 C 170 232, 250 214, 310 160 S 372 62, 384 36" fill="none" stroke="var(--red)" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M78 186 C 200 178, 340 158, 486 130" fill="none" stroke="var(--blue)" stroke-width="2.6" stroke-linecap="round"/>
+
+        <text x="392" y="30" fill="var(--red)" class="dg-text" font-size="13" font-weight="700">테스트 부재</text>
+        <text x="494" y="126" fill="var(--blue)" class="dg-text" font-size="13" font-weight="700">테스트 존재</text>
+
+        <text x="30" y="96" class="dg-text-sub" font-size="12" text-anchor="middle">작업</text>
+        <text x="30" y="114" class="dg-text-sub" font-size="12" text-anchor="middle">소요</text>
+        <text x="30" y="132" class="dg-text-sub" font-size="12" text-anchor="middle">시간</text>
+        <text x="470" y="282" class="dg-text-sub" font-size="12" text-anchor="middle">진척도</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>테스트 없는 프로젝트는 어느 시점부터 침체 국면에 빠진다</b> — 초기에는 테스트가 더 느리지만, 진척도가 쌓일수록 두 곡선은 교차하고 다시는 만나지 않는다.</div>
+  </div>
+
+  <p>결국 테스트는 <b>안전망</b> 역할을 하며, 대부분의 <b>회귀(regression)</b> 에 대한 보험을 제공하는 도구다. 코드베이스를 지속적으로 검증하는 테스트 없이는 소프트웨어 개발이 쉽게 확장되지 않는다.</p>
+
+  <h4>좋은 테스트와 좋지 않은 테스트를 가르는 요인</h4>
+
+  <p>여기서 중요한 반전이 있다. 테스트가 프로젝트 성장에 도움이 되는 건 맞지만, <b>단순히 작성한다고 도움이 되는 건 아니다.</b> 모든 테스트를 작성할 필요도 없다.</p>
+
+  <p>테스트를 하나 더 쓸 때마다 아래 비용이 함께 늘어난다는 걸 계산에 넣어야 한다.</p>
+
+  <ul>
+    <li>기반 코드를 리팩터링할 때 테스트도 함께 리팩터링해야 한다</li>
+    <li>각 코드 변경마다 테스트를 실행해야 한다</li>
+    <li>테스트가 잘못된 경고를 발생시키면 그것도 처리해야 한다</li>
+    <li>기반 코드가 어떻게 동작하는지 이해하려 할 때 테스트를 읽는 시간이 든다</li>
+  </ul>
+
+  <p>가치와 유지비를 함께 저울에 올렸을 때 유지비가 이기는 테스트가 코드베이스에 쌓이면, 그래프는 아래처럼 된다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 300" width="560" role="img" aria-label="테스트 부재, 잘못된 테스트 포함, 테스트 존재 세 곡선을 비교한 그래프">
+        <line x1="66" y1="26" x2="66" y2="258" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <line x1="66" y1="258" x2="520" y2="258" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M62 32 L66 24 L70 32" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M514 254 L522 258 L514 262" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+
+        <path d="M78 236 C 170 232, 250 214, 310 160 S 372 62, 384 36" fill="none" stroke="var(--red)" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M78 212 C 190 196, 300 140, 424 58" fill="none" stroke="var(--yellow)" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M78 186 C 200 178, 340 158, 486 130" fill="none" stroke="var(--blue)" stroke-width="2.6" stroke-linecap="round"/>
+
+        <text x="392" y="30" fill="var(--red)" class="dg-text" font-size="13" font-weight="700">테스트 부재</text>
+        <text x="432" y="52" fill="var(--yellow)" class="dg-text" font-size="13" font-weight="700">잘못된 테스트 포함</text>
+        <text x="494" y="126" fill="var(--blue)" class="dg-text" font-size="13" font-weight="700">테스트 존재</text>
+
+        <text x="30" y="96" class="dg-text-sub" font-size="12" text-anchor="middle">작업</text>
+        <text x="30" y="114" class="dg-text-sub" font-size="12" text-anchor="middle">소요</text>
+        <text x="30" y="132" class="dg-text-sub" font-size="12" text-anchor="middle">시간</text>
+        <text x="470" y="282" class="dg-text-sub" font-size="12" text-anchor="middle">진척도</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>잘못된 테스트를 포함한 프로젝트는 테스트가 아예 없는 것보다 조금 나은 정도에 그친다</b> — 노란 곡선은 초반엔 파란 곡선 아래에 있지만 끝내 위로 올라선다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">지속 가능한 성장의 조건</p>
+      <p>테스트를 늘리는 것이 아니라 <b>고품질 테스트에만 집중</b>해야 한다. 가치가 유지비를 넘지 못하는 테스트는 코드베이스에 있는 것이 없느니만 못하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>단위 테스트의 목표는 <b>지속 가능한 프로젝트 성장</b>이다. 좋은 설계는 부산물이다.</li>
+      <li>테스트는 회귀에 대한 보험이며, 없으면 개발이 확장되지 않는다.</li>
+      <li>모든 테스트를 쓸 필요는 없다. 항상 <b>가치와 유지비를 함께</b> 계산한다.</li>
+      <li>잘못된 테스트가 쌓인 프로젝트는 테스트 없는 프로젝트와 크게 다르지 않다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-1-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-3</div>
+    <h3>테스트 스위트 품질 측정을 위한 커버리지 지표</h3>
+    <p class="item-tagline">커버리지는 좋은 부정 지표이지만 나쁜 긍정 지표다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    커버리지 10% 는 확실히 나쁜 신호다. 하지만 커버리지 100% 라고 해서 좋은 테스트 스위트라는 뜻은 <b>전혀</b> 아니다.
+  </div>
+
+  <p>커버리지 지표는 테스트 스위트가 소스 코드를 얼마나 실행하는지 백분율로 나타낸다. 중요한 피드백을 주기는 하지만, 이것만으로 테스트 <b>품질</b>을 효과적으로 측정할 수는 없다.</p>
+
+  <h4>코드 커버리지 지표에 대한 이해</h4>
+
+  <p>코드 커버리지(테스트 커버리지)는 <code>실행 코드 라인 수 / 전체 라인 수</code> 다. 라인 수만 세기 때문에, 동작을 하나도 바꾸지 않고 코드를 줄이는 것만으로 지표가 올라간다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">1-2.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { isStringLong } from "../1-2.js";
+
+describe("isStringLong", () =&gt; {
+  it("문자열의 길이가 5보다 크다면 true 반환", () =&gt; {
+    expect(isStringLong("123456")).toBe(true);
+  });
+});</code></pre>
+  </div>
+
+  <p>동일한 이 테스트 하나를 두고, 제품 코드만 바꿔보자.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">1-2.ts</span>
+      <span class="code-tag bad">커버리지 80%</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export const isStringLong = (str: string): boolean =&gt; {
+  if (str.length &gt; 5) {
+    return true;
+  }
+
+  return false;
+};</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">----------|---------|----------|---------|---------|-------------------
+File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+----------|---------|----------|---------|---------|-------------------
+All files |      80 |      100 |     100 |      75 |
+ 1-2.ts   |      80 |      100 |     100 |      75 | 6
+----------|---------|----------|---------|---------|-------------------</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">1-2.ts</span>
+      <span class="code-tag good">커버리지 100%</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export const isStringLong = (str: string): boolean =&gt; {
+  return str.length &gt; 5;
+};</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">----------|---------|----------|---------|---------|-------------------
+File      | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+----------|---------|----------|---------|---------|-------------------
+All files |     100 |      100 |     100 |     100 |
+ 1-2.ts   |     100 |      100 |     100 |     100 |
+----------|---------|----------|---------|---------|-------------------</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">테스트는 그대로인데 지표만 올랐다</p>
+      <p>두 버전 모두 <code>"123456"</code> 하나만 검증한다. 검증 범위는 조금도 넓어지지 않았는데 커버리지는 80% 에서 100% 가 됐다. <b>코드가 작을수록 커버리지 지표가 좋아진다</b>는 뜻이다.</p>
+    </div>
+  </div>
+
+  <h4>분기 커버리지 지표에 대한 이해</h4>
+
+  <p>분기 커버리지는 코드 커버리지의 이 단점을 극복하므로 더 정확한 결과를 준다. 원시 코드 라인 수 대신 <code>if</code>, <code>switch</code> 같은 <b>제어 구조</b>에 중점을 둔다.</p>
+
+  <p>계산식은 <code>통과 분기 수 / 전체 분기 수</code> 다. 코드베이스의 모든 가능한 분기를 합산하고, 그중 테스트가 얼마나 실행하는지 확인한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">1-2.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export const isStringLong = (str: string): boolean =&gt; {
+  // 이 한 줄이 다루는 분기는 두 개다
+  //   str.length &gt;  5  -&gt; true
+  //   str.length &lt;= 5  -&gt; false
+  // 테스트가 true 케이스만 검증하므로 분기 커버리지는 50%
+  return str.length &gt; 5;
+};</code></pre>
+  </div>
+
+  <p>라인 커버리지가 100% 인 바로 그 코드의 분기 커버리지가 50% 다. 같은 테스트를 두고도 두 지표가 이렇게 갈린다.</p>
+
+  <h4>커버리지 지표에 관한 문제점</h4>
+
+  <p>분기 커버리지조차도 품질의 근거가 될 수 없다. 두 가지 이유가 있다.</p>
+
+  <h5>가능한 모든 결과를 검증한다고 보장할 수 없다</h5>
+
+  <p>커버리지는 코드가 <b>실행됐는지</b>만 볼 뿐, 그 결과를 <b>검증했는지</b>는 보지 않는다. 테스트에서 결과가 여러 개라면 그 모두를 검증해야 지표가 유의미해진다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">1-2.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export const isStringLong = (str: string): boolean =&gt; {
+  const result = str.length &gt; 5;
+  wasLastStringLong = result; // 검증되지 않는 두 번째 결과
+  return result;
+};</code></pre>
+  </div>
+
+  <p>두 케이스를 모두 통과시켜 라인 / 분기 모두 100% 를 찍어도, <code>wasLastStringLong</code> 이 올바른지는 아무도 확인하지 않았다.</p>
+
+  <h5>외부 라이브러리 코드 경로를 고려할 수 없다</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">parse.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export const parse = (str: string): number =&gt; {
+  return parseInt(str, 10);
+};
+
+describe("parse", () =&gt; {
+  it("`1234`를 숫자로 변환하면 1234다", () =&gt; {
+    expect(parse("1234")).toBe(1234);
+  });
+});</code></pre>
+  </div>
+
+  <p><code>parseInt</code> 내부에는 공백 처리, 부호 처리, 파싱 실패 시 <code>NaN</code> 반환 같은 다양한 경로가 있다. 커버리지는 100% 로 나오지만 그 경로들은 하나도 테스트되지 않았다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>이 한계 때문에 커버리지 대신 <b>뮤테이션 테스팅(mutation testing)</b> 을 쓰기도 한다. 제품 코드를 일부러 조금씩 바꿔놓고(<code>&gt;</code> 를 <code>&gt;=</code> 로 등) 테스트가 실패하는지 보는 방식이라, "실행됐는가" 가 아니라 "검증됐는가" 를 직접 측정한다. JS/TS 진영에서는 <a href="https://stryker-mutator.io/">Stryker Mutator</a> 가 대표적이다.</p>
+    </div>
+  </div>
+
+  <h4>특정 커버리지 숫자를 목표로 하기</h4>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">커버리지 목표치를 강제하면 벌어지는 일</p>
+      <p>숫자를 목표로 삼는 순간 개발자는 <b>가치 있는 테스트가 아니라 숫자를 채우는 테스트</b>를 쓰기 시작한다. 커버리지는 관찰하되, 통과 기준으로 삼지 않는다.</p>
+    </div>
+  </div>
+
+  <p>커버리지 지표는 <b>좋은 부정 지표이지만 나쁜 긍정 지표</b>다. 60% 처럼 낮은 숫자는 문제의 징후로 읽을 만하지만, 높은 숫자는 아무것도 보증하지 않는다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>코드 커버리지 = 실행 라인 / 전체 라인. 코드를 줄이는 것만으로도 올라간다.</li>
+      <li>분기 커버리지 = 통과 분기 / 전체 분기. 더 정확하지만 여전히 충분하지 않다.</li>
+      <li>커버리지는 <b>검증 여부</b>와 <b>외부 라이브러리 경로</b>를 볼 수 없다.</li>
+      <li>낮은 커버리지는 나쁜 신호, 높은 커버리지는 좋은 신호가 아니다. 목표치로 삼지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-1-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-4</div>
+    <h3>무엇이 성공적인 테스트를 만드는가</h3>
+    <p class="item-tagline">개발 주기에 통합되고, 가장 중요한 부분만 겨냥하고, 최소 유지비로 최대 가치를 낸다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    코드베이스의 모든 부분에 똑같이 주목할 필요는 없다. <b>비즈니스 로직이 있는 도메인 모델</b>이 시간 투자 대비 최고의 수익을 낸다.
+  </div>
+
+  <h4>개발 주기에 통합되어 있음</h4>
+
+  <p>자동화된 테스트를 유지하는 방법은 끊임없이 실행하는 것뿐이다. 코드 변경마다 돌아가지 않는 테스트는 곧 아무도 안 보는 테스트가 된다. 모든 테스트는 개발 주기에 통합되어야 한다.</p>
+
+  <h4>코드베이스에서 가장 중요한 부분만을 대상으로 한다</h4>
+
+  <p>대부분의 앱에서 가장 중요한 부분은 <b>비즈니스 로직이 존재하는 도메인 모델</b>이다. 인프라 코드나 외부 시스템 연동, 프레임워크 설정은 같은 노력을 들여도 같은 가치를 돌려주지 않는다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 기준은 7장에서 사분면으로 다시 온다</p>
+      <p>"중요한 부분" 을 감이 아니라 <b>복잡도 및 도메인 유의성 × 협력자 수</b> 라는 두 축으로 판별하는 방법이 <a href="#item-7-1">7-1 리팩터링할 코드 식별하기</a> 에 나온다.</p>
+    </div>
+  </div>
+
+  <h4>최소 유지비로 최대 가치를 끌어냄</h4>
+
+  <h5>가치 있는 테스트 식별하기</h5>
+
+  <p>가치가 높은 테스트와 낮은 테스트를 구별하려면 <b>기준 틀</b>이 필요하다. 그 틀이 4장의 네 가지 요소다. 그리고 이 식별 작업은 테스트만 봐서는 안 되고 코드베이스 자체에 노력을 기울여야 가능하다.</p>
+
+  <h5>가치 있는 테스트 작성하기</h5>
+
+  <p>식별만으로는 부족하다. 테스트하기 좋은 코드로 <b>제품 코드를 바꾸는 일</b>까지가 세트다. 의미 없는 부분이 아니라 비즈니스 로직처럼 가치 있는 부분에 테스트를 만든다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트는 개발 주기에 통합되어 <b>계속 실행</b>되어야 의미가 있다.</li>
+      <li>도메인 모델 / 비즈니스 로직이 투자 대비 수익이 가장 높다.</li>
+      <li>가치 있는 테스트를 <b>식별</b>하는 기준 틀과, 그렇게 쓸 수 있도록 코드를 <b>바꾸는</b> 작업이 함께 간다.</li>
+    </ul>
+  </div>
+</article>

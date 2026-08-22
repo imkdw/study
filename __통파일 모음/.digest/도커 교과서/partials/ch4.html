@@ -1,0 +1,83 @@
+<article class="item" id="item-4-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 4-5</div>
+    <h3>멀티 스테이지 Dockerfile 스크립트 이해하기</h3>
+    <p class="item-tagline">빌드 도구는 빌드 단계에만 있으면 된다. 최종 이미지에는 실행에 필요한 것만 남긴다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    멀티 스테이지 빌드는 <b>표준화 / 성능 / 이미지 크기</b> 세 가지를 한 번에 해결한다.
+    스테이지 사이에서 넘어가는 것은 <code>COPY --from</code> 으로 명시한 산출물뿐이다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  S1["Stage 1: build-stage (FROM sdk)"] -->|"COPY --from 산출물만"| S2["Stage 2: test-stage (FROM sdk)"]
+  S2 -->|"COPY --from 산출물만"| S3["Stage 3: 최종 이미지 (FROM runtime)"]
+  S1 -.->|"SDK / 컴파일러 / curl 은 버려진다"| X["최종 이미지에 없음"]
+      </pre>
+    </div>
+    <div class="figure-cap">
+      <b>각 스테이지는 독립된 이미지 빌드이고, 마지막 스테이지만 최종 이미지가 된다</b> —
+      앞 스테이지에서 쓴 SDK, 컴파일러, <code>curl</code> 은 <code>COPY --from</code> 으로 명시하지 않는 한 남지 않는다.
+    </div>
+  </div>
+
+  <h4>표준화</h4>
+  <ul>
+    <li>모든 빌드 과정이 컨테이너 내부에서 이뤄진다.</li>
+    <li>모든 컨테이너가 빌드 도구를 동일한 버전으로 유지한다.</li>
+    <li>실무에 적용하면 신규 인원의 적응 기간이나 환경 설정으로 인한 빌드 실패를 줄일 수 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이게 왜 중요한가 <span class="badge b-blue">보강</span></p>
+      <p>
+        빌드 도구가 Dockerfile 안에 <code>FROM</code> 으로 명시돼 있으면, 신규 인원의 로컬 환경에도
+        CI 서버에도 언어 런타임을 깔 필요가 없다. 필요한 것은 도커 하나뿐이다.
+        이 발상이 <a href="#item-11-1">11장</a> 의 "CI 서버에 아무것도 설치하지 않는 파이프라인"으로 이어진다.
+      </p>
+    </div>
+  </div>
+
+  <h4>성능 향상</h4>
+  <ul>
+    <li>멀티 스테이지 빌드의 각 단계는 자신만의 캐시를 따로 가진다.</li>
+    <li>도커는 빌드 중 각 인스트럭션에 해당하는 레이어 캐시를 찾는다.</li>
+    <li>Dockerfile 을 세심하게 최적화해 두면 캐시 재사용으로 90% 이상의 빌드 단계에서 시간을 아낄 수 있다.</li>
+  </ul>
+
+  <h4>최종 이미지의 크기 줄이기</h4>
+  <ul>
+    <li>최종 산출물인 이미지에서 불필요한 도구는 모두 뺄 수 있다.</li>
+    <li>예를 들어 <code>curl</code> 은 빌드 중 파일을 내려받기 위한 도구지만 최종 결과물에는 필요 없다.</li>
+    <li>최종 산출되는 이미지를 매우 작게 유지할 수 있다.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">크기 줄이기는 곧 보안</p>
+      <p>
+        이미지에 남지 않은 도구는 공격자도 쓸 수 없다. 컨테이너에 침입해도 <code>curl</code> 이 없으면
+        추가 페이로드를 내려받기 어렵고, 컴파일러가 없으면 그 자리에서 뭘 만들어 내기도 어렵다.
+        같은 이야기가 <a href="#item-17-2">17-2</a> 에서 기반 이미지 선택 기준으로 다시 나온다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>스테이지를 여러 개 두고, 스테이지 사이에는 <code>COPY --from</code> 으로 산출물만 넘긴다.</li>
+      <li>빌드 도구 버전이 Dockerfile 에 고정되므로 "내 로컬에서는 됐는데"가 사라진다.</li>
+      <li>스테이지마다 캐시가 따로 있어 잘 짜면 대부분의 단계가 캐시에 걸린다.</li>
+      <li>최종 이미지에는 실행에 필요한 것만 남아 작고, 그만큼 공격 표면도 작다.</li>
+    </ul>
+  </div>
+</article>

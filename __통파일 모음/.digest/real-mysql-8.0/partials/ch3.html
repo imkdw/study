@@ -1,0 +1,565 @@
+<article class="item" id="item-3-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-1</div>
+    <h3>사용자 식별</h3>
+    <p class="item-tagline">MySQL의 계정은 아이디가 아니라 <code>아이디@호스트</code> 쌍이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    같은 아이디로 여러 계정이 존재할 수 있고, 인증에는 항상 <b>범위가 더 좁은 쪽</b>이 먼저 선택된다.
+  </div>
+
+  <p>MySQL은 사용자를 식별할 때 아이디와 함께 <b>접속 가능한 호스트</b>를 반드시 명시해야 한다.</p>
+
+  <h4>로컬 호스트에서만 접속 가능한 계정</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">'user_id'@'127.0.0.1'</code></pre>
+  </div>
+
+  <h4>모든 호스트에서 접속 가능한 계정</h4>
+  <p><code>%</code> 는 모든 호스트를 의미한다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">'user_id'@'%'</code></pre>
+  </div>
+
+  <h4>범위가 겹칠 때 — 좁은 쪽이 이긴다</h4>
+  <p><code>'user_id'@'192.168.0.1'</code> 과 <code>'user_id'@'%'</code> 두 계정이 동시에 있다고 하자. MySQL은 권한과 사용자 정보에 대해 <b>항상 범위가 더 좁은 것을 먼저 선택</b>한다. 따라서 <code>192.168.0.1</code> 에서 접속하면 <code>'user_id'@'192.168.0.1'</code> 계정으로 인증이 진행된다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 220" width="460" role="img" aria-label="넓은 호스트 범위 안에 좁은 호스트 범위가 포함된 벤 다이어그램">
+        <circle cx="230" cy="110" r="95" class="venn-a"/>
+        <circle cx="230" cy="130" r="48" class="venn-b"/>
+        <circle cx="230" cy="110" r="95" class="venn-a-s"/>
+        <circle cx="230" cy="130" r="48" class="venn-b-s"/>
+        <text x="230" y="40" class="dg-text dg-mono" font-size="13" text-anchor="middle">'user_id'@'%'</text>
+        <text x="230" y="58" class="dg-text-sub" font-size="11" text-anchor="middle">모든 호스트</text>
+        <text x="230" y="130" class="dg-text dg-mono" font-size="12" text-anchor="middle">@'192.168.0.1'</text>
+        <text x="230" y="147" class="dg-text-sub" font-size="11" text-anchor="middle">먼저 선택됨</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>좁은 범위가 우선한다</b> — <code>%</code> 계정에 권한을 몰아줘도, 더 구체적인 호스트 계정이 있으면 그쪽 권한으로 인증된다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">여기서 사고가 난다</p>
+      <p>"권한을 분명히 줬는데 접근이 안 된다"의 흔한 원인이 이것이다. <code>'app'@'%'</code> 에 권한을 부여했지만 <code>'app'@'localhost'</code> 라는 빈 껍데기 계정이 남아 있으면, 로컬에서 접속할 때 권한이 없는 쪽으로 인증된다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>계정의 정체성은 <b>아이디 + 호스트</b> 쌍이다. 아이디만으로는 계정을 특정할 수 없다.</li>
+      <li><code>%</code> 는 모든 호스트, 구체적인 IP는 좁은 범위. 겹치면 <b>좁은 쪽이 선택</b>된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-2</div>
+    <h3>사용자 계정 관리</h3>
+    <p class="item-tagline"><code>SYSTEM_USER</code> 권한 하나로 시스템 계정과 일반 계정이 갈린다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>CREATE USER</code> 의 옵션들은 대부분 <b>비밀번호의 수명 정책</b>에 관한 것이다. 사람에게는 좋지만 <b>애플리케이션 계정에 걸면 장애</b>가 된다.
+  </div>
+
+  <h4>시스템 계정과 일반 계정</h4>
+  <p><code>SYSTEM_USER</code> 권한 보유 여부에 따라 나뉜다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>용도</th><th>계정 관리</th></tr></thead>
+      <tbody>
+        <tr><td>시스템 계정</td><td>데이터베이스 서버 관리자</td><td class="t-center t-ok">시스템 계정 + 일반 계정 모두 관리 가능</td></tr>
+        <tr><td>일반 계정</td><td>애플리케이션 / 개발자</td><td class="t-center t-no">불가</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>시스템 계정만 할 수 있는 일</h5>
+  <ul>
+    <li>계정 관리 (추가 / 수정 / 삭제)</li>
+    <li>다른 세션이나 그 세션에서 실행 중인 쿼리 종료</li>
+    <li>스토어드 프로그램 생성 시 생성자(DEFINER)를 타 사용자로 설정</li>
+  </ul>
+
+  <h5>기본으로 존재하는 3개의 계정</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>계정</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr><td><code>mysql.sys@localhost</code></td><td>내장 sys 스키마 객체들의 생성자</td></tr>
+        <tr><td><code>mysql.session@localhost</code></td><td>플러그인이 서버로 접근할 때 사용</td></tr>
+        <tr><td><code>mysql.infoschema@localhost</code></td><td><code>information_schema</code> 에 정의된 뷰의 생성자</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>세 계정 모두 기본적으로 잠겨 있다. <b>의도적으로 잠금을 풀지 않는 한</b> 악의적인 용도로 사용될 수 없으니 지우려 들 필요가 없다 — 오히려 지우면 sys 스키마가 깨진다.</p>
+
+  <h4>계정 생성 옵션</h4>
+  <p>8.0에서는 <code>CREATE USER</code> 로 계정을 만들고, 여러 옵션을 함께 지정할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">create-user.sql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE USER 'app'@'10.0.%'
+  IDENTIFIED WITH 'caching_sha2_password' BY 'secret'
+  REQUIRE NONE
+  PASSWORD EXPIRE NEVER
+  PASSWORD HISTORY DEFAULT
+  ACCOUNT UNLOCK;</code></pre>
+  </div>
+
+  <h5>IDENTIFIED WITH</h5>
+  <ul>
+    <li>인증 방식(플러그인)과 비밀번호를 설정한다. <code>IDENTIFIED WITH 'plugin' BY 'password'</code> 형식.</li>
+    <li>여러 플러그인이 있고, <b>8.0의 기본은 Caching SHA-2 Authentication</b> (<code>caching_sha2_password</code>) 이다.</li>
+  </ul>
+
+  <h5>REQUIRE</h5>
+  <ul>
+    <li>접속 시 TLS/SSL 채널을 사용할지 여부.</li>
+    <li>굳이 켜지 않아도 인증 과정 자체는 암호화되어 안전하게 접속된다.</li>
+  </ul>
+
+  <h5>PASSWORD EXPIRE</h5>
+  <ul>
+    <li>비밀번호의 유효 기간을 설정한다. <code>NEVER</code>, <code>DEFAULT</code>, <code>INTERVAL n DAY</code> 등.</li>
+    <li>지정하지 않으면 <code>default_password_lifetime</code> 값이 적용된다.</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">애플리케이션 계정에는 만료를 걸지 말 것</p>
+      <p>개발자나 관리자 계정에는 만료 정책이 좋지만, <b>앱이 사용하는 계정에 걸면 어느 날 갑자기 전면 장애</b>가 된다. 만료된 계정은 비밀번호를 바꾸기 전까지 어떤 쿼리도 실행할 수 없다.</p>
+    </div>
+  </div>
+
+  <h5>PASSWORD HISTORY</h5>
+  <ul>
+    <li>과거에 썼던 비밀번호의 재사용 가능 여부를 설정한다.</li>
+    <li>이력은 <code>mysql.password_history</code> 테이블에 저장된다.</li>
+  </ul>
+
+  <h5>PASSWORD REUSE INTERVAL</h5>
+  <ul>
+    <li>썼던 비밀번호의 재사용 <b>금지 기간</b>을 설정한다.</li>
+    <li>명시하지 않으면 <code>password_reuse_interval</code> 값이 적용된다.</li>
+  </ul>
+
+  <h5>PASSWORD REQUIRE</h5>
+  <ul>
+    <li>만료되어 비밀번호를 변경할 때 <b>현재 비밀번호</b>를 요구할지 설정한다.</li>
+    <li><code>CURRENT</code> / <code>OPTIONAL</code> / <code>DEFAULT</code>. 명시하지 않으면 <code>password_require_current</code> 값이 적용된다.</li>
+  </ul>
+
+  <h5>ACCOUNT LOCK / UNLOCK</h5>
+  <ul>
+    <li>계정 정보 변경 시 그 계정을 사용할 수 있는 상태로 둘지 결정한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>SYSTEM_USER</code> 권한이 시스템 계정과 일반 계정을 가르며, 계정 관리는 시스템 계정만 할 수 있다.</li>
+      <li>기본 인증 플러그인은 <code>caching_sha2_password</code> 다.</li>
+      <li>비밀번호 만료 / 이력 / 재사용 정책은 <b>사람 계정에만</b>. 앱 계정에는 <code>PASSWORD EXPIRE NEVER</code>.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-3</div>
+    <h3>비밀번호 관리</h3>
+    <p class="item-tagline">8.0은 비밀번호 검증을 플러그인이 아닌 <b>컴포넌트</b>로 제공하고, 계정 하나에 비밀번호 두 개를 허용한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이중 비밀번호는 <b>무중단 비밀번호 교체</b>를 위한 기능이다. 예전엔 비밀번호를 바꾸는 순간 앱이 죽었다.
+  </div>
+
+  <h4>고수준 비밀번호 — validate_password</h4>
+  <p>글자 조합을 강제하거나 금칙어를 설정하는 기능은 <code>validate_password</code> 컴포넌트가 제공한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; INSTALL COMPONENT 'file://component_validate_password';
+Query OK, 0 rows affected (0.45 sec)
+
+mysql&gt; SELECT * FROM mysql.component;
++--------------+--------------------+------------------------------------+
+| component_id | component_group_id | component_urn                      |
++--------------+--------------------+------------------------------------+
+|            1 |                  1 | file://component_validate_password |
++--------------+--------------------+------------------------------------+
+1 row in set (0.00 sec)</code></pre>
+  </div>
+
+  <p>설치하면 컴포넌트가 제공하는 시스템 변수들이 노출된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW GLOBAL VARIABLES LIKE 'validate_password%';
++-------------------------------------------------+--------+
+| Variable_name                                   | Value  |
++-------------------------------------------------+--------+
+| validate_password.changed_characters_percentage | 0      |
+| validate_password.check_user_name               | ON     |
+| validate_password.dictionary_file               |        |
+| validate_password.length                        | 8      |
+| validate_password.mixed_case_count              | 1      |
+| validate_password.number_count                  | 1      |
+| validate_password.policy                        | MEDIUM |
+| validate_password.special_char_count            | 1      |
++-------------------------------------------------+--------+
+8 rows in set (0.00 sec)</code></pre>
+  </div>
+
+  <h5>비밀번호 정책 세 단계</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>정책</th><th>검증 내용</th></tr></thead>
+      <tbody>
+        <tr><td><code>LOW</code></td><td>길이만 검증</td></tr>
+        <tr><td><code>MEDIUM</code></td><td>길이 + 숫자 + 대소문자 + 특수문자 배합</td></tr>
+        <tr><td><code>STRONG</code></td><td>MEDIUM 전부 + 금칙어(사전 파일) 포함 여부</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>금칙어 추가하기</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SET GLOBAL validate_password.dictionary_file = 'prohibitive_word.data';
+SET GLOBAL validate_password.policy = 'STRONG';</code></pre>
+  </div>
+
+  <h5>5.x 와의 차이</h5>
+  <p>5.x는 <b>플러그인</b>, 8.0은 <b>컴포넌트</b>로 제공한다. 제공 기능 자체는 거의 같고, 변수 이름이 <code>validate_password_length</code>(플러그인) 에서 <code>validate_password.length</code>(컴포넌트) 처럼 점 표기로 바뀐 것이 눈에 띄는 차이다.</p>
+
+  <h4>이중 비밀번호</h4>
+  <p>이전 버전에서는 계정 하나에 비밀번호 하나뿐이었다. 8.0은 <b>Primary / Secondary</b> 두 개를 동시에 유효하게 유지할 수 있다. 공식 문서는 이를 <b>Dual Password</b>(이중 비밀번호) 라고 부른다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dual-password.sql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 현재 비밀번호는 old_password
+mysql&gt; ALTER USER 'root'@'localhost' IDENTIFIED BY 'old_password';
+
+-- 새 비밀번호로 바꾸되, 기존 비밀번호도 남겨둔다
+mysql&gt; ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password'
+    -&gt; RETAIN CURRENT PASSWORD;
+
+-- 앱 설정 배포가 끝난 뒤, 세컨더리(옛 비밀번호)를 폐기
+mysql&gt; ALTER USER 'root'@'localhost' DISCARD OLD PASSWORD;</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["1. RETAIN CURRENT PASSWORD - 새 비밀번호 설정"] --> B["2. 두 비밀번호 모두 유효 - 앱 설정을 순차 배포"]
+  B --> C["3. DISCARD OLD PASSWORD - 옛 비밀번호 폐기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>2단계가 이중 비밀번호의 존재 이유다</b> — 이 구간이 있어야 서버 재배포를 롤링으로 진행할 수 있다.</div>
+  </div>
+
+  <ul>
+    <li>이중 비밀번호를 설정하기 전에는 <code>old_password</code> 만 사용 가능하다.</li>
+    <li><code>RETAIN CURRENT PASSWORD</code> 를 붙이면 <code>new_password</code> 와 함께 <b>둘 다</b> 사용할 수 있다.</li>
+    <li>앱 설정 변경이 끝났다면 보안을 위해 <b>세컨더리는 삭제하는 것을 권장</b>한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>비밀번호 정책은 <code>validate_password</code> <b>컴포넌트</b>가 담당한다 (5.x는 플러그인).</li>
+      <li>정책은 <code>LOW</code> &lt; <code>MEDIUM</code> &lt; <code>STRONG</code> 순으로 강해지고, <code>STRONG</code> 만 사전 파일을 본다.</li>
+      <li>이중 비밀번호는 <b>무중단 교체용</b>이다. 교체가 끝나면 <code>DISCARD OLD PASSWORD</code> 로 반드시 정리한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-4</div>
+    <h3>권한</h3>
+    <p class="item-tagline">권한은 <b>글로벌/객체</b>, <b>정적/동적</b> 두 축으로 분류된다. 이 분류가 <code>GRANT ~ ON</code> 뒤에 무엇을 쓸지를 결정한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    권한의 종류가 <b><code>ON</code> 뒤에 올 수 있는 객체의 범위</b>를 정한다. 글로벌 권한은 언제나 <code>*.*</code>, 테이블 권한은 컬럼 단위까지 내려갈 수 있다.
+  </div>
+
+  <h4>권한의 분류</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>분류</th><th>설명</th><th>GRANT 시 객체 명시</th></tr></thead>
+      <tbody>
+        <tr><td>글로벌 권한</td><td>데이터베이스/테이블 <b>이외</b>의 객체에 적용</td><td class="t-center t-no">명시하지 않는다</td></tr>
+        <tr><td>객체 권한</td><td>데이터베이스/테이블을 제어하는 데 필요</td><td class="t-center t-ok">명시해야 한다</td></tr>
+        <tr><td>정적 권한</td><td>MySQL 소스코드에 고정적으로 명시된 권한</td><td>—</td></tr>
+        <tr><td>동적 권한</td><td>컴포넌트/플러그인이 설치될 때 등록되는 권한</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>예외적인 ALL (ALL PRIVILEGES)</h5>
+  <ul>
+    <li>글로벌과 객체 <b>두 가지 용도로 모두</b> 쓰인다.</li>
+    <li>특정 객체에 부여하면 그 객체에 적용 가능한 모든 객체 권한을 부여한다.</li>
+    <li>글로벌로 부여하면 글로벌 수준에서 가능한 모든 권한을 부여한다.</li>
+  </ul>
+
+  <h4>GRANT 구문</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">GRANT &lt;privileges&gt; ON db.table TO 'user'@'host';</code></pre>
+  </div>
+  <ul>
+    <li>8.0부터는 <b>계정이 없으면 에러</b>가 난다. <code>CREATE USER</code> 를 먼저 해야 한다. (5.x는 GRANT가 계정을 만들어 줬다.)</li>
+    <li>콤마로 여러 권한을 한 번에 부여할 수 있다.</li>
+  </ul>
+
+  <h4>권한마다 달라지는 객체 범위</h4>
+  <p><code>GRANT ~ ON</code> 뒤에 무엇을 쓸 수 있는지는 <b>권한의 종류가 결정</b>한다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["*.* (서버 전체)"] --> B["db.* (데이터베이스 단위)"]
+  B --> C["db.table (테이블 단위)"]
+  C --> D["db.table.column (컬럼 단위)"]
+  G["글로벌 권한 (SUPER 등)"] -.->|"여기까지만"| A
+  H["DB 권한 (EVENT 등)"] -.->|"여기까지"| B
+  I["테이블 권한 (INSERT 등)"] -.->|"여기까지"| D
+      </pre>
+    </div>
+    <div class="figure-cap"><b>권한 종류가 도달 가능한 깊이를 정한다</b> — 글로벌 권한은 <code>*.*</code> 를 벗어날 수 없고, 테이블 권한만 컬럼까지 내려간다.</div>
+  </div>
+
+  <h5>글로벌 권한</h5>
+  <p>특정 DB나 테이블에 부여될 수 없어서 항상 <code>*.*</code> 를 쓰게 된다. <code>*.*</code> 는 모든 객체, 곧 MySQL 서버 전체를 의미한다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">GRANT SUPER ON *.* TO 'user'@'host';</code></pre>
+  </div>
+
+  <h5>DB 권한</h5>
+  <p>특정 DB 또는 서버의 모든 DB에 부여할 수 있다. 테이블 단위로는 내려갈 수 없어 <code>*.*</code> 또는 <code>db.*</code> 만 쓴다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">GRANT EVENT ON *.* TO 'user'@'host';
+GRANT EVENT ON employee.* TO 'user'@'host';</code></pre>
+  </div>
+
+  <h5>테이블 권한</h5>
+  <p><code>*.*</code> 부터 개별 테이블까지, 그리고 <b>특정 컬럼</b>까지 부여할 수 있다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">GRANT INSERT ON *.* TO 'user'@'host';
+GRANT INSERT ON employee.* TO 'user'@'host';
+GRANT INSERT ON employee.salary TO 'user'@'host';
+GRANT INSERT, UPDATE(dept_no) ON employee.* TO 'user'@'host';</code></pre>
+  </div>
+  <ul>
+    <li>컬럼 단위 권한은 <code>DELETE</code> 를 제외한 <code>INSERT</code> / <code>UPDATE</code> / <code>SELECT</code> 에 부여할 수 있다.</li>
+    <li>다만 실무에서 잘 쓰지 않는다. 컬럼 노출 제어가 필요하면 <b>뷰(VIEW)로 푸는 편</b>이 관리하기 쉽다.</li>
+  </ul>
+
+  <h4>권한 목록 확인</h4>
+  <p><code>SHOW GRANTS</code> 또는 권한 관련 시스템 테이블(<code>mysql.user</code>, <code>mysql.db</code>, <code>mysql.tables_priv</code> 등)에서 현재 부여된 권한을 확인할 수 있다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>글로벌 권한은 <code>*.*</code>, DB 권한은 <code>db.*</code> 까지, 테이블 권한은 컬럼까지 내려간다.</li>
+      <li>8.0에서는 <b>계정을 먼저 만들어야</b> <code>GRANT</code> 가 통과한다.</li>
+      <li>컬럼 단위 권한보다 <b>뷰</b>가 현실적인 선택지인 경우가 많다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-5</div>
+    <h3>역할</h3>
+    <p class="item-tagline">8.0의 역할은 새로운 개념이 아니다 — <b>내부적으로는 그냥 계정</b>이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    역할을 부여받아도 <b>로그인 직후에는 활성화되지 않는다.</b> <code>SET ROLE</code> 을 하거나 <code>activate_all_roles_on_login</code> 을 켜야 한다.
+  </div>
+
+  <p>8.0부터 권한을 묶어 <b>역할(Role)</b> 로 관리할 수 있게 되었다.</p>
+
+  <h4>역할 생성 — 그런데 왜 안 될까</h4>
+  <p>껍데기 역할을 만들고, 권한을 붙이고, 사용자에게 부여하는 자연스러운 순서를 따라가 보자. 역할은 분명히 부여됐는데 조회는 실패한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag bad">여기서 막힌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; CREATE ROLE role_emp_read;
+mysql&gt; GRANT SELECT ON employee.* TO role_emp_read;
+mysql&gt; CREATE USER reader@'localhost' IDENTIFIED BY '1234';
+mysql&gt; GRANT role_emp_read TO reader@'localhost';
+
+mysql&gt; SHOW GRANTS;
++---------------------------------------------------+
+| Grants for reader@localhost                       |
++---------------------------------------------------+
+| GRANT USAGE ON *.* TO `reader`@`localhost`        |
+| GRANT `role_emp_read`@`%` TO `reader`@`localhost` |
++---------------------------------------------------+
+2 rows in set (0.00 sec)
+
+mysql&gt; SELECT * FROM realmysql.employee;
+ERROR 1142 (42000): SELECT command denied to user 'reader'@'localhost' for table 'employee'</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">ERROR 1142 — 역할이 부여되지 않은 게 아니다</p>
+      <p><code>SHOW GRANTS</code> 는 역할이 부여됐다고 말하고 있다. 문제는 <b>활성화되지 않았다는 것</b>이다.</p>
+    </div>
+  </div>
+
+  <h4>역할은 로그인 시 자동으로 켜지지 않는다</h4>
+  <ul>
+    <li>MySQL은 최초 로그인 시 <b>아무런 역할도 할당하지 않는다.</b></li>
+    <li><code>SET ROLE &lt;ROLE_NAME&gt;</code> 을 입력해야 그 권한이 들어온다. 단, <b>로그아웃하면 다시 초기화</b>된다.</li>
+    <li><code>activate_all_roles_on_login</code> 시스템 변수를 켜면 로그인 시 자동으로 활성화된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag good">해결</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT current_role();
++----------------+
+| current_role() |
++----------------+
+| NONE           |
++----------------+
+
+mysql&gt; SET ROLE 'role_emp_read';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; SELECT current_role();
++---------------------+
+| current_role()      |
++---------------------+
+| `role_emp_read`@`%` |
++---------------------+
+
+mysql&gt; SELECT * FROM realmysql.employee;
+Empty set (0.00 sec)</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag good">매번 SET ROLE 하기 싫다면</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SET GLOBAL activate_all_roles_on_login = ON;</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> 로그인
+  로그인 --> 역할없음 : current_role() 은 NONE
+  역할없음 --> 역할활성 : SET ROLE 실행
+  로그인 --> 역할활성 : activate_all_roles_on_login = ON
+  역할활성 --> [*] : 로그아웃하면 초기화
+      </pre>
+    </div>
+    <div class="figure-cap"><b>부여와 활성화는 다른 단계다</b> — 부여는 영구적이지만 활성화는 세션마다 새로 필요하다.</div>
+  </div>
+
+  <h4>8.0 역할의 비밀 — 사실은 계정이다</h4>
+  <ul>
+    <li>역할은 사용자 계정과 <b>거의 같은 모습</b>을 하고 있다.</li>
+    <li>서버 내부적으로 역할과 계정은 <b>동일한 객체</b>로 취급된다.</li>
+    <li>즉 새로운 개념이 생긴 게 아니라, <b>하나의 계정에 다른 계정의 권한을 병합해서 쓸 수 있게 된 것</b>뿐이다.</li>
+    <li>생성 시 계정처럼 호스트 부분을 명시할 수 있고, 생략하면 자동으로 <code>%</code> 가 된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT user, host, account_locked FROM mysql.user;
++------------------+-----------+----------------+
+| user             | host      | account_locked |
++------------------+-----------+----------------+
+| role_emp_read    | %         | Y              |
+| mysql.infoschema | localhost | Y              |
+| mysql.session    | localhost | Y              |
+| mysql.sys        | localhost | Y              |
+| reader           | localhost | N              |
+| root             | localhost | N              |
++------------------+-----------+----------------+
+6 rows in set (0.00 sec)</code></pre>
+  </div>
+
+  <p>역할 <code>role_emp_read</code> 가 <code>mysql.user</code> 에 <b>계정으로</b> 들어 있다. <code>account_locked = Y</code> 인 것이 유일한 차이인데, 이 잠금이 "이 계정으로는 로그인할 수 없다"는 표식 역할을 한다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>역할은 권한 묶음이지만, 내부적으로는 <code>mysql.user</code> 에 들어 있는 <b>잠긴 계정</b>이다.</li>
+      <li><code>GRANT role TO user</code> 로 부여해도 <b>세션에서 활성화해야</b> 효력이 생긴다.</li>
+      <li>매번 <code>SET ROLE</code> 이 번거로우면 <code>activate_all_roles_on_login = ON</code>.</li>
+    </ul>
+  </div>
+</article>

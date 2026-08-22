@@ -1,0 +1,295 @@
+<article class="item" id="item-16" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 16</div>
+    <h3>Classic, Quorum, Stream</h3>
+    <p class="item-tagline">큐 타입은 선언할 때 정하고, 나중에 못 바꾼다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ 4.x의 실질적 기본값은 <b>quorum queue</b>다. classic은 복제 기능이 제거되어 단일 노드용으로 남았고, stream은 큐라기보다 로그다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Classic</th><th>Quorum</th><th>Stream</th></tr></thead>
+      <tbody>
+        <tr><td>자료구조</td><td>큐</td><td>큐 (Raft 복제)</td><td>추가 전용 로그</td></tr>
+        <tr><td>복제</td><td class="t-no">없음 (4.x에서 제거)</td><td class="t-ok">Raft 과반</td><td class="t-ok">있음</td></tr>
+        <tr><td>내구성</td><td>durable / transient</td><td class="t-ok">항상 durable</td><td class="t-ok">항상 durable</td></tr>
+        <tr><td>소비 후</td><td>삭제</td><td>삭제</td><td class="t-ok">남아 있음 (재읽기 가능)</td></tr>
+        <tr><td>소비자 여럿</td><td>경합 분배</td><td>경합 분배</td><td>각자 오프셋으로 전체 읽기</td></tr>
+        <tr><td>우선순위</td><td><code>x-max-priority</code> 선언 필요</td><td class="t-ok">0~31 항상 사용 가능</td><td class="t-no">없음</td></tr>
+        <tr><td>TTL / DLX</td><td class="t-ok">지원</td><td class="t-ok">지원</td><td class="t-no">없음</td></tr>
+        <tr><td>exclusive</td><td class="t-ok">지원</td><td class="t-no">불가</td><td class="t-no">불가</td></tr>
+        <tr><td>주 용도</td><td>임시 큐, RPC 응답 큐</td><td><b>업무용 기본</b></td><td>대량 팬아웃, 이벤트 재생</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">queue-types.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 타입을 안 주면 classic 이 된다. 업무 큐라면 항상 명시한다.
+await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: { 'x-queue-type': 'quorum' },
+});
+
+await ch.assertQueue('audit.events', {
+  durable: true,
+  arguments: { 'x-queue-type': 'stream', 'x-max-age': '7D' },
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">타입은 사후 변경 불가</p>
+      <p>
+        <code>x-queue-type</code>은 선언 시에만 정해진다. classic → quorum 전환은 <b>새 큐를 만들고 트래픽을
+        옮기는 마이그레이션</b>이다. shovel 플러그인으로 기존 메시지를 옮기거나, 새 큐를 같은 exchange에
+        바인딩해 놓고 옛 큐가 비면 지우는 식으로 한다. 그래서 처음 만들 때 제대로 정하는 게 중요하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>업무 큐의 기본값은 quorum. 고민되면 quorum.</li>
+      <li>classic은 이제 임시/짧은 수명 큐용이다. 복제가 없다.</li>
+      <li>stream은 다른 물건이다. 큐 대체재가 아니라 로그다.</li>
+      <li>타입은 선언 시 고정. 바꾸려면 마이그레이션.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 17</div>
+    <h3>Quorum queue를 기본으로 두기</h3>
+    <p class="item-tagline">Raft 합의로 복제된다. 안전한 대신 규칙이 몇 개 붙는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    quorum queue는 <b>과반이 살아 있어야 동작</b>한다. 노드 3개 중 2개가 살아야 하고, 모든 메시지가 디스크에 기록된다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] --> L["Leader 복제본 (노드 1)"]
+  L --> F1["Follower (노드 2)"]
+  L --> F2["Follower (노드 3)"]
+  F1 -.->|"기록 확인"| L
+  F2 -.->|"기록 확인"| L
+  L -->|"과반 확인 후 confirm"| P
+      </pre>
+    </div>
+    <div class="figure-cap"><b>과반 합의</b> — 퍼블리셔 컨펌은 과반 복제본이 받아들인 뒤에 나간다. 그래서 confirm이 곧 내구성 보증이 된다.</div>
+  </div>
+
+  <h4>알아 둘 인자</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>인자</th><th>기본값</th><th>뜻</th></tr></thead>
+      <tbody>
+        <tr><td><code>x-quorum-initial-group-size</code></td><td>3</td><td>복제본 개수. 홀수로 둔다</td></tr>
+        <tr><td><code>x-delivery-limit</code></td><td>20</td><td>재배달 한도. 초과 시 dead-letter (-1이면 무제한)</td></tr>
+        <tr><td><code>x-queue-leader-locator</code></td><td><code>client-local</code></td><td>리더를 어느 노드에 둘지. 큐가 많으면 <code>balanced</code></td></tr>
+        <tr><td><code>x-consumer-timeout</code></td><td>(전역 30분)</td><td>큐별 미확인 타임아웃</td></tr>
+        <tr><td><code>x-delayed-retry-type</code></td><td><code>disabled</code></td><td>4.3의 지연 재시도 (ITEM 22)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>classic에 있던 게 없는 것들</h4>
+  <ul>
+    <li><b>비내구성 큐 불가.</b> 항상 durable이다.</li>
+    <li><b>exclusive 큐 불가.</b> RPC 응답 큐 같은 건 classic으로 만든다.</li>
+    <li><b>서버 생성 이름 불가.</b> 큐 이름을 내가 지어야 한다.</li>
+    <li><b>global QoS 불가.</b> 컨슈머별 prefetch만 쓴다.</li>
+    <li><b><code>x-max-priority</code> 불필요.</b> 0~31 우선순위가 항상 켜져 있다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4.3에서 좋아진 점 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        4.3은 quorum queue에 <b>32단계 엄격 우선순위</b>(관리 UI에서 우선순위별 메시지 수까지 보인다),
+        <b>지연 재시도</b>, <b>무제한 return</b>(<code>acquired-count</code>와 <code>delivery-count</code>를
+        분리 추적해, 컨슈머가 명시적으로 되돌린 횟수는 재배달 한도에 안 세는 것), 그리고
+        <b>32 KiB 이하 메시지의 메모리 오버헤드 50% 감소</b>를 넣었다. 3.x 시절 "quorum은 느리고 무겁다"는
+        평이 지금도 맞다고 보긴 어렵다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">단일 노드 개발 환경에서도 <span class="badge b-blue">보강</span></p>
+      <p>
+        노드가 하나뿐인 로컬 도커에서도 quorum queue는 잘 돈다(복제본 1개짜리 Raft 그룹). 운영과 같은 타입으로
+        개발하는 편이 낫다. classic으로 개발하다 운영에서 quorum으로 바꾸면 exclusive/global QoS 같은
+        제약에 배포 당일 걸린다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>과반 노드가 살아 있어야 쓰기가 된다. 홀수 개(보통 3개)로 구성한다.</li>
+      <li>항상 durable, exclusive 불가, global QoS 불가, 우선순위 항상 활성.</li>
+      <li><code>x-delivery-limit</code> 기본값 20이 무한 재시도를 자동으로 막아 준다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-18" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 18</div>
+    <h3>Stream: 지우지 않는 큐</h3>
+    <p class="item-tagline">Kafka를 써봤다면 익숙한 모델. 소비해도 메시지가 남는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    stream은 <b>추가 전용 로그</b>다. 소비는 읽기일 뿐이고, 메시지는 <b>보존 정책</b>에 따라 지워진다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph QQ["큐: 파괴적 소비"]
+    Q1["m1 m2 m3"] --> CA["컨슈머 A가 m1 처리 후 ack"]
+    CA --> Q2["남은 것: m2 m3"]
+  end
+  subgraph ST["스트림: 비파괴적 읽기"]
+    S["m1 m2 m3 m4 ..."]
+    S --> RA["리더 A: offset 2 에서 읽는 중"]
+    S --> RB["리더 B: offset 0 부터 다시 읽는 중"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>소비의 의미가 다르다</b> — 스트림에서 컨슈머는 자기 오프셋만 들고 있고, 데이터는 공유된다.</div>
+  </div>
+
+  <h4>선언과 읽기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">stream.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('events.stream', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'stream',
+    'x-max-age': '7D',                       // 7일 보존
+    'x-max-length-bytes': 20_000_000_000,    // 또는 크기 기준
+  },
+});
+
+// AMQP 0-9-1 로 읽을 때는 prefetch 가 필수다.
+await ch.prefetch(100);
+await ch.consume('events.stream', handler, {
+  noAck: false,
+  arguments: { 'x-stream-offset': 'first' },  // first | last | next | 숫자 | 타임스탬프
+});</code></pre>
+  </div>
+
+  <h4>언제 쓰나</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>이럴 때</th><th>선택</th></tr></thead>
+      <tbody>
+        <tr><td>같은 이벤트를 여러 팀이 각자 처리, 나중에 팀이 늘 수도 있음</td><td class="t-ok">Stream</td></tr>
+        <tr><td>버그 고친 뒤 지난 24시간을 다시 처리하고 싶음</td><td class="t-ok">Stream</td></tr>
+        <tr><td>초당 수십만 건의 적재성 이벤트</td><td class="t-ok">Stream</td></tr>
+        <tr><td>건별 재시도, DLX, TTL, 우선순위가 필요</td><td class="t-no">Quorum queue</td></tr>
+        <tr><td>작업 분배(하나의 일을 하나의 워커가)</td><td class="t-no">Quorum queue</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">stream에 없는 것</p>
+      <p>
+        <b>메시지 TTL, 우선순위, dead lettering이 전부 없다.</b> 개별 메시지를 실패 처리한다는 개념 자체가
+        없기 때문이다. 실패하면 오프셋을 안 올리고 다시 읽거나, 실패분을 별도 큐로 넘기는 걸 내가 짜야 한다.
+        전용 <b>stream 프로토콜</b>(포트 5552, 전용 클라이언트)을 쓰면 성능이 훨씬 좋지만 amqplib으로는
+        AMQP 0-9-1 경유로만 접근할 수 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>stream은 소비해도 안 지워지는 로그다. 오프셋으로 위치를 잡고 재생할 수 있다.</li>
+      <li>대량 팬아웃/재처리/감사 로그에 강하다.</li>
+      <li>TTL, 우선순위, DLX가 없으니 작업 큐 용도로는 쓰지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-19" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 19</div>
+    <h3>4.x에서 사라진 것들</h3>
+    <p class="item-tagline">검색해서 나오는 자료의 절반은 이미 유효하지 않다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    3.x 기준 블로그 글을 그대로 따라 하면 <b>존재하지 않는 기능</b>을 설정하게 된다. 특히 미러링, Mnesia, 지연 메시지 플러그인.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>사라진 것</th><th>언제</th><th>지금은</th></tr></thead>
+      <tbody>
+        <tr><td>클래식 큐 미러링 (<code>ha-mode</code>, <code>ha-params</code> policy)</td><td>4.0</td><td><b>quorum queue</b>로 대체</td></tr>
+        <tr><td>Mnesia 메타데이터 저장소</td><td>4.3에서 완전 제거</td><td><b>Khepri</b>가 유일한 저장소</td></tr>
+        <tr><td>네트워크 분단 처리 전략 (<code>pause_minority</code>, <code>autoheal</code> 등)</td><td>4.3</td><td>Raft가 처리. 설정 항목 자체가 없어짐</td></tr>
+        <tr><td><code>rabbitmq_delayed_message_exchange</code> 플러그인</td><td>2026-04 아카이브</td><td>4.3+에서 <b>로드되지 않는다</b> (ITEM 23)</td></tr>
+        <tr><td>transient non-exclusive 클래식 큐</td><td>4.3부터 기본 비활성</td><td>durable로 선언. 굳이 쓰려면 <code>deprecated_features.permit.transient_nonexcl_queues = true</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">이런 자료를 만나면 일단 의심한다</p>
+      <p>
+        <code>ha-mode: all</code>이라는 policy 설정이 나오면 3.x 자료다. <code>x-delayed-message</code>
+        exchange 타입으로 지연을 구현하라는 글도 마찬가지다. 두 가지 모두 <b>4.3에서는 아예 동작하지 않는다.</b>
+        RabbitMQ 자료를 읽을 때는 작성 시점과 대상 버전을 먼저 확인하는 습관이 필요하다.
+      </p>
+    </div>
+  </div>
+
+  <h4>Khepri가 뭔지 한 줄로</h4>
+  <p>
+    큐/exchange/바인딩/사용자 같은 <b>메타데이터</b>를 저장하는 내부 데이터베이스다. 옛 Mnesia는 네트워크 분단에
+    취약해 사람이 개입해야 하는 경우가 있었지만, Khepri는 Raft 기반이라 클러스터가 스스로 일관성을 지킨다.
+    애플리케이션 개발자가 직접 만질 일은 없지만, <b>클러스터 운영 절차가 바뀌었다</b>는 사실은 알아야 한다.
+  </p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>미러링은 없다. 복제가 필요하면 quorum queue.</li>
+      <li>Mnesia와 분단 처리 전략은 4.3에서 제거. Khepri가 유일한 메타데이터 저장소.</li>
+      <li>지연 메시지 플러그인은 아카이브됐고 4.3에서 못 쓴다.</li>
+      <li>검색 결과를 볼 때 버전을 먼저 확인한다.</li>
+    </ul>
+  </div>
+</article>

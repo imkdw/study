@@ -1,0 +1,664 @@
+<article class="item" id="item-61" data-spy>
+  <header class="item-head">
+    <div class="item-num">26-1</div>
+    <h3>문제 이해 및 설계 정리</h3>
+    <p class="item-tagline">초당 10건. 이 장에서 성능은 문제가 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>초당 10 TPS</b>는 평범한 DB 한 대로도 여유롭다. 그러므로 이 장의 모든 설계는 처리량이 아니라 <b>단 한 건도 틀리지 않는 것</b>을 향한다.
+  </div>
+
+  <h4>기능적 요구사항</h4>
+  <ul>
+    <li><b>대금 수신(pay-in) 흐름</b> — 결제 시스템이 판매자를 대신해 고객으로부터 대금을 수령한다.</li>
+    <li><b>대금 정산(pay-out) 흐름</b> — 결제 시스템이 전 세계의 판매자에게 제품 판매 대금을 송금한다.</li>
+  </ul>
+
+  <h4>비기능 요구사항</h4>
+  <ul>
+    <li><b>신뢰성 및 내결함성</b> — 결제 실패는 신중하게 처리해야 한다.</li>
+    <li><b>내부 서비스와 외부 서비스 간 조정 프로세스</b> — 시스템 간 결제 정보가 일치하는지 비동기적으로 확인한다.
+      <ul>
+        <li>내부 서비스 — 결제 시스템, 회계 시스템</li>
+        <li>외부 서비스 — 결제 서비스 제공업체(PSP)</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>개략적인 규모 추정</h4>
+  <ul>
+    <li>하루 100만 건의 결제(트랜잭션)를 처리한다. 약 <b>초당 10건(TPS)</b>이다.</li>
+    <li>일반적인 데이터베이스로 문제없이 처리 가능한 숫자이므로, 처리 대역폭보다 <b>결제 트랜잭션의 정확한 처리</b>에 중점을 두고 진행한다.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">앞선 장들과 정반대의 문제</p>
+      <p>4장은 초당 수만, 13장은 48,000 QPS를 다뤘다. 여기는 10 TPS다. <b>같은 도구(큐 / 멱등성 / 재시도)를 쓰지만 최적화 목표가 다르다.</b> 앞에서는 "빠르게"를 위해 정확성을 조금 양보했다면, 여기서는 정확성을 위해 속도를 기꺼이 양보한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>기능은 대금 수신(pay-in)과 대금 정산(pay-out) 두 흐름.</li>
+      <li>비기능의 핵심은 신뢰성/내결함성과 조정(reconciliation).</li>
+      <li>초당 10건이므로 성능이 아니라 정확성이 설계 목표다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-62" data-spy>
+  <header class="item-head">
+    <div class="item-num">26-2</div>
+    <h3>개략적 설계안</h3>
+    <p class="item-tagline">결제 서비스 / 결제 실행자 / PSP / 원장 / 지갑. 다섯 배역의 분업.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>결제 이벤트 하나에 결제 주문이 여러 개</b>일 수 있다는 구조를 잡고 가야 한다. 장바구니 하나에 여러 판매자의 상품이 담기기 때문이다.
+  </div>
+
+  <h4>대금 수신 흐름</h4>
+  <ul>
+    <li>아마존에서 구매자가 주문하면 아마존의 은행 계좌로 돈이 들어오는데, 이것이 대금 수신 흐름이다.</li>
+    <li>실제 돈은 아마존의 은행 계좌에 있지만, 판매자가 그 상당 부분을 소유한다.</li>
+    <li>배송이 완료되면 계좌에 묶여 있던 판매 대금에서 수수료를 제외한 금액이 판매자의 은행 계좌로 지급된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  BUYER["구매자"] --> CARD["신용카드"]
+  CARD -->|"대금 수신 (pay-in)"| ACC["전자상거래 서비스<br>은행 계좌"]
+  ACC -->|"대금 정산 (pay-out)"| SACC["판매자<br>은행 계좌"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>돈은 두 번 움직인다</b> — 구매자에서 플랫폼으로 한 번(수신), 플랫폼에서 판매자로 한 번(정산). 이 둘 사이에 시차가 있고, 그 사이의 잔액을 관리하는 것이 지갑과 원장이다.</div>
+  </div>
+
+  <h4>구성 요소</h4>
+
+  <h5>결제 서비스 (Payment Service)</h5>
+  <ul>
+    <li>사용자로부터 결제 이벤트를 받아 결제 프로세스를 조율한다.</li>
+    <li>AML/CFT 같은 규정 준수, 자금 세탁 등 범죄 행위 여부에 대한 위험 점검을 진행한다.</li>
+    <li>이 점검을 통과한 것만 결제가 가능하며, 점검 과정은 매우 복잡하고 고도로 전문화되어 있어 보통 제3자 서비스를 이용한다.</li>
+  </ul>
+
+  <h5>결제 실행자 (Payment Executor)</h5>
+  <ul>
+    <li>결제 서비스 공급자를 통해 <b>결제 주문 하나</b>를 실행한다.</li>
+    <li>하나의 결제 이벤트에는 여러 결제 주문이 포함될 수 있다.</li>
+  </ul>
+
+  <h5>결제 서비스 공급자 (Payment Service Provider, PSP)</h5>
+  <ul>
+    <li>A에서 B로 돈을 옮기는 역할을 담당한다.</li>
+    <li>이 예제에서는 구매자의 신용카드 계좌에서 돈을 인출하는 역할을 한다.</li>
+    <li>대표적으로 PayPal, Stripe, Adyen 등이 있다.</li>
+  </ul>
+
+  <h5>카드 유형</h5>
+  <ul>
+    <li>카드사는 신용카드 업무를 처리하는 조직이다.</li>
+    <li>비자, 마스터카드, 디스커버 등이 있으며, 카드 결제망의 내부 동작은 매우 복잡하다.</li>
+  </ul>
+
+  <h5>원장 (Ledger)</h5>
+  <ul>
+    <li>결제 트랜잭션에 대한 금융 기록이다.</li>
+    <li>전자상거래 웹사이트의 총수익을 계산하거나 향후 수익을 예측하는 등, 결제 후 분석에서 매우 중요한 역할을 한다.</li>
+    <li>예를 들어 사용자가 1달러를 결제하면, 사용자로부터 1달러를 인출하고 판매자에게 1달러를 지급하는 기록을 남긴다.</li>
+  </ul>
+
+  <h5>지갑 (Wallet)</h5>
+  <ul>
+    <li><b>판매자</b>의 계정 잔액을 기록한다.</li>
+    <li>특정 사용자가 결제한 총금액을 기록할 수도 있다.</li>
+  </ul>
+
+  <h4>일반적인 결제의 흐름</h4>
+  <ol class="steps">
+    <li><div class="step-title">결제 이벤트 생성</div><p>주문하기 버튼을 누르면 결제 이벤트가 생성되어 결제 서비스로 전송된다.</p></li>
+    <li><div class="step-title">결제 이벤트 저장</div><p>결제 서비스가 결제 이벤트를 DB에 저장한다.</p></li>
+    <li><div class="step-title">결제 주문 저장</div><p>단일 결제 이벤트에 여러 결제 주문이 포함될 수 있다. 한 번의 결제로 여러 판매자의 제품을 처리하는 경우가 그 예다. 결제를 여러 주문으로 분할하면 결제 서비스는 주문마다 결제 실행자를 호출한다. 결제 실행자는 주문을 DB에 저장한다.</p></li>
+    <li><div class="step-title">PSP 호출</div><p>결제 실행자가 외부 PSP를 호출해 신용카드 결제를 처리한다.</p></li>
+    <li><div class="step-title">판매자 지갑 갱신</div><p>결제가 성공하면 결제 서비스가 지갑을 갱신해 판매자의 잔고를 기록하고, 지갑 서비스가 이를 DB에 저장한다.</p></li>
+    <li><div class="step-title">원장 정보 업데이트</div><p>지갑 갱신이 성공하면 결제 서비스가 원장을 호출해 새 원장 정보를 DB에 기록한다.</p></li>
+  </ol>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["유저"] -->|"1. 결제 이벤트 생성"| PS["결제 서비스"]
+  PS -->|"2. 결제 이벤트 저장"| DB1[("DB")]
+  PS -->|"5. 판매자 지갑 갱신"| WAL["지갑"] --> DB2[("DB")]
+  PS -->|"6. 원장 정보 업데이트"| LED["원장"] --> DB3[("DB")]
+  PS --> PE["결제 실행자"]
+  PE -->|"3. 결제 주문 저장"| DB4[("DB")]
+  PE -->|"4. PSP 를 호출해서 결제 처리"| PSP["결제 서비스 공급자 (PSP)<br>PayPal / Stripe …"]
+  PSP --> CARD["카드 유형<br>VISA / MASTER CARD …"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>왼쪽이 내부, 오른쪽이 외부다</b> — PSP를 경계로 우리가 통제할 수 있는 영역과 없는 영역이 갈린다. 26-3의 조정(reconciliation)은 이 경계를 넘나든 결과를 대조하는 작업이다.</div>
+  </div>
+
+  <h4>결제 서비스 API</h4>
+
+  <h5>POST /v1/payments</h5>
+  <p>결제 이벤트를 실행하는 엔드포인트다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">request body</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">{
+  "buyer_info": { },
+  "checkout_id": "string",
+  "credit_card_info": { },
+  "payment_orders": [
+    {
+      "seller_account": "string",
+      "amount": "string",
+      "currency": "string",
+      "payment_order_id": "string"
+    }
+  ]
+}</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>설명</th><th>타입</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">buyer_info</td><td>구매자 정보</td><td class="dg-mono">json</td></tr>
+        <tr><td class="dg-mono">checkout_id</td><td>결제 이벤트를 식별하는 전역적으로 고유한 ID</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">credit_card_info</td><td>암호화된 신용카드 정보나 결제 토큰. PSP마다 상이하다</td><td class="dg-mono">json</td></tr>
+        <tr><td class="dg-mono">payment_orders</td><td>결제 주문 목록</td><td class="dg-mono">array</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>payment_orders 내부 데이터</h5>
+  <ul>
+    <li>하나의 결제에 여러 주문이 포함될 수 있으므로 결제 주문 목록은 배열로 처리한다.</li>
+    <li><code>amount</code>를 문자열로 처리하는 이유는 환경마다 숫자 정밀도가 다를 수 있기 때문이다. 문자로 주고받고 실제 계산 시에만 숫자로 변환한다.</li>
+    <li><code>payment_order_id</code>는 PSP에 결제 요청을 보낼 때 중복 제거 ID로 활용한다. 이를 <b>멱등 키(idempotency key)</b>라고도 부른다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>설명</th><th>타입</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">seller_account</td><td>대금을 수령할 판매자</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">amount</td><td>결제 금액</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">currency</td><td>통화 단위 (ISO 4217을 따름)</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">payment_order_id</td><td>결제 주문을 식별하는 전역적으로 고유한 ID</td><td class="dg-mono">string</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">금액을 부동소수점으로 다루지 않는다 <span class="badge b-blue">보강</span></p>
+      <p><code>amount</code>를 문자열로 두는 이유를 더 정확히 말하면, <b>IEEE 754 부동소수점이 0.1 같은 십진 소수를 정확히 표현하지 못하기 때문</b>이다. <code>0.1 + 0.2 !== 0.3</code>인 언어에서 금액을 double로 다루면 반올림 오차가 누적되어 원장이 맞지 않는다. 실무에서는 문자열이나 십진 고정소수점(<code>DECIMAL</code>), 혹은 최소 단위 정수(센트/원 단위)로 다룬다.</p>
+    </div>
+  </div>
+
+  <h5>GET /v1/payments/{:id}</h5>
+  <ul>
+    <li>단일 결제 주문의 실행 상태를 반환하는 엔드포인트다.</li>
+    <li>잘 알려진 일부 PSP가 제공하는 API와 유사하다.</li>
+  </ul>
+
+  <h4>결제 서비스 데이터 모델</h4>
+  <ul>
+    <li><b>결제 이벤트(Payment Event)</b>와 <b>결제 주문(Payment Order)</b> 두 개의 테이블이 필요하다.</li>
+    <li>결제 시스템용 저장소를 고를 때 성능은 대체로 가장 중요한 고려사항이 아니다.</li>
+  </ul>
+
+  <h5>데이터베이스를 고르는 중점 사항</h5>
+  <ul>
+    <li>다른 금융 회사에서 수년간 긍정적인 피드백을 받으며 쓰인 적이 있는가? 즉 검증되었는가?</li>
+    <li>모니터링 및 데이터 탐사(investigation)에 필요한 도구가 풍부하게 지원되는가?</li>
+    <li>DBA 채용 시장이 성숙했는가? 즉 숙련된 DBA를 쉽게 구할 수 있는가?</li>
+    <li>일반적으로 NoSQL/NewSQL보다는 <b>ACID 트랜잭션을 지원하는 RDBMS</b>를 쓰는 것이 좋다.</li>
+  </ul>
+
+  <h5>payment_event 테이블</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>타입</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">checkout_id</td><td class="dg-mono">string / PK</td></tr>
+        <tr><td class="dg-mono">buyer_info</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">seller_info</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">credit_card_info</td><td class="dg-mono">PSP 업체별로 상이함</td></tr>
+        <tr><td class="dg-mono">is_payment_done</td><td class="dg-mono">boolean</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>payment_order 테이블</h5>
+  <ul>
+    <li><code>checkout_id</code>는 FK다. 한 번의 결제 행위는 결제 이벤트 하나를 만들고, 하나의 결제 이벤트에는 여러 결제 주문이 포함된다.</li>
+    <li><code>payment_order_status</code>는 보통 ENUM으로 처리하며 프로세스는 아래와 같다 —
+      <ul>
+        <li>초깃값은 <code>NOT_STARTED</code></li>
+        <li>결제 실행자에 주문을 전송하면 <code>EXECUTING</code>으로 변경</li>
+        <li>결제 처리자의 응답에 따라 <code>SUCCESS</code> 또는 <code>FAILED</code>로 변경</li>
+      </ul>
+    </li>
+    <li>상태가 <code>SUCCESS</code>가 되면 지갑과 원장 서비스를 호출해 각각을 갱신하고, 해당 <code>*_updated</code> 컬럼을 <code>true</code>로 바꾼다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> NOT_STARTED
+  NOT_STARTED --> EXECUTING: 결제 실행자에 전송
+  EXECUTING --> SUCCESS: PSP 성공 응답
+  EXECUTING --> FAILED: PSP 실패 응답
+  SUCCESS --> [*]: wallet_updated / ledger_updated = true
+  FAILED --> [*]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>상태 전이가 단방향이다</b> — <code>SUCCESS</code>에서 되돌아가는 화살표가 없다는 점이 중요하다. 결제 결과를 되돌리는 것은 상태 변경이 아니라 환불이라는 새로운 거래다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>타입</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">payment_order_id</td><td class="dg-mono">string / PK</td></tr>
+        <tr><td class="dg-mono">buyer_account</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">amount</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">currency</td><td class="dg-mono">string</td></tr>
+        <tr><td class="dg-mono">checkout_id</td><td class="dg-mono">string / FK</td></tr>
+        <tr><td class="dg-mono">payment_order_status</td><td class="dg-mono">string(ENUM)</td></tr>
+        <tr><td class="dg-mono">ledger_updated</td><td class="dg-mono">boolean</td></tr>
+        <tr><td class="dg-mono">wallet_updated</td><td class="dg-mono">boolean</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>복식부기 원장 시스템</h4>
+  <ul>
+    <li>원장 시스템에는 <b>복식부기(double-entry)</b>라는 원리가 있다. 복식부기 회계(accounting) 또는 부기(bookkeeping)라고도 부른다.</li>
+    <li>모든 결제 시스템의 필수 요소로, 정확한 기록을 남기는 데 핵심적인 역할을 한다.</li>
+    <li>모든 거래 항목의 합계는 0이어야 하며, 누군가 1원을 잃으면 다른 누군가는 1원을 얻어야 한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>계정</th><th>차감</th><th>증가</th></tr></thead>
+      <tbody>
+        <tr><td>구매자</td><td class="dg-mono">$1</td><td class="t-center">—</td></tr>
+        <tr><td>판매자</td><td class="t-center">—</td><td class="dg-mono">$1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">합이 0이 아니면 버그다</p>
+      <p>복식부기의 진짜 가치는 <b>자체 검증 능력</b>이다. 전체 원장의 합계를 더했을 때 0이 아니면, 어딘가에서 돈이 생기거나 사라진 것이므로 반드시 오류다. 26-3의 조정(reconciliation)이 이 성질 위에서 작동한다.</p>
+    </div>
+  </div>
+
+  <h4>외부 결제 페이지</h4>
+  <ul>
+    <li>대부분의 기업은 신용카드 정보를 내부에 저장하지 않는다.</li>
+    <li>내부에 저장하면 미국의 PCI DSS 규정을 준수해야 하는데 매우 복잡하다.</li>
+    <li>보통 PSP가 제공하는 외부 결제 페이지를 이용하며, 위젯, iframe, SDK 등 다양한 형태로 제공된다.</li>
+  </ul>
+
+  <h4>대금 정산 흐름</h4>
+  <ul>
+    <li>대금 수신 흐름과 아주 유사하다.</li>
+    <li>대금 수신에서는 PSP를 통해 A에서 B로 돈을 옮겼지만, 대금 정산에서는 정산 시스템을 통해 판매자 은행 계좌로 입금한다.</li>
+    <li>다양한 부기 및 규제 요구사항이 있어 Tipalti 같은 외상매입금 지급 서비스를 이용하곤 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>결제 이벤트 1 : 결제 주문 N 구조가 데이터 모델의 뼈대다.</li>
+      <li><code>payment_order_id</code>가 곧 PSP에 보내는 멱등 키다.</li>
+      <li>금액은 문자열/십진으로 다루고 부동소수점을 피한다.</li>
+      <li>저장소는 성능이 아니라 검증 이력 / 도구 / 인력으로 고른다. 답은 대체로 ACID RDBMS.</li>
+      <li>복식부기는 기록 방식이자 자체 검증 장치다.</li>
+      <li>카드 정보는 직접 저장하지 않고 PSP의 외부 결제 페이지에 맡긴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-63" data-spy>
+  <header class="item-head">
+    <div class="item-num">26-3</div>
+    <h3>상세 설계</h3>
+    <p class="item-tagline">멱등성이 첫 번째 방어선, 조정이 마지막 방어선.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>재시도 + 멱등성 = 정확히 한 번</b>. 재시도가 "최소 한 번"을, 멱등성이 "최대 한 번"을 보장하고, 둘을 합치면 "정확히 한 번"이 된다.
+  </div>
+
+  <h4>PSP 연동</h4>
+  <ul>
+    <li>PSP 없이 은행이나 카드 시스템과 직접 연동해 결제하는 것도 가능하다.</li>
+    <li>하지만 그런 시스템 구축은 일부 기업만 가능하고 매우 특이한 경우다.</li>
+    <li>아래 흐름 중간에 네트워크 문제로 실패할 수 있는데, 이를 체계적으로 처리하는 방법이 <b>조정</b>이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant B as 구매 페이지
+  participant P as 결제 서비스
+  participant D as DB
+  participant S as PSP
+  participant C as 결제 페이지
+  B->>P: 1. 구매
+  P->>S: 2. 비중복 난수(nonce)로 결제 생성
+  S-->>P: 3. 결제 토큰 반환
+  P->>D: 4. 토큰 저장
+  P->>C: 5. 결제 페이지 표시
+  C->>S: 6. 결제 시작
+  S-->>C: 7. 결제 결과
+  C-->>B: 8. 완료 페이지 리다이렉트
+  S->>P: 9. 완료 여부를 포함한 웹훅
+      </pre>
+    </div>
+    <div class="figure-cap"><b>결제 정보는 우리 서버를 거치지 않는다</b> — 카드 정보는 6~7번에서 클라이언트와 PSP 사이에서만 오간다. 우리는 토큰과 웹훅만 다루므로 PCI DSS 범위를 크게 줄일 수 있다.</div>
+  </div>
+
+  <h4>조정 (reconciliation)</h4>
+  <ul>
+    <li>PSP를 통한 결제 시스템은 비동기적으로 작동하므로 일관성 보장이 어렵다.</li>
+    <li>이런 경우 서비스 간 상태를 주기적으로 비교해 일치하는지 검사하는데, 일반적으로 <b>결제 시스템의 마지막 방어선</b>으로 받아들여진다.</li>
+    <li>매일 밤 PSP나 은행은 고객에게 정산(settlement) 파일을 보낸다. 조정 시스템은 이를 바탕으로 원장 시스템과 비교한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["유저"] --> PS["결제 서비스"]
+  PS --> DB1[("DB")]
+  PS --> WAL["지갑"] --> DB2[("DB")]
+  PS --> LED["원장"] --> DB3[("DB")]
+  PS --> PE["결제 실행자"] --> DB4[("DB")]
+  PE --> PSP["PSP<br>PayPal / Stripe"]
+  PSP --> CARD["카드 유형<br>VISA / MASTER CARD"]
+  DB3 -->|"결제 시스템 기록"| REC["조정"]
+  PSP -->|"정산 파일"| REC
+      </pre>
+    </div>
+    <div class="figure-cap"><b>두 갈래의 기록이 조정 지점에서 만난다</b> — 우리 원장과 PSP의 정산 파일. 이 둘이 어긋난 항목을 찾아내는 것이 조정의 전부다.</div>
+  </div>
+
+  <h5>불일치 문제와 해결 방안</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유형</th><th>상황</th><th>처리</th></tr></thead>
+      <tbody>
+        <tr><td>유형을 알고 자동화 가능</td><td>원인과 해결 방법을 알고 있고, 자동화 프로그램 작성이 비용적으로 효율적</td><td>분류와 조정 작업을 모두 자동화한다</td></tr>
+        <tr><td>유형은 알지만 자동화 불가</td><td>자동 조정 프로그램의 작성 비용이 너무 높다</td><td>작업 대기열에 넣고 재무팀이 수동으로 처리한다</td></tr>
+        <tr><td>분류할 수 없는 유형</td><td>원인을 알지 못한다</td><td>특별 작업 대기열에 넣고 재무팀이 조사한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>결제 지연 처리</h4>
+  <ul>
+    <li>결제 요청은 여러 컴포넌트를 거치고 다양한 처리 주체와 연동한다.</li>
+    <li>일부는 몇 초 만에 처리되지만, 일부는 몇 분에서 며칠이 걸릴 수도 있다 —
+      <ul>
+        <li>PSP가 해당 결제를 보류하는 경우</li>
+        <li>카드 소유자의 보안 인증(3D Secure)이 필요한 경우</li>
+      </ul>
+    </li>
+    <li>결제 시스템은 이렇게 지연되는 결제도 처리할 수 있어야 한다.</li>
+    <li>처리 방법 —
+      <ul>
+        <li>결제 대기 상태를 알리는 상태 정보를 클라이언트에 반환하고 사용자에게 표시한다.</li>
+        <li>PSP는 대기 중인 결제의 상태를 추적하고, 완료되면 결제 시스템으로 웹훅을 보낸다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>내부 서비스 간 커뮤니케이션</h4>
+  <ul>
+    <li>일반적으로 동기식 통신은 설계하기 쉽지만 서비스의 자율성을 높이기에는 적합하지 않다.</li>
+    <li>의존성 그래프가 커지면 전반적인 성능이 낮아진다.</li>
+  </ul>
+
+  <h5>동기식 통신</h5>
+  <ul>
+    <li>HTTP 같은 동기식 통신은 소규모 시스템에서는 잘 작동하지만 규모가 커지면 단점이 드러난다.</li>
+    <li>한 요청에 응답을 만드는 처리 주기는 관련된 서비스가 많을수록 길어진다.</li>
+  </ul>
+
+  <h5>동기식 통신의 단점</h5>
+  <ul>
+    <li><b>성능 저하</b> — 요청 처리에 관계된 서비스 중 하나에 발생한 성능 문제가 전체 시스템에 영향을 미친다.</li>
+    <li><b>장애 격리 곤란</b> — PSP 등 서비스에 장애가 발생하면 클라이언트는 더 이상 응답을 받지 못한다.</li>
+    <li><b>높은 결합도</b> — 요청 발신자가 수신자를 알아야 한다.</li>
+    <li><b>낮은 확장성</b> — 큐를 버퍼로 쓰지 않고서는 갑작스러운 트래픽 증가에 대응하도록 시스템을 확장하기 어렵다.</li>
+  </ul>
+
+  <h5>비동기 통신 — 단일 수신자</h5>
+  <ul>
+    <li>각 요청은 하나의 수신자 또는 서비스가 처리한다.</li>
+    <li>일반적으로 공유 메시지 큐로 구현하며, 큐에는 복수의 구독자가 있을 수 있으나 처리된 메시지는 큐에서 바로 제거된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q1[["메시지 큐<br>M4 M3 M2 M1"]] --> SA1["서비스 A"]
+  Q1 --> SB1["서비스 B"]
+  Q2[["메시지 큐<br>M4 M3 (M2, M1 소비됨)"]] -->|"M1"| SA2["서비스 A"]
+  Q2 -->|"M2"| SB2["서비스 B"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>메시지 당 수신자는 하나</b> — M1은 서비스 A가, M2는 서비스 B가 가져갔고 둘 다 큐에서 사라졌다. 19-3의 일대일 모델 그대로다.</div>
+  </div>
+
+  <h5>비동기 통신 — 다중 수신자</h5>
+  <ul>
+    <li>각 요청을 여러 수신자나 서비스가 처리한다.</li>
+    <li>대표적으로 카프카를 쓰면 이 시나리오를 원활하게 처리할 수 있다. 카프카는 소비자가 수신한 메시지가 바로 사라지지 않기 때문이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  E["이벤트"] --> K[["kafka<br>M4 M3 M2 M1"]]
+  K -->|"M1"| P["결제 시스템"]
+  K -->|"M1"| A["분석 서비스"]
+  K -->|"M1"| B["결제 현황 서비스"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 M1이 세 서비스에 모두 도착한다</b> — 결제 이벤트 하나로 결제 처리 / 분석 / 현황 갱신을 동시에 굴릴 수 있다. 19-1에서 짚은 "소비해도 사라지지 않는다"는 성질의 실제 활용 사례다.</div>
+  </div>
+
+  <h4>결제 실패 처리</h4>
+  <ul>
+    <li>모든 결제 시스템은 실패한 결제를 적절히 처리해야 한다.</li>
+    <li>안정성 및 결함 내성은 결제 시스템의 핵심 요구사항이다.</li>
+  </ul>
+
+  <h5>결제 상태 추적</h5>
+  <ul>
+    <li>결제 주기의 모든 단계에서 결제 상태를 정확하게 유지하는 것은 매우 중요하다.</li>
+    <li>실패가 발생할 때마다 재시도가 필요한지 환불이 필요한지를 결정한다.</li>
+    <li>결제 상태는 <b>데이터 추가만 가능한(append-only) 테이블</b>에 보관한다.</li>
+  </ul>
+
+  <h5>재시도 큐 및 실패 메시지 큐</h5>
+  <ul>
+    <li>우아한 실패 처리를 위해 <b>재시도 큐(retry queue)</b>와 <b>실패 메시지 큐(dead letter queue)</b>를 쓰는 것이 바람직하다.</li>
+    <li><b>재시도 큐</b> — 일시적 오류처럼 재시도 가능한 오류를 보관한다.</li>
+    <li><b>실패 메시지 큐</b> — 반복적으로 처리에 실패한 메시지가 최종적으로 도착하는 곳이다. 문제 있는 메시지를 디버깅하고 격리해, 성공하지 못한 이유를 파악하는 데 유용하다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  F["실패"] --> Q1{"재시도 가능?"}
+  Q1 -->|"아니오"| DB[("DB 에 기록")]
+  Q1 -->|"예"| RQ[["재시도 큐"]]
+  RQ -->|"재시도 큐의 데이터로 결제 재시도"| PSYS["결제 시스템"]
+  PSYS --> F2["실패"] --> Q2{"재시도 가능?"}
+  Q2 -->|"예 / 임계값 이내"| RQ
+  Q2 -->|"아니오 / 임계값 초과"| DLQ[["실패 메시지 큐"]]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>재시도 루프에 반드시 탈출구를 둔다</b> — 임계값을 넘으면 실패 메시지 큐로 보낸다. 이 탈출구가 없으면 영구 실패 건이 큐를 영원히 돌며 자원을 태운다.</div>
+  </div>
+
+  <h4>정확히 한 번 전달</h4>
+  <ul>
+    <li>결제 시스템에서 가장 심각한 문제는 <b>고객에게 이중으로 청구하는 것</b>이다.</li>
+    <li>결제 주문이 정확히 한 번만 실행되도록 설계하는 것이 중요하다.</li>
+  </ul>
+
+  <h5>재시도</h5>
+  <ul>
+    <li>네트워크 문제나 시간 초과로 거래를 다시 시도해야 하는 경우가 있다.</li>
+    <li>재시도 메커니즘으로 어떤 결제가 <b>최소 한 번</b>은 실행되도록 보장할 수 있다.</li>
+    <li>얼마나 간격을 두고 재시도할지 정하는 것이 중요하다.</li>
+    <li>재시도 전략 결정은 어렵고 모든 상황에 맞는 해결책은 없다.</li>
+    <li>일반적인 지침은, 네트워크 문제가 단시간 내 해결될 것 같지 않다면 <b>지수적 백오프(exponential backoff)</b>를 쓰는 것이다.</li>
+    <li>재시도에서 발생할 수 있는 문제 중 하나가 이중 결제이므로, 결제는 반드시 멱등성을 보장해야 한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as 클라이언트
+  participant P as 결제 시스템
+  C->>P: $10 결제
+  P-->>C: 결제 실패
+  Note over C: 재시도
+  C->>P: $10 결제
+  P-->>C: 결제 실패
+  Note over C: 재시도
+  C->>P: $10 결제
+  P-->>C: 결제 성공
+      </pre>
+    </div>
+    <div class="figure-cap"><b>재시도만으로는 "최소 한 번"까지가 한계다</b> — 만약 두 번째 시도가 실제로는 성공했는데 응답만 못 받은 것이라면, 세 번째 시도가 이중 청구가 된다. 그래서 멱등성이 필요하다.</div>
+  </div>
+
+  <h5>재시도 전략들</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>전략</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td>즉시 재시도 (immediate retry)</td><td>클라이언트가 즉시 요청을 다시 보낸다</td></tr>
+        <tr><td>고정 간격 (fixed interval)</td><td>재시도 전에 일정 시간 기다린다</td></tr>
+        <tr><td>증분 간격 (incremental interval)</td><td>대기 시간을 특정 양만큼 점진적으로 늘려 나간다</td></tr>
+        <tr><td>지수적 백오프 (exponential backoff)</td><td>대기 시간을 직전 재시도 대비 2배씩 늘려 나간다</td></tr>
+        <tr><td>취소 (cancel)</td><td>요청을 철회한다. 실패가 영구적이거나 성공 가능성이 낮을 때 쓴다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>멱등성</h5>
+  <ul>
+    <li><b>최대 한 번</b> 실행을 보장하기 위한 핵심 개념이다.</li>
+    <li>API 관점에서 보면, 같은 API를 여러 번 호출하더라도 동일한 결과가 나와야 한다는 뜻이다.</li>
+    <li>일반적으로 PSP는 멱등 키로 UUID를 쓰며, HTTP 헤더에 <code>&lt;멱등 키: 값&gt;</code> 형태로 담아 보낸다.</li>
+  </ul>
+
+  <h5>시나리오 1 : 고객이 결제 버튼을 빠르게 두 번 누르는 경우</h5>
+  <ul>
+    <li>전자상거래에서 멱등 키는 일반적으로 결제 직전의 장바구니 ID를 쓴다.</li>
+    <li>PSP에서 동시에 같은 멱등 키로 여러 요청이 들어오면 하나만 처리하고 나머지는 오류로 거절한다.</li>
+    <li>내부 결제 시스템에서 멱등성을 활용하는 방법은 <b>DB의 PK를 멱등 키로 쓰는</b> 것이다.</li>
+    <li>새 결제 건이 잘 추가되면 이전에 결제가 없던 것이고, 동일한 값을 또 추가하려 하면 <b>PK 제약 위반으로 실패</b>한다. DB가 중복을 막아 준다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 동시에 같은 멱등 키로 여러 요청이 오면 "HTTP 429 응답을 반환한다"고 적혀 있으나, Stripe는 이 상황에서 <b>HTTP 409 Conflict</b>와 <code>idempotency_key_in_use</code> 오류 코드를 반환한다("There is currently another in-progress request using this Idempotent Key"). 429는 처리율 제한(4장)에서 쓰는 코드로 의미가 다르다. 409를 받으면 잠시 기다렸다 재시도하는 것이 권장 동작이다.</p>
+    </div>
+  </div>
+
+  <h5>시나리오 2 : PSP는 결제를 처리했지만 네트워크 오류로 응답이 전달되지 못해 사용자가 다시 누르는 경우</h5>
+  <ul>
+    <li>최초에 결제 위젯이나 페이지를 받을 때 PSP가 난수 토큰을 전달해 준다.</li>
+    <li>이미 결제가 완료된 거래를 이 토큰으로 파악하고 종전의 결과를 그대로 반환한다.</li>
+    <li>이 토큰 역시 멱등성을 위해 쓰일 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as 클라이언트
+  participant P as 결제 시스템
+  C->>P: POST { 멱등키: value }
+  P-->>C: 결제 성공
+  Note over C,P: 재시도 — 같은 멱등키
+  C->>P: POST { 멱등키: value }
+  Note over P: 이미 동일한 멱등키의 거래가 존재<br>→ 다시 결제하지 않음
+  P-->>C: 이전 결제의 상태를 그대로 반환
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 멱등 키는 같은 답을 돌려준다</b> — 두 번째 요청은 새 결제를 만들지 않고 첫 결제의 결과를 재생한다. 이것이 "최대 한 번"의 구현이다.</div>
+  </div>
+
+  <h4>일관성</h4>
+  <ul>
+    <li>결제 실행 과정에서는 상태 정보를 유지 관리하는 여러 서비스가 호출된다.</li>
+    <li>특히 분산 환경에서는 서비스 간 통신 문제로 데이터 불일치가 발생할 수 있다.</li>
+    <li>요청이 정확히 한 번만 처리되도록 보장하는 것이 매우 중요하며, 내부와 외부 서비스 간 일관성을 위해 <b>멱등성과 조정 프로세스</b>를 함께 활용한다.</li>
+    <li>PSP가 멱등성을 지원한다고 해서 완전히 신뢰해서는 안 되므로, 조정 프로세스는 생략할 수 없다.</li>
+    <li>예외 케이스로, DB가 분산된 경우 동기화 지연으로 불일치가 발생할 수 있다 —
+      <ul>
+        <li>메인 DB에서 모든 것을 처리하는 것은 비효율적이다.</li>
+        <li>Raft, Paxos 같은 합의 알고리즘으로 모든 사본을 동기화하거나, 합의 기반 분산 DB인 YugabyteDB, CockroachDB 등을 쓸 수도 있다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">두 겹의 방어선</p>
+      <p><b>멱등성</b>은 실시간 방어선으로 대부분의 중복을 그 자리에서 막는다. <b>조정</b>은 사후 방어선으로, 멱등성이 놓친 것과 PSP 쪽 문제까지 매일 밤 대조해 걸러 낸다. 하나만으로는 부족하고, 둘 다 있어야 "정확히 한 번"에 실무적으로 도달한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>재시도(최소 한 번) + 멱등성(최대 한 번) = 정확히 한 번.</li>
+      <li>재시도 루프에는 반드시 실패 메시지 큐라는 탈출구를 둔다.</li>
+      <li>동시 중복 멱등 키에 대한 응답은 429가 아니라 409 Conflict다.</li>
+      <li>결제 상태는 append-only 테이블로 남겨 이력을 지우지 않는다.</li>
+      <li>서비스 간 통신은 비동기로 — 단일 수신자는 메시지 큐, 다중 수신자는 카프카.</li>
+      <li>조정은 마지막 방어선이며 PSP를 믿는다고 해서 생략할 수 없다.</li>
+    </ul>
+  </div>
+</article>

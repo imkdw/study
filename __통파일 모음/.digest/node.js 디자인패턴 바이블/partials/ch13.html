@@ -1,0 +1,423 @@
+<article class="item" id="item-48" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-1</div>
+    <h3>메시징 시스템의 기초</h3>
+    <p class="item-tagline">메시징 설계는 세 개의 선택으로 거의 다 결정된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>(1)</b> 단방향인가 요청/응답인가, <b>(2)</b> 큐인가 스트림인가, <b>(3)</b> P2P 인가 브로커인가.
+    이 세 축의 조합이 곧 아키텍처다. 나머지는 프로토콜 선택일 뿐이다.
+  </div>
+
+  <h4>메시징과 통합 패턴</h4>
+  <ul>
+    <li>확장성이 시스템의 <b>배포</b>에 관한 것이라면, 통합은 시스템들을 <b>연결</b>하는 것이다.</li>
+    <li>분산 앱을 통합하는 방법에는 두 가지가 있다.
+      <ul>
+        <li>공유 스토리지를 중앙의 중재자이자 정보 관리자로 사용</li>
+        <li><b>메시지</b>를 사용해 시스템 노드들에게 데이터, 이벤트, 명령을 전파</li>
+      </ul>
+    </li>
+    <li>분산 아키텍처에서 <b>메시징 시스템</b>은 네트워크를 통한 정보 교환을 용이하게 하는 솔루션을 가리킨다.</li>
+  </ul>
+
+  <h4>단방향 vs 요청/응답 패턴</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>단방향</th><th>요청/응답</th></tr></thead>
+      <tbody>
+        <tr><td>흐름</td><td>소스 → 대상 한 방향으로 푸시</td><td>메시지가 반대 방향 메시지와 항상 한 쌍</td></tr>
+        <tr><td>예</td><td>웹소켓으로 브라우저에 메시지 보내기</td><td>웹 서비스 호출, DB 쿼리</td></tr>
+        <tr><td>난이도</td><td class="t-center t-ok">단순</td><td class="t-center t-no">여러 노드가 끼면 복잡해진다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>메시지 유형</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유형</th><th>용도</th><th>담기는 것</th></tr></thead>
+      <tbody>
+        <tr><td><b>명령 메시지</b></td>
+          <td>수신자에서 작업의 실행을 트리거할 때. RPC 같은 시스템에서 사용</td>
+          <td>작업 이름 + 인자 목록</td></tr>
+        <tr><td><b>이벤트 메시지</b></td>
+          <td>무언가 발생했음을 다른 컴포넌트에 알릴 때. 분산 앱에서 매우 중요한 메커니즘</td>
+          <td>일어난 일과 그 맥락</td></tr>
+        <tr><td><b>문서 메시지</b></td>
+          <td>주로 컴포넌트와 머신 사이의 데이터 전송</td>
+          <td>데이터 그 자체</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">명령과 이벤트의 차이가 결합도를 만든다 <span class="badge b-blue">보강</span></p>
+      <p><b>명령</b>은 "결제해라"이고 <b>이벤트</b>는 "주문이 생성되었다"이다.
+        명령은 <b>수신자가 무엇을 해야 하는지 발신자가 안다</b>는 뜻이므로 결합이 남고,
+        이벤트는 <b>일어난 사실만 알릴 뿐</b>이라 누가 어떻게 반응하든 발신자와 무관하다.
+        <a href="#item-47">12-3</a>에서 오케스트레이션과 브로커 방식이 갈리는 지점이 정확히 이 차이다.</p>
+      <p>명령 메시지는 <a href="#item-38">9-6 명령 패턴</a>을 직렬화해 네트워크 너머로 보낸 것이기도 하다.</p>
+    </div>
+  </div>
+
+  <h4>비동기 메시징, 큐 및 스트림</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>동기식 통신</th><th>비동기식 통신</th></tr></thead>
+      <tbody>
+        <tr><td>비유</td><td>전화 통화</td><td>SMS</td></tr>
+        <tr><td>연결</td><td>두 피어가 동시에 같은 채널에 연결되어 있어야 한다</td><td>수신자가 연결되어 있지 않아도 보낼 수 있다</td></tr>
+        <tr><td>수신 시점</td><td>실시간</td><td>즉시, 일정 시간 후, 또는 아예 못 받을 수도</td></tr>
+        <tr><td>리소스</td><td>더 많이 사용</td><td class="t-center t-ok">더 적게 사용하며 병렬 처리에 유리</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>비동기식은 메시지를 저장해 두었다가 가능한 한 빨리, 또는 나중에 전달할 수 있다.
+    <b>메시지 대기열</b>이 생산자와 소비자 사이에서 이를 가능하게 한다.</p>
+
+  <h4>큐 vs 스트림</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 220" width="460" role="img" aria-label="큐와 스트림의 소비 방식 비교">
+        <text x="115" y="22" class="dg-text-sub" font-size="11" text-anchor="middle">큐 — 소비되면 사라진다</text>
+        <rect x="30" y="36" width="42" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <rect x="78" y="36" width="42" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <rect x="126" y="36" width="42" height="30" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="51" y="56" class="dg-text dg-mono" font-size="11" text-anchor="middle">m3</text>
+        <text x="99" y="56" class="dg-text dg-mono" font-size="11" text-anchor="middle">m2</text>
+        <text x="147" y="56" class="dg-text dg-mono" font-size="11" text-anchor="middle">m1</text>
+        <path d="M174 51 L204 51" class="dg-stroke" fill="none" marker-end="url(#arQ)"/>
+        <defs><marker id="arQ" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" class="dg-accent"/></marker></defs>
+        <text x="232" y="55" class="dg-text-sub" font-size="10" text-anchor="middle">소비자 1개</text>
+        <text x="115" y="88" class="dg-text-sub" font-size="10" text-anchor="middle">m1 은 전달 후 큐에서 제거</text>
+
+        <text x="230" y="126" class="dg-text-sub" font-size="11" text-anchor="middle">스트림 — 남아 있고, 각자 오프셋을 갖는다</text>
+        <rect x="60" y="142" width="42" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <rect x="108" y="142" width="42" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <rect x="156" y="142" width="42" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <rect x="204" y="142" width="42" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="81" y="162" class="dg-text dg-mono" font-size="11" text-anchor="middle">m1</text>
+        <text x="129" y="162" class="dg-text dg-mono" font-size="11" text-anchor="middle">m2</text>
+        <text x="177" y="162" class="dg-text dg-mono" font-size="11" text-anchor="middle">m3</text>
+        <text x="225" y="162" class="dg-text dg-mono" font-size="11" text-anchor="middle">m4</text>
+        <text x="129" y="192" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">↑ 소비자 A (offset 1)</text>
+        <text x="300" y="162" class="dg-text-sub dg-mono" font-size="10" text-anchor="start">↖ 소비자 B (offset 3)</text>
+        <text x="230" y="210" class="dg-text-sub" font-size="10" text-anchor="middle">재시작하면 자기 오프셋부터 다시 읽는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>큐는 "누가 처리했나", 스트림은 "어디까지 읽었나"를 관리한다</b> —
+      그래서 스트림은 소비자를 나중에 추가해 과거 메시지를 전부 다시 읽게 할 수 있고, 큐는 그럴 수 없다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>큐</th><th>스트림</th></tr></thead>
+      <tbody>
+        <tr><td>소비 후</td><td>메시지를 <b>제거</b>한다</td><td class="t-center">제거되지 않는다</td></tr>
+        <tr><td>전달</td><td>보통 한 소비자에게 한 번에 하나</td><td>소비자가 <b>가져간다</b>(pull), 처리할 수 있는 만큼</td></tr>
+        <tr><td>본질</td><td>메시지 브로커</td><td class="t-center">데이터 저장소에 가깝다</td></tr>
+        <tr><td>재시작</td><td>처리 중이던 메시지는 재전달</td><td class="t-center t-ok">이전에 처리한 지점부터 이어서</td></tr>
+        <tr><td>적합한 경우</td><td>작업 분배, 각 메시지가 독립적</td><td>일괄 처리, 과거 메시지 간 상관관계가 필요한 순차 데이터</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>피어 투 피어 또는 중개자 기반의 메시징</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>피어 투 피어</th><th>중개자(브로커) 기반</th></tr></thead>
+      <tbody>
+        <tr><td>전달 책임</td><td>모든 노드가 수신자에게 직접 전달할 책임을 진다</td><td>중앙의 메시지 브로커가 전달한다</td></tr>
+        <tr><td>단일 장애 지점</td><td class="t-center t-ok">없다</td><td class="t-center t-no">브로커가 죽으면 전체가 멈춘다</td></tr>
+        <tr><td>지연</td><td class="t-center t-ok">중개자가 없어 더 짧다</td><td>한 홉이 더 있다</td></tr>
+        <tr><td>운영</td><td class="t-center t-no">노드가 서로를 찾아야 한다</td><td class="t-center t-ok">브로커만 알면 된다</td></tr>
+        <tr><td>프로토콜</td><td>ZeroMQ 등</td><td>MQTT, STOMP, AMQP 등</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">브로커의 단일 장애 지점은 대개 해결되어 있다 <span class="badge b-blue">보강</span></p>
+      <p>실무의 브로커(RabbitMQ, Kafka 등)는 클러스터와 복제를 지원하므로
+        "브로커 = SPOF" 는 개념적 정리이지 운영상의 결론은 아니다.
+        진짜 트레이드오프는 <b>운영해야 할 인프라가 하나 더 생긴다</b>는 것과,
+        그 대가로 <b>모든 노드가 서로를 몰라도 된다</b>는 것이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메시징 설계의 세 축: 방향(단방향/요청·응답) · 저장(큐/스트림) · 위상(P2P/브로커)</li>
+      <li>메시지 유형 3종: 명령(무엇을 해라) / 이벤트(무엇이 일어났다) / 문서(데이터)</li>
+      <li>명령은 결합을 남기고 이벤트는 결합을 끊는다</li>
+      <li>큐는 소비 시 삭제, 스트림은 남기고 소비자마다 오프셋을 관리한다</li>
+      <li>P2P 는 지연이 짧고 SPOF 가 없지만, 브로커는 운영이 단순하다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-49" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-2</div>
+    <h3>발행/구독 패턴</h3>
+    <p class="item-tagline">프로세스 경계를 넘어간 관찰자 패턴.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    pub/sub 의 가치는 <b>발행자가 구독자를 모른다</b>는 것 하나다.
+    구독자를 추가해도 발행자 코드는 그대로다 — <a href="#item-12">3-2</a>의 <code>EventEmitter</code> 와 같은 이야기를
+    네트워크에서 반복하는 것이다.
+  </div>
+
+  <h4>발행/구독 패턴</h4>
+  <ul>
+    <li>pub/sub 또는 <b>분산된 옵저버 패턴</b>으로 잘 알려진 단방향 메시징 패턴이다.</li>
+    <li>수신자는 메시지 수신에 대한 관찰을 등록한다.</li>
+    <li>게시자는 모든 관련 구독자에게 배포되는 메시지를 생성한다.</li>
+    <li>메시지 브로커를 사용하면 양쪽이 <b>느슨하게 결합</b>되어 분산 시스템의 노드를 통합하기에 이상적이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["발행자"] -->|"publish('topic', msg)"| B["브로커 / 토픽"]
+  B -->|"deliver"| S1["구독자 A"]
+  B -->|"deliver"| S2["구독자 B"]
+  B -.->|"나중에 추가해도 발행자는 그대로"| S3["구독자 C"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>발행자는 화살표의 끝을 모른다</b> —
+      <a href="#item-12">3-2</a>의 <code>emitter.emit("found", ...)</code> 가
+      리스너가 몇 개든 신경 쓰지 않았던 것과 정확히 같다. 달라진 것은 경계가 프로세스에서 네트워크로 넓어졌다는 점뿐이다.</div>
+  </div>
+
+  <h4>큐를 통한 안정적인 메시지 전달</h4>
+  <ul>
+    <li>메시징 시스템에서 가장 중요한 추상화는 <b>메시지 큐</b>다.</li>
+    <li>큐 덕분에 발신자와 수신자가 <b>동시에 활성 상태일 필요가 없어진다</b>.</li>
+    <li>시스템은 구독자의 연결이 끊겨 있는 동안 메시지를 쌓아 두어야 한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">EventEmitter 와 결정적으로 다른 점 <span class="badge b-blue">보강</span></p>
+      <p><a href="#item-12">3-2</a>에서 봤듯 <code>EventEmitter</code> 는 <b>emit 하는 순간 듣고 있지 않으면 놓친다</b>.
+        큐가 있는 pub/sub 은 구독자가 죽어 있어도 메시지를 보관했다가 돌아오면 전달한다.
+        "분산된 옵저버"라는 이름이 붙었지만, <b>내구성</b>이라는 새 차원이 추가된 셈이다.</p>
+    </div>
+  </div>
+
+  <h5>AMQP</h5>
+  <ul>
+    <li>메시지 큐는 미션 크리티컬한 앱을 포함해, <b>메시지가 손실되면 안 되는</b> 상황에서 사용된다.</li>
+    <li>AMQP 는 많은 메시지 대기열 시스템이 지원하는 <b>개방형 표준 프로토콜</b>이다.</li>
+  </ul>
+
+  <h4>스트림을 통한 안정적인 메시징</h4>
+  <ul>
+    <li>순서가 지정되고 <b>추가 전용</b>인 영구적 데이터 구조다.</li>
+    <li>메시지는 항상 스트림의 끝에 추가되고, 큐와 달리 소비될 때 자동으로 삭제되지 않는다.</li>
+    <li>메시지 브로커보다는 <b>데이터 저장소</b>에 더 가깝다.</li>
+    <li>소비자가 레코드를 <b>가져오며</b>, 자신이 처리할 수 있는 만큼만 가져온다.</li>
+    <li>도중에 소비자가 중지됐다가 다시 실행되면 <b>이전에 처리하고 남은 지점부터</b> 처리를 시작한다.</li>
+  </ul>
+
+  <h5>스트림 vs 메시지 대기열</h5>
+  <ul>
+    <li><b>스트림</b>: 소비자가 메시지를 일괄 처리해야 하거나,
+      과거 메시지와의 상관관계를 찾아야 하는 <b>순차적인 데이터</b>를 처리하는 경우에 적합하다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 노트는 "스트림" 항목만 적혀 있고 <b>큐 쪽 서술이 비어 있다</b>.
+        내용을 지어내지 않고, <a href="#item-48">13-1</a>에서 정리한 두 방식의 대비를 참고하도록 남긴다.
+        요약하면 <b>각 메시지가 독립적인 작업이고 한 번만 처리되면 되는 경우</b>가 큐 쪽이다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">6장의 스트림과는 다른 것이다 <span class="badge b-blue">보강</span></p>
+      <p>같은 "스트림"이라는 단어지만 <a href="#item-20">6장의 Node 스트림</a>과는 층위가 다르다.
+        6장은 <b>한 프로세스 안</b>에서 데이터를 청크 단위로 흘리는 API 이고,
+        여기서는 <b>브로커에 영구 저장</b>되어 여러 소비자가 각자의 오프셋으로 읽는 로그다(Kafka 등).
+        공통점은 "전체를 한 번에 들지 않고 순서대로 흘려보낸다"는 발상뿐이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>pub/sub = 분산된 옵저버 패턴. 발행자가 구독자를 모르는 것이 전부이자 핵심</li>
+      <li>큐가 붙으면 발신자와 수신자가 동시에 살아 있지 않아도 된다 — 내구성</li>
+      <li>AMQP 는 메시지 손실이 허용되지 않는 상황을 위한 개방형 표준</li>
+      <li>스트림은 소비해도 지워지지 않고, 소비자가 오프셋을 들고 재개할 수 있다</li>
+      <li>일괄 처리와 과거 메시지 상관관계가 필요하면 스트림, 독립적 작업이면 큐</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-50" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-3</div>
+    <h3>작업 배포 패턴</h3>
+    <p class="item-tagline">소비자가 가져가게 만들면 확장이 저절로 따라온다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    HTTP 는 서버가 <b>받는</b> 구조라 부하 분산을 앞단이 책임져야 하지만,
+    작업 배포는 소비자가 <b>가져가는</b> 구조라 처리 속도가 곧 분배 비율이 된다.
+  </div>
+
+  <ul>
+    <li>여러 컴퓨터에 작업을 분산시킬 수 있는 메시징 패턴이다.</li>
+    <li>개별 작업 청크 또는 <b>분할 정복</b> 접근 방식을 사용한다.</li>
+    <li>HTTP 와의 차이는 <b>소비자가 더 적극적인 역할</b>을 한다는 것이다.</li>
+    <li>단방향 비동기 통신을 사용해 더 나은 병렬 처리와 확장을 얻는다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["생산자"] -->|"작업 투입"| Q["작업 큐"]
+  Q -->|"pull"| W1["워커 1 (빠름 → 많이 가져감)"]
+  Q -->|"pull"| W2["워커 2 (느림 → 적게 가져감)"]
+  Q -->|"pull"| W3["워커 3"]
+  W1 --> R["결과 수집"]
+  W2 --> R
+  W3 --> R
+      </pre>
+    </div>
+    <div class="figure-cap"><b>부하 분산이 자동으로 일어난다</b> —
+      누구에게 얼마나 보낼지 정하는 주체가 없다. 워커가 여유가 생겨야 가져가므로
+      <b>처리 속도가 그대로 분배 비율</b>이 된다. 워커를 추가하는 것만으로 처리량이 늘어난다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 파일에는 위 다섯 줄까지만 적혀 있고 구현 예제가 없다.
+        내용을 지어내지 않고, 이 책 안에서 이미 만난 같은 구조만 아래에 연결해 둔다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이미 세 번 만난 구조 <span class="badge b-blue">보강</span></p>
+      <ul>
+        <li><a href="#item-15">4-2 TaskQueue</a> — 한 프로세스 안, 동시성 제한 슬롯</li>
+        <li><a href="#item-44">11-4 프로세스 풀</a> — 한 머신 안, OS 프로세스</li>
+        <li><b>13-3 작업 배포</b> — 여러 머신, 메시지 큐</li>
+      </ul>
+      <p>세 경우 모두 <b>생산자가 큐에 넣고, 여유 있는 소비자가 가져간다</b>는 구조가 같다.
+        경계가 함수 → 프로세스 → 네트워크로 넓어졌을 뿐이다.
+        정식 이름은 <b>경쟁 소비자(competing consumers)</b> 패턴이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>원본 노트 미완성 — 개념 서술만 있고 구현 예제 없음</li>
+      <li>작업 배포 = 생산자가 큐에 넣고 소비자가 가져가는 pull 구조</li>
+      <li>분배 결정 주체가 없어 처리 속도가 곧 부하 분산이 된다</li>
+      <li>4-2 TaskQueue / 11-4 프로세스 풀과 같은 구조가 네트워크로 확장된 것</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-51" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-4</div>
+    <h3>요청/응답 패턴</h3>
+    <p class="item-tagline">단방향 채널 위에서 응답을 되받으려면, 상관관계를 직접 만들어야 한다.</p>
+  </header>
+
+  <ul>
+    <li>단방향 통신이 병렬성과 효율성 측면에서 큰 이점이 있지만, 때로는 다른 방법도 필요하다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 파일에는 위 한 줄만 적혀 있다. 내용을 지어내지 않고,
+        이 책 안에서 이미 다룬 <b>같은 문제와 같은 해법</b>만 아래에 연결해 둔다.</p>
+    </div>
+  </div>
+
+  <h4>이 패턴이 푸는 문제</h4>
+  <p>단방향 채널에서는 응답이 <b>언제, 어떤 순서로</b> 돌아올지 알 수 없다.
+    요청 A와 B를 연달아 보냈는데 B의 응답이 먼저 온다면, 그 응답이 누구의 것인지 알아낼 방법이 필요하다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 150" width="460" role="img" aria-label="상관 식별자를 붙인 요청과 응답 매칭">
+        <rect x="26" y="40" width="60" height="30" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="56" y="60" class="dg-text dg-mono" font-size="11" text-anchor="middle">id: 1</text>
+        <rect x="94" y="40" width="130" height="30" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="159" y="60" class="dg-text dg-mono" font-size="11" text-anchor="middle">요청 본문</text>
+        <text x="125" y="30" class="dg-text-sub" font-size="10" text-anchor="middle">요청</text>
+        <rect x="256" y="40" width="60" height="30" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="286" y="60" class="dg-text dg-mono" font-size="11" text-anchor="middle">id: 1</text>
+        <rect x="324" y="40" width="110" height="30" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="379" y="60" class="dg-text dg-mono" font-size="11" text-anchor="middle">응답 본문</text>
+        <text x="345" y="30" class="dg-text-sub" font-size="10" text-anchor="middle">응답</text>
+        <path d="M230 55 L252 55" class="dg-stroke" fill="none" marker-end="url(#arC)"/>
+        <defs><marker id="arC" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" class="dg-accent"/></marker></defs>
+        <text x="230" y="106" class="dg-text-sub" font-size="11" text-anchor="middle">발신자는 id → 콜백(또는 resolve) 맵을 들고 있다가</text>
+        <text x="230" y="126" class="dg-text-sub" font-size="11" text-anchor="middle">같은 id 의 응답이 오면 짝을 맞춘다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>상관 식별자(correlation id)를 요청에 붙이고 응답에 되돌려받는다</b> —
+      <a href="#item-22">6-4 멀티플렉싱</a>에서 채널 ID 를 패킷 앞에 붙였던 것과 같은 발상이다.
+      공유 채널 위에서 논리적 흐름을 구분하려면, 결국 봉투에 이름을 써야 한다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 책 안의 같은 해법들 <span class="badge b-blue">보강</span></p>
+      <ul>
+        <li><a href="#item-22">6-4</a> — 멀티플렉싱: <code>[채널ID][길이][데이터]</code> 로 하나의 소켓 위에서 두 흐름을 구분</li>
+        <li><a href="#item-42">11-2</a> — 요청 일괄 처리: <code>Map</code> 에 <code>id → Promise</code> 를 담아 두었다가 응답과 짝짓기</li>
+        <li><a href="#item-41">11-1</a> — 사전 초기화 큐: pending Promise 를 보관했다가 나중에 <code>resolve</code></li>
+      </ul>
+      <p>세 경우 모두 <b>보낸 것과 돌아온 것을 잇는 자료구조</b>를 발신자 쪽에 두었다.
+        요청/응답 패턴에서 추가로 필요한 것은 <b>반환 주소(return address)</b> —
+        응답을 어느 큐로 보낼지 요청에 함께 실어 보내는 것 — 정도다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>원본 노트 미완성 — 도입 한 줄만 존재</li>
+      <li>문제: 단방향 채널에서는 응답 순서가 보장되지 않아 짝을 찾을 수 없다</li>
+      <li>해법: 상관 식별자를 요청에 붙이고 응답에 되돌려받아 발신자 쪽 맵에서 매칭</li>
+      <li>같은 발상이 6-4 멀티플렉싱, 11-2 일괄 처리에 이미 나왔다</li>
+    </ul>
+  </div>
+</article>

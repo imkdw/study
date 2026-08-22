@@ -1,0 +1,362 @@
+<article class="item" id="item-11-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 11-1</div>
+    <h3>도커를 이용한 CI 절차</h3>
+    <p class="item-tagline">CI 서버가 아무것도 설치하지 않아도 되게 만드는 것. 그것이 도커가 CI 에 가져오는 변화다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    빌드도 테스트도 <b>컨테이너 안에서</b> 돌면, CI 서버가 바뀌어도 결과가 같다.
+    자동화된 테스트를 이미지 빌드 단계에 넣으면 테스트 실패가 곧 빌드 실패가 된다.
+  </div>
+
+  <h4>CI 에서 어려운 점</h4>
+  <ul>
+    <li>모든 CI 파이프라인은 프로젝트마다 다르다.</li>
+    <li>도커는 이러한 CI 절차의 일관성을 유지해 준다.</li>
+    <li>자동화된 테스트 또한 이미지 빌드 단계에 포함되므로, 빌드가 실패하면 CI 도 중단된다.</li>
+  </ul>
+
+  <h4>도커와 함께하는 CI 플로우</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 250" width="640" role="img" aria-label="CI 시작에서 최신 코드를 로딩하고, 빌드 테스트 배포 세 단계가 모두 컨테이너 내부에서 진행된다">
+        <rect x="16" y="26" width="120" height="102" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="76" y="52" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">CI 시작</text>
+        <line x1="28" y1="62" x2="124" y2="62" class="dg-stroke"/>
+        <text x="76" y="86" class="dg-text-sub" font-size="11.5" text-anchor="middle">최신 코드</text>
+        <text x="76" y="106" class="dg-text-sub" font-size="11.5" text-anchor="middle">로딩</text>
+
+        <rect x="180" y="18" width="132" height="110" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="246" y="46" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">빌드 단계</text>
+        <text x="246" y="72" class="dg-text-sub" font-size="11.5" text-anchor="middle">도커 이미지</text>
+        <text x="246" y="92" class="dg-text-sub" font-size="11.5" text-anchor="middle">빌드</text>
+
+        <rect x="332" y="18" width="132" height="110" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="398" y="46" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">테스트 단계</text>
+        <text x="398" y="76" class="dg-text-sub" font-size="11.5" text-anchor="middle">컨테이너 실행</text>
+
+        <rect x="484" y="10" width="140" height="118" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="554" y="40" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">배포 단계</text>
+        <text x="554" y="68" class="dg-text-sub" font-size="11.5" text-anchor="middle">레지스트리에</text>
+        <text x="554" y="88" class="dg-text-sub" font-size="11.5" text-anchor="middle">이미지 푸시</text>
+
+        <path d="M140 76 L 174 76" fill="none" class="dg-stroke" marker-end="url(#ci-arr)"/>
+        <path d="M316 73 L 328 73" fill="none" class="dg-stroke" marker-end="url(#ci-arr)"/>
+        <path d="M468 69 L 480 69" fill="none" class="dg-stroke" marker-end="url(#ci-arr)"/>
+        <defs>
+          <marker id="ci-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+
+        <path d="M246 134 L 246 172 L 554 172 L 554 134" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+        <path d="M398 134 L 398 172" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+        <text x="400" y="200" class="dg-accent" font-size="13" font-weight="700" text-anchor="middle">Docker + Compose 를 통해 컨테이너 내부에서 진행</text>
+        <text x="400" y="222" class="dg-text-sub" font-size="11" text-anchor="middle">CI 서버에는 도커만 있으면 된다 &mdash; 언어 런타임도 빌드 도구도 설치하지 않는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>세 단계가 모두 컨테이너 안이라는 것이 요점이다</b> — 코드 로딩만 CI 서버가 하고,
+      나머지는 전부 도커가 맡는다. 그래서 로컬에서든 CI 에서든 같은 명령으로 같은 결과가 나온다.
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">테스트를 빌드 단계에 넣는다는 것 <span class="badge b-blue">보강</span></p>
+      <p>
+        <a href="#item-4-5">4-5</a> 의 멀티 스테이지 빌드에서 테스트 스테이지를 하나 두면,
+        테스트 실패가 곧 <code>docker build</code> 실패가 된다. 별도의 테스트 실행 명령을 파이프라인에
+        따로 적을 필요가 없고, <b>테스트를 통과하지 못한 이미지는 애초에 만들어지지 않는다</b>.
+      </p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">Dockerfile</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-dockerfile">FROM sdk AS builder
+COPY . .
+RUN build
+
+FROM builder AS test
+RUN test          # 실패하면 여기서 빌드가 멈춘다
+
+FROM runtime
+COPY --from=builder /out/ .</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">배포 단계가 "푸시"인 이유</p>
+      <p>
+        마지막 단계가 다시 빌드하는 게 아니라 <b>이미 만들어진 이미지를 푸시</b>하는 것임에 주목하자.
+        <a href="#item-10-5">10-5</a> 에서 본 "한 번 빌드하고 그 산출물을 승격시킨다"가
+        파이프라인 위에서 그대로 구현된 모습이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>CI 서버에는 도커만 있으면 된다. 빌드 / 테스트 / 배포가 모두 컨테이너 안에서 돈다.</li>
+      <li>테스트를 빌드 스테이지에 넣으면 테스트 실패가 곧 빌드 실패가 된다.</li>
+      <li>배포 단계는 다시 빌드하지 않고 이미 만든 이미지를 푸시한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 11-2</div>
+    <h3>도커를 이용한 빌드 인프라 구축</h3>
+    <p class="item-tagline">형상관리 / 레지스트리 / 자동화 서버 세 가지를 컨테이너로 띄우면 사내 파이프라인이 완성된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    요즘은 매니지드 서비스가 좋아서 직접 구축할 이유가 줄었다.
+    그럼에도 <b>폐쇄망</b>처럼 외부로 코드를 내보낼 수 없는 환경에서는 이 구성이 여전히 유효하다.
+  </div>
+
+  <h4>언제 사용할까</h4>
+  <ul>
+    <li>요즈음에는 신뢰성 있는 무료 매니지드 서비스가 많아서 굳이 직접 구축할 필요는 없다.</li>
+    <li>하지만 폐쇄망 등 외부 네트워크로 공개하기 꺼려지는 경우에 유용하다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>역할</th><th>이 실습에서 쓰는 도구</th><th>흔한 매니지드 대안</th></tr></thead>
+      <tbody>
+        <tr><td>형상관리</td><td>Gogs</td><td>GitHub / GitLab</td></tr>
+        <tr><td>이미지 배포</td><td>오픈소스 도커 레지스트리</td><td>Docker Hub / ECR / GHCR</td></tr>
+        <tr><td>자동화 서버</td><td>젠킨스</td><td>GitHub Actions / GitLab CI</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>인프라 실행</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker-compose -f docker-compose.yml -f docker-compose-linux.yml up -d
+
+$ echo '\n127.0.0.1 registry.local' | sudo tee -a /etc/hosts
+Password: ******************
+
+$ docker ps
+CONTAINER ID   IMAGE             COMMAND                   CREATED         STATUS         PORTS                      NAMES
+59926dbd43fd   diamol/jenkins    "/bin/sh -c 'java -D…"    4 minutes ago   Up 4 minutes   0.0.0.0:8080-&gt;8080/tcp     infrastructure-jenkins-1
+b76cd89ac294   diamol/registry   "/registry/registry …"    4 minutes ago   Up 4 minutes   0.0.0.0:5000-&gt;5000/tcp     infrastructure-registry.local-1
+367a7f11c239   diamol/gogs       "/app/gogs/docker/st…"    4 minutes ago   Up 4 minutes   0.0.0.0:3000-&gt;3000/tcp     infrastructure-gogs-1</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 &mdash; 명령문 오타 <span class="badge b-red">원문 교정</span></p>
+      <p>
+        원문에는 <code>echo &amp;'\n127.0.0.1 registry.local'</code> 로 <code>&amp;</code> 가 섞여 있다.
+        그래서 출력에 <code>[1] + 53715 done echo</code> 라는 잡 제어 메시지가 함께 찍혔다.
+        올바른 명령은 <code>echo '\n127.0.0.1 registry.local' | sudo tee -a /etc/hosts</code> 이며,
+        위 코드 블록에는 고쳐서 실었다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>/etc/hosts</code> 를 왜 건드리나 <span class="badge b-blue">보강</span></p>
+      <p>
+        레지스트리 컨테이너의 이름이 <code>registry.local</code> 이라서, 이미지 이름도
+        <code>registry.local:5000/...</code> 형태가 된다. 그런데 <b>호스트 PC 는 그 이름을 모른다</b>.
+        컨테이너끼리는 도커 DNS 로 서로를 찾지만(<a href="#item-7-3">7-3</a>),
+        호스트에서 <code>docker push</code> 를 하려면 호스트도 그 이름을 풀 수 있어야 한다.
+        <code>/etc/hosts</code> 한 줄이 그 역할을 한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">젠킨스 컨테이너가 도커를 쓰려면 <span class="badge b-blue">보강</span></p>
+      <p>
+        컨테이너 안의 젠킨스가 <code>docker build</code> 를 실행하려면 도커 API 에 닿아야 한다.
+        가장 흔한 방법은 호스트의 도커 소켓을 바인드 마운트하는 것이다
+        (<code>-v /var/run/docker.sock:/var/run/docker.sock</code>).
+      </p>
+      <p>
+        다만 <b>이것은 사실상 호스트 root 권한을 컨테이너에 넘기는 것</b>과 같다.
+        소켓에 접근할 수 있으면 특권 컨테이너를 띄우거나 호스트 파일 시스템을 마운트할 수 있기 때문이다.
+        신뢰할 수 없는 코드를 빌드하는 CI 에서는 특히 위험하므로,
+        가능하면 원격 빌더나 소켓이 필요 없는 빌드 도구를 검토한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>형상관리 / 레지스트리 / 자동화 서버 세 가지를 컨테이너로 띄우면 자체 CI 인프라가 된다.</li>
+      <li>매니지드 서비스가 있으면 그쪽이 낫다. 자체 구축은 폐쇄망 같은 제약이 있을 때의 선택지다.</li>
+      <li>사내 레지스트리 이름은 호스트에서도 풀려야 하므로 DNS 나 <code>/etc/hosts</code> 설정이 필요하다.</li>
+      <li>CI 컨테이너에 도커 소켓을 마운트하는 것은 편하지만 보안 위험이 크다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 11-3</div>
+    <h3>도커 컴포즈를 이용한 빌드 설정</h3>
+    <p class="item-tagline">레지스트리 주소를 변수로 빼고, 빌드 번호를 이미지에 새겨 넣는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>ARG</code> 는 <b>빌드 시점에만</b> 살아 있고 최종 이미지에 남지 않는다.
+    반대로 <code>LABEL</code> 은 이미지에 영구히 새겨진다. 이 둘을 짝지어 빌드 정보를 기록한다.
+  </div>
+
+  <h4>도커 컴포즈 환경 변수 기본값 설정</h4>
+  <p><code>:-</code> 문법으로 기본값을 지정한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose.yml</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-yaml">services:
+  numbers-api:
+    image: ${REGISTRY:-docker.io}/diamol/...</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>:-</code> 와 <code>-</code> 는 다르다 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>문법</th><th>동작</th></tr></thead>
+          <tbody>
+            <tr><td class="dg-mono">${VAR:-기본값}</td><td>VAR 가 없거나 <b>빈 문자열</b>이면 기본값</td></tr>
+            <tr><td class="dg-mono">${VAR-기본값}</td><td>VAR 가 <b>정의되지 않았을 때만</b> 기본값 (빈 문자열은 그대로 씀)</td></tr>
+            <tr><td class="dg-mono">${VAR:?메시지}</td><td>없거나 비었으면 <b>에러로 중단</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        필수 값에는 <code>:?</code> 를 쓰면 좋다. 값이 빠진 채로 엉뚱한 이미지를 만드는 대신
+        컴포즈가 그 자리에서 멈춘다.
+      </p>
+    </div>
+  </div>
+
+  <h4>새로운 인스트럭션</h4>
+
+  <h5>LABEL</h5>
+  <ul>
+    <li>Dockerfile 에 정의되는 키-값 쌍을 빌드되는 이미지에 적용해 준다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Dockerfile</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-dockerfile">LABEL version=3.0</code></pre>
+  </div>
+
+  <h5>ARG</h5>
+  <ul>
+    <li>이미지를 빌드하는 시점에만 유효한 <b>빌드 전용 변수</b>다.</li>
+    <li>실제 빌드된 이미지로 실행한 컨테이너에는 적용되지 않는다.</li>
+    <li>보통 이미지 레이블에 들어갈 값을 제공하기 위해 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Dockerfile</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-dockerfile">ARG BUILD_NUMBER=0</code></pre>
+  </div>
+
+  <h4>둘을 함께 쓰기</h4>
+  <p>CI 서버의 빌드 번호를 <code>ARG</code> 로 받아 <code>LABEL</code> 에 새기는 것이 전형적인 조합이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Dockerfile</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-dockerfile">ARG BUILD_NUMBER=0
+LABEL build_number=${BUILD_NUMBER}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker build --build-arg BUILD_NUMBER=421 -t myapp:2.1.421 .
+
+# 이미지에 새겨진 레이블 확인
+$ docker image inspect myapp:2.1.421 --format '{{.Config.Labels}}'
+map[build_number:421]</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>ARG</th><th>ENV</th><th>LABEL</th></tr></thead>
+      <tbody>
+        <tr><td>유효 시점</td><td>빌드 중에만</td><td>빌드 + 실행</td><td>이미지 메타데이터</td></tr>
+        <tr><td>컨테이너 안에서 보이나</td><td class="t-center t-no">✗</td><td class="t-center t-ok">✓</td><td class="t-center t-no">✗</td></tr>
+        <tr><td>주 용도</td><td>빌드 파라미터</td><td>앱 설정 기본값</td><td>버전 / 출처 기록</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">ARG 로 비밀값을 넘기지 말 것 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>ARG</code> 값은 최종 이미지의 환경 변수로 남지는 않지만,
+        <b><code>docker history</code> 에 그대로 보인다</b>. 공식 문서도 자격 증명이나 API 토큰을
+        빌드 인자로 넘기지 말라고 명시적으로 경고한다. 빌드 중 비밀값이 필요하면
+        <code>RUN --mount=type=secret</code> 을 쓴다. 이 방식은 값이 레이어에 남지 않는다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>${VAR:-기본값}</code> 으로 레지스트리 주소 같은 값을 환경에 따라 바꾼다. 필수 값에는 <code>:?</code>.</li>
+      <li><code>ARG</code> 는 빌드 시점 전용, <code>LABEL</code> 은 이미지에 영구 기록.</li>
+      <li>CI 빌드 번호를 <code>ARG</code> 로 받아 <code>LABEL</code> 에 새기면 이미지 추적이 쉬워진다.</li>
+      <li><code>ARG</code> 는 <code>docker history</code> 에 노출된다. 비밀값에는 쓰지 않는다.</li>
+    </ul>
+  </div>
+</article>

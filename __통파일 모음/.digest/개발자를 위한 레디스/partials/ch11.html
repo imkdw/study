@@ -1,0 +1,550 @@
+<article class="item" id="item-11-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-1</div>
+    <h3>커넥션 제어</h3>
+    <p class="item-tagline">레디스의 첫 번째 방어선은 암호가 아니라 <b>어떤 주소에서 들어오는가</b>이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    레디스는 원래 <b>신뢰할 수 있는 네트워크 안에</b> 있다는 전제로 설계됐다. 그래서 보안의 출발점은 인증이 아니라 <code>bind</code> 로 접근 가능한 주소를 좁히는 일이다.
+  </div>
+
+  <h4>bind</h4>
+  <ul>
+    <li>레디스 서버가 어떤 IP 로의 접속을 허용할지 설정하는 방법</li>
+    <li><code>127.0.0.1</code> 은 루프백 주소로, 레디스가 설치된 서버에서의 자체 접근만 허용한다는 의미다</li>
+    <li>외부 접근이 필요하다면 <code>0.0.0.0</code> 이나 <code>*</code> 가 아니라 <b>특정 IP 만</b> 지정하는 것을 권장한다</li>
+  </ul>
+
+  <h4>비밀번호</h4>
+
+  <h5>노드에 직접 지정하기</h5>
+  <ul>
+    <li>Redis 6 이후에는 ACL 사용을 권장한다</li>
+    <li><code>redis.conf</code> 또는 CLI 에서 설정할 수 있다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; config set requirepass password
+OK</code></pre>
+  </div>
+
+  <p><code>requirepass</code> 는 사실 <b>default 유저의 비밀번호를 설정하는 것</b>과 같다. ACL 관점에서 보면 레디스에는 언제나 <code>default</code> 라는 유저가 존재하고, 예전 방식의 <code>AUTH &lt;password&gt;</code> 는 그 유저로 인증하는 축약형이다.</p>
+
+  <h4>Protected Mode</h4>
+  <ul>
+    <li>레디스를 운영 목적으로 사용한다면 켜 두기를 권장한다</li>
+    <li><code>yes</code> : 비밀번호가 설정되지 않았다면 로컬에서의 접근만 허용한다</li>
+    <li><code>no</code> : 비밀번호 없이도 외부에서 접근할 수 있게 한다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">protected-mode 는 안전장치이지 보안 기능이 아니다</p>
+      <p>이 옵션은 <b>설정을 깜빡한 인스턴스가 인터넷에 그대로 노출되는 사고</b>를 막기 위한 것이다. <code>bind</code> 를 좁히고 비밀번호나 ACL 을 설정하면 이 옵션과 무관하게 안전해진다. 반대로 <code>protected-mode no</code> 로 껐다면, 그 순간 <code>bind</code> 와 인증을 스스로 책임진다는 뜻이 된다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>보안의 1순위는 <code>bind</code> 로 접근 가능한 주소를 좁히는 것이다. <code>0.0.0.0</code> 은 피한다.</li>
+      <li><code>requirepass</code> 는 default 유저의 비밀번호를 설정하는 것과 같다. 6 이후로는 ACL 을 쓴다.</li>
+      <li><code>protected-mode</code> 는 설정 누락으로 인한 노출을 막는 최후의 안전장치다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-2</div>
+    <h3>커맨드 제어</h3>
+    <p class="item-tagline">누구나 <code>CONFIG SET</code> 을 부를 수 있다는 것은, 누구나 서버 설정을 바꿀 수 있다는 뜻이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    커맨드 이름 바꾸기는 <b>임시방편</b>이다. 재시작 없이는 되돌릴 수 없고 센티널과도 어긋난다. 제대로 된 답은 ACL 이다.
+  </div>
+
+  <h4>커맨드 제어</h4>
+  <ul>
+    <li>대부분의 설정은 <code>CONFIG GET</code>, <code>CONFIG SET</code> 으로 조회하고 수정할 수 있다</li>
+    <li>편리하다는 장점이 있지만, 접속한 <b>모든 클라이언트</b>가 제어할 수 있다는 점에서 위험하다</li>
+  </ul>
+
+  <h4>커맨드 이름 변경</h4>
+  <ul>
+    <li><code>rename-command</code> 로 커맨드 이름을 바꾸거나 비활성화할 수 있다
+      <ul><li><code>redis.conf</code> 에서만 설정할 수 있고 실행 중에 동적으로 바꿀 수는 없다</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 커맨드 이름 변경
+rename-command CONFIG CONFIG_NEW
+
+# 커맨드 비활성화
+rename-command CONFIG ""</code></pre>
+  </div>
+
+  <h5>주의사항</h5>
+  <ul>
+    <li>센티널을 사용 중이라면 커맨드 이름을 맞춰 줘야 한다
+      <ul><li>센티널은 <code>sentinel.conf</code> 에서 따로 설정한다</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">sentinel.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">sentinel rename-command mymaster CONFIG my_config</code></pre>
+  </div>
+
+  <p>센티널은 마스터에 <code>CONFIG</code>, <code>REPLICAOF</code> 같은 커맨드를 직접 보내므로, 서버 쪽에서만 이름을 바꾸면 <b>페일오버가 조용히 실패</b>한다. 이런 함정 때문에라도 이름 변경보다 ACL 이 낫다.</p>
+
+  <h4>커맨드 실행 환경 제어</h4>
+  <ul>
+    <li>Redis 7 부터 특정 커맨드를 실행할 수 있는 환경을 제어할 수 있다</li>
+    <li>실행 중에 바꾸면 위험한 커맨드는 기본적으로 변경이 차단된다</li>
+    <li>사용자가 직접 차단/허용할 수 있고, 로컬 접속에 한해 허용하는 선택지도 있다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">enable-protected-configs {no|yes|local}
+enable-debug-command {no|yes|local}
+enable-module-command {no|yes|local}</code></pre>
+  </div>
+
+  <h5>커맨드 설명</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>옵션</th><th>무엇을 막는가</th><th>기본값</th></tr></thead>
+      <tbody>
+        <tr><td><code>enable-protected-configs</code></td><td><code>dir</code>, <code>dbfilename</code> 등 경로 관련 설정의 변경</td><td class="t-center">no</td></tr>
+        <tr><td><code>enable-debug-command</code></td><td><code>DEBUG</code> 커맨드</td><td class="t-center">no</td></tr>
+        <tr><td><code>enable-module-command</code></td><td><code>MODULE</code> 커맨드</td><td class="t-center">no</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>세 옵션 모두 기본값이 <code>no</code>, 즉 <b>차단</b>이다. <code>local</code> 을 주면 루프백 접속에서만 허용된다. <code>dir</code> 과 <code>dbfilename</code> 이 이 목록에 있는 이유는, 그 둘을 바꿀 수 있으면 RDB 를 임의 경로에 임의 이름으로 쓸 수 있어 원격 코드 실행으로 이어질 수 있기 때문이다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>CONFIG SET</code> 은 접속만 하면 누구나 쓸 수 있으므로 반드시 통제해야 한다.</li>
+      <li><code>rename-command</code> 는 정적 설정이고 센티널과 어긋나기 쉽다. 가능하면 ACL 로 대신한다.</li>
+      <li>7.0 의 <code>enable-*</code> 옵션 세 가지는 기본이 차단이며, 경로 설정 변경을 막는 것이 핵심이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-3</div>
+    <h3>ACL</h3>
+    <p class="item-tagline">유저를 만들고, 쓸 수 있는 커맨드와 만질 수 있는 키를 정해 준다. Redis 6 이 가져온 가장 큰 운영 변화.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    ACL 규칙은 <b>왼쪽에서 오른쪽으로 차례대로</b> 적용된다. <code>+@all -@dangerous</code> 는 "전부 허용한 뒤 위험한 것만 뺀다"는 뜻이고, 순서를 바꾸면 결과가 달라진다.
+  </div>
+
+  <h4>ACL</h4>
+  <ul>
+    <li>Redis 6 에서 도입된, 유저별 권한 관리 기능이다
+      <ul><li>이전 버전에는 클라이언트의 권한을 제어할 방법이 없었다</li></ul>
+    </li>
+    <li><code>rename-command</code> 로도 커맨드를 제어할 수 있지만, 일시적인 우회일 뿐 완전한 방법은 아니다</li>
+  </ul>
+
+  <h4>유저 생성</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">문법</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">ACL SETUSER &lt;username&gt; &lt;on|off&gt; &gt;&lt;password&gt; ~&lt;accessable key&gt; &amp;&lt;pub/sub channel&gt; +&lt;command&gt;</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; acl setuser dongwoo on &gt;password ~cached:* &amp;* +@all -@dangerous
+OK</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>토큰</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>dongwoo</code></td><td>유저 이름</td></tr>
+        <tr><td><code>on</code></td><td>활성화 여부</td></tr>
+        <tr><td><code>&gt;password</code></td><td>비밀번호 추가</td></tr>
+        <tr><td><code>~cached:*</code></td><td>접근 가능한 키 패턴</td></tr>
+        <tr><td><code>&amp;*</code></td><td>접근 가능한 pub/sub 채널</td></tr>
+        <tr><td><code>+@all -@dangerous</code></td><td>모든 커맨드 허용 후 위험 카테고리 제외</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>유저 조회</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; acl getuser dongwoo
+ 1) "flags"
+ 2) 1) "on"
+    2) "sanitize-payload"
+ 3) "passwords"
+ 4) 1) "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"
+ 5) "commands"
+ 6) "+@all -@dangerous"
+ 7) "keys"
+ 8) "~cached:*"
+ 9) "channels"
+10) "&amp;*"
+11) "selectors"
+12) (empty array)</code></pre>
+  </div>
+
+  <h4>유저 업데이트</h4>
+  <p>수정하고 싶은 부분을 <code>ACL SETUSER</code> 로 다시 지정한다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; acl setuser dongwoo ~id:*
+OK
+127.0.0.1:6379&gt; acl getuser dongwoo
+ 7) "keys"
+ 8) "~cached:* ~id:*"</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">SETUSER 는 덮어쓰지 않고 더한다</p>
+      <p>위에서 보듯 키 패턴이 교체되지 않고 <code>~cached:* ~id:*</code> 로 <b>누적</b>됐다. 이미 존재하는 유저에 대한 <code>ACL SETUSER</code> 는 기존 규칙 위에 새 규칙을 얹을 뿐이다. 초기화하려면 <code>resetkeys</code>, <code>resetchannels</code>, <code>resetpass</code> 또는 전체 <code>reset</code> 을 명시해야 한다.</p>
+    </div>
+  </div>
+
+  <h4>유저 삭제</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; acl deluser dongwoo
+(integer) 1
+127.0.0.1:6379&gt; acl list
+1) "user default on nopass sanitize-payload ~* &amp;* +@all"</code></pre>
+  </div>
+
+  <h4>유저 상태 제어</h4>
+  <ul>
+    <li><code>on</code>/<code>off</code> 두 가지로 상태를 제어한다</li>
+    <li>새로 만든 유저의 기본값은 <code>off</code> 이며, 생성 또는 수정 시 상태를 지정할 수 있다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; acl setuser user1
+OK
+127.0.0.1:6379&gt; acl getuser user1
+ 1) "flags"
+ 2) 1) "off"
+    2) "sanitize-payload"
+
+127.0.0.1:6379&gt; acl setuser user1 on
+OK
+127.0.0.1:6379&gt; acl getuser user1
+ 1) "flags"
+ 2) 1) "on"
+    2) "sanitize-payload"</code></pre>
+  </div>
+
+  <h4>패스워드</h4>
+  <ul>
+    <li><code>&gt;password</code> 로 비밀번호를 추가한다</li>
+    <li>비밀번호가 없으면 그 유저로 접속할 수 없다
+      <ul>
+        <li><code>nopass</code> : 비밀번호 없이 접근 가능. 기존 비밀번호는 모두 삭제된다</li>
+        <li><code>resetpass</code> : 비밀번호 목록을 비우고 <code>nopass</code> 도 해제한다. 이후 비밀번호를 다시 주거나 <code>nopass</code> 로 만들기 전까지 접근이 불가능하다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; acl list
+1) "user default on nopass sanitize-payload ~* &amp;* +@all"
+2) "user user1 on sanitize-payload resetchannels -@all"
+
+127.0.0.1:6379&gt; acl setuser user1 resetpass
+OK</code></pre>
+  </div>
+
+  <p>유저 하나가 <b>여러 개의 비밀번호</b>를 가질 수 있다는 점이 중요하다. 비밀번호를 교체할 때 새 비밀번호를 먼저 추가하고, 모든 클라이언트가 옮겨 간 뒤 옛 비밀번호를 <code>&lt;password</code> 로 제거하면 무중단 교체가 된다.</p>
+
+  <h4>패스워드 저장 방식</h4>
+  <ul>
+    <li><code>requirepass</code> 를 쓰면 설정 파일에 <b>평문</b>으로 저장된다</li>
+    <li>ACL 을 쓰면 <b>SHA-256</b> 해시로 저장된다</li>
+    <li><code>ACL GENPASS</code> 로 안전한 난수 비밀번호를 생성할 수 있다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>ACL GENAPSS</code> 는 <code>ACL GENPASS</code> 의 오타다. 이 커맨드는 시스템의 암호학적 난수 생성기로 256비트를 만들어 64자리 16진수 문자열로 돌려준다. (근거: <a href="https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/">Redis Docs — ACL</a>)</p>
+    </div>
+  </div>
+
+  <h4>커맨드 권한 제어</h4>
+  <ul>
+    <li>ACL 로 유저별 커맨드 사용을 제어한다</li>
+    <li><code>+@all</code>, <code>allcommands</code> : 모든 커맨드 사용 가능</li>
+    <li><code>-@all</code>, <code>nocommands</code> : 모든 커맨드 사용 불가</li>
+    <li><code>+@&lt;category&gt;</code>, <code>-@&lt;category&gt;</code> : 카테고리 단위 권한 추가/삭제</li>
+  </ul>
+
+  <h5>dangerous</h5>
+  <ul>
+    <li>아무나 쓰면 위험한 커맨드들이 묶여 있다</li>
+    <li>이 카테고리만 막아 두어도 의도치 않은 장애를 상당 부분 예방할 수 있다</li>
+    <li>구성 변경 계열 : <code>REPLCONF</code>, <code>REPLICAOF</code> ...</li>
+    <li>장애 유발 계열 : <code>SORT</code>, <code>FLUSHDB</code>, <code>FLUSHALL</code>, <code>KEYS</code> ...</li>
+    <li>운영 계열 : <code>SHUTDOWN</code>, <code>MONITOR</code>, <code>DEBUG</code>, <code>CONFIG</code> ...</li>
+  </ul>
+
+  <h5>admin</h5>
+  <ul>
+    <li>일반 애플리케이션은 쓸 일이 없는 <b>관리용</b> 커맨드들이다</li>
+    <li><code>REPLICAOF</code>, <code>CONFIG</code>, <code>DEBUG</code>, <code>SAVE</code>, <code>MONITOR</code>, <code>ACL</code>, <code>SHUTDOWN</code> 등이 포함된다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 admin 이 "dangerous 커맨드를 제외한 커맨드"라고 되어 있으나, 실제로는 <b>서로 배타적이지 않고 크게 겹친다</b>. <code>CONFIG</code>, <code>DEBUG</code>, <code>SAVE</code>, <code>MONITOR</code>, <code>SHUTDOWN</code>, <code>REPLICAOF</code> 는 두 카테고리 모두에 속한다. admin 은 "관리 목적", dangerous 는 "잘못 쓰면 위험" 이라는 <b>다른 기준</b>으로 나눈 분류다. (근거: <a href="https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/">Redis Docs — ACL 카테고리</a>)</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 235" width="440" role="img" aria-label="admin 카테고리와 dangerous 카테고리가 크게 겹치는 관계를 나타낸 벤 다이어그램">
+        <circle cx="185" cy="110" r="80" class="venn-a"/>
+        <circle cx="275" cy="110" r="80" class="venn-b"/>
+        <circle cx="185" cy="110" r="80" class="venn-a-s"/>
+        <circle cx="275" cy="110" r="80" class="venn-b-s"/>
+        <text x="132" y="100" class="dg-text dg-mono" font-size="11" text-anchor="middle">ACL</text>
+        <text x="132" y="118" class="dg-text dg-mono" font-size="11" text-anchor="middle">SLAVEOF</text>
+        <text x="230" y="88" class="dg-text dg-mono" font-size="11" text-anchor="middle">CONFIG</text>
+        <text x="230" y="104" class="dg-text dg-mono" font-size="11" text-anchor="middle">DEBUG</text>
+        <text x="230" y="120" class="dg-text dg-mono" font-size="11" text-anchor="middle">SAVE</text>
+        <text x="230" y="136" class="dg-text dg-mono" font-size="11" text-anchor="middle">SHUTDOWN</text>
+        <text x="330" y="100" class="dg-text dg-mono" font-size="11" text-anchor="middle">KEYS</text>
+        <text x="330" y="118" class="dg-text dg-mono" font-size="11" text-anchor="middle">FLUSHALL</text>
+        <text x="95" y="35" class="dg-text dg-mono" font-size="12" text-anchor="middle">@admin</text>
+        <text x="370" y="35" class="dg-text dg-mono" font-size="12" text-anchor="middle">@dangerous</text>
+        <text x="230" y="222" class="dg-text-sub" font-size="12" text-anchor="middle">기준이 다른 두 분류라 상당 부분이 겹친다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>admin 과 dangerous 는 배타적인 분류가 아니다</b> — 같은 커맨드가 여러 카테고리에 속할 수 있으므로, <code>-@dangerous</code> 를 걸었다고 <code>@admin</code> 이 통째로 남아 있다고 생각하면 안 된다. 실제 권한은 <code>ACL CAT &lt;카테고리&gt;</code> 로 확인하는 것이 확실하다.</div>
+  </div>
+
+  <h5>fast</h5>
+  <ul>
+    <li>O(1) 로 수행되는 커맨드를 모아 놓은 카테고리</li>
+    <li><code>GET</code>, <code>SPOP</code>, <code>HSET</code> 등이 포함된다</li>
+  </ul>
+
+  <h5>slow</h5>
+  <ul>
+    <li><code>fast</code> 에 속하지 않는 모든 커맨드</li>
+    <li><code>SCAN</code>, <code>KEYS</code>, <code>SORT</code> 등이 포함된다</li>
+  </ul>
+
+  <h5>keyspace</h5>
+  <ul>
+    <li>자료구조와 무관하게 키 자체를 다루는 커맨드들</li>
+    <li><code>SCAN</code>, <code>KEYS</code>, <code>RENAME</code>, <code>DEL</code>, <code>EXPIRE</code>, <code>TTL</code> 등이 포함된다</li>
+  </ul>
+
+  <h5>read</h5>
+  <ul>
+    <li>키에서 데이터를 읽는 커맨드들</li>
+    <li><code>GET</code>, <code>HGET</code>, <code>XRANGE</code> 등이 포함된다</li>
+  </ul>
+
+  <h5>write</h5>
+  <ul>
+    <li>키에 데이터를 쓰는 커맨드들</li>
+    <li><code>SET</code>, <code>HSET</code>, <code>XADD</code> 등이 포함된다</li>
+    <li>만료시간 같은 메타데이터를 바꾸는 <code>EXPIRE</code>, <code>PEXPIRE</code> 등도 여기 포함된다</li>
+  </ul>
+
+  <h4>키 접근 제어</h4>
+  <ul>
+    <li>유저가 접근할 수 있는 키도 제어할 수 있다</li>
+    <li><code>~*</code>, <code>allkeys</code> : 모든 키 접근 가능</li>
+    <li><code>~&lt;pattern&gt;</code> : 특정 패턴의 키만 접근 가능
+      <ul><li><code>~mail:*</code> 이면 <code>mail:some</code> 에 접근 가능</li></ul>
+    </li>
+    <li>Redis 7 부터는 읽기/쓰기를 나눠 제어할 수 있다
+      <ul>
+        <li><code>%R~&lt;pattern&gt;</code> : 읽기 권한만</li>
+        <li><code>%W~&lt;pattern&gt;</code> : 쓰기 권한만</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">키 패턴이 막지 못하는 커맨드가 있다</p>
+      <p><code>FLUSHALL</code>, <code>FLUSHDB</code>, <code>SWAPDB</code> 처럼 <b>키 인자를 받지 않는</b> 커맨드는 키 패턴의 통제를 받지 않는다. <code>~tenant1:* +@all</code> 유저도 <code>FLUSHALL</code> 로 전체 DB 를 날릴 수 있다는 뜻이다. 커맨드 자체를 <code>-flushall -flushdb -swapdb</code> 로 명시적으로 빼야 한다.</p>
+    </div>
+  </div>
+
+  <h4>셀렉터</h4>
+  <ul>
+    <li>Redis 7 부터 더 유연한 ACL 규칙을 위해 도입됐다</li>
+    <li><code>%R~mail:*</code> 로 지정하면 <code>GET</code> 외에 TTL 읽기 등도 가능하다</li>
+    <li><code>GET</code> 만 주고 싶다면 괄호로 셀렉터를 만들어 제한할 수 있다
+      <ul>
+        <li><code>acl setuser user1 resetkeys ~log:* (+GET ~mail:*)</code></li>
+        <li><code>mail:*</code> 키에 대해서는 정확히 <code>GET</code> 권한만 부여된다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <p>셀렉터는 <b>기본 권한 또는 셀렉터 중 하나라도 통과하면 허용</b>하는 방식으로 평가된다. 그래서 "이 키에는 이 커맨드만"이라는 조합을 여러 벌 만들 수 있다. 단, 한번 추가한 셀렉터는 개별 수정이 불가능하고 <code>clearselectors</code> 로 전부 지우는 것만 가능하다.</p>
+
+  <h4>PUB/SUB 채널 접근 제어</h4>
+  <ul>
+    <li><code>&amp;*</code> : 모든 채널 접근 가능</li>
+    <li><code>resetchannels</code> : 모든 채널 접근 불가 (Redis 7 부터 기본값)</li>
+  </ul>
+
+  <h4>유저 초기화</h4>
+  <ul>
+    <li><code>reset</code> 으로 유저를 초기화한다</li>
+    <li>방금 <code>ACL SETUSER</code> 로 만든 직후 상태와 동일해진다 (off, 비밀번호 없음, 권한 없음)</li>
+  </ul>
+
+  <h4>ACL 규칙을 파일로 관리하기</h4>
+  <ul>
+    <li>기본적으로는 <code>redis.conf</code> 에 저장된다</li>
+    <li>외부 파일로 관리하고 싶다면 <code>redis.conf</code> 에 <code>aclfile &lt;path&gt;</code> 를 지정한다</li>
+    <li>외부 파일을 쓰지 않는다면 CLI 에서 설정한 뒤 <code>CONFIG REWRITE</code> 로 저장한다</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">aclfile 을 쓸 때의 저장 커맨드 <span class="badge b-blue">보강</span></p>
+      <p>두 방식은 <b>동시에 쓸 수 없고</b> 저장 커맨드도 다르다. <code>redis.conf</code> 방식은 <code>CONFIG REWRITE</code>, <code>aclfile</code> 방식은 <code>ACL SAVE</code>(저장)와 <code>ACL LOAD</code>(다시 읽기)를 쓴다. <code>CONFIG REWRITE</code> 는 ACL 파일을 저장해 주지 않으므로, aclfile 을 쓰면서 <code>ACL SAVE</code> 를 잊으면 재시작 때 방금 만든 유저가 사라진다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>ACL 규칙은 왼쪽부터 순서대로 적용된다. <code>+@all -@dangerous</code> 가 실무의 출발점이다.</li>
+      <li><code>ACL SETUSER</code> 는 누적이다. 바꾸려면 <code>resetkeys</code>/<code>resetchannels</code>/<code>reset</code> 을 명시한다.</li>
+      <li>@admin 과 @dangerous 는 기준이 다른 분류라 크게 겹친다. 실제 범위는 <code>ACL CAT</code> 으로 확인한다.</li>
+      <li>키 패턴은 키 인자를 받는 커맨드만 통제한다. <code>FLUSHALL</code> 류는 커맨드 단위로 막아야 한다.</li>
+      <li>비밀번호는 SHA-256 으로 저장되고 여러 개를 둘 수 있어 무중단 교체가 가능하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-4</div>
+    <h3>SSL, TLS</h3>
+    <p class="item-tagline">기본은 평문이다. 암호화를 쓰려면 <b>빌드 단계부터</b> 결정해야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    TLS 는 클라이언트 연결만 감싸는 게 아니다. 복제/센티널/클러스터 버스 각각에 별도 옵션이 있고, <b>하나라도 빠지면 그 경로만 조용히 실패</b>한다.
+  </div>
+
+  <h4>레디스에서 SSL/TLS 사용하기</h4>
+  <ul>
+    <li>기본적으로 비활성화되어 있다</li>
+    <li>사용하려면 <b>빌드 시점부터</b> 지정해야 한다
+      <ul><li><code>make BUILD_TLS=yes</code></li></ul>
+    </li>
+    <li>클라이언트와 레디스가 같은 CA 를 신뢰하도록 인증서를 구성해야 한다</li>
+  </ul>
+
+  <h5>서버 구성</h5>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">tls-port &lt;port&gt;
+tls-cert-file &lt;cert-file&gt;
+tls-key-file &lt;key-file&gt;
+tls-ca-cert-file &lt;ca-cert-file&gt;</code></pre>
+  </div>
+
+  <p><code>tls-port</code> 는 기존 <code>port</code> 와 별개다. 평문 접속을 완전히 막으려면 <code>port 0</code> 으로 두어 비-TLS 리스너를 꺼야 한다.</p>
+
+  <h5>redis 접속</h5>
+  <ul>
+    <li><code>redis-cli</code> 나 애플리케이션 클라이언트에서 접속할 때도 tls 관련 옵션을 붙여야 한다</li>
+  </ul>
+
+  <h4>SSL/TLS 를 이용한 HA 구성</h4>
+
+  <h5>복제 구성</h5>
+  <ul>
+    <li>기존 TLS 설정에 <code>tls-replication yes</code> 를 추가해야 한다</li>
+    <li><code>no</code> 인 경우 마스터-복제본 사이가 평문 프로토콜로 연결되려 하면서 오류가 발생한다</li>
+  </ul>
+
+  <h5>센티널 구성</h5>
+  <ul>
+    <li><code>sentinel.conf</code> 에도 TLS 관련 설정을 추가해야 한다</li>
+  </ul>
+
+  <h5>클러스터 구성</h5>
+  <ul>
+    <li>기본 설정 외에 <code>tls-cluster yes</code> 를 추가해야 한다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">TLS 는 공짜가 아니다</p>
+      <p>암복호화 비용이 붙으므로 처리량이 떨어지고 지연이 늘어난다. 같은 VPC 안의 통신이라면 TLS 대신 네트워크 수준의 격리로 충분한 경우가 많다. 반대로 네트워크를 넘어가는 구간이라면 반드시 켜야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>TLS 는 <code>make BUILD_TLS=yes</code> 로 빌드한 바이너리에서만 쓸 수 있다.</li>
+      <li>클라이언트용 <code>tls-port</code> 외에 <code>tls-replication</code>, <code>tls-cluster</code>, 센티널 설정을 각각 켜야 한다.</li>
+      <li>평문 접속을 완전히 막으려면 <code>port 0</code> 으로 비-TLS 리스너를 끈다.</li>
+    </ul>
+  </div>
+</article>

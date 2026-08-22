@@ -1,0 +1,483 @@
+<article class="item" id="item-25" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 25</div>
+    <h3>연결과 채널의 수명주기</h3>
+    <p class="item-tagline">재연결은 기본값이 아니다. 켜거나, 직접 짜거나 둘 중 하나다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    BullMQ에서는 ioredis가 재연결을 알아서 했다. amqplib은 <b>옵션을 켜야</b> 복구하고, 켜지 않으면 끊긴 커넥션 객체는 그대로 끝이다.
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">amqplib에 자동 복구가 생겼다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        오랫동안 amqplib의 대표적인 불편함은 "자동 재연결이 없다"는 것이었고, 그래서
+        <code>amqp-connection-manager</code> 같은 래퍼를 얹는 게 관행이었다. 하지만
+        <b>1.1.0에서 opt-in 커넥션 복구가 들어갔고</b>, 1.2.0부터는 <b>타입 정의도 패키지에 번들</b>되어
+        <code>@types/amqplib</code>이 더 이상 필요 없다. 현재 최신은 <b>2.0.1</b>이다.
+        회사 코드가 0.10.x 대라면 이 기능이 없으니, <code>package.json</code>의 버전부터 확인하자.
+      </p>
+    </div>
+  </div>
+
+  <h4>1) 복구를 켜는 방식 (amqplib 1.1.0+)</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">connection.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">import amqp from 'amqplib';
+
+const conn = await amqp.connect(process.env.AMQP_URL!, {
+  heartbeat: 30,
+  clientProperties: { connection_name: `${process.env.SERVICE_NAME}-${process.pid}` },
+  recovery: {
+    initialDelay: 200,     // 첫 재시도 지연
+    maxDelay: 5000,        // 지연 상한
+    factor: 2,             // 지수 백오프 배수
+    jitter: 0.2,           // thundering herd 방지
+    maxRetries: Infinity,
+    // 재연결에 성공할 때마다 호출된다. 여기서 토폴로지와 컨슈머를 다시 만든다.
+    async setup(model) {
+      const ch = await model.createChannel();
+      await ch.prefetch(20);
+      await ch.assertQueue('order.payment', { durable: true, arguments: { 'x-queue-type': 'quorum' } });
+      await ch.consume('order.payment', handler, { noAck: false });
+    },
+  },
+});
+
+conn.on('disconnect', (err) => logger.warn({ err }, 'amqp 연결 끊김'));
+conn.on('reconnect-scheduled', ({ attempt, delay }) => logger.info({ attempt, delay }, '재연결 예약'));
+conn.on('connect', () => logger.info('amqp 재연결 완료'));</code></pre>
+  </div>
+  <p>
+    <code>setup</code>이 핵심이다. 재연결하면 <b>채널이 전부 새로 만들어지므로</b> prefetch, 토폴로지, 컨슈머를
+    여기서 다시 세워야 한다. 이걸 빼먹으면 "연결은 살아났는데 아무것도 소비하지 않는" 상태가 된다.
+  </p>
+
+  <h4>2) 복구를 안 쓰거나 구버전일 때</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">connection-legacy.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">import amqp, { type ChannelModel } from 'amqplib';
+
+let conn: ChannelModel | null = null;
+let closing = false;
+
+export async function getConnection(): Promise&lt;ChannelModel&gt; {
+  if (conn) return conn;
+
+  conn = await amqp.connect(process.env.AMQP_URL!, { heartbeat: 30 });
+
+  // error 를 안 잡으면 프로세스가 죽는다. 반드시 등록한다.
+  conn.on('error', (err) => logger.error({ err }, 'amqp connection error'));
+  conn.on('close', () => {
+    conn = null;
+    if (!closing) scheduleReconnect();      // 지수 백오프로 재시도
+  });
+
+  return conn;
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title"><code>'error'</code> 핸들러를 빼먹으면</p>
+      <p>
+        amqplib의 Connection과 Channel은 EventEmitter다. Node.js에서 핸들러 없는 <code>'error'</code>
+        이벤트는 <b>예외를 던져 프로세스를 종료시킨다.</b> 브로커가 잠깐 재시작했을 뿐인데 앱 전체가
+        죽는 사고가 여기서 나온다. 커넥션과 <b>모든 채널</b>에 <code>'error'</code>와 <code>'close'</code>를 건다.
+      </p>
+    </div>
+  </div>
+
+  <h4>재연결 후 반드시 다시 해야 하는 것</h4>
+  <ol class="steps">
+    <li><div class="step-title">채널을 새로 연다</div><p>옛 채널 객체는 무효다. 참조를 들고 있으면 안 된다.</p></li>
+    <li><div class="step-title">prefetch를 다시 설정한다</div><p>채널 단위 설정이므로 새 채널에는 안 걸려 있다.</p></li>
+    <li><div class="step-title">토폴로지를 다시 선언한다</div><p><code>assertExchange</code>/<code>assertQueue</code>/<code>bindQueue</code>는 멱등하므로 매번 호출해도 안전하다.</p></li>
+    <li><div class="step-title">컨슈머를 다시 등록한다</div><p><code>consume</code>은 채널에 붙어 있던 것이라 같이 사라진다.</p></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">채널 하나를 전역으로 돌려쓰지 않기</p>
+      <p>
+        채널은 하나만 잘못돼도 <b>통째로 닫힌다.</b> 예를 들어 없는 exchange에 발행하거나 인자가 다른
+        <code>assertQueue</code>를 호출하면 그 채널이 죽는다. 전역 채널 하나를 공유하고 있었다면
+        모든 발행과 소비가 동시에 멈춘다. 용도별로 채널을 나누는 진짜 이유가 이것이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">대안 라이브러리 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>rabbitmq-client</code>는 자동 재연결, TypeScript 지원, Consumer/Publisher/RPCClient 추상화를
+        기본 제공하고 의존성이 없다. 성능은 amqplib과 비슷하다. 다만 회사 코드가 amqplib이라면
+        <b>라이브러리를 바꾸자고 하기 전에</b> 위의 <code>recovery</code> 옵션을 켜는 쪽이 훨씬 싼 개선이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>amqplib 1.1.0+는 <code>recovery</code> 옵션으로 자동 재연결을 제공한다. 기본은 꺼져 있다.</li>
+      <li><code>setup</code> 콜백에서 채널/prefetch/토폴로지/컨슈머를 전부 다시 세운다.</li>
+      <li><code>'error'</code> 핸들러 누락은 프로세스 종료로 이어진다.</li>
+      <li><code>connection_name</code>을 채워두면 관리 UI에서 누가 붙었는지 보인다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-26" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 26</div>
+    <h3>컨슈머 템플릿</h3>
+    <p class="item-tagline">try / catch / ack / nack의 네 갈래만 정확히 잡으면 된다.</p>
+  </header>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-tag good">기본형</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">export async function startConsumer() {
+  const conn = await getConnection();
+  const ch = await conn.createChannel();
+
+  ch.on('error', (err) => logger.error({ err }, 'channel error'));
+  ch.on('close', () => scheduleRestart());
+
+  await ch.prefetch(20);                       // 채널을 새로 열 때마다 필요
+
+  await ch.assertQueue('order.payment', {
+    durable: true,
+    arguments: {
+      'x-queue-type': 'quorum',
+      'x-delivery-limit': 5,
+      'x-dead-letter-exchange': 'order.dlx',
+    },
+  });
+  await ch.bindQueue('order.payment', 'order.events', 'order.payment.requested');
+
+  const { consumerTag } = await ch.consume('order.payment', async (msg) => {
+    if (msg === null) return;                  // 컨슈머가 취소됨
+
+    const attempt = Number(msg.properties.headers?.['x-delivery-count'] ?? 0) + 1;
+    try {
+      const payload = JSON.parse(msg.content.toString());
+      await handlePayment(payload, { messageId: msg.properties.messageId });
+      ch.ack(msg);
+    } catch (err) {
+      logger.error({ err, attempt, messageId: msg.properties.messageId }, '처리 실패');
+      ch.nack(msg, false, false);              // 재시도/DLX 는 브로커가 판단
+    }
+  }, { noAck: false });
+
+  return { ch, consumerTag };
+}</code></pre>
+  </div>
+
+  <h4>이 코드가 지키고 있는 것들</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>지점</th><th>왜 이렇게 하나</th></tr></thead>
+      <tbody>
+        <tr><td><code>msg === null</code> 체크</td><td>컨슈머가 취소되면 콜백이 <code>null</code>로 한 번 불린다</td></tr>
+        <tr><td><code>prefetch</code>를 <code>consume</code>보다 먼저</td><td>나중에 걸면 이미 밀려든 메시지에는 안 먹는다</td></tr>
+        <tr><td>핸들러 전체를 try로 감쌈</td><td><code>JSON.parse</code> 실패도 잡아야 한다. 안 잡으면 unhandled rejection</td></tr>
+        <tr><td><code>requeue: false</code></td><td>즉시 재큐는 핫루프. 재시도 정책은 큐 설정에 맡긴다</td></tr>
+        <tr><td>ack/nack가 모든 경로에 정확히 한 번</td><td>빠지면 메시지가 미확인으로 남아 prefetch를 잠식한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">가장 흔한 버그: ack 누락</p>
+      <p>
+        <code>if (조건) return;</code>처럼 <b>중간에서 빠져나가는 분기</b>에서 ack를 안 하면, 그 메시지는
+        영원히 미확인 상태로 남는다. prefetch 20이면 이런 게 20건 쌓이는 순간 컨슈머가 완전히 멈춘다.
+        관리 UI의 <b>Unacked</b> 수치가 계속 오르고 안 내려간다면 거의 이 문제다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">중복 처리 방어는 별도로 <span class="badge b-blue">보강</span></p>
+      <p>
+        위 템플릿은 전달 보장까지만 다룬다. <code>handlePayment</code> 안에서 <code>messageId</code> 기반
+        멱등 처리(ITEM 15)를 반드시 함께 구현한다. RabbitMQ는 at-least-once이므로 이 방어가 없으면
+        네트워크가 한 번 흔들릴 때 결제가 두 번 잡힐 수 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>모든 경로에서 ack 또는 nack가 정확히 한 번 일어나야 한다.</li>
+      <li><code>prefetch</code>는 <code>consume</code> 전에, 채널을 열 때마다.</li>
+      <li>핸들러 전체를 try로 감싼다. 파싱 실패도 실패다.</li>
+      <li>Unacked가 안 줄면 ack 누락을 먼저 의심한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-27" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 27</div>
+    <h3>퍼블리셔 템플릿</h3>
+    <p class="item-tagline">발행이 성공했다는 걸 알아야 트랜잭션을 닫을 수 있다.</p>
+  </header>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">publisher.ts</span><span class="code-tag good">기본형</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">let pubCh: amqp.ConfirmChannel | null = null;
+
+async function getPublishChannel() {
+  if (pubCh) return pubCh;
+  const conn = await getConnection();
+  pubCh = await conn.createConfirmChannel();
+  pubCh.on('error', (err) => logger.error({ err }, 'publish channel error'));
+  pubCh.on('close', () => { pubCh = null; });
+  pubCh.on('return', (msg) => {
+    logger.error({ routingKey: msg.fields.routingKey }, 'NO_ROUTE: 바인딩 누락 의심');
+  });
+  return pubCh;
+}
+
+export function publishEvent(routingKey: string, payload: unknown, messageId: string) {
+  return new Promise&lt;void&gt;(async (resolve, reject) => {
+    const ch = await getPublishChannel();
+    ch.publish(
+      'order.events',
+      routingKey,
+      Buffer.from(JSON.stringify(payload)),
+      {
+        persistent: true,
+        mandatory: true,
+        contentType: 'application/json',
+        messageId,
+        timestamp: Date.now(),
+      },
+      (err) => (err ? reject(err) : resolve()),
+    );
+  });
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">DB 커밋과 발행 사이의 틈</p>
+      <p>
+        "DB에 저장하고 이벤트를 발행한다"는 코드는 <b>두 개의 원자적 연산</b>이다. 커밋 직후 프로세스가 죽으면
+        DB에는 남고 이벤트는 안 나간다. 반대 순서면 이벤트만 나가고 DB에는 없다. RabbitMQ에는 이걸 해결할
+        기능이 없다.
+      </p>
+      <p>
+        정석은 <b>transactional outbox</b>다. 같은 트랜잭션 안에서 <code>outbox</code> 테이블에 이벤트를
+        INSERT하고, 별도 워커가 그 테이블을 읽어 발행한 뒤 발행 완료 표시를 한다. 발행이 두 번 될 수는 있어도
+        누락되지는 않는다. 그래서 컨슈머 멱등성이 다시 전제가 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">AMQP 트랜잭션(<code>tx.select</code>)은 답이 아니다</p>
+      <p>
+        AMQP에는 채널 트랜잭션이 있지만 <b>느리고, DB 트랜잭션과 묶이지도 않는다.</b> 실무에서는 거의
+        쓰지 않는다. 발행 신뢰성은 퍼블리셔 컨펌 + outbox로 푼다.
+      </p>
+    </div>
+  </div>
+
+  <h4>배치 발행</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">batch.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const ch = await getPublishChannel();
+for (const e of events) {
+  ch.publish('order.events', e.key, e.buf, { persistent: true, messageId: e.id });
+}
+await ch.waitForConfirms();   // 전부 확인될 때까지. 하나라도 nack 면 throw
+await markAllPublished(events);</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>발행 채널은 <code>createConfirmChannel()</code>로, <code>'return'</code> 핸들러까지 함께 건다.</li>
+      <li><code>persistent</code> + <code>mandatory</code> + <code>messageId</code>는 기본 세트.</li>
+      <li>DB와 발행의 원자성은 outbox 패턴으로 푼다. AMQP 트랜잭션은 쓰지 않는다.</li>
+      <li>대량 발행은 <code>waitForConfirms()</code> 배치로.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-28" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 28</div>
+    <h3>Graceful shutdown</h3>
+    <p class="item-tagline">배포할 때마다 메시지가 재처리된다면 이 코드가 없는 것이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    종료 순서는 <b>컨슈머 취소 → 진행 중인 작업 완료 → 채널 닫기 → 커넥션 닫기</b>다. 순서를 지키지 않으면 미확인 메시지가 requeue되어 중복 처리된다.
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">shutdown.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const inFlight = new Set&lt;Promise&lt;void&gt;&gt;();
+
+async function shutdown() {
+  closing = true;
+
+  // 1) 새 메시지 수신을 멈춘다. 이미 받은 건 계속 처리된다.
+  await ch.cancel(consumerTag);
+
+  // 2) 진행 중인 처리를 기다린다 (타임아웃 포함)
+  await Promise.race([
+    Promise.allSettled([...inFlight]),
+    new Promise((r) => setTimeout(r, 25_000)),
+  ]);
+
+  // 3) 채널 → 커넥션 순으로 닫는다
+  await ch.close();
+  await conn.close();
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  S["SIGTERM 수신"] --> A["ch.cancel: 새 배달 중단"]
+  A --> B["진행 중 작업 완료 대기"]
+  B --> C["ch.close"]
+  C --> D["conn.close"]
+  D --> E["프로세스 종료"]
+  S -.->|"이 단계를 건너뛰면"| X["미확인 메시지가 전부 requeue 되어 중복 처리"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>순서가 곧 정확성</b> — <code>cancel</code> 없이 커넥션을 닫으면 처리 중이던 메시지가 통째로 되돌아간다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">쿠버네티스라면 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>terminationGracePeriodSeconds</code>가 위의 대기 시간보다 커야 한다. 기본값은 30초라서
+        25초 대기를 두면 빠듯하다. 처리 시간이 긴 컨슈머라면 grace period를 늘리고, 그래도 부족하면
+        애초에 <b>메시지를 먼저 ack하고 진행 상태를 DB로 관리</b>하는 구조로 바꾸는 게 맞다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>cancel</code> → 대기 → <code>close</code> 순서를 지킨다.</li>
+      <li>이 코드가 없으면 배포할 때마다 prefetch 개수만큼 중복 처리가 발생한다.</li>
+      <li>grace period와 대기 시간을 함께 맞춘다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-29" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 29</div>
+    <h3>토폴로지는 누가 선언하나</h3>
+    <p class="item-tagline">앱이 <code>assertQueue</code>를 부르는 게 항상 정답은 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    큐 인자는 <b>선언 시 고정</b>이므로, 앱 코드에 박아 두면 설정을 바꿀 때마다 배포가 필요하고 그마저도 실패한다. 자주 바뀌는 값은 <b>policy</b>로 뺀다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>장점</th><th>단점</th></tr></thead>
+      <tbody>
+        <tr><td>앱이 <code>assertQueue</code></td><td>코드와 함께 관리, 로컬 개발 편함</td><td>인자 변경 시 <code>PRECONDITION_FAILED</code>, 앱마다 중복 선언</td></tr>
+        <tr><td><code>definitions.json</code> 임포트</td><td>토폴로지를 한곳에서 형상 관리</td><td>브로커 배포 파이프라인이 따로 필요</td></tr>
+        <tr><td><b>policy</b></td><td class="t-ok">운영 중 무중단 변경 가능</td><td>policy로 설정 가능한 항목만</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>인자 대신 policy로 빼면 좋은 것들</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">policy.sh</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">rabbitmqctl set_policy order-retry \
+  "^order\." \
+  '{"dead-letter-exchange":"order.dlx",
+    "delivery-limit":5,
+    "delayed-retry-type":"all",
+    "delayed-retry-min":2000,
+    "delayed-retry-max":120000,
+    "max-length":500000}' \
+  --apply-to queues</code></pre>
+  </div>
+  <p>
+    policy는 <b>이름 패턴으로 여러 큐에 한 번에</b> 적용되고, 운영 중에 값을 바꿔도 큐를 다시 만들 필요가 없다.
+    공식 문서도 dead lettering 설정을 인자보다 policy로 하라고 권한다. 큐 선언에는
+    <code>x-queue-type</code>처럼 <b>절대 안 바뀌는 것만</b> 남긴다.
+  </p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">policy와 인자가 겹치면</p>
+      <p>
+        같은 항목을 큐 인자와 policy 양쪽에 걸면 <b>큐 인자가 이긴다.</b> 그래서 policy로 관리하기로 했다면
+        앱 코드에서 그 인자를 <b>지워야</b> 한다. 남겨두면 "policy를 바꿨는데 왜 안 먹지"로 몇 시간을 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">실무 절충안</p>
+      <p>
+        exchange와 큐의 <b>존재와 타입</b>은 앱이 <code>assertQueue</code>로 선언하되(로컬 개발이 쉬워진다),
+        DLX/재시도/길이 제한 같은 <b>운영 파라미터는 policy</b>로 뺀다. 바인딩은 소비하는 쪽 앱이 선언한다.
+        이렇게 나누면 "누가 뭘 소비하는지"는 코드에 남고, "얼마나 참아줄지"는 운영이 쥐게 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>큐 인자는 사후 변경 불가. 앱 코드에 박을수록 나중에 아프다.</li>
+      <li>DLX/재시도/길이 제한은 policy로 빼면 무중단 변경이 된다.</li>
+      <li>같은 항목이 인자와 policy에 둘 다 있으면 인자가 이긴다.</li>
+      <li>선언은 앱, 운영 파라미터는 policy가 무난한 분담이다.</li>
+    </ul>
+  </div>
+</article>

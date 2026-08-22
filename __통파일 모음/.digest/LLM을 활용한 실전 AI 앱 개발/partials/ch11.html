@@ -1,0 +1,474 @@
+<article class="item" id="item-11-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-1</div>
+    <h3>검색 성능을 높이기 위한 두 가지 방법</h3>
+    <p class="item-tagline">넓게 건지고 정밀하게 다시 줄 세운다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    검색 성능을 올리는 길은 둘이다 — <b>교차 인코더로 순위를 다시 매기거나</b>, <b>바이 인코더를 내 데이터로 학습시키거나</b>.
+  </div>
+
+  <h4>바이 인코더의 위치</h4>
+  <ul>
+    <li>바이 인코더는 입력 문장에 대해 <b>독립적인 문장 임베딩</b>을 생성한다.</li>
+    <li>임베딩끼리는 코사인 유사도 같은 <b>가벼운 거리 계산</b>으로 비교하므로, 큰 데이터셋에서도 빠르게 가장 비슷한 문장을 찾을 수 있다.</li>
+    <li>이 특성 때문에 바이 인코더는 문장 임베딩 생성의 대표 방식이자 <b>RAG 의 필수 구성요소</b>로 쓰인다.</li>
+  </ul>
+
+  <h4>방법 ① 순위 재정렬</h4>
+  <p>교차 인코더로 <b>1차 검색에서 걸러진 문장들의 유사도를 다시 계산해 순서를 바꾸는 것</b>을 <b>순위 재정렬</b>(reranking)이라 한다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">바이 인코더가 넓게 건진다</div><p>대규모 문서에서 검색 쿼리와 유사한 <b>소수의 후보</b>를 선별한다. 수백만 건에서 수십 건으로 줄인다.</p></li>
+    <li><div class="step-title">교차 인코더가 정밀하게 줄 세운다</div><p>선별된 후보에 대해서만 쿼리와 함께 넣고 유사도를 계산해 <b>유사한 순서대로 재정렬</b>한다.</p></li>
+  </ol>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  D["문서 1,000,000건"] -->|"사전 색인된 임베딩"| BI["바이 인코더 검색<br>빠름 / 대략적"]
+  Q["쿼리"] --> BI
+  BI -->|"상위 50건"| CE["교차 인코더 재정렬<br>느림 / 정확"]
+  Q --> CE
+  CE -->|"최종 5건"| L["LLM 프롬프트"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>비싼 연산을 후보가 줄어든 뒤에 쓴다</b> — 교차 인코더의 정확도를 취하면서 확장성 문제를 피하는 구성이다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 이 순서가 성립하나 <span class="badge b-blue">보강</span></p>
+      <p>바이 인코더는 <b>재현율</b>(정답을 후보 안에 포함시키는 능력)이 좋고, 교차 인코더는 <b>정밀도</b>(후보 중 정답을 위로 올리는 능력)가 좋다. 1차에서 정답을 놓치면 2차가 아무리 정확해도 복구할 수 없으므로, 1차는 <code>top_k</code> 를 넉넉히 잡아 재현율을 확보하는 것이 원칙이다.</p>
+    </div>
+  </div>
+
+  <h4>방법 ② 내 데이터로 추가 학습</h4>
+  <p>문장 임베딩 모델도 다른 딥러닝 모델과 마찬가지로 <b>학습 데이터와 유사한 입력에 더 잘 작동한다</b>. 따라서 실제로 사용하려는 데이터셋으로 추가 학습하면 검색 성능을 높일 수 있다. 다음 두 절이 이 방법을 다룬다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>바이 인코더는 빠르고 확장 가능해 RAG 의 1차 검색을 담당한다.</li>
+      <li><b>순위 재정렬</b>: 바이 인코더로 후보를 좁히고 교차 인코더로 다시 줄 세운다.</li>
+      <li><b>미세 조정</b>: 사용할 데이터셋으로 임베딩 모델을 추가 학습한다.</li>
+      <li>1차 검색은 재현율, 2차 재정렬은 정밀도를 담당한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-2</div>
+    <h3>언어 모델을 임베딩 모델로 만들기</h3>
+    <p class="item-tagline">사전 학습 모델을 그냥 쓰면 0.36, 학습시키면 0.90.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>언어 모델을 그대로 평균 풀링해서 쓰면 문장 임베딩 모델로서는 형편없다</b>(0.36). 유사도 라벨이 있는 데이터로 학습시켜야 비로소 쓸 만해진다(0.90).
+  </div>
+
+  <h4>사전 학습된 언어 모델로 임베딩 모델 만들기</h4>
+  <p><a href="#item-10-2">10-2</a> 에서 본 것처럼 <b>트랜스포머 층 + 풀링 층</b>을 이어 붙이면 형태상으로는 문장 임베딩 모델이 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">build_model.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import SentenceTransformer, models
+
+# 사용할 언어 모델 로드
+transformer_model = models.Transformer('klue/roberta-base')
+
+# 출력 토큰들을 평균 내는 평균 모드로 풀링 층 구성
+pooling_layer = models.Pooling(
+    transformer_model.get_word_embedding_dimension(),
+    pooling_mode_mean_tokens=True,
+)
+
+# 두 모듈을 결합해 문장 임베딩 모델 생성
+embedding_model = SentenceTransformer(modules=[transformer_model, pooling_layer])</code></pre>
+  </div>
+
+  <h4>실습 데이터셋 — KLUE STS</h4>
+  <p>STS(Semantic Textual Similarity)는 <b>두 문장이 얼마나 유사한지를 점수로 라벨링한</b> 데이터셋이다. 임베딩 모델 학습에 딱 맞는 형태다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">sts_data.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from datasets import load_dataset
+
+klue_sts_train = load_dataset('klue', 'sts', split='train')
+klue_sts_test  = load_dataset('klue', 'sts', split='validation')
+
+'''
+sentence1 / sentence2 컬럼에 두 문장이 있고,
+labels 컬럼에 유사도가 여러 형식으로 담겨 있다.
+
+{
+   "guid": "klue-sts-v1_train_00000",
+   "source": "airbnb-rtt",
+   "sentence1": "숙소 위치는 찾기 쉽고 일반적인 한국의 반지하 숙소입니다.",
+   "sentence2": "숙박시설의 위치는 쉽게 찾을 수 있고 한국의 대표적인 반지하 숙박시설입니다.",
+   "labels": {
+      "label": 3.7,                      # 0~5 척도, 소수점 첫째 자리 반올림
+      "real-label": 3.714285714285714,   # 평가자 점수의 원본 평균
+      "binary-label": 1                  # 유사/비유사 이진 라벨
+   }
+}
+'''
+print(klue_sts_train[0])
+
+'''
+{
+   "guid": "klue-sts-v1_dev_00000",
+   "source": "airbnb-rtt",
+   "sentence1": "무엇보다도 호스트분들이 너무 친절하셨습니다.",
+   "sentence2": "무엇보다도, 호스트들은 매우 친절했습니다.",
+   "labels": { "label": 4.9, "real-label": 4.857142857142857, "binary-label": 1 }
+}
+'''
+print(klue_sts_test[0])</code></pre>
+  </div>
+
+  <h5>학습 데이터에서 검증 데이터 분리</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">split.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python"># 학습 데이터의 10% 를 학습 진행 확인용 검증 데이터로 분리
+klue_sts_train = load_dataset('klue', 'sts', split='train') \
+    .train_test_split(test_size=0.1, seed=42)
+klue_sts_train, klue_sts_eval = klue_sts_train['train'], klue_sts_train['test']</code></pre>
+  </div>
+
+  <h5>라벨 정규화</h5>
+  <p>원본 라벨은 <b>0~5 척도</b>인데, 코사인 유사도의 목표값으로 쓰려면 <b>0~1</b> 로 맞춰야 한다. 그래서 5로 나눈다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">normalize.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import InputExample
+
+def prepare_sts_examples(dataset):
+    examples = []
+    for data in dataset:
+        examples.append(
+            InputExample(
+                texts=[data['sentence1'], data['sentence2']],
+                label=data['labels']['label'] / 5.0,   # 0~5 → 0~1
+            )
+        )
+    return examples
+
+train_examples = prepare_sts_examples(klue_sts_train)
+eval_examples  = prepare_sts_examples(klue_sts_eval)
+test_examples  = prepare_sts_examples(klue_sts_test)</code></pre>
+  </div>
+
+  <h5>학습 전 성능 측정</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">baseline_eval.py</span>
+      <span class="code-tag bad">학습 전</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from torch.utils.data import DataLoader
+from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+
+# 배치 데이터로더
+train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=16)
+
+# 검증/테스트용 평가 객체
+eval_evaluator = EmbeddingSimilarityEvaluator.from_input_examples(eval_examples)
+test_evaluator = EmbeddingSimilarityEvaluator.from_input_examples(test_examples)
+
+print(test_evaluator(embedding_model))   # 0.36460670798564826</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">0.36 이 말하는 것</p>
+      <p><code>klue/roberta-base</code> 는 한국어를 잘 이해하는 <b>좋은 언어 모델</b>이다. 그런데 문장 임베딩 모델로 쓰면 상관계수가 <code>0.36</code> 밖에 안 나온다. <b>토큰 임베딩을 평균 낸 벡터가 문장의 유사도를 반영하도록 학습된 적이 없기 때문</b>이다. 언어를 이해하는 능력과 "의미가 가까우면 벡터도 가깝게" 만드는 능력은 별개다 — 이 격차를 메우는 것이 바로 다음 학습 단계다.</p>
+    </div>
+  </div>
+
+  <h4>유사한 문장 데이터로 임베딩 모델 학습하기</h4>
+  <p><code>CosineSimilarityLoss</code> 는 두 문장을 임베딩으로 바꿔 <b>코사인 유사도를 계산하고, 정답 유사도와의 차이를 줄이도록</b> 학습시킨다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">train_embedding.py</span>
+      <span class="code-tag good">학습 후</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import losses
+
+num_epochs = 4
+model_name = 'klue/roberta-base'
+model_save_path = 'output/training_sts' + model_name.replace("/", "-")
+
+# 코사인 유사도와 정답 유사도의 차이를 줄이도록 학습
+train_loss = losses.CosineSimilarityLoss(model=embedding_model)
+
+embedding_model.fit(
+    train_objectives=[(train_dataloader, train_loss)],
+    evaluator=eval_evaluator,
+    epochs=num_epochs,
+    evaluation_steps=1000,
+    warmup_steps=100,
+    output_path=model_save_path,
+)
+
+# 성능 평가
+trained_embedding_model = SentenceTransformer(model_save_path)
+print(test_evaluator(trained_embedding_model))   # 0.897121312312</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상태</th><th>테스트 상관계수</th></tr></thead>
+      <tbody>
+        <tr><td>언어 모델 + 평균 풀링 (학습 전)</td><td class="t-center t-no">0.365</td></tr>
+        <tr><td>KLUE STS 로 4 에포크 학습 후</td><td class="t-center t-ok">0.897</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 숫자가 뭘 재는 건가 <span class="badge b-blue">보강</span></p>
+      <p><code>EmbeddingSimilarityEvaluator</code> 가 반환하는 값은 <b>모델이 계산한 코사인 유사도</b>와 <b>사람이 매긴 정답 유사도</b> 사이의 <b>상관계수</b>다(기본은 스피어만 상관계수). 정확도가 아니라 <b>순위 경향이 사람과 얼마나 일치하는가</b>를 재는 지표이므로, 0.9 는 "모델이 매긴 유사도 순서가 사람의 판단과 거의 같다"는 뜻이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>언어 모델 + 풀링 층 = 형태상 문장 임베딩 모델. 하지만 그대로는 성능이 낮다(0.36).</li>
+      <li>KLUE STS 처럼 <b>유사도 라벨이 있는 데이터</b>로 학습해야 쓸 만해진다(0.90).</li>
+      <li>라벨은 코사인 유사도 범위에 맞춰 <b>0~1 로 정규화</b>한다.</li>
+      <li><code>CosineSimilarityLoss</code> = 예측 코사인 유사도와 정답 유사도의 차이를 줄인다.</li>
+      <li>평가 지표는 정확도가 아니라 <b>사람 판단과의 상관계수</b>다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-3</div>
+    <h3>임베딩 모델 미세 조정하기</h3>
+    <p class="item-tagline">MNR 손실 — 정답 쌍만 모으면, 오답은 배치가 알아서 만들어준다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>MNR 손실은 같은 배치 안의 다른 문서를 자동으로 오답 취급한다.</b> 덕분에 "관련 있는 쌍"만 모으면 되고, 오답 라벨링이 필요 없다.
+  </div>
+
+  <h4>임베딩 모델 성능 평가</h4>
+  <p>MRC 데이터셋에는 <b>질문-정답 본문 쌍</b>만 있고 오답이 없다. 평가를 하려면 오답이 필요하므로, <b>다른 문서의 본문을 가져와 무관한 컨텍스트로 붙인다</b>.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">evaluate.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import SentenceTransformer, InputExample
+from datasets import load_dataset
+from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+
+# 질문과 관련 없는 임의의 본문을 컬럼으로 추가한다
+def add_ir_context(df):
+    irrelevant_contexts = []
+    for idx, row in df.iterrows():
+        title = row['title']
+        # 제목이 다른 행에서 하나를 뽑아 무관한 컨텍스트로 사용
+        irrelevant_contexts.append(
+            df.query(f"title != '{title}'").sample(n=1)['context'].values[0]
+        )
+    df['irrelevant_context'] = irrelevant_contexts
+    return df
+
+klue_mrc_train = load_dataset('klue', 'mrc', split='train')
+klue_mrc_test  = load_dataset('klue', 'mrc', split='validation')
+
+df_train = klue_mrc_train.to_pandas()[['title', 'question', 'context']]
+df_test  = klue_mrc_test.to_pandas()[['title', 'question', 'context']]
+
+df_train_ir = add_ir_context(df_train)
+df_test_ir  = add_ir_context(df_test)
+
+sentence_model = SentenceTransformer('shangrilar/klue-roberta-base-klue')
+
+examples = []
+for idx, row in df_test_ir.iterrows():
+    # 질문 - 정답 본문 → 라벨 1
+    examples.append(InputExample(texts=[row['question'], row['context']], label=1))
+    # 질문 - 무관한 본문 → 라벨 0
+    examples.append(InputExample(texts=[row['question'], row['irrelevant_context']], label=0))
+
+evaluator = EmbeddingSimilarityEvaluator.from_input_examples(examples)
+
+print(evaluator(sentence_model))   # 0.815612312781</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에서는 오답 쪽 컬럼명이 <code>row['irrlevant_context']</code> 로 적혀 있었다. 앞서 <code>add_ir_context</code> 가 만든 컬럼명은 <code>irrelevant_context</code> 이므로 그대로 실행하면 <code>KeyError</code> 가 난다. 위 코드에서는 철자를 맞췄다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 제목이 다른 행에서 뽑을까 <span class="badge b-blue">보강</span></p>
+      <p><code>df.query(f"title != '{title}'")</code> 로 <b>같은 문서(제목)에서 온 본문을 제외</b>한다. KLUE MRC 는 한 기사에 여러 질문이 달려 있어, 무작위로 뽑으면 <b>사실상 정답인 본문이 오답으로 라벨링될 수 있다</b>. 이런 <b>거짓 오답</b>(false negative)은 평가와 학습 모두를 망가뜨린다. 이 한 줄이 그것을 막는다.</p>
+    </div>
+  </div>
+
+  <h4>MNR 손실로 미세 조정하기</h4>
+  <ul>
+    <li><b>MNR</b>(Multiple Negatives Ranking) 손실은 MRC 처럼 <b>서로 관련 있는 문장 쌍만 있는</b> 데이터셋에 쓰기 좋다.</li>
+    <li>하나의 배치 안에서 <b>다른 데이터의 기사 본문을 관련 없는 데이터로 사용</b>해 모델을 학습시킨다.</li>
+    <li>즉 <b>서로 관련 있는 데이터만으로 학습 데이터를 구성하면 된다</b>.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 200" width="460" role="img" aria-label="배치 크기 4의 MNR 손실에서 대각선은 정답 쌍, 나머지는 자동 생성된 오답 쌍">
+        <text x="230" y="18" class="dg-text dg-mono" font-size="12" text-anchor="middle">배치 크기 4 — 질문 × 본문 행렬</text>
+        <text x="55" y="52" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">Q1</text>
+        <text x="55" y="87" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">Q2</text>
+        <text x="55" y="122" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">Q3</text>
+        <text x="55" y="157" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">Q4</text>
+        <text x="100" y="34" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">C1</text>
+        <text x="150" y="34" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">C2</text>
+        <text x="200" y="34" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">C3</text>
+        <text x="250" y="34" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">C4</text>
+
+        <rect x="80" y="38" width="40" height="26" rx="5" class="dg-accent"/>
+        <rect x="130" y="38" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="180" y="38" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="230" y="38" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+
+        <rect x="80" y="73" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="130" y="73" width="40" height="26" rx="5" class="dg-accent"/>
+        <rect x="180" y="73" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="230" y="73" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+
+        <rect x="80" y="108" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="130" y="108" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="180" y="108" width="40" height="26" rx="5" class="dg-accent"/>
+        <rect x="230" y="108" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+
+        <rect x="80" y="143" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="130" y="143" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="180" y="143" width="40" height="26" rx="5" class="dg-fill-soft dg-stroke"/>
+        <rect x="230" y="143" width="40" height="26" rx="5" class="dg-accent"/>
+
+        <rect x="300" y="46" width="18" height="14" rx="4" class="dg-accent"/>
+        <text x="326" y="58" class="dg-text-sub" font-size="11">대각선 = 정답 쌍 (당겨라)</text>
+        <rect x="300" y="76" width="18" height="14" rx="4" class="dg-fill-soft dg-stroke"/>
+        <text x="326" y="88" class="dg-text-sub" font-size="11">나머지 = 자동 오답 (밀어라)</text>
+        <text x="326" y="118" class="dg-text-sub" font-size="11">배치 4 → 오답 12개</text>
+        <text x="326" y="136" class="dg-text-sub" font-size="11">배치 64 → 오답 4,032개</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>배치가 클수록 오답이 제곱으로 늘어난다</b> — MNR 손실에서 배치 크기가 곧 학습 신호의 양인 이유다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mnr_finetune.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import InputExample, losses, datasets
+
+# 긍정(관련 있는) 쌍만으로 학습 데이터 구성
+train_examples = []
+for idx, row in df_train_ir.iterrows():
+    train_examples.append(InputExample(texts=[row['question'], row['context']]))
+
+# 한 배치 안에 같은 데이터가 중복되지 않도록 하는 데이터로더
+batch_size = 16
+loader = datasets.NoDuplicatesDataLoader(train_examples, batch_size)
+
+# MNR 손실 함수
+loss = losses.MultipleNegativesRankingLoss(sentence_model)
+
+# MRC 데이터셋으로 미세 조정
+epochs = 1
+save_path = './klue_mrc_mnr'
+sentence_model.fit(
+    train_objectives=[(loader, loss)],
+    epochs=epochs,
+    warmup_steps=100,
+    output_path=save_path,
+    show_progress_bar=True,
+)
+
+print(evaluator(sentence_model))   # 0.8601021412321</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>df_train_ir.interrows()</code> 로 적혀 있는데 판다스의 메서드명은 <code>iterrows()</code> 다. 또 <code>datasets.NoDuplicatesDataLoader</code> 는 허깅페이스의 <code>datasets</code> 가 아니라 <b><code>sentence_transformers.datasets</code></b> 이므로, 두 라이브러리를 함께 쓸 때 이름이 충돌하지 않도록 import 를 명시해야 한다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">NoDuplicatesDataLoader 가 필요한 이유 <span class="badge b-blue">보강</span></p>
+      <p>MNR 은 <b>같은 배치의 다른 항목을 오답으로 간주</b>한다. 그런데 배치 안에 같은 기사에서 나온 질문 두 개가 들어가면, 서로의 정답 본문이 오답으로 취급되어 <b>모델에게 틀린 신호를 준다</b>. 이 데이터로더가 배치 구성 단계에서 그런 중복을 막는다. 같은 이유로 MNR 학습에서는 <b>배치 크기를 크게 잡을수록 유리</b>하다 — 오답 후보가 늘어 학습 신호가 풍부해지기 때문이다.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>단계</th><th>테스트 상관계수</th></tr></thead>
+      <tbody>
+        <tr><td>STS 로만 학습된 모델 (<code>shangrilar/klue-roberta-base-klue</code>)</td><td class="t-center">0.816</td></tr>
+        <tr><td>+ MRC 데이터로 MNR 미세 조정 (1 에포크)</td><td class="t-center t-ok">0.860</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>단 1 에포크로 <b>0.816 → 0.860</b>. 11-1 에서 말한 "사용하려는 데이터셋으로 추가 학습하면 검색 성능이 올라간다"가 숫자로 확인된 셈이다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>평가를 하려면 오답이 필요하다 — <b>제목이 다른 행</b>에서 본문을 뽑아 무관한 컨텍스트를 만든다.</li>
+      <li><b>MNR 손실</b>은 배치 안의 다른 항목을 자동으로 오답 취급한다 → <b>정답 쌍만 모으면 된다</b>.</li>
+      <li>그래서 배치 안 중복을 막는 <code>NoDuplicatesDataLoader</code> 가 필수이고, <b>배치가 클수록 유리</b>하다.</li>
+      <li>도메인 데이터로 1 에포크만 돌려도 0.816 → 0.860 으로 개선됐다.</li>
+    </ul>
+  </div>
+</article>

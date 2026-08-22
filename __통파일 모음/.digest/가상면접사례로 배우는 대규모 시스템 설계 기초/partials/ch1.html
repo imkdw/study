@@ -1,0 +1,770 @@
+<article class="item" id="item-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-1</div>
+    <h3>단일 서버</h3>
+    <p class="item-tagline">아무리 복잡한 시스템도 출발점은 모든 것이 한 대에 들어 있는 모놀리식 서버다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    확장은 <b>더 좋은 서버를 사는 일</b>이 아니라, <b>한 상자 안에 뭉쳐 있던 책임을 하나씩 떼어내는 일</b>이다. 이 장 전체가 그 분리의 순서다.
+  </div>
+
+  <h4>올인원 서버</h4>
+  <ul>
+    <li>웹, API, 데이터베이스가 전부 한 서버 안에서 실행된다.</li>
+    <li>브라우저는 먼저 DNS에 도메인을 물어 IP를 받아 온다.</li>
+    <li>웹 브라우저 요청에는 HTML을 돌려주고, 모바일 앱의 API 요청에는 데이터만 돌려준다.</li>
+    <li>API 응답 포맷은 보통 JSON이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U1["웹 브라우저"] -->|"1. 도메인 질의"| D["DNS"]
+  D -->|"2. IP 주소"| U1
+  U1 -->|"3. HTTP 요청"| S["웹 서버 (단일)"]
+  S -->|"4. HTML 응답"| U1
+  U2["모바일 앱"] -->|"API 요청"| S
+  S -->|"JSON 응답"| U2
+      </pre>
+    </div>
+    <div class="figure-cap"><b>DNS는 시스템 바깥에 있다</b> — 우리가 설계할 대상은 3번 화살표부터다. DNS 조회는 보통 제3 사업자가 운영하는 별도 인프라를 탄다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>면접에서 이 그림부터 그리는 이유는 겸손해서가 아니라 <b>공통 기준선을 잡기 위해서</b>다. "여기서 무엇이 먼저 터질까요?"라고 물으면 상대가 어떤 병목에 관심 있는지 드러나고, 그 답을 따라 이후 설계를 전개할 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>단일 서버 = 웹 + API + DB가 한 프로세스/한 장비에 공존하는 구조.</li>
+      <li>요청 경로는 DNS 조회 → HTTP 요청 → HTML 또는 JSON 응답.</li>
+      <li>이후 모든 확장은 이 상자에서 무언가를 <b>바깥으로 꺼내는</b> 형태로 진행된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-2</div>
+    <h3>데이터베이스</h3>
+    <p class="item-tagline">가장 먼저 떼어내는 것은 데이터베이스다. 웹과 DB는 부하 성격이 완전히 다르기 때문이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    웹/API 서버와 데이터베이스를 분리하는 진짜 이유는 성능이 아니라 <b>각각을 독립적으로 확장할 수 있게 되기 때문</b>이다.
+  </div>
+
+  <ul>
+    <li>트래픽이 늘면 서버 한 대로는 감당이 안 되는 시점이 온다.</li>
+    <li>하나는 API 처리용, 나머지는 데이터베이스용으로 서버를 분리한다.</li>
+    <li>분리해 두면 웹 계층과 데이터 계층을 각기 다른 속도로 늘려 나갈 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U["웹 브라우저 / 모바일 앱"] --> W["웹 / API 서버"]
+  W -->|"쿼리"| DB[("데이터베이스 서버")]
+  DB -->|"결과"| W
+      </pre>
+    </div>
+    <div class="figure-cap"><b>계층이 둘로 갈리는 첫 순간</b> — 웹 서버는 CPU 바운드, DB는 I/O 바운드다. 한 상자에 두면 서로의 자원을 뺏는다.</div>
+  </div>
+
+  <h4>어떤 데이터베이스를 쓸 것인가</h4>
+
+  <h5>관계형 데이터베이스 (RDBMS)</h5>
+  <ul>
+    <li>Oracle, MySQL, PostgreSQL 등이 대표적이다.</li>
+    <li>자료를 테이블과 행, 열로 표현한다.</li>
+    <li>SQL의 <code>JOIN</code>으로 여러 테이블에 흩어진 데이터를 조합할 수 있다.</li>
+    <li>대부분의 경우 RDBMS를 쓰는 것이 무난한 기본값이다.</li>
+  </ul>
+
+  <h5>비관계형 데이터베이스 (NoSQL)</h5>
+  <ul>
+    <li>MongoDB, DynamoDB, HBase 등이 있다.</li>
+    <li>일반적으로 RDBMS 같은 조인은 지원하지 않는다.</li>
+    <li>RDBMS가 어울리지 않는 상황 — 아주 낮은 응답 지연(low-latency)이 필요하거나, 다루는 데이터가 비정형(unstructured)일 때 유용하다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>NoSQL 분류</th><th>모델</th><th>대표 제품</th><th>이 책에서 다시 등장하는 곳</th></tr></thead>
+      <tbody>
+        <tr><td>키-값 저장소</td><td>키 하나로만 접근</td><td>Redis, DynamoDB</td><td>6장 / 12장 채팅 이력</td></tr>
+        <tr><td>그래프 저장소</td><td>노드와 간선</td><td>Neo4j</td><td>11장 소셜 그래프</td></tr>
+        <tr><td>컬럼 저장소</td><td>컬럼 패밀리</td><td>Cassandra, HBase</td><td>6장 SSTable 읽기/쓰기 경로</td></tr>
+        <tr><td>문서 저장소</td><td>JSON 유사 문서</td><td>MongoDB</td><td>13장 트라이 직렬화 저장</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>웹 계층과 데이터 계층을 분리하면 각 계층을 독립적으로 확장할 수 있다.</li>
+      <li>특별한 이유가 없다면 RDBMS가 기본값이다.</li>
+      <li>NoSQL은 네 갈래(키-값 / 그래프 / 컬럼 / 문서)이고, 아주 낮은 지연이나 비정형 데이터가 선택 근거가 된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-3</div>
+    <h3>수직적 규모 확장 vs 수평적 규모 확장</h3>
+    <p class="item-tagline">스케일 업은 단순하지만 천장이 있고, 스케일 아웃은 복잡하지만 천장이 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    수직 확장의 진짜 문제는 성능 한계가 아니라 <b>장애 복구 방안이 없다는 것</b>이다. 서버가 하나면 그 하나가 죽는 순간 서비스가 죽는다.
+  </div>
+
+  <h4>수직적 규모 확장 (스케일 업)</h4>
+  <ul>
+    <li>서버 한 대에 더 좋은 자원(CPU, RAM)을 붙이는 방식이다.</li>
+    <li>트래픽이 적을 때는 이 방법이 낫다. 가장 큰 장점은 <b>단순함</b>이다.</li>
+  </ul>
+
+  <h5>단점</h5>
+  <ul>
+    <li>서버 스펙에는 한계가 있다. CPU/RAM을 무한히 증설할 수 없다.</li>
+    <li>장애 자동 복구나 다중화 방안을 전혀 제시하지 못한다. 단일 서버에 오류가 나면 서비스가 통째로 중단된다.</li>
+  </ul>
+
+  <h4>수평적 규모 확장 (스케일 아웃)</h4>
+  <ul>
+    <li>서버를 더 많이 추가해서 성능을 개선한다.</li>
+    <li>트래픽이 분산되므로 서버 한 대가 받는 부하가 줄어든다.</li>
+    <li>대규모 애플리케이션이라면 사실상 이 방향밖에 없다.</li>
+  </ul>
+
+  <h4>로드밸런서</h4>
+  <ul>
+    <li>여러 서버에 트래픽을 골고루 분산하는 역할을 맡는다.</li>
+    <li>외부에서는 각 서버의 IP가 아니라 <b>로드밸런서의 공개 IP</b>만 바라본다.</li>
+    <li>로드밸런서는 내부 사설 IP로 트래픽을 전달한다. 서버들은 인터넷에서 직접 접근할 수 없다.</li>
+    <li>이렇게 하면 단일 서버가 자동 복구되지 못하는 문제가 해소되어 가용성이 올라간다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U["사용자"] -->|"공개 IP"| LB["로드밸런서"]
+  LB -->|"사설 IP"| S1["서버 1"]
+  LB -->|"사설 IP"| S2["서버 2"]
+  S1 --> DB[("DB")]
+  S2 --> DB
+      </pre>
+    </div>
+    <div class="figure-cap"><b>공개 IP는 로드밸런서만 갖는다</b> — 서버가 사설 IP 뒤에 숨는 것 자체가 보안 이득이기도 하다.</div>
+  </div>
+
+  <h5>로드밸런서가 가져다주는 가용성</h5>
+  <ul>
+    <li>서버 1이 죽으면 모든 트래픽이 서버 2로 간다. 사용자는 장애를 모른다.</li>
+    <li>서버 두 대로도 트래픽을 못 견디면 서버를 더 넣기만 하면 된다.</li>
+  </ul>
+
+  <h4>데이터베이스 다중화</h4>
+  <ul>
+    <li>DB 사이에 주(master)-부(slave) 관계를 설정한다.</li>
+    <li>원본은 주 서버에, 복제본은 부 서버에 둔다.</li>
+    <li>주 DB는 쓰기 연산만, 부 DB는 읽기 연산만 담당한다.</li>
+    <li>일반적인 서비스는 읽기가 압도적으로 많으므로 <b>부 DB의 수가 더 많은 것이 보통</b>이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  W["웹 서버"] -->|"INSERT / UPDATE / DELETE"| M[("주 DB (master)")]
+  W -->|"SELECT"| S1[("부 DB 1")]
+  W -->|"SELECT"| S2[("부 DB 2")]
+  M -.->|"복제"| S1
+  M -.->|"복제"| S2
+      </pre>
+    </div>
+    <div class="figure-cap"><b>쓰기는 한 곳, 읽기는 여러 곳</b> — 점선은 복제 스트림이다. 이 점선에 걸리는 지연이 곧 복제 지연(replication lag)이다.</div>
+  </div>
+
+  <h5>다중화의 장점</h5>
+  <ul>
+    <li><b>성능</b> — 주/부 DB로 연산이 나뉘므로 병렬 처리 가능한 쿼리 수가 늘어난다.</li>
+    <li><b>안정성과 가용성</b> — 여러 리전에 분산해 두면 특정 리전에 장애가 나도 서비스가 이어진다.</li>
+  </ul>
+
+  <h5>DB 한 대가 죽으면 벌어지는 일</h5>
+  <ol class="steps">
+    <li><div class="step-title">부 서버가 죽었고 그것이 유일한 부 서버였다면</div><p>모든 읽기 트래픽이 일시적으로 주 서버로 몰린다. 이후 새 부 서버가 투입되어 장애 서버를 대체한다.</p></li>
+    <li><div class="step-title">주 서버가 죽었다면</div><p>부 서버 가운데 하나가 새로운 주 서버로 승격된다. 실제로는 복제 지연 때문에 데이터가 최신이 아닐 수 있어 훨씬 복잡한 과정을 거친다.</p></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">주 서버 승격의 함정 <span class="badge b-blue">보강</span></p>
+      <p>승격 순간의 부 서버가 주 서버의 마지막 쓰기를 아직 못 받았을 수 있다. 실무에서는 복구 로그(binlog 등)를 재생하거나, 그래도 복구되지 않는 구간은 손실을 인정하고 넘어간다. "부 서버를 올리면 끝"이 아니라는 점이 면접에서 자주 짚는 지점이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>수직 확장은 단순하지만 하드웨어 천장과 SPOF가 있다.</li>
+      <li>수평 확장 + 로드밸런서 = 웹 계층의 가용성과 확장성.</li>
+      <li>주-부 다중화 = 데이터 계층의 읽기 확장과 가용성.</li>
+      <li>주 서버 장애 시 부 서버 승격은 겉보기보다 복잡하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-4</div>
+    <h3>캐시</h3>
+    <p class="item-tagline">비싼 연산의 결과를 메모리에 잠깐 세워 두는 것. 문제는 언제 치우느냐다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    캐시는 성능 장치이자 <b>정합성 부채</b>다. 만료 시간을 정하는 일은 곧 "얼마나 오래된 데이터를 참아줄 것인가"를 정하는 일이다.
+  </div>
+
+  <ul>
+    <li>값비싼 연산 결과나 자주 참조되는 데이터를 메모리에 두고 요청을 빠르게 처리하는 저장소다.</li>
+    <li>애플리케이션 성능은 DB를 얼마나 자주 호출하느냐에 크게 좌우되는데, 캐시가 이 문제를 완화한다.</li>
+  </ul>
+
+  <h4>캐시 계층</h4>
+  <ul>
+    <li>데이터가 잠시 보관되는 공간으로, DB보다 훨씬 빠르다.</li>
+    <li>용도에 맞는 전략을 고르면 된다. 아래는 <b>읽기 주도형(read-through) 캐시 전략</b>의 흐름이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  W["웹 서버"] -->|"1. 캐시 조회"| C{"캐시에 있나?"}
+  C -->|"Hit"| R["즉시 응답"]
+  C -->|"Miss"| DB[("데이터베이스")]
+  DB -->|"2. 조회 결과"| SAVE["캐시에 저장"]
+  SAVE --> R
+      </pre>
+    </div>
+    <div class="figure-cap"><b>읽기 주도형 캐시</b> — 캐시에 없을 때만 DB로 내려가고, 내려간 김에 캐시를 채운다. 첫 요청 한 번만 느리다.</div>
+  </div>
+
+  <h4>캐시를 쓸 때 주의할 점</h4>
+  <ul>
+    <li>갱신은 드물고 참조는 잦은 데이터에 적합하다. 반대라면 캐시가 오히려 짐이 된다.</li>
+    <li>캐시는 휘발성이다. 중요한 데이터는 반드시 영속 저장소에 둔다.</li>
+    <li>만료 기간을 적절히 잡아야 한다. 짧으면 DB 접근이 잦아지고, 길면 최신성이 깨진다.</li>
+    <li>원본과 캐시 사이의 일관성은 규모가 커질수록 관리가 어려워진다.</li>
+    <li>SPOF를 피하려면 캐시도 여러 리전에 분산해야 한다.</li>
+    <li>LRU, LFU 같은 방출(eviction) 정책도 데이터 성격에 맞게 골라야 한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방출 정책</th><th>버리는 기준</th><th>어울리는 상황</th></tr></thead>
+      <tbody>
+        <tr><td>LRU</td><td>가장 오래 안 쓰인 것</td><td>최근성이 곧 인기인 데이터 (타임라인, 세션)</td></tr>
+        <tr><td>LFU</td><td>가장 적게 쓰인 것</td><td>인기 편차가 크고 오래 유지되는 데이터 (인기 검색어)</td></tr>
+        <tr><td>FIFO</td><td>가장 먼저 들어온 것</td><td>접근 패턴이 균일해 정책이 별 의미 없는 경우</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">SPOF는 캐시에도 있다 <span class="badge b-blue">보강</span></p>
+      <p>캐시 노드가 통째로 죽으면 그 순간 모든 요청이 DB로 쏟아진다(캐시 스탬피드). 노드를 여러 개로 나누고 만료 시각에 약간의 무작위 지터를 주면 한꺼번에 만료되는 사고를 줄일 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>캐시는 "갱신 드물고 참조 잦은" 데이터에 쓴다.</li>
+      <li>만료 시간은 DB 부하와 최신성 사이의 저울이다.</li>
+      <li>캐시는 휘발성이며 그 자체로 SPOF가 될 수 있으므로 분산이 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-5</div>
+    <h3>콘텐츠 전송 네트워크(CDN)</h3>
+    <p class="item-tagline">사용자에게 가장 가까운 서버가 정적 콘텐츠를 대신 내려준다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    CDN은 캐시와 같은 아이디어를 <b>지리적 거리</b>에 적용한 것이다. 그래서 고민거리도 캐시와 똑같다 — 만료, 무효화, 장애.
+  </div>
+
+  <ul>
+    <li>정적 콘텐츠를 전송하기 위해 지리적으로 분산 배치된 서버 네트워크다.</li>
+    <li>사용자 입장에서 가장 가까운 CDN 서버가 정적 콘텐츠를 전달한다.</li>
+    <li>CDN에 콘텐츠가 없으면 원본 서버(origin)에서 받아 와 지정된 시간만큼 보관한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U["서울 사용자"] -->|"1. 이미지 요청"| E["CDN 엣지 (서울)"]
+  E -->|"2. 캐시에 없으면"| O["원본 서버 (미국)"]
+  O -->|"3. 원본 + TTL"| E
+  E -->|"4. 응답 + 이후 TTL 동안 재사용"| U
+      </pre>
+    </div>
+    <div class="figure-cap"><b>첫 사용자만 태평양을 건넌다</b> — 두 번째 요청부터는 2~3번 화살표가 사라진다.</div>
+  </div>
+
+  <h4>CDN에서 고려할 점</h4>
+
+  <h5>비용</h5>
+  <ul>
+    <li>보통 제3 사업자가 운영하며, 데이터 I/O 기준으로 요금이 부과된다.</li>
+    <li>자주 쓰이지 않는 콘텐츠를 캐싱하는 것은 이득이 크지 않다.</li>
+  </ul>
+
+  <h5>만료 기간</h5>
+  <ul>
+    <li>너무 길면 콘텐츠 신선도가 떨어져 옛 이미지가 보일 수 있다.</li>
+    <li>너무 짧으면 원본 서버 접속이 잦아져 CDN을 쓰는 의미가 줄어든다.</li>
+  </ul>
+
+  <h5>CDN 장애</h5>
+  <ul>
+    <li>CDN 자체가 다운됐을 때 웹/앱이 어떻게 동작할지 미리 정해 둬야 한다.</li>
+    <li>예를 들어 CDN이 응답하지 않으면 원본 서버에서 직접 콘텐츠를 가져오도록 폴백을 둔다.</li>
+  </ul>
+
+  <h5>콘텐츠 무효화</h5>
+  <ul>
+    <li>지정한 만료 시각 전이라도 직접 무효화할 수 있다.</li>
+    <li>CDN 사업자가 제공하는 API로 원하는 경로나 파일을 무효화한다.</li>
+    <li>또는 오브젝트 버저닝 — 파일명 자체에 버전을 넣어(<code>logo.v2.png</code>) 새 URL로 만들면 무효화가 필요 없다.</li>
+  </ul>
+
+  <h4>CDN + 캐시를 얹은 아키텍처</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["사용자"] -->|"정적 콘텐츠"| CDN["CDN"]
+  U -->|"동적 요청"| LB["로드밸런서"]
+  LB --> W1["웹 서버 1"]
+  LB --> W2["웹 서버 2"]
+  W1 --> C[("캐시")]
+  W2 --> C
+  C -.->|"Miss"| M[("주 DB")]
+  C -.->|"Miss"| S[("부 DB")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>요청이 두 갈래로 갈린다</b> — 정적인 것은 아예 서버까지 오지 않고, 동적인 것도 캐시에서 대부분 끝난다. DB까지 내려오는 요청은 극히 일부다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">버저닝이 무효화보다 나은 이유 <span class="badge b-blue">보강</span></p>
+      <p>무효화 API는 전 세계 엣지에 전파되는 데 시간이 걸리고 호출 횟수에 과금되는 경우도 있다. 반면 파일명에 해시나 버전을 박으면 <b>새 URL은 애초에 캐시에 없으므로</b> 즉시 반영된다. 프런트엔드 빌드 도구들이 파일명에 해시를 붙이는 이유가 이것이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>CDN = 지리적으로 분산된 정적 콘텐츠 캐시.</li>
+      <li>고민거리는 비용 / 만료 기간 / 장애 폴백 / 무효화 네 가지.</li>
+      <li>무효화는 API 호출보다 오브젝트 버저닝이 실무적으로 편하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-6</div>
+    <h3>무상태 웹 계층</h3>
+    <p class="item-tagline">웹 계층을 수평 확장하려면 서버가 아무것도 기억하지 않아야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    상태를 서버에 두는 순간 <b>"이 사용자는 저 서버로만 가야 한다"</b>는 제약이 생기고, 그 제약이 확장을 막는다.
+  </div>
+
+  <ul>
+    <li>상태 정보를 서버가 아니라 데이터베이스나 캐시에 보관하고 필요할 때 가져오는 방식이다.</li>
+  </ul>
+
+  <h4>상태 정보에 의존적인 아키텍처</h4>
+  <ul>
+    <li>상태를 보관하는 서버는 사용자 고유 정보를 자기 세션에 담아 둔다.</li>
+    <li>사용자 정보가 A 서버에 있는데 요청이 C 서버로 가면 그 요청은 실패한다.</li>
+    <li>이를 피하려고 로드밸런서에 <b>스티키 세션</b>을 걸지만, 이는 로드밸런서에 부담을 주고 부하 분산을 왜곡한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["사용자 A"] --> LB["로드밸런서"]
+  LB -->|"1회차"| S1["서버 1<br>세션A 보관"]
+  LB -->|"2회차 (라운드로빈)"| S3["서버 3<br>세션A 없음 → 실패"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>상태 유지 서버의 고장 지점</b> — 라운드로빈이 정상 동작하는데도 요청이 실패한다. 잘못은 로드밸런서가 아니라 상태를 들고 있는 서버에 있다.</div>
+  </div>
+
+  <h4>무상태 아키텍처</h4>
+  <ul>
+    <li>여러 서버 앞에 로드밸런서를 두되, 상태는 <b>중앙 공유 저장소</b>에서 관리한다.</li>
+    <li>각 서버가 고유 데이터를 갖지 않으므로 어떤 서버로 가도 동일하게 처리된다.</li>
+    <li>상태가 웹 서버에서 분리되어 구조가 단순해지고, 안정적이며, 확장이 쉽다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["사용자 A"] --> LB["로드밸런서"]
+  LB --> S1["서버 1"]
+  LB --> S2["서버 2"]
+  LB --> S3["서버 3"]
+  S1 --> ST[("공유 세션 저장소<br>NoSQL / Redis")]
+  S2 --> ST
+  S3 --> ST
+      </pre>
+    </div>
+    <div class="figure-cap"><b>서버는 전부 동등해진다</b> — 아무 서버나 죽여도, 아무 서버나 새로 띄워도 동작이 같다. 오토스케일링이 가능해지는 지점이다.</div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">여기서 얻는 것</p>
+      <p>무상태로 바꾸는 순간 <b>오토스케일링 / 무중단 배포 / 장애 서버 즉시 격리</b>가 전부 공짜로 따라온다. 12장 채팅 시스템에서 "채팅 서버만은 상태를 유지해야 한다"고 예외를 두는 대목이 나오는데, 그때 이 이득을 포기하는 대가가 무엇인지 비교하며 읽으면 좋다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>상태 유지 서버 + 스티키 세션 = 확장을 막는 조합.</li>
+      <li>상태를 공유 저장소로 옮기면 모든 서버가 동등해진다.</li>
+      <li>무상태화는 오토스케일링과 무중단 배포의 전제 조건이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-7</div>
+    <h3>데이터 센터</h3>
+    <p class="item-tagline">여러 IDC로 나누면 지연이 줄고 장애 내성이 생긴다. 대신 데이터 동기화라는 큰 숙제가 온다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    IDC 이중화의 어려움은 트래픽을 나누는 쪽이 아니라 <b>나뉜 데이터를 다시 맞추는 쪽</b>에 있다.
+  </div>
+
+  <ul>
+    <li>IDC 두 곳을 쓰면 사용자의 지리적 위치에 따라 트래픽이 나뉜다. 이를 <b>지리적 라우팅</b>이라고 한다.</li>
+    <li>A 지역에 x%의 트래픽이 갔다면 B 지역에는 (100 − x)%가 간다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U1["미국 서부 사용자"] --> G["GeoDNS"]
+  U2["아시아 사용자"] --> G
+  G -->|"x%"| A["IDC A (US-West)"]
+  G -->|"100-x%"| B["IDC B (Asia)"]
+  A -.->|"데이터 다중화"| B
+      </pre>
+    </div>
+    <div class="figure-cap"><b>점선이 이 그림의 난제</b> — 실선(트래픽 분배)은 GeoDNS가 해결해 주지만, 점선(데이터 동기화)은 직접 설계해야 한다.</div>
+  </div>
+
+  <h4>데이터 센터 장애</h4>
+  <ul>
+    <li>IDC A에 장애가 나면 모든 트래픽이 IDC B로 넘어간다.</li>
+  </ul>
+
+  <h4>IDC 이중화의 기술적 난제</h4>
+  <ul>
+    <li><b>트래픽 우회</b> — 올바른 IDC로 트래픽을 보내는 방법이 필요하다. GeoDNS는 사용자에게 가장 가까운 IDC로 트래픽을 보내 준다.</li>
+    <li><b>데이터 동기화</b> — IDC마다 별도 DB를 쓰면 장애 복구 후 트래픽이 우회해도 다른 IDC의 데이터가 최신이 아닐 수 있다. 보편적인 전략은 <b>데이터를 여러 IDC에 걸쳐 다중화</b>하는 것이다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">테스트와 배포도 난제다 <span class="badge b-blue">보강</span></p>
+      <p>원본 노트에는 없지만 책이 함께 드는 세 번째 숙제가 <b>테스트와 배포</b>다. IDC가 여러 곳이면 모든 IDC에서 동일한 버전이 동작하는지 검증해야 하고, 배포도 IDC 단위로 순차 진행해야 한다. 자동화 도구 없이는 관리가 불가능한 영역이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>GeoDNS가 사용자를 가까운 IDC로 보낸다.</li>
+      <li>한 IDC가 죽으면 트래픽 전부가 다른 IDC로 넘어간다.</li>
+      <li>진짜 어려운 부분은 IDC 간 데이터 동기화이며, 다중화가 그 답이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-8</div>
+    <h3>메시지 큐</h3>
+    <p class="item-tagline">생산자와 소비자를 시간과 속도로부터 떼어놓는 완충 장치.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    메시지 큐가 주는 것은 속도가 아니라 <b>독립성</b>이다. 생산자와 소비자를 따로 배포하고 따로 확장할 수 있게 된다.
+  </div>
+
+  <ul>
+    <li>메시지의 무손실을 보장하는 비동기 통신 컴포넌트다.</li>
+    <li>서비스나 서버 간 결합이 느슨해져, 규모 확장이 필요한 애플리케이션을 구성하기 좋다.</li>
+    <li>생산자와 소비자로 나뉘며, 소비자는 큐를 구독하고 필요한 작업을 수행한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P1["생산자 (웹 서버)"] -->|"작업 발행"| Q[["메시지 큐"]]
+  Q -->|"구독 / 소비"| C1["소비자 1<br>이미지 리사이즈"]
+  Q -->|"구독 / 소비"| C2["소비자 2<br>워터마크"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>웹 서버는 큐에 넣기만 하고 즉시 응답한다</b> — 소비자가 느리거나 잠깐 죽어도 사용자 요청은 실패하지 않는다. 일이 큐에 쌓일 뿐이다.</div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">확장 방향이 서로 다르다</p>
+      <p>트래픽이 몰리면 생산자(웹 서버)만 늘리면 되고, 처리가 밀리면 소비자만 늘리면 된다. 큐가 없으면 둘이 한 몸이라 한쪽만 늘릴 수가 없다. 19장에서 이 주제를 통째로 다시 파고든다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메시지 큐 = 무손실을 보장하는 비동기 통신 컴포넌트.</li>
+      <li>생산자와 소비자를 느슨하게 결합해 각각 독립 확장이 가능해진다.</li>
+      <li>소비자 장애가 사용자 요청 실패로 번지지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-9</div>
+    <h3>로그, 메트릭 그리고 자동화</h3>
+    <p class="item-tagline">시스템이 커지면 "무슨 일이 일어나는지 보는 능력" 자체가 기능이 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    서버가 한 대일 때는 <code>ssh</code>로 들어가 로그를 보면 되지만, 수십 대가 되면 <b>로그를 한곳에 모으는 것부터가 설계 대상</b>이다.
+  </div>
+
+  <h4>로그</h4>
+  <ul>
+    <li>에러 로그 모니터링은 매우 중요하다.</li>
+    <li>서버 단위로도 모니터링할 수 있지만, 로그를 단일 서비스로 모아 두면 훨씬 낫다.</li>
+  </ul>
+
+  <h4>메트릭</h4>
+  <ul>
+    <li>잘 수집하면 사업 현황에 대한 유용한 정보를 얻을 수 있고, 시스템 상태 파악도 쉬워진다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>메트릭 종류</th><th>예시</th><th>누가 본다</th></tr></thead>
+      <tbody>
+        <tr><td>호스트 단위</td><td>CPU, RAM, 디스크 I/O</td><td>인프라 담당</td></tr>
+        <tr><td>종합 메트릭</td><td>DB 계층의 성능, 캐시 계층의 성능</td><td>백엔드 담당</td></tr>
+        <tr><td>핵심 비즈니스 메트릭</td><td>일별 사용자, 수익, 재방문율</td><td>제품 / 사업 담당</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>자동화</h4>
+  <ul>
+    <li>대표적으로 CI/CD 파이프라인이 있다.</li>
+    <li>이 외에도 빌드, 테스트 등 다양한 절차를 자동화할 수 있다.</li>
+  </ul>
+
+  <h4>메시지 큐 / 로그 / 메트릭을 반영한 아키텍처</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["사용자"] --> CDN["CDN"]
+  U --> LB["로드밸런서"]
+  LB --> W["웹 서버 (무상태)"]
+  W --> C[("캐시")]
+  W --> DB[("주 DB / 부 DB")]
+  W --> Q[["메시지 큐"]]
+  Q --> WK["작업 서버 (소비자)"]
+  W -.-> OBS["로그 / 메트릭 / 자동화"]
+  WK -.-> OBS
+      </pre>
+    </div>
+    <div class="figure-cap"><b>1장의 종착점</b> — 여기까지가 "부품 카탈로그"다. 4장 이후의 모든 설계는 이 그림에서 필요한 조각을 골라 조립한 형태다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>로그는 한곳에 모아야 쓸 수 있다.</li>
+      <li>메트릭은 호스트 / 종합 / 비즈니스 세 층위로 나눠 본다.</li>
+      <li>규모가 커지면 CI/CD를 포함한 자동화가 선택이 아니라 필수가 된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-10</div>
+    <h3>데이터베이스의 규모 확장</h3>
+    <p class="item-tagline">데이터 계층에도 수직/수평이 있고, 수평 확장의 이름은 샤딩이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    샤딩에서 가장 중요한 결정은 기술 선택이 아니라 <b>샤딩 키를 무엇으로 잡느냐</b>다. 한번 정하면 되돌리기가 매우 어렵다.
+  </div>
+
+  <ul>
+    <li>저장할 데이터가 많아지면 데이터베이스의 부하도 늘어난다.</li>
+    <li>DB 증설 방법도 서버와 마찬가지로 수직/수평 두 가지다.</li>
+  </ul>
+
+  <h4>수직적 확장</h4>
+  <ul>
+    <li>더 많은 자원을 할당하는 방법이다. AWS는 24TB RAM을 갖춘 데이터베이스 인스턴스도 지원한다.</li>
+    <li>다만 하드웨어 스펙에는 한계가 있다.</li>
+    <li>SPOF를 피할 수 없고, 비용도 가파르게 상승한다.</li>
+  </ul>
+
+  <h4>수평적 확장</h4>
+  <ul>
+    <li><b>샤딩</b>이라고도 부르며, 서버를 추가해 성능을 높인다.</li>
+    <li>샤딩은 데이터베이스를 <b>샤드</b>라는 작은 단위로 분할하는 기술이다.</li>
+    <li>샤딩 전략에서 가장 중요한 것은 <b>샤딩 키를 무엇으로 정할 것인가</b>이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["애플리케이션"] -->|"user_id % 4"| R{"샤딩 키 계산"}
+  R -->|"0"| S0[("샤드 0")]
+  R -->|"1"| S1[("샤드 1")]
+  R -->|"2"| S2[("샤드 2")]
+  R -->|"3"| S3[("샤드 3")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>샤딩 키가 데이터의 주소를 정한다</b> — 이 그림의 <code>% 4</code>가 문제를 일으키는 이유는 5장 안정 해시에서 곧바로 다룬다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">샤딩이 데려오는 세 가지 문제 <span class="badge b-blue">보강</span></p>
+      <ul>
+        <li><b>재샤딩</b> — 샤드 하나가 꽉 차거나 데이터가 한쪽으로 쏠리면 샤드를 다시 나눠야 한다. 5장의 안정 해시가 이 고통을 줄이는 도구다.</li>
+        <li><b>유명인사(핫스팟) 문제</b> — 특정 샤드에 인기 사용자가 몰리면 그 샤드만 죽는다. 11장 뉴스 피드의 핫키 문제와 같은 뿌리다.</li>
+        <li><b>조인과 비정규화</b> — 샤드를 넘나드는 조인은 사실상 불가능해, 데이터를 미리 합쳐 두는 비정규화로 우회한다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>DB 수직 확장은 한계와 SPOF, 그리고 가파른 비용이 따른다.</li>
+      <li>수평 확장 = 샤딩, 그 핵심은 샤딩 키 선택.</li>
+      <li>샤딩의 대가는 재샤딩 / 핫스팟 / 조인 불가 세 가지다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-11</div>
+    <h3>백만 사용자 그리고 그 이상</h3>
+    <p class="item-tagline">확장은 한 번의 큰 결정이 아니라 반복되는 작은 결정의 누적이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    아래 여덟 줄이 1장 전체의 압축본이며, 이후 모든 장에서 형태를 바꿔 반복된다.
+  </div>
+
+  <ul>
+    <li>시스템 규모 확장은 지속적이고 반복적인 과정이다.</li>
+    <li>때로는 수평 확장으로 스펙을 늘리거나, 시스템을 더 잘게 나눠야 할 수도 있다.</li>
+  </ul>
+
+  <h4>정리된 확장 기법</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기법</th><th>해결하는 문제</th><th>이 책에서 이어지는 장</th></tr></thead>
+      <tbody>
+        <tr><td>웹 계층을 무상태로 유지</td><td>서버 증설 불가</td><td>12장(예외로서의 상태 유지 서버)</td></tr>
+        <tr><td>모든 계층에 다중화 도입</td><td>SPOF</td><td>6장, 15장</td></tr>
+        <tr><td>가능한 한 많은 데이터 캐싱</td><td>DB 부하</td><td>13장 트라이 캐시</td></tr>
+        <tr><td>여러 IDC로 분산</td><td>지역 지연 / 리전 장애</td><td>14장 업로드 센터</td></tr>
+        <tr><td>정적 콘텐츠는 CDN으로</td><td>대역폭 / 지연</td><td>14장 비디오 스트리밍</td></tr>
+        <tr><td>데이터 계층은 샤딩으로 확장</td><td>단일 DB 한계</td><td>5장, 6장, 19장 파티션</td></tr>
+        <tr><td>각 계층을 독립 서비스로 분할</td><td>배포 / 확장 결합</td><td>10장, 26장</td></tr>
+        <tr><td>지속적 모니터링과 자동화</td><td>운영 불가시성</td><td>4장, 10장 큐 모니터링</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>확장은 한 번에 끝나지 않는다. 병목이 옮겨 다니는 것을 계속 쫓는 일이다.</li>
+      <li>여덟 가지 기법은 서로 독립적이지 않고 조합해서 쓴다.</li>
+      <li>4장부터는 이 부품들을 문제별로 어떻게 조립하는지를 본다.</li>
+    </ul>
+  </div>
+</article>

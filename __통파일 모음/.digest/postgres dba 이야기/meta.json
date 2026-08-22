@@ -1,0 +1,106 @@
+{
+  "title": "PostgreSQL DBA 이야기",
+  "subtitle": "26개 노트 정리",
+  "mark": "PG",
+  "eyebrow": "STUDY DIGEST",
+  "description": "인덱스, 파티션, 아키텍처, 복제, 백업, 모니터링, 락, Vacuum까지 PostgreSQL 운영의 핵심을 정리한 학습자료",
+  "lead": "PostgreSQL을 <b>운영</b>하는 사람의 관점에서 정리한 노트다. 문법을 훑는 대신 <em>실제로 장애를 만드는 지점</em>을 따라간다. CIC가 왜 INVALID 인덱스를 남기는지, 복제 슬롯이 어떻게 인스턴스를 죽이는지, 슬로우 쿼리 하나가 왜 데이터베이스 전체의 Vacuum을 막는지 — 26편의 노트를 7개 챕터로 묶고 공식 문서(PostgreSQL 17/18)로 검증했다.",
+  "footer": "원본 노트: <code>postgres dba 이야기</code> · 검증 기준 PostgreSQL 17 공식 문서 (일부 항목은 18 기준 반영)",
+  "stats": [
+    { "val": "26", "unit": "개", "label": "아이템" },
+    { "val": "7", "unit": "개", "label": "챕터" },
+    { "val": "17", "unit": "", "label": "검증 기준 버전" }
+  ],
+  "coverNote": "<div class=\"callout tip\"><div class=\"ic\">i</div><div><p class=\"callout-title\">이 문서의 표기 규칙</p><p><span class=\"badge b-red\">원문 교정</span> 은 노트의 서술이 공식 문서와 달라 바로잡은 곳, <span class=\"badge b-purple\">최신 반영</span> 은 노트 작성 이후 버전에서 달라진 곳, <span class=\"badge b-blue\">보강</span> 은 노트에는 없지만 함께 알아두면 좋은 내용이다. 원문 노트의 소제목 순서와 실습 결과는 그대로 살렸고, 손그림 3장은 다이어그램으로 다시 그렸다.</p></div></div>",
+  "chapters": [
+    {
+      "id": "ch2",
+      "short": "CH 2",
+      "navTitle": "오브젝트",
+      "title": "오브젝트",
+      "lead": "인덱스와 파티션. 운영 중인 데이터베이스에 <b>서비스를 멈추지 않고</b> 손을 대는 방법과, 그 대가로 감수해야 하는 것들.",
+      "items": [
+        { "id": "item-2-2", "idx": "2-2", "title": "인덱스", "keywords": "index CIC create index concurrently INVALID reindex _ccnew partial index covering include btree BRIN GIN GiST 커버링 부분인덱스 리빌드" },
+        { "id": "item-2-3", "idx": "2-3", "title": "파티션", "keywords": "partition range list hash declarative 선언적 파티션 default partition attach detach split modulus remainder pg_partition_tree ONLY 파티션인덱스" }
+      ]
+    },
+    {
+      "id": "ch3",
+      "short": "CH 3",
+      "navTitle": "아키텍처",
+      "title": "아키텍처",
+      "lead": "공유 메모리 - 프로세스 - 파일. PostgreSQL이 디스크 위에 어떤 모양으로 놓여 있는지 확인한다.",
+      "items": [
+        { "id": "item-3-1", "idx": "3-1", "title": "인스턴스", "keywords": "shared buffer WAL buffer 공유버퍼 postmaster backend background process fork postgresql.conf postgresql.auto.conf ALTER SYSTEM work_mem temp_buffers" },
+        { "id": "item-3-2", "idx": "3-2", "title": "테이블스페이스", "keywords": "tablespace pg_default pg_global PGDATA base global OID pg_relation_filepath template0 template1 temp tablespace" },
+        { "id": "item-3-3", "idx": "3-3", "title": "테이블", "keywords": "heap unlogged temp table TOAST fsm vm visibility map pg_column_compression pglz pg_toast relpersistence on commit drop" }
+      ]
+    },
+    {
+      "id": "ch5",
+      "short": "CH 5",
+      "navTitle": "복제",
+      "title": "복제",
+      "lead": "물리 복제는 <b>클러스터 전체를 블록 단위로</b>, 논리 복제는 <b>테이블을 SQL 단위로</b> 옮긴다. 이 차이가 구성 방법과 장애 양상을 전부 결정한다.",
+      "items": [
+        { "id": "item-5-1", "idx": "5-1", "title": "물리 복제", "keywords": "physical replication streaming walsender walreceiver startup recovering pg_basebackup pg_hba.conf synchronous_commit remote_apply remote_write cascade 동기 비동기 sync async replication slot VIP" },
+        { "id": "item-5-2", "idx": "5-2", "title": "논리 복제", "keywords": "logical replication publication subscription apply worker tablesync worker logical decoding wal_level copy_data streaming parallel origin none 양방향 bidirectional publish_via_partition_root refresh" },
+        { "id": "item-5-3", "idx": "5-3", "title": "논리/물리 복제를 활용한 전일자 배치 환경 구성", "keywords": "batch 전일자 배치 promote pg_ctl promote disable enable subscription snapshot 스냅샷 통합복제서버" },
+        { "id": "item-5-4", "idx": "5-4", "title": "복제 슬롯", "keywords": "replication slot pg_replication_slots confirmed_flush_lsn active_pid max_slot_wal_keep_size wal_keep_size pg_drop_replication_slot pg_controldata WAL 볼륨 full 장애" },
+        { "id": "item-5-5", "idx": "5-5", "title": "LSN과 WAL 파일명", "keywords": "LSN log sequence number timeline WAL file id segment id pg_walfile_name 24자리 16진수 hex" }
+      ]
+    },
+    {
+      "id": "ch6",
+      "short": "CH 6",
+      "navTitle": "백업과 복구",
+      "title": "백업과 복구",
+      "lead": "논리 백업은 <b>데이터를 보관</b>하고, 물리 백업은 <b>장애 시점까지 되돌린다</b>. 둘은 대체재가 아니다.",
+      "items": [
+        { "id": "item-6-1", "idx": "6-1", "title": "논리 백업과 복구", "keywords": "pg_dump pg_dumpall pg_restore psql format plain custom directory tar compress gzip lz4 zstd jobs parallel COPY \\copy on_error ignore log_verbosity csv delimiter" },
+        { "id": "item-6-2", "idx": "6-2", "title": "물리 백업과 복구", "keywords": "physical backup pg_basebackup pgBackRest incremental differential full backup 증분 차등 전체 델타복구 delta restore PITR 시점복구 archive" }
+      ]
+    },
+    {
+      "id": "ch7",
+      "short": "CH 7",
+      "navTitle": "모니터링",
+      "title": "모니터링",
+      "lead": "PostgreSQL의 모니터링은 <b>뷰를 아는 것</b>이 전부에 가깝다. 어떤 뷰가 무엇을 알려주고, 무엇은 끝내 알려주지 않는지.",
+      "items": [
+        { "id": "item-7-2", "idx": "7-2", "title": "데이터베이스 모니터링", "keywords": "pg_stat_database numbackends xact_commit blks_read blks_hit active_time stats_reset delta 델타값 초당 처리량 top-down" },
+        { "id": "item-7-3", "idx": "7-3", "title": "세션 모니터링", "keywords": "pg_stat_activity datname pid usename application_name client_addr xact_start query_start wait_event state backend_xmin query_id compute_query_id pg_blocking_pids extract epoch" },
+        { "id": "item-7-4", "idx": "7-4", "title": "SQL 모니터링", "keywords": "log_min_duration_statement auto_explain pg_stat_statements slow query 슬로우쿼리 total_exec_time shared_blks_hit shared_blks_read local temp queryid track_planning explain analyze buffers" },
+        { "id": "item-7-5", "idx": "7-5", "title": "I/O 모니터링", "keywords": "pg_stat_io buffer access strategy ring buffer 링버퍼 BAS_NORMAL BAS_BULKREAD BAS_BULKWRITE BAS_VACUUM track_io_timing pg_stat_wal pg_waldump full page write pg_stat_all_tables pg_statio_all_tables vacuum_buffer_usage_limit" },
+        { "id": "item-7-6", "idx": "7-6", "title": "복제 모니터링", "keywords": "pg_stat_replication write_lag flush_lag replay_lag sent_lsn write_lsn flush_lsn replay_lsn pg_wal_lsn_diff sync_state 복제지연" },
+        { "id": "item-7-7", "idx": "7-7", "title": "작업 진행 상황 모니터링", "keywords": "progress view pg_stat_progress_create_index pg_stat_progress_vacuum pg_stat_progress_cluster pg_stat_progress_copy phase 진행률 basebackup analyze" }
+      ]
+    },
+    {
+      "id": "ch8",
+      "short": "CH 8",
+      "navTitle": "트랜잭션과 대기이벤트",
+      "title": "트랜잭션과 대기이벤트",
+      "lead": "락은 <b>어떤 명령이 어떤 모드를 잡는가</b>로 환원된다. 대기이벤트는 그 결과를 사람이 읽을 수 있게 이름 붙인 것이다.",
+      "items": [
+        { "id": "item-8-1", "idx": "8-1", "title": "트랜잭션과 락", "keywords": "lock row level table level access share row exclusive share update exclusive access exclusive deadlock deadlock_timeout multixact pg_multixact pg_stat_slru pg_locks virtualxid fastpath slowpath tuple lock select for update for share for key share FK" },
+        { "id": "item-8-2", "idx": "8-2", "title": "대기이벤트", "keywords": "wait event pg_wait_events DataFileRead WALInsert WALWrite WALSync BufferMapping transactionid tuple virtualxid relation LWLock fsync log file sync 오라클 LGWR" }
+      ]
+    },
+    {
+      "id": "ch9",
+      "short": "CH 9",
+      "navTitle": "Vacuum",
+      "title": "Vacuum",
+      "lead": "PostgreSQL은 이전 버전의 데이터를 <b>테이블 안에</b> 쌓는다. 그래서 Vacuum은 청소가 아니라 <em>MVCC를 성립시키는 조건</em>이다.",
+      "items": [
+        { "id": "item-9-1", "idx": "9-1", "title": "MVCC 모델과 PG MVCC 특징", "keywords": "MVCC dead tuple live tuple bloat 블로팅 XMIN XMAX 32bit XID wraparound frozen anti-wraparound FrozenTransactionId signed int 21.5억 43억" },
+        { "id": "item-9-2", "idx": "9-2", "title": "Vacuum 기본", "keywords": "VACUUM FULL FREEZE ANALYZE SKIP_LOCKED INDEX_CLEANUP TRUNCATE PARALLEL pageinspect heap_page_items WAL 발생량 single page cleanup 싱글페이지클린업 vacuumlo orphan LOB pg_largeobject AGE relfrozenxid visibility map ALL_VISIBLE ALL_FROZEN" },
+        { "id": "item-9-3", "idx": "9-3", "title": "Vacuum 및 Autovacuum 관련 주요 파라미터", "keywords": "autovacuum launcher worker naptime max_workers vacuum_cost_delay vacuum_cost_limit scale_factor threshold insert_threshold freeze_max_age multixact_freeze_max_age vacuum_freeze_min_age mxid_age relminmxid" },
+        { "id": "item-9-4", "idx": "9-4", "title": "Slow Query 수행과 Vacuum", "keywords": "cutoff backend_xmin snapshot too old removable cutoff XID gap 슬로우쿼리 반복 업데이트 pgbench sale_event 블로팅" },
+        { "id": "item-9-5", "idx": "9-5", "title": "복제 충돌과 Hot Standby Feedback", "keywords": "replication conflict hot_standby_feedback max_standby_streaming_delay max_standby_archive_delay pg_stat_database_conflicts canceling statement due to conflict with recovery 복제충돌" },
+        { "id": "item-9-6", "idx": "9-6", "title": "Heap Only Tuples 및 fillfactor", "keywords": "HOT heap only tuple fillfactor CTID HOT chain n_tup_hot_upd n_tup_newpage_upd bt_page_items 인덱스 갱신 회피 VACUUM FULL" }
+      ]
+    }
+  ]
+}

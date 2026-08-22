@@ -1,0 +1,658 @@
+<article class="item" id="item-6-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6-1</div>
+    <h3>컨테이너 속 데이터가 사라지는 이유</h3>
+    <p class="item-tagline">읽기 전용 이미지 레이어 위에 컨테이너마다 얇은 기록 가능 레이어가 하나씩 얹힌다. 그 레이어의 수명이 컨테이너의 수명이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    컨테이너의 파일 시스템은 <b>공유되는 읽기 전용 레이어 + 컨테이너 전용 기록 가능 레이어</b>다.
+    데이터가 사라지는 이유는 쓴 내용이 전부 후자에만 남고, 그 레이어가 컨테이너와 함께 삭제되기 때문이다.
+  </div>
+
+  <h4>컨테이너의 파일 시스템</h4>
+  <ul>
+    <li>컨테이너의 디스크는 이미지 레이어를 순서대로 연결해 만든 <b>가상 파일 시스템</b>이다.</li>
+    <li>모든 컨테이너는 독립된 파일 시스템을 갖는다.</li>
+    <li>같은 이미지에서 실행된 컨테이너는 처음엔 같은 내용이지만, 한쪽의 파일을 수정해도 다른 쪽에는 영향이 없다.</li>
+  </ul>
+
+  <h5>컨테이너의 파일시스템이 독립적임을 확인해 보기</h5>
+  <p>같은 이미지로 시작한 컨테이너지만 내부 내용물이 서로 다르다. 각 컨테이너가 독립적인 저장 공간을 가진다는 증명이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run --name rn1 diamol/ch06-random-number
+$ docker run --name rn2 diamol/ch06-random-number
+
+$ docker cp rn1:/random/number.txt number1.txt
+Successfully copied 2.05kB to /Users/imkdw/number1.txt
+$ docker cp rn2:/random/number.txt number2.txt
+Successfully copied 2.05kB to /Users/imkdw/number2.txt
+
+$ cat number1.txt
+10341
+
+$ cat number2.txt
+8719</code></pre>
+  </div>
+
+  <h4>컨테이너 파일시스템 구성</h4>
+  <p>기본적으로 이미지 레이어와 컨테이너의 기록 가능 레이어로 나뉜다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>공유 여부</th><th>쓰기</th><th>수명</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>이미지 레이어</b></td>
+          <td>모든 컨테이너가 공유</td>
+          <td class="t-center t-no">✗ 읽기 전용</td>
+          <td>이미지를 지울 때까지</td>
+        </tr>
+        <tr>
+          <td><b>기록 가능 레이어</b></td>
+          <td>컨테이너마다 하나씩</td>
+          <td class="t-center t-ok">✓ 수정 가능</td>
+          <td class="t-no">컨테이너와 동일 — 지우면 함께 삭제</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 300" width="640" role="img" aria-label="rn1 과 rn2 두 컨테이너가 각자의 기록 가능 레이어를 갖고, 앱 레이어와 OS 레이어는 이미지에서 공유한다">
+        <rect x="8" y="44" width="184" height="204" rx="9" class="dg-fill-bg dg-stroke"/>
+        <text x="100" y="68" class="dg-text dg-mono" font-size="13" font-weight="700" text-anchor="middle">rn1</text>
+        <rect x="26" y="82" width="148" height="38" rx="5" class="dg-fill-soft dg-stroke"/>
+        <text x="100" y="106" class="dg-accent" font-size="11" text-anchor="middle">기록 가능 레이어</text>
+        <text x="100" y="136" class="dg-mono dg-text-sub" font-size="10.5" text-anchor="middle">number.txt = 10341</text>
+        <rect x="26" y="150" width="148" height="34" rx="5" class="dg-fill-bg dg-stroke"/>
+        <rect x="26" y="194" width="148" height="34" rx="5" class="dg-fill-bg dg-stroke"/>
+
+        <rect x="232" y="44" width="176" height="204" rx="9" class="dg-fill-soft dg-stroke"/>
+        <text x="320" y="66" class="dg-text dg-mono" font-size="10.5" text-anchor="middle">diamol/ch06-</text>
+        <text x="320" y="82" class="dg-text dg-mono" font-size="10.5" text-anchor="middle">random-number</text>
+        <rect x="250" y="150" width="140" height="34" rx="5" class="dg-fill-bg dg-stroke"/>
+        <text x="320" y="172" class="dg-text" font-size="11" text-anchor="middle">앱 레이어</text>
+        <rect x="250" y="194" width="140" height="34" rx="5" class="dg-fill-bg dg-stroke"/>
+        <text x="320" y="216" class="dg-text" font-size="11" text-anchor="middle">OS 레이어</text>
+
+        <rect x="448" y="44" width="184" height="204" rx="9" class="dg-fill-bg dg-stroke"/>
+        <text x="540" y="68" class="dg-text dg-mono" font-size="13" font-weight="700" text-anchor="middle">rn2</text>
+        <rect x="466" y="82" width="148" height="38" rx="5" class="dg-fill-soft dg-stroke"/>
+        <text x="540" y="106" class="dg-accent" font-size="11" text-anchor="middle">기록 가능 레이어</text>
+        <text x="540" y="136" class="dg-mono dg-text-sub" font-size="10.5" text-anchor="middle">number.txt = 8719</text>
+        <rect x="466" y="150" width="148" height="34" rx="5" class="dg-fill-bg dg-stroke"/>
+        <rect x="466" y="194" width="148" height="34" rx="5" class="dg-fill-bg dg-stroke"/>
+
+        <path d="M248 167 L 178 167" fill="none" class="dg-stroke" marker-end="url(#fs-arr)"/>
+        <path d="M248 211 L 178 211" fill="none" class="dg-stroke" marker-end="url(#fs-arr)"/>
+        <path d="M392 167 L 462 167" fill="none" class="dg-stroke" marker-end="url(#fs-arr)"/>
+        <path d="M392 211 L 462 211" fill="none" class="dg-stroke" marker-end="url(#fs-arr)"/>
+        <defs>
+          <marker id="fs-arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+
+        <text x="320" y="278" class="dg-accent" font-size="11.5" text-anchor="middle">아래 2개는 읽기 전용 레이어 — 두 컨테이너가 같은 실체를 본다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>같은 이미지, 다른 난수</b> — 각자 자기 기록 가능 레이어에 썼기 때문이다.
+      아래 두 레이어는 물리적으로 한 벌만 존재하고 둘이 함께 본다.
+    </div>
+  </div>
+
+  <h4>이미지 레이어 수정하기</h4>
+  <ul>
+    <li>읽기 전용이라 수정이 안 되는 게 맞지만, <b>기록 중 복사(copy-on-write)</b> 방식으로 수정이 가능하다.</li>
+    <li>컨테이너나 앱에서는 이 과정이 드러나지 않지만, 도커가 스토리지를 아끼는 매우 좋은 방법이다.</li>
+    <li>컨테이너 속 파일을 수정하면 해당 컨테이너에만 영향을 미친다.
+      <ul>
+        <li>이미지를 공유하는 다른 컨테이너나 이미지는 영향을 받지 않는다.</li>
+        <li>수정된 파일은 그 컨테이너의 기록 가능 레이어에만 존재하기 때문이다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">기록 중 복사가 실제로 하는 일 <span class="badge b-blue">보강</span></p>
+      <p>
+        읽기 전용 레이어의 파일을 수정하면 도커는 <b>그 파일을 기록 가능 레이어로 통째로 복사한 뒤 거기서 수정</b>한다.
+        그래서 큰 파일을 한 바이트만 고쳐도 파일 전체가 복사되고, 그 순간 디스크와 시간을 쓴다.
+        데이터베이스처럼 큰 파일을 계속 쓰는 워크로드를 기록 가능 레이어 위에 두면 안 되는
+        성능상의 이유가 여기 있다. 그런 데이터는 <a href="#item-6-2">볼륨</a>이나 <a href="#item-6-3">바인드 마운트</a>로 뺀다.
+      </p>
+    </div>
+  </div>
+
+  <h5>예제</h5>
+  <ul>
+    <li>최초 컨테이너 실행 시에는 <code>https://...</code> 문구가 출력된다.</li>
+    <li>이후 "asdf" 문구가 담긴 파일을 f1 컨테이너에 복사했다.</li>
+    <li>f1 컨테이너를 다시 실행하니 복사한 내용이 출력된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run --name f1 diamol/ch06-file-display
+https://www.manning.com/books/learn-docker-in-a-month-of-lunches
+
+$ echo "asdf" &gt; url.txt
+
+$ docker container cp url.txt f1:/input.txt
+Successfully copied 2.05kB to f1:/input.txt
+
+$ docker container start --attach f1
+asdf</code></pre>
+  </div>
+
+  <h4>컨테이너 스토리지 라이프사이클 확인하기</h4>
+  <ul>
+    <li>최초 구동 이후 f3 컨테이너의 파일을 복사하니 컨테이너와 동일한 내용이 보인다.</li>
+    <li>이후 f3 컨테이너를 삭제하니 <code>No such container: f3</code> 에러가 발생한다.</li>
+    <li>컨테이너의 파일 시스템이 컨테이너와 동일한 라이프사이클을 지닌 것을 확인할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run --name f3 diamol/ch06-file-display
+https://www.manning.com/books/learn-docker-in-a-month-of-lunches
+
+$ docker container cp f3:/input.txt .
+Successfully copied 2.05kB to /Users/imkdw/.
+
+$ cat input.txt
+https://www.manning.com/books/learn-docker-in-a-month-of-lunches
+
+$ docker rm -f f3
+f3
+
+$ docker container cp f3:/input.txt .
+<span class="err-line">Error response from daemon: No such container: f3</span></code></pre>
+  </div>
+
+  <h4>컨테이너의 영속성?</h4>
+  <ul>
+    <li>도커로 DB 를 운영하다가 컨테이너를 교체한다고 해 보자. 교체되면 지워지고 다시 뜨는 것이므로 내부 내용이 전부 삭제된다.</li>
+    <li>이런 상황을 감안해 도커는 <b>도커 볼륨(Docker Volume)</b> 과 <b>마운트(Mount)</b> 를 제공한다.</li>
+    <li>이 둘은 컨테이너와 다른 라이프사이클을 가지므로, 지속돼야 할 데이터를 담을 수 있다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컨테이너 파일 시스템 = 공유되는 읽기 전용 이미지 레이어 + 컨테이너 전용 기록 가능 레이어.</li>
+      <li>쓰기는 전부 기록 가능 레이어에 남고, 그 레이어는 컨테이너와 함께 사라진다.</li>
+      <li>이미지 레이어 수정은 기록 중 복사로 처리된다. 큰 파일에는 비용이 크다.</li>
+      <li>살아남아야 할 데이터는 볼륨이나 마운트로 컨테이너 밖에 둔다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6-2</div>
+    <h3>도커 볼륨을 사용하는 컨테이너 실행하기</h3>
+    <p class="item-tagline">볼륨은 컨테이너를 위한 USB 다. 뽑아서 다른 컨테이너에 꽂을 수 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    볼륨은 <b>이미지 / 컨테이너와 동급인 도커 리소스</b>다. 그래서 <code>docker volume ls</code> 로 조회되고,
+    컨테이너를 지워도 남으며, 다른 컨테이너에 그대로 다시 붙일 수 있다.
+  </div>
+
+  <h4>도커 볼륨</h4>
+  <ul>
+    <li>도커 볼륨은 도커에서 스토리지를 다루는 단위다.</li>
+    <li>마치 컨테이너를 위한 USB 라고 이해하면 쉽다.</li>
+  </ul>
+
+  <h4>수동으로 직접 생성해서 컨테이너에 연결하기</h4>
+  <ul>
+    <li><code>docker volume create &lt;volume_name&gt;</code> 으로 볼륨을 만들 수 있다.</li>
+    <li><code>-v</code> 플래그로 컨테이너 시작 시 볼륨을 마운트할 수 있다.</li>
+    <li>아래는 v1 컨테이너에서 데이터를 추가하면 v2 에도 반영되는(디스크 공유) 모습이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 도커 볼륨 생성
+$ docker volume create todo-list
+todo-list
+
+# v1 컨테이너 시작
+$ docker run -d -p 8011:80 -v todo-list:/data --name todo-v1 diamol/ch06-todo-list
+7d0dcc71e0a98fe8a315a98d9d30a9504ad2e1c777c47add41c5c7a9810b91b1
+
+# v2 컨테이너 시작 (같은 볼륨을 붙인다)
+$ docker run -d -p 8012:80 -v todo-list:/data --name todo-v2 diamol/ch06-todo-list:v2
+66b19a7f8118ee52addfa0bb570e883faec599c3505272b277f5a67696b70878</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 300" width="640" role="img" aria-label="8011 포트의 v1 컨테이너에서 todo from v1 을 추가하면 8012 포트의 v2 컨테이너 목록에도 같은 항목이 보인다">
+        <!-- left browser: v1 new item -->
+        <rect x="8" y="8" width="290" height="180" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="8" y="8" width="290" height="28" rx="8" class="dg-fill-soft"/>
+        <line x1="8" y1="36" x2="298" y2="36" class="dg-stroke"/>
+        <text x="24" y="27" class="dg-accent dg-mono" font-size="10.5">localhost:8011/new</text>
+        <rect x="8" y="36" width="72" height="152" class="dg-fill-soft"/>
+        <text x="44" y="60" class="dg-text-sub" font-size="8.5" text-anchor="middle">DIAMOL</text>
+        <text x="44" y="96" class="dg-text-sub" font-size="9" text-anchor="middle">Home</text>
+        <text x="44" y="122" class="dg-accent" font-size="9" text-anchor="middle" font-weight="700">New item</text>
+        <text x="44" y="148" class="dg-text-sub" font-size="9" text-anchor="middle">To-do list</text>
+        <text x="96" y="78" class="dg-text" font-size="16" font-weight="800">New Item</text>
+        <rect x="96" y="94" width="150" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="106" y="112" class="dg-text dg-mono" font-size="10.5">todo from v1</text>
+        <rect x="252" y="94" width="38" height="26" rx="4" class="dg-fill-soft dg-stroke"/>
+        <text x="271" y="112" class="dg-text" font-size="9.5" text-anchor="middle">Submit</text>
+
+        <!-- right browser: v2 list -->
+        <rect x="342" y="8" width="290" height="180" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="342" y="8" width="290" height="28" rx="8" class="dg-fill-soft"/>
+        <line x1="342" y1="36" x2="632" y2="36" class="dg-stroke"/>
+        <text x="358" y="27" class="dg-accent dg-mono" font-size="10.5">localhost:8012/list</text>
+        <rect x="342" y="36" width="72" height="152" class="dg-fill-soft"/>
+        <text x="378" y="60" class="dg-text-sub" font-size="8.5" text-anchor="middle">DIAMOL</text>
+        <text x="378" y="96" class="dg-text-sub" font-size="9" text-anchor="middle">Home</text>
+        <text x="378" y="122" class="dg-text-sub" font-size="9" text-anchor="middle">New item</text>
+        <text x="378" y="148" class="dg-accent" font-size="9" text-anchor="middle" font-weight="700">To-do list</text>
+        <text x="430" y="72" class="dg-text" font-size="16" font-weight="800">TODO List</text>
+        <line x1="430" y1="112" x2="616" y2="112" class="dg-stroke"/>
+        <text x="430" y="128" class="dg-text" font-size="10" font-weight="700">Item</text>
+        <text x="546" y="128" class="dg-text" font-size="10" font-weight="700">Date Added</text>
+        <line x1="430" y1="136" x2="616" y2="136" class="dg-stroke"/>
+        <text x="430" y="154" class="dg-accent dg-mono" font-size="10.5">todo from v1</text>
+        <text x="546" y="154" class="dg-text-sub" font-size="9.5">26 October 2024</text>
+
+        <!-- shared volume -->
+        <path d="M150 192 L 150 224 L 300 224" fill="none" class="dg-stroke"/>
+        <path d="M490 192 L 490 224 L 340 224" fill="none" class="dg-stroke"/>
+        <rect x="230" y="238" width="180" height="46" rx="8" class="dg-fill-soft dg-stroke"/>
+        <text x="320" y="258" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="middle">volume: todo-list</text>
+        <text x="320" y="274" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">두 컨테이너의 /data 에 함께 마운트</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>서로 다른 이미지 버전, 서로 다른 포트, 같은 데이터</b> — 볼륨을 공유하므로
+      v1 에서 넣은 항목이 v2 목록에 그대로 보인다. 컨테이너 교체형 업데이트가 가능한 이유가 이것이다.
+    </div>
+  </div>
+
+  <h4>Dockerfile 에서 VOLUME 인스트럭션 사용하기</h4>
+  <p><code>VOLUME</code> 인스트럭션은 <code>VOLUME &lt;target-directory&gt;</code> 형식으로 쓴다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Dockerfile</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-dockerfile"># 일부 내용
+
+# set in the base image - `/data` for Linux, `C:\data` for Windows
+VOLUME $SQLITE_DATA_DIRECTORY
+
+# ...</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 명시적인 -v 연결은 없지만 Dockerfile 의 VOLUME 때문에 볼륨이 붙는다
+$ docker run -d --name todo1 -p 8010:80 diamol/ch06-todo-list
+cbb8096739d34b4cc51a5dcc48b2c3c38b0c64a2721c260c9316d8785843e4c1
+
+# mounts 항목에서 볼륨 관련 정보를 확인할 수 있다
+$ docker inspect --format '{{.Mounts}}' todo1
+[{volume 5baf8fce2819f63c731417e0be889db779460f88316ffc44d099c2ce9150f8f3 /var/lib/docker/volumes/5baf8fce.../_data /data local  true }]
+
+# 볼륨은 도커에서 이미지나 컨테이너와 동급인 요소다
+$ docker volume ls
+DRIVER    VOLUME NAME
+local     5baf8fce2819f63c731417e0be889db779460f88316ffc44d099c2ce9150f8f3</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이름 없는 볼륨이 조용히 쌓인다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>VOLUME</code> 인스트럭션만 있고 <code>-v</code> 로 이름을 주지 않으면, 위 출력처럼
+        <b>해시 이름의 익명 볼륨</b>이 컨테이너를 실행할 때마다 새로 생긴다.
+        컨테이너를 지워도 이 볼륨은 남으므로 실습을 반복하면 디스크가 계속 차오른다.
+        <code>docker volume ls</code> 로 확인하고, 붙어 있지 않은 볼륨은
+        <code>docker volume prune</code> 으로 정리한다. <b>실제 데이터가 들어 있는 볼륨도
+        같이 지워지므로 반드시 목록을 먼저 확인할 것.</b>
+        컨테이너를 지울 때 익명 볼륨까지 함께 지우려면 <code>docker rm -v</code> 를 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>docker volume create</code> + <code>-v 볼륨명:컨테이너경로</code> 가 기본형이다.</li>
+      <li>같은 볼륨을 여러 컨테이너에 붙이면 데이터를 공유한다. 컨테이너 교체 업데이트의 기반이다.</li>
+      <li>Dockerfile 의 <code>VOLUME</code> 은 이름 없는 볼륨을 자동으로 만든다. 방치하면 디스크가 찬다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6-3</div>
+    <h3>파일시스템 마운트를 사용하는 컨테이너 실행하기</h3>
+    <p class="item-tagline">볼륨이 도커가 관리하는 저장소라면, 바인드 마운트는 호스트의 특정 폴더를 그대로 꽂는 것이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    바인드 마운트는 <b>호스트 파일 시스템의 폴더를 컨테이너 폴더로 만든다</b>.
+    호스트에서 접근 가능한 것이면 SSD 든 SAN 이든 컨테이너에서 그대로 쓸 수 있다.
+  </div>
+
+  <h4>볼륨의 장점</h4>
+  <ul>
+    <li>컨테이너와 스토리지의 라이프사이클을 분리하면서, 도커를 쓰던 방식 그대로 스토리지를 제어할 수 있다.</li>
+  </ul>
+
+  <h4>바인드 마운트(Bind Mount)</h4>
+  <ul>
+    <li>호스트의 스토리지를 컨테이너에 좀 더 직접적으로 연결하는 수단이다.</li>
+    <li>즉 호스트 컴퓨터 파일 시스템의 폴더를 컨테이너 파일 시스템의 폴더로 만든다.</li>
+    <li>SSD, 디스크 어레이, SAN 등 호스트에서 접근 가능한 파일 시스템이면 무엇이든 컨테이너에서 쓸 수 있다.</li>
+  </ul>
+
+  <h4><code>--mount</code> 플래그</h4>
+  <p>컨테이너에서 읽기 전용으로 쓰게 하려면 <code>--mount</code> 옵션에 <code>readonly</code> 를 함께 지정할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ source="$(pwd)/databases" &amp;&amp; target='/data'
+
+$ mkdir ./databases
+
+$ docker run --mount type=bind,source=$source,target=$target -d -p 8013:80 diamol/ch06-todo-list
+6e071e5e8cdf9b1bb641ed5dc586144264fb3f1d6e0cb7c8396d47a81fcd5c40
+
+$ ll ./databases
+total 24
+-rw-r--r--@ 1 imkdw  staff    12K 10 27 11:09 todo-list.db</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">볼륨과 바인드 마운트, 언제 무엇을 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>볼륨</th><th>바인드 마운트</th></tr></thead>
+          <tbody>
+            <tr><td>저장 위치</td><td>도커가 관리하는 영역</td><td>호스트의 지정한 경로</td></tr>
+            <tr><td>호스트 경로 의존</td><td class="t-center t-ok">✓ 없음 (이식성 높음)</td><td class="t-center t-no">✗ 경로가 머신마다 달라짐</td></tr>
+            <tr><td>호스트에서 직접 편집</td><td class="t-center t-no">✗ 불편</td><td class="t-center t-ok">✓ 바로 가능</td></tr>
+            <tr><td>주 용도</td><td>운영 데이터 (DB 등)</td><td>개발 중 소스 공유, 설정 파일 주입</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        읽기 전용으로 붙이려면 <code>--mount type=bind,source=...,target=...,readonly</code> 로 쓴다.
+        설정 파일을 주입할 때는 이 옵션을 붙이는 게 안전하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>바인드 마운트는 호스트 폴더를 컨테이너 폴더로 그대로 노출한다.</li>
+      <li><code>--mount type=bind,source=&lt;호스트&gt;,target=&lt;컨테이너&gt;</code> 형식, <code>readonly</code> 를 붙일 수 있다.</li>
+      <li>운영 데이터는 볼륨, 개발 중 소스 공유와 설정 주입은 바인드 마운트가 기본 선택이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6-4</div>
+    <h3>파일 시스템 마운트의 한계점</h3>
+    <p class="item-tagline">마운트는 합치는 게 아니라 덮는다. 그리고 그 규칙마저 OS 마다 다르다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>디렉터리를 마운트하면 원본이 기존 내용을 완전히 대체한다.</b>
+    이미지 안에 있던 파일은 사라진 게 아니라 가려진 것이며, 마운트를 떼면 다시 나타난다.
+  </div>
+
+  <h4>기존 이미지의 파일 시스템 사용 불가</h4>
+  <ul>
+    <li>이미 존재하는 대상 폴더에 마운트하면, 마운트의 원본 폴더가 기존 폴더를 완전히 대체한다.</li>
+    <li>즉 이미지에 포함돼 있던 원래 파일은 사용할 수 없다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ source="$(pwd)/new" &amp;&amp; target='/init';
+
+# 기존 이미지에 포함되어 있던 파일들
+$ docker run diamol/ch06-bind-mount
+abc.txt
+def.txt
+
+# 마운트된 디스크에 존재하는 파일들 — 이미지 쪽 파일은 보이지 않는다
+$ docker run --mount type=bind,source=$source,target=$target diamol/ch06-bind-mount
+1.txt
+2.txt</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">실무에서 가장 자주 밟는 지뢰</p>
+      <p>
+        개발 중 소스 폴더를 <code>-v $(pwd):/app</code> 로 붙이는 순간, 이미지 빌드 때 설치해 둔
+        <code>/app/node_modules</code> 가 <b>호스트 폴더에 가려서 사라진다</b>.
+        컨테이너 안에서 <code>Cannot find module</code> 이 뜨는 전형적인 원인이다.
+        해결은 그 하위 경로에 익명 볼륨을 겹쳐 덮어쓰기를 막는 것이다.
+      </p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">해결</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-bash">$ docker run -v $(pwd):/app -v /app/node_modules myapp
+#                            └ 이 경로만 호스트가 아닌 볼륨으로 덮어 되살린다</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4>OS 별 파일 시스템의 차이점 문제</h4>
+  <p>호스트 컴퓨터의 <b>파일 하나</b>를 컨테이너에 이미 존재하는 디렉터리로 마운트할 때, OS 마다 결과가 다르다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>호스트 OS</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>유닉스 계열</td><td class="t-ok">디렉터리의 파일이 합쳐져 이미지 + 호스트 마운트 파일이 모두 보인다</td></tr>
+        <tr><td>윈도우</td><td class="t-no"><code>Invalid Mount Config</code> 에러가 발생한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">단일 파일 마운트의 또 다른 함정 <span class="badge b-blue">보강</span></p>
+      <p>
+        리눅스에서 단일 파일을 마운트하면 <b>inode 단위로 묶인다</b>. 그래서 호스트에서 그 파일을
+        에디터로 저장할 때(대부분 임시 파일을 만들고 <code>rename</code> 하는 방식) 마운트가 끊겨,
+        컨테이너 안에서는 변경이 반영되지 않는다.
+        설정 파일을 실시간으로 갈아 끼워야 한다면 파일 하나가 아니라 <b>그 파일이 든 디렉터리</b>를
+        마운트하는 편이 안전하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>디렉터리 마운트는 이미지의 기존 내용을 가린다. 합쳐지지 않는다.</li>
+      <li><code>node_modules</code> 가 사라지는 문제는 하위 경로에 익명 볼륨을 겹쳐 해결한다.</li>
+      <li>단일 파일 마운트는 OS 마다 동작이 다르고 에디터 저장에 끊긴다. 디렉터리 단위로 마운트하자.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6-5</div>
+    <h3>컨테이너 파일시스템이 만들어지는 방법</h3>
+    <p class="item-tagline">여러 출처를 하나의 가상 디스크로 합치는 것이 유니언 파일 시스템. 저장할 곳을 고르는 다섯 가지 선택지.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    한 컨테이너에서 <b>기록 가능 레이어는 정확히 하나</b>이고, 나머지는 여러 개일 수 있다.
+    데이터를 어디에 둘지는 "이 데이터가 컨테이너보다 오래 살아야 하는가"로 갈린다.
+  </div>
+
+  <h4>유니언 파일 시스템(Union File System)</h4>
+  <ul>
+    <li>모든 컨테이너는 도커가 여러 출처에서 모아 만든 단일 가상 디스크로 구성된 파일 시스템을 갖는다. 이것을 <b>유니언 파일 시스템</b>이라고 부른다.</li>
+    <li>유니언 파일 시스템은 OS 마다 다르게 구현돼 있지만, 사용자가 신경 쓸 필요는 없다. 도커가 알아서 처리한다.</li>
+    <li>파일 시스템 중 기록 가능 레이어는 하나만 가질 수 있고, 나머지는 여러 개가 가능하다.</li>
+  </ul>
+
+  <h4>컨테이너 스토리지 구성 시 고려사항</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 320" width="640" role="img" aria-label="컨테이너 파일 시스템을 구성하는 다섯 층: 기록 가능 레이어, 로컬 바인드 마운트, 분산 바인드 마운트, 볼륨 마운트, 이미지 레이어">
+        <rect x="8" y="8" width="440" height="304" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="28" y="34" class="dg-text" font-size="13" font-weight="700">Container</text>
+
+        <rect x="28" y="48" width="400" height="38" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="46" y="72" class="dg-text dg-mono" font-size="12">Writeable layer</text>
+        <path d="M432 67 L 470 67" fill="none" class="dg-stroke"/>
+        <text x="478" y="63" class="dg-accent" font-size="10.5">컨테이너 삭제 시</text>
+        <text x="478" y="77" class="dg-accent" font-size="10.5">같이 삭제</text>
+
+        <rect x="28" y="96" width="400" height="34" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="46" y="118" class="dg-text dg-mono" font-size="12">Bind mount &mdash; local</text>
+        <rect x="28" y="138" width="400" height="34" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="46" y="160" class="dg-text dg-mono" font-size="12">Bind mount &mdash; distributed</text>
+        <path d="M432 134 L 456 134 L 456 148 L 470 148" fill="none" class="dg-stroke"/>
+        <text x="478" y="138" class="dg-accent" font-size="10.5">호스트 / 네트워크</text>
+        <text x="478" y="152" class="dg-accent" font-size="10.5">저장 공간을 함께 사용</text>
+
+        <rect x="28" y="182" width="400" height="34" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="46" y="204" class="dg-text dg-mono" font-size="12">Volume mount</text>
+        <path d="M432 199 L 470 199" fill="none" class="dg-stroke"/>
+        <text x="478" y="203" class="dg-accent" font-size="10.5">도커 볼륨 &mdash; 영속성</text>
+
+        <rect x="28" y="226" width="400" height="70" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="46" y="248" class="dg-text dg-mono" font-size="12">Image layers</text>
+        <rect x="46" y="256" width="364" height="14" rx="3" class="dg-fill-bg dg-stroke"/>
+        <rect x="46" y="274" width="364" height="14" rx="3" class="dg-fill-bg dg-stroke"/>
+        <path d="M432 261 L 470 261" fill="none" class="dg-stroke"/>
+        <text x="478" y="265" class="dg-accent" font-size="10.5">읽기 전용 &mdash; 공유</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>위로 갈수록 수명이 짧고, 아래로 갈수록 공유 범위가 넓다</b> —
+      기록 가능 레이어는 컨테이너와 함께 사라지고, 이미지 레이어는 모든 컨테이너가 함께 쓴다.
+      그 사이의 세 층이 "컨테이너보다 오래 살아야 하는 데이터"를 담는 자리다.
+    </div>
+  </div>
+
+  <h5>기록 가능 레이어</h5>
+  <ul>
+    <li>캐싱 등 단기 저장에 적합하다.</li>
+    <li>각 컨테이너마다 독립적이다.</li>
+    <li>생명주기가 컨테이너와 동일해서 컨테이너가 삭제되면 같이 삭제된다.</li>
+  </ul>
+
+  <h5>로컬 바인드 마운트</h5>
+  <ul>
+    <li>호스트 PC 와 컨테이너 간 데이터를 공유하기 위해 쓴다.</li>
+    <li>예를 들어 개발 중인 코드를 컨테이너와 공유하면 다시 빌드하지 않고 바로 실행할 수 있다.</li>
+  </ul>
+
+  <h5>분산 바인드 마운트</h5>
+  <ul>
+    <li>네트워크 스토리지와 컨테이너 간 데이터 공유를 위해 쓴다.</li>
+    <li>가용성이 높지만 로컬 파일 시스템에 비해 지원하지 않는 기능이 있을 수 있다.</li>
+  </ul>
+
+  <h5>볼륨 마운트</h5>
+  <ul>
+    <li>앱의 데이터를 볼륨에 영구히 저장할 수 있다(영속성).</li>
+    <li>컨테이너를 교체하는 방식으로 앱을 업데이트해도 이전 버전 컨테이너의 데이터를 그대로 유지할 수 있다.</li>
+  </ul>
+
+  <h5>이미지 레이어</h5>
+  <ul>
+    <li>컨테이너의 초기 파일 시스템을 구성한다.</li>
+    <li>읽기 전용이며 여러 컨테이너가 공유한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">고르는 기준 한 줄 <span class="badge b-blue">보강</span></p>
+      <p>
+        <b>"컨테이너를 지웠을 때 같이 사라져도 되는가?"</b> 하나만 물으면 된다.
+        사라져도 되면 기록 가능 레이어(임시 파일, 캐시), 남아야 하면 볼륨(운영 데이터),
+        호스트에서 직접 편집해야 하면 바인드 마운트(개발 소스, 설정 파일)다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컨테이너 파일 시스템은 여러 출처를 겹쳐 만든 단일 가상 디스크(유니언 파일 시스템)다.</li>
+      <li>기록 가능 레이어는 하나뿐이고, 나머지 층은 여러 개일 수 있다.</li>
+      <li>수명 기준으로 고른다 — 임시는 기록 가능 레이어, 영속은 볼륨, 편집 필요는 바인드 마운트.</li>
+    </ul>
+  </div>
+</article>

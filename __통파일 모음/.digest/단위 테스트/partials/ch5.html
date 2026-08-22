@@ -1,0 +1,663 @@
+<article class="item" id="item-5-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-1</div>
+    <h3>목과 스텁 구분</h3>
+    <p class="item-tagline">목은 나가는 상호작용을 모방하고 검사한다. 스텁은 들어오는 상호작용을 모방만 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>스텁으로 상호작용을 검증하지 않는다.</b> 최종 결과가 아닌 것을 검증하는 이 관행을 <b>과잉 명세</b>라고 부른다.
+  </div>
+
+  <h4>테스트 대역 유형</h4>
+
+  <p>테스트 대역은 모든 유형의 비운영용 가짜 의존성을 설명하는 포괄적인 용어다. 크게 <b>목(Mock)</b> 과 <b>스텁(Stub)</b> 두 갈래로 나뉜다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>목</th><th>스텁</th></tr></thead>
+      <tbody>
+        <tr><td>방향</td><td>SUT 에서 <b>나가는</b> 상호작용</td><td>SUT 로 <b>들어오는</b> 상호작용</td></tr>
+        <tr><td>역할</td><td>모방하고 <b>검사한다</b></td><td>모방만 한다</td></tr>
+        <tr><td>의미</td><td>SUT 가 상태를 변경하기 위해 의존성을 호출</td><td>SUT 가 입력 데이터를 얻기 위해 의존성을 호출</td></tr>
+        <tr><td>세부 종류</td><td>목, 스파이</td><td>스텁, 더미, 페이크</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  SUT["SUT"] -->|"이메일 발송<br>나가는 상호작용"| SMTP["SMTP 서버<br>목"]
+  SUT -->|"데이터 검색<br>들어오는 상호작용"| DB[("DB<br>스텁")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 의존성이라도 통신의 방향이 역할을 결정한다</b> — 상태를 바꾸러 나가는 호출은 목으로 검사하고, 데이터를 받아오는 호출은 스텁으로 모방만 한다.</div>
+  </div>
+
+  <ul>
+    <li><b>더미</b>는 <code>null</code> 이나 아무 문자열처럼 단순하고 하드코딩된 값이다.</li>
+    <li><b>페이크</b>는 보통 아직 존재하지 않는 의존성을 대체하고자 구현한다.</li>
+    <li>목은 일반적으로 전용 프레임워크의 도움을 받아 생성하고, <b>스파이</b>는 직접 작성한다.</li>
+  </ul>
+
+  <h4>도구로서의 목과 테스트 대역으로서의 목</h4>
+
+  <p>"목" 이라는 단어가 두 가지를 가리키기 때문에 혼동이 생긴다. <b>목 라이브러리의 클래스</b>도 목이라 부르는데, 그 클래스는 실제 목을 만드는 데 도움을 줄 뿐 그 자체가 목은 아니다.</p>
+
+  <h5>예제 1 — 목 도구로 목 생성하기</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">controller.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface IEmailGateway {
+  sendGreetingsEmail(email: string): void;
+}
+
+it("sending_a_greetings_email", () =&gt; {
+  // jest.Mocked&lt;IEmailGateway&gt; 는 "도구로서의 목"
+  // mock 변수는 "테스트 대역으로서의 목"
+  const mock: jest.Mocked&lt;IEmailGateway&gt; = {
+    sendGreetingsEmail: jest.fn(),
+  };
+  const email = "user@gmail.com";
+
+  const sut = new Controller(mock);
+
+  sut.greetUser(email);
+
+  expect(mock.sendGreetingsEmail).toHaveBeenCalledWith(email);
+  expect(mock.sendGreetingsEmail).toHaveBeenCalledTimes(1);
+});</code></pre>
+  </div>
+
+  <h5>예제 2 — 목 도구로 스텁 생성하기</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">report-generator.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface IDatabase {
+  getNumberOfUsers(): number;
+}
+
+it("creating_a_report", () =&gt; {
+  // SUT 에 입력 데이터를 제공하는 호출을 모방한다
+  const stub: jest.Mocked&lt;IDatabase&gt; = {
+    getNumberOfUsers: jest.fn().mockReturnValue(10),
+  };
+  const sut = new ReportGenerator(stub);
+
+  const report = sut.createReport();
+
+  expect(report.numberOfUsers).toBe(10);
+});</code></pre>
+  </div>
+
+  <p>같은 <code>jest.fn()</code> 을 썼지만 하나는 목이고 하나는 스텁이다. <b>도구가 아니라 통신의 방향</b>이 종류를 정한다.</p>
+
+  <h4>스텁으로 상호작용을 검증하지 말라</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">report-generator.spec.ts</span>
+      <span class="code-tag bad">과잉 명세</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("creating_a_report", () =&gt; {
+  const stub: jest.Mocked&lt;IDatabase&gt; = {
+    getNumberOfUsers: jest.fn().mockReturnValue(10),
+  };
+  const sut = new ReportGenerator(stub);
+
+  const report = sut.createReport();
+
+  expect(report.numberOfUsers).toBe(10); // 최종 결과 검증 — 좋다
+
+  // 안티패턴: 스텁으로 관련 의존성 간 상호작용을 검증
+  expect(stub.getNumberOfUsers).toHaveBeenCalledTimes(1);
+});</code></pre>
+  </div>
+
+  <p>보고서의 숫자가 맞다면 <code>getNumberOfUsers</code> 를 몇 번 호출했든 상관없다. 캐시를 넣어 호출 횟수를 줄이는 리팩터링을 하면 기능은 멀쩡한데 테스트만 깨진다. <b>최종 결과가 아닌 것을 검증하는 관행을 과잉 명세</b>라 부른다.</p>
+
+  <h4>목과 스텁 함께 쓰기</h4>
+
+  <p>목과 스텁을 같이 쓰는 객체는 보통 그냥 "목" 이라고 부른다. 목이라는 사실이 스텁이라는 사실보다 더 중요하기 때문이다. 스텁으로 준비된 응답을 반환하고, 목으로 행위를 검증한다. <b>서로 다른 메소드</b>이므로 "스텁과 상호작용을 검증하지 말라" 는 원칙을 깨지 않는다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("purchase_fails_when_not_enough_inventory", () =&gt; {
+  const storeMock: jest.Mocked&lt;IStore&gt; = {
+    // 스텁 역할: 준비된 응답을 돌려준다
+    hasEnoughInventory: jest.fn().mockReturnValue(false),
+    // 목 역할: 호출 여부를 검사할 대상
+    removeInventory: jest.fn(),
+  };
+  const sut = new Customer();
+
+  const success = sut.purchase(storeMock, Product.Shampoo, 5);
+
+  expect(success).toBe(false);
+  expect(storeMock.removeInventory).not.toHaveBeenCalled();
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>expect(storeMock.removeInventory(Product.Shampoo, 5)).toHaveBeenCalledTimes(0)</code> 으로 적혀 있는데, 이렇게 쓰면 <b>검증문 안에서 목을 실제로 한 번 호출</b>해 버려서 검증 자체가 무의미해진다. 목 함수는 호출하지 않고 <b>참조만</b> 넘겨야 한다.</p>
+    </div>
+  </div>
+
+  <h4>목과 스텁은 명령과 조회에 어떻게 관련돼 있는가</h4>
+
+  <p>목과 스텁의 구분은 <b>명령 조회 분리(CQS, Command Query Separation)</b> 원칙과 맞닿아 있다. 모든 메소드는 명령이거나 조회여야 하고, 둘을 혼용해서는 안 된다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>사이드 이펙트</th><th>반환값</th><th>대역</th></tr></thead>
+      <tbody>
+        <tr><td><b>명령(Command)</b></td><td class="t-center t-ok">있음</td><td class="t-center t-no">없음</td><td>목</td></tr>
+        <tr><td><b>조회(Query)</b></td><td class="t-center t-no">없음</td><td class="t-center t-ok">있음</td><td>스텁</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">cqs.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// 목 — 명령에 해당하는 메소드
+const mock: jest.Mocked&lt;IEmailGateway&gt; = {
+  sendGreetingsEmail: jest.fn(),
+};
+expect(mock.sendGreetingsEmail).toHaveBeenCalledWith("some@email.com");
+
+// 스텁 — 조회에 해당하는 메소드
+const stub: jest.Mocked&lt;IDatabase&gt; = {
+  getNumberOfUsers: jest.fn().mockReturnValue(10),
+};</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>목 = 나가는 상호작용을 <b>모방 + 검사</b>. 스텁 = 들어오는 상호작용을 <b>모방만</b>.</li>
+      <li>도구(<code>jest.fn()</code>)가 아니라 <b>통신의 방향</b>이 종류를 정한다.</li>
+      <li>스텁으로 상호작용을 검증하면 과잉 명세다.</li>
+      <li>CQS 로 보면 명령이 목, 조회가 스텁에 대응한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-2</div>
+    <h3>식별할 수 있는 동작과 구현 세부 사항</h3>
+    <p class="item-tagline">클래스에서 호출해야 하는 연산의 수가 1보다 크면 구현 세부 사항이 새고 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    코드는 <b>식별할 수 있는 동작</b>이거나 <b>구현 세부 사항</b>이지, 둘 다는 될 수 없다. 좋은 API 설계와 좋은 단위 테스트는 같은 목표를 공유한다.
+  </div>
+
+  <h4>식별할 수 있는 동작은 공개 API 와 다르다</h4>
+
+  <p>모든 제품 코드는 서로 겹치지 않는 두 개의 차원으로 분류된다.</p>
+
+  <ul>
+    <li>공개 API 인가, 비공개 API 인가</li>
+    <li>식별할 수 있는 동작인가, 구현 세부 사항인가</li>
+  </ul>
+
+  <p>코드가 <b>식별할 수 있는 동작</b>이려면 아래 둘 중 하나를 만족해야 한다.</p>
+
+  <ul>
+    <li>클라이언트가 목표를 달성하는 데 도움이 되는 <b>연산</b>을 노출한다. 연산은 계산을 수행하거나 사이드 이펙트를 내거나 둘 다 하는 메소드다.</li>
+    <li>클라이언트가 목표를 달성하는 데 도움이 되는 <b>상태</b>를 노출한다.</li>
+  </ul>
+
+  <p>이상적으로 시스템의 공개 API 는 식별할 수 있는 동작과 일치하고, 모든 구현 세부 사항은 캡슐화되어야 한다.</p>
+
+  <h4>구현 세부 사항 유출 — 연산의 예</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag bad">유출</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  name: string;
+
+  normalizeName(name: string) {
+    const result = name.trim();
+
+    if (result.length &gt; 50) {
+      return result.slice(0, 50);
+    }
+
+    return result;
+  }
+}
+
+class UserController {
+  renameUser(userId: number, newName: string) {
+    const user = getUserFromDatabase(userId);
+
+    // 클라이언트가 두 개의 연산을 순서대로 호출해야만 한다
+    const normalizedName = user.normalizeName(newName);
+    user.name = normalizedName;
+
+    saveUserToDatabase(user);
+  }
+}</code></pre>
+  </div>
+
+  <p>정규화 없이 <code>user.name</code> 에 값을 넣을 수도 있으므로, 클라이언트가 규칙을 어기는 순간 불변성이 깨진다. 해결책은 <code>normalizeName</code> 을 감추고 세터 안에서 <b>내부적으로</b> 호출하는 것이다.</p>
+
+  <h4>잘 설계된 API</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">캡슐화</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  private _name: string;
+
+  constructor(name: string) {
+    this._name = this.normalizeName(name);
+  }
+
+  getName() {
+    return this._name;
+  }
+
+  setName(name: string) {
+    this._name = this.normalizeName(name);
+  }
+
+  private normalizeName(name: string) {
+    const result = (name ?? "").trim();
+    if (result.length &gt; 50) {
+      return result.slice(0, 50);
+    }
+
+    return result;
+  }
+}
+
+class UserController {
+  renameUser(userId: number, newName: string) {
+    const user = getUserFromDatabase(userId);
+
+    user.setName(newName); // 연산 하나로 끝난다
+
+    saveUserToDatabase(user);
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">유출을 알아채는 신호</p>
+      <p>클라이언트가 목표 하나를 달성하려고 호출해야 하는 <b>연산의 수가 1보다 크면</b>, 그 클래스는 구현 세부 사항을 유출하고 있을 가능성이 높다.</p>
+    </div>
+  </div>
+
+  <h4>잘 설계된 API 와 캡슐화</h4>
+
+  <p>캡슐화는 <b>불변성 위반</b>이라고도 하는 모순을 방지하는 조치다. 불변성은 항상 참이어야 하는 조건이며, 구현 세부 사항을 노출하면 불변성 위반이 따라온다.</p>
+
+  <p>장기적으로 코드베이스 유지 보수에서 캡슐화가 중요한 이유는 <b>복잡도</b> 때문이다. 캡슐화는 궁극적으로 단위 테스트와 동일한 목표를 달성한다. 소프트웨어 프로젝트의 지속적인 성장이다.</p>
+
+  <h4>구현 세부 사항 유출 — 상태의 예</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">message-renderer.ts</span>
+      <span class="code-tag bad">상태 유출</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class MessageRenderer implements IRenderer {
+  readonly subRenderers: IRenderer[]; // 클라이언트에게 필요한가?
+
+  constructor() {
+    this.subRenderers = [
+      new HeaderRenderer(),
+      new BodyRenderer(),
+      new FooterRenderer(),
+    ];
+  }
+
+  render(message: Message): string {
+    return this.subRenderers
+      .map((renderer) =&gt; renderer.render(message))
+      .join("");
+  }
+}</code></pre>
+  </div>
+
+  <p><code>subRenderers</code> 가 클라이언트에게 필요한가? 답은 아니오다. 클라이언트에게 필요한 것은 <code>render</code> 하나뿐이므로, 나머지는 감춰야 한다. <a href="#item-4-1">4-1</a> 에서 본 깨지기 쉬운 테스트는 정확히 이 유출된 상태를 붙잡고 있었다.</p>
+
+  <h4>API 와 테스트의 관계</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>공개 여부</th><th>식별할 수 있는 동작</th><th>구현 세부 사항</th></tr></thead>
+      <tbody>
+        <tr><td><b>공개</b></td><td class="t-center t-ok">좋음</td><td class="t-center t-no">나쁨</td></tr>
+        <tr><td><b>비공개</b></td><td class="t-center">해당 없음</td><td class="t-center t-ok">좋음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">좋은 API 설계 = 좋은 단위 테스트</p>
+      <p>API 를 잘 설계하면 단위 테스트도 자동으로 좋아진다. <b>연산과 상태를 최소한으로 노출</b>하고, 목표 달성에 직접 도움이 되는 코드만 공개한다. 나머지는 전부 구현 세부 사항이므로 비공개 API 뒤에 숨긴다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>코드는 식별할 수 있는 동작이거나 구현 세부 사항이다. 둘 다일 수 없다.</li>
+      <li>목표 하나에 필요한 연산이 둘 이상이면 유출을 의심한다.</li>
+      <li>캡슐화는 불변성 위반을 막는 조치이며, 단위 테스트와 목표가 같다.</li>
+      <li>공개해야 할 것은 동작뿐. 나머지는 비공개 뒤로 숨긴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-3</div>
+    <h3>목과 테스트 취약성 간의 관계</h3>
+    <p class="item-tagline">시스템 간 통신에 쓰는 목은 안전하고, 시스템 내부 통신에 쓰는 목은 위험하다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>시스템 내부 통신은 구현 세부 사항이고, 시스템 간 통신은 그렇지 않다.</b> 목은 후자에만 쓴다.
+  </div>
+
+  <h4>육각형 아키텍쳐 정의</h4>
+
+  <p>전형적인 앱은 <b>도메인</b>과 <b>앱 서비스</b> 두 계층으로 구성된다. 도메인 계층 위에 앱 서비스 계층이 있으며, 외부 환경과의 통신을 조정한다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 300" width="560" role="img" aria-label="육각형 아키텍쳐 - 안쪽 도메인 계층과 이를 둘러싼 앱 서비스 계층, 그리고 외부 시스템들">
+        <path d="M362 150 L321 221 L239 221 L198 150 L239 79 L321 79 Z" class="dg-fill-soft dg-stroke" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="280" cy="150" r="33" fill="var(--accent-weak)" stroke="var(--accent)" stroke-width="1.6"/>
+
+        <text x="280" y="154" class="dg-text" font-size="11.5" text-anchor="middle" font-weight="700">도메인</text>
+        <text x="280" y="206" class="dg-text-sub" font-size="11" text-anchor="middle">앱 서비스</text>
+
+        <line x1="280" y1="79" x2="280" y2="56" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M276 64 L280 54 L284 64" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="280" y="44" class="dg-text" font-size="12" text-anchor="middle">메세지 버스</text>
+
+        <line x1="316" y1="132" x2="404" y2="112" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M396 108 L406 111 L398 117" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="470" y="108" class="dg-text" font-size="12" text-anchor="middle">도메인</text>
+        <text x="470" y="125" class="dg-text-sub" font-size="10.5" text-anchor="middle">비즈니스 로직</text>
+
+        <line x1="212" y1="176" x2="140" y2="150" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M148 146 L138 149 L146 155" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="88" y="146" class="dg-text" font-size="12" text-anchor="middle">앱 서비스</text>
+
+        <line x1="240" y1="214" x2="160" y2="248" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M168 240 L157 250 L170 251" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="104" y="264" class="dg-text" font-size="12" text-anchor="middle">SMTP 서비스</text>
+
+        <line x1="320" y1="214" x2="400" y2="248" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M392 240 L403 250 L390 251" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="464" y="264" class="dg-text" font-size="12" text-anchor="middle">서드파티 시스템</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>도메인은 육각형의 한가운데에 갇혀 있다</b> — 외부 앱은 앱 서비스 계층의 공통 인터페이스로만 연결되며, 아무도 도메인 계층에 직접 접근하지 못한다.</div>
+  </div>
+
+  <h5>도메인 계층과 앱 서비스 계층 간 관심사 분리</h5>
+  <p>도메인 계층은 비즈니스 로직에 대해서만 책임진다. 앱 서비스에는 <b>어떠한 비즈니스 로직도</b> 존재하면 안 된다.</p>
+
+  <h5>앱 내부 통신</h5>
+  <p>앱 서비스 계층에서 도메인 계층으로 흐르는 <b>단방향 의존성</b>을 규정한다. 앱 계층은 도메인을 알지만 그 반대는 안 된다. 도메인 계층은 외부 환경에서 완전히 격리되어야 한다.</p>
+
+  <h5>앱 간의 통신</h5>
+  <p>외부 앱은 앱 서비스 계층의 공통 인터페이스를 통해서만 연결된다. 아무도 도메인 계층에 직접 접근할 수 없다.</p>
+
+  <h4>프랙탈(Fractal) 특성</h4>
+
+  <p>API 를 잘 설계하면 테스트도 프랙탈 구조를 갖기 시작한다. 달성하는 목표는 같지만 <b>서로 다른 수준에서</b> 동작을 검증한다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  EXT["외부 클라이언트"] -->|"목표 (Usecase)"| APP["앱 서비스"]
+  APP --> EXT
+  APP -->|"하위 목표"| D1["도메인 1"]
+  D1 --> APP
+  APP -->|"하위 목표"| D2["도메인 2"]
+  D2 --> APP
+  T1["테스트 1"] -.-> APP
+  T2["테스트 2"] -.-> D1
+  T3["테스트 3"] -.-> D2
+      </pre>
+    </div>
+    <div class="figure-cap"><b>어떤 테스트도 비즈니스 요구 사항까지 거슬러 올라갈 수 있어야 한다</b> — 상위 테스트는 목표를, 하위 테스트는 하위 목표를 검증한다. 각 테스트는 도메인 전문가에게 의미 있는 이야기를 전달한다.</div>
+  </div>
+
+  <h4>시스템 내부 통신과 시스템 간 통신</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>정의</th><th>성격</th><th>목 사용</th></tr></thead>
+      <tbody>
+        <tr><td><b>시스템 내부 통신</b></td><td>앱 내 클래스 간의 통신</td><td>구현 세부 사항</td><td class="t-center t-no">쓰면 테스트가 취약해진다</td></tr>
+        <tr><td><b>시스템 간 통신</b></td><td>앱이 다른 앱과 하는 통신</td><td>식별할 수 있는 동작</td><td class="t-center t-ok">여기에만 쓴다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>시스템 내부 통신과 시스템 간 통신의 예</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer-controller.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class CustomerController {
+  purchase(customerId: number, productId: number, quantity: number) {
+    // 시스템 간 통신 — 데이터베이스와의 통신
+    const customer = this.customerRepository.getById(customerId);
+    const product = this.productRepository.getById(productId);
+
+    // 시스템 내부 통신 — Customer, Store 클래스 간 통신
+    const isSuccess = customer.purchase(this.mainStore, product, quantity);
+
+    // 시스템 간 통신 — 이메일 발송을 위한 SMTP 서버와의 통신
+    if (isSuccess) {
+      this.emailGateway.sendReceipt(customer.email, product.name, quantity);
+    }
+
+    return isSuccess;
+  }
+}</code></pre>
+  </div>
+
+  <h4>취약한 테스트로 이어지지 않는 목 사용</h4>
+
+  <p>SMTP 서버와의 통신을 목으로 대체하면, 내부를 어떻게 리팩터링하더라도 <b>통신 유형 자체는 그대로 유지</b>되므로 테스트 취약성이 생기지 않는다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer-controller.spec.ts</span>
+      <span class="code-tag good">시스템 간 통신을 목으로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface IEmailGateway {
+  sendReceipt(email: string, productName: string, quantity: number): void;
+}
+
+it("successful_purchase", () =&gt; {
+  const mock: jest.Mocked&lt;IEmailGateway&gt; = {
+    sendReceipt: jest.fn(),
+  };
+  const sut = new CustomerController(mock);
+
+  const isSuccess = sut.purchase(1, 2, 5);
+
+  expect(isSuccess).toBe(true);
+
+  // 시스템 경계 밖으로 나간 사이드 이펙트를 검증한다
+  expect(mock.sendReceipt).toHaveBeenCalledWith(
+    "customer@email.com",
+    "Shampoo",
+    5
+  );
+  expect(mock.sendReceipt).toHaveBeenCalledTimes(1);
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>toHaveBeenCalledWith([...])</code> 처럼 인자를 <b>배열 하나로 묶어</b> 넘겼는데, Jest 는 각 인자를 <b>순서대로 나열</b>해야 한다. 배열로 감싸면 "인자 1개를 받았고 그것이 배열" 이라는 뜻이 되어 검증이 실패한다.</p>
+    </div>
+  </div>
+
+  <h4>취약한 테스트로 이어지는 목 사용</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer.spec.ts</span>
+      <span class="code-tag bad">내부 통신을 목으로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("purchase_succeeds_when_enough_inventory", () =&gt; {
+  const storeMock: jest.Mocked&lt;IStore&gt; = {
+    hasEnoughInventory: jest
+      .fn()
+      .mockImplementation(
+        (product: Product, quantity: number) =&gt;
+          product.name === "Shampoo" &amp;&amp; quantity === 5
+      ),
+    removeInventory: jest.fn(),
+  };
+  const sut = new Customer();
+
+  const success = sut.purchase(storeMock, Product.Shampoo, 5);
+
+  expect(success).toBe(true);
+  expect(storeMock.removeInventory).toHaveBeenCalledWith(Product.Shampoo, 5);
+
+  // removeInventory 는 고객이 목표에 도달하는 "중간 단계", 즉 구현 세부 사항이다.
+  // 이걸 검증하는 순간 테스트가 내부 구현과 결합된다.
+  expect(storeMock.removeInventory).toHaveBeenCalledTimes(1);
+});</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>육각형 아키텍쳐 = 도메인 + 앱 서비스. 의존성은 앱 서비스 → 도메인 단방향.</li>
+      <li>잘 설계된 시스템에서는 테스트가 <b>프랙탈</b> 구조를 갖는다.</li>
+      <li>시스템 내부 통신은 구현 세부 사항, 시스템 간 통신은 식별할 수 있는 동작이다.</li>
+      <li>목은 <b>앱 경계를 넘는 통신</b>에만 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-4</div>
+    <h3>단위 테스트 고전파 런던파 재고</h3>
+    <p class="item-tagline">모든 프로세스 외부 의존성을 목으로 해야 하는 것은 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>완전히 통제권을 가진 프로세스 외부 의존성에 목을 쓰면 깨지기 쉬운 테스트가 된다.</b> 그 디비와 앱은 하나의 시스템으로 취급한다.
+  </div>
+
+  <h4>런던파의 문제</h4>
+
+  <ul>
+    <li>불변 의존성을 제외한 <b>모든</b> 의존성에 목 사용을 권장한다.</li>
+    <li>시스템 내 통신과 시스템 간 통신을 구분하지 않는다.</li>
+    <li>목을 무분별하게 쓰면 구현 세부 사항에 결합되어 리팩터링 내성이 사라진다.</li>
+    <li>리팩터링 내성이 저하되면 <a href="#item-4-4">테스트의 가치는 0 이 된다.</a></li>
+  </ul>
+
+  <h4>고전파의 문제</h4>
+
+  <p>고전파는 테스트 간 공유하는 의존성(디비, 메세지 버스 등)만 교체하자고 하므로 이 문제에서 훨씬 유리하다. 하지만 고전파 역시 <b>시스템 간 통신을 다루는 데는 이상적이지 않다.</b> 런던파만큼은 아니어도 목 사용을 지나치게 장려하는 편이다.</p>
+
+  <h4>모든 프로세스 외부 의존성을 목으로 해야 하는 건 아니다</h4>
+
+  <p>고전파가 공유 의존성을 피하라고 하는 이유는 <b>테스트 격리</b> 때문이다. 테스트가 실행 컨텍스트에서 서로 방해하면 병렬 처리가 불가능해진다. 테스트를 병렬로, 순차적으로, 또는 임의의 순서로 실행할 수 있는 것을 테스트 격리라고 부른다.</p>
+
+  <h5>어떨 때 실제 인스턴스를 써도 되는가</h5>
+
+  <ul>
+    <li>프로세스 외부 의존성이 <b>앱을 통해서만</b> 접근 가능하다면, 그 의존성과의 통신은 시스템에서 식별할 수 있는 동작이 아니다.</li>
+    <li>실제로 외부에서 관찰할 수 없는 프로세스 외부 의존성은 <b>앱의 일부로</b> 작용한다.</li>
+    <li>앱 전용 디비가 대표적이다. 어떤 외부 시스템도 그 디비에 직접 접근하지 못한다.</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">통제권을 가진 의존성을 목으로 처리하면</p>
+      <p>깨지기 쉬운 테스트로 이어진다. 테이블을 나누거나 컬럼 이름을 바꾸는 순수 리팩터링에도 테스트가 함께 깨지기 때문이다. <b>디비와 앱은 하나의 시스템으로 취급해야 한다.</b></p>
+    </div>
+  </div>
+
+  <h5>목을 사용한 동작 검증</h5>
+
+  <p>중요한 것은 <b>클라이언트의 목표까지 거슬러 올라갈 수 있는 동작</b>이다. 목은 앱의 경계를 넘나드는 상호작용을 검증할 때, 그리고 그 상호작용의 사이드 이펙트가 <b>외부 환경에서 보일 때</b>만 동작과 관련이 있다.</p>
+
+  <p>이 기준이 <a href="#item-8-2">8-2 관리 의존성 / 비관리 의존성</a> 으로 이어진다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>런던파는 목을 남용해 리팩터링 내성을 잃는다.</li>
+      <li>고전파도 시스템 간 통신 처리는 이상적이지 않다.</li>
+      <li>앱이 완전히 통제하는 프로세스 외부 의존성은 <b>앱의 일부</b>다. 목으로 바꾸지 않는다.</li>
+      <li>목의 기준은 "앱 경계를 넘고, 외부에서 사이드 이펙트가 보이는가" 다.</li>
+    </ul>
+  </div>
+</article>

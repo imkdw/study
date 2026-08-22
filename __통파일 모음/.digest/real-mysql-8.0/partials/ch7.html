@@ -1,0 +1,435 @@
+<article class="item" id="item-7-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-1</div>
+    <h3>MySQL 서버의 암호화</h3>
+    <p class="item-tagline">암·복호화가 <b>스토리지 엔진의 I/O 레이어에서만</b> 일어난다. 그래서 인덱스가 멀쩡하고, 그래서 Transparent 다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    TDE는 <b>디스크에 닿는 순간에만</b> 암호화한다. 버퍼 풀 안의 데이터는 평문이므로 옵티마이저도 인덱스도 아무것도 달라지지 않는다.
+  </div>
+
+  <h4>어디를 암호화하는가</h4>
+  <ul>
+    <li>보안 감사에서 필수적으로 언급되는 부분이다.</li>
+    <li>애플리케이션 암호화는 주민번호 같은 중요 정보를 가진 <b>컬럼 단위</b>로 수행한다.</li>
+    <li>DB 수준에서는 <b>테이블 단위</b>로 암호화를 적용한다.</li>
+  </ul>
+
+  <h4>MySQL 서버의 데이터 암호화 — TDE</h4>
+  <ul>
+    <li>DB 서버와 디스크 사이의 <b>데이터 I/O 지점</b>에서 암·복호화를 수행한다.</li>
+    <li>스토리지 엔진의 I/O 레이어에서만 일어나는 일이다.</li>
+    <li>이런 특성 때문에 <b>TDE(Transparent Data Encryption)</b> 라고 부른다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["MySQL 엔진 (옵티마이저, 실행 엔진)"] --> B["버퍼 풀 (평문 상태)"]
+  B -->|"쓰기: 암호화"| C["디스크 데이터 파일 (암호문)"]
+  C -->|"읽기: 복호화"| B
+      </pre>
+    </div>
+    <div class="figure-cap"><b>암호화 경계는 버퍼 풀과 디스크 사이 딱 한 곳이다</b> — 그 위쪽 레이어는 암호화 사실을 전혀 모른다.</div>
+  </div>
+
+  <h4>2단계 키 관리</h4>
+  <ul>
+    <li>암호화 키는 <b>키링 플러그인</b>이 관리하며, 여러 종류의 키링 플러그인이 있다.</li>
+    <li>커뮤니티 에디션에서는 <code>keyring_file</code> 플러그인만 쓸 수 있다.</li>
+    <li>기본적으로 <b>2단계(2-Tier) 키 관리</b> 방식을 사용한다 — 마스터 키와 테이블스페이스 키.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 520 200" width="520" role="img" aria-label="마스터 키가 테이블스페이스 키를 암호화하고, 테이블스페이스 키가 데이터를 암호화하는 2단계 구조">
+        <rect x="180" y="16" width="160" height="42" rx="8" class="dg-fill-soft"/>
+        <rect x="180" y="16" width="160" height="42" rx="8" class="dg-stroke" fill="none"/>
+        <text x="260" y="36" class="dg-text" font-size="13" text-anchor="middle">마스터 키</text>
+        <text x="260" y="51" class="dg-text-sub" font-size="11" text-anchor="middle">키링 파일 / 외부 KMS</text>
+
+        <line x1="260" y1="58" x2="150" y2="92" class="dg-stroke" stroke-width="1.5"/>
+        <line x1="260" y1="58" x2="370" y2="92" class="dg-stroke" stroke-width="1.5"/>
+        <text x="260" y="80" class="dg-text-sub" font-size="11" text-anchor="middle">AES-256 ECB 로 암호화</text>
+
+        <rect x="70" y="92" width="160" height="42" rx="8" class="dg-fill-bg"/>
+        <rect x="70" y="92" width="160" height="42" rx="8" class="dg-stroke" fill="none"/>
+        <text x="150" y="112" class="dg-text" font-size="12" text-anchor="middle">테이블스페이스 키 A</text>
+        <text x="150" y="127" class="dg-text-sub" font-size="11" text-anchor="middle">table_a.ibd 헤더에 저장</text>
+
+        <rect x="290" y="92" width="160" height="42" rx="8" class="dg-fill-bg"/>
+        <rect x="290" y="92" width="160" height="42" rx="8" class="dg-stroke" fill="none"/>
+        <text x="370" y="112" class="dg-text" font-size="12" text-anchor="middle">테이블스페이스 키 B</text>
+        <text x="370" y="127" class="dg-text-sub" font-size="11" text-anchor="middle">table_b.ibd 헤더에 저장</text>
+
+        <line x1="150" y1="134" x2="150" y2="160" class="dg-stroke" stroke-width="1.5"/>
+        <line x1="370" y1="134" x2="370" y2="160" class="dg-stroke" stroke-width="1.5"/>
+        <text x="260" y="180" class="dg-text-sub" font-size="11" text-anchor="middle">데이터 파일은 AES-256 CBC 로 암호화</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>마스터 키를 바꿔도 데이터는 다시 암호화되지 않는다</b> — 테이블스페이스 키만 새 마스터 키로 재암호화하면 끝이다.</div>
+  </div>
+
+  <h5>마스터 키</h5>
+  <ul>
+    <li>외부 키 관리 솔루션이나 디스크의 파일에서 가져온다.</li>
+    <li>외부에 노출될 위험이 있으니 <b>주기적으로 변경</b>하는 것이 좋다.</li>
+    <li>마스터 키가 변경되면 기존 키로 테이블스페이스 키를 복호화한 뒤 <b>새 키로 다시 암호화</b>한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER INSTANCE ROTATE INNODB MASTER KEY;</code></pre>
+  </div>
+
+  <h5>테이블스페이스 키</h5>
+  <ul>
+    <li>암호화된 테이블이 생성될 때마다 <b>고유한 키</b>가 만들어진다.</li>
+    <li>테이블스페이스 키는 <b>마스터 키로 암호화</b>되어 저장된다.</li>
+    <li>생성된 키는 각 테이블 데이터 파일의 <b>헤더</b>에 보관된다.</li>
+    <li>한 번 생성된 테이블스페이스 키는 <b>테이블이 삭제되지 않는 한 절대 바뀌지 않는다.</b></li>
+  </ul>
+
+  <h5>암호화 알고리즘</h5>
+  <ul>
+    <li>TDE가 지원하는 알고리즘은 <b>AES 256비트</b> 뿐이다.</li>
+    <li>테이블스페이스 키는 <b>AES-256 ECB</b> 로 암호화된다.</li>
+    <li>실제 데이터 파일은 <b>AES-256 CBC</b> 로 암호화된다.</li>
+  </ul>
+
+  <h4>암호화의 성능</h4>
+  <ul>
+    <li>한 번 읽은 페이지는 복호화되어 버퍼 풀에 남으므로, <b>평문 테이블과 성능이 거의 같다.</b></li>
+    <li>암·복호화 시간만큼 쿼리가 지연되긴 하지만, 디스크 동기화는 백그라운드 스레드가 담당하므로 <b>사용자 쿼리가 그만큼 지연되지는 않는다.</b></li>
+    <li>읽기·쓰기 자체는 평문 대비 3~6배 느리지만, <b>밀리초 단위</b>라 체감되지 않는다.</li>
+    <li><code>performance_schema.file_summary_by_instance</code> 테이블에서 속도를 확인할 수 있다.</li>
+  </ul>
+
+  <h5>데이터 크기</h5>
+  <ul>
+    <li>평문이 짧으면 암호문이 더 클 수 있지만, <b>데이터 페이지 자체가 이미 훨씬 크므로</b> 사실상 동일하다.</li>
+    <li>암호화를 적용한다고 버퍼 풀의 효율이나 메모리 사용 효율이 떨어지지는 않는다.</li>
+  </ul>
+
+  <h5>압축과 암호화 — 순서가 중요하다</h5>
+  <ul>
+    <li>MySQL은 <b>압축을 먼저 하고 그다음 암호화</b>한다.</li>
+    <li>암호화된 결과물은 랜덤 바이트에 가까워서, 순서를 뒤집으면 <b>압축률이 거의 0</b> 이 된다.</li>
+    <li>또 버퍼 풀에 암호화된 데이터가 올라간다면 접근할 때마다 복호화해야 하므로 성능이 저하된다.</li>
+  </ul>
+
+  <h4>암호화와 복제</h4>
+  <ul>
+    <li>소스와 레플리카 사이에 모든 데이터가 복제되지만 <b>키는 복제되지 않는다.</b></li>
+    <li>각 인스턴스는 <b>고유한 마스터 키</b>를 갖는다. 원격 키 관리 솔루션을 쓰더라도 서로 다른 마스터 키를 갖도록 설정해야 한다.</li>
+    <li><code>ALTER INSTANCE ROTATE INNODB MASTER KEY</code> 명령 자체는 레플리카로 복제되지만, <b>키 값이 복제되는 것은 아니다.</b></li>
+    <li>따라서 <b>백업할 때마다 키링 파일의 백업도 함께</b> 고려해야 한다. 키가 없으면 백업은 쓰레기다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>TDE의 암호화 경계는 <b>스토리지 엔진의 I/O 레이어 한 곳</b>뿐이다.</li>
+      <li>마스터 키(외부) → 테이블스페이스 키(파일 헤더) → 데이터 의 <b>2단계 구조</b>. 로테이션은 마스터 키만 갈아 끼운다.</li>
+      <li>테이블스페이스 키는 AES-256 <b>ECB</b>, 데이터 파일은 AES-256 <b>CBC</b>.</li>
+      <li>압축 → 암호화 순서를 지켜야 압축이 의미를 갖는다.</li>
+      <li><b>키는 복제되지 않는다.</b> 백업에는 반드시 키링도 포함한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-2</div>
+    <h3>keyring_file 플러그인 설치</h3>
+    <p class="item-tagline">TDE 플러그인은 <b>다른 어떤 플러그인보다 먼저</b> 초기화되어야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>plugin-load</code> 가 아니라 <code>early-plugin-load</code> 다. 데이터 딕셔너리를 열기 전에 키가 준비되어 있어야 하기 때문이다.
+  </div>
+
+  <h4>keyring_file 이 하는 일</h4>
+  <ul>
+    <li>마스터 키를 저장하는 파일을 생성한다.</li>
+    <li>이때 <b>평문으로 저장</b>되므로, 그 파일이 유출되면 암호화 자체가 무의미해진다.</li>
+    <li>HashiCorp Vault를 쓰고 있다면 <code>keyring_vault</code> 플러그인도 함께 검토할 만하다.</li>
+  </ul>
+
+  <h4>초기화</h4>
+  <ul>
+    <li>TDE 플러그인은 다른 플러그인과 달리 <b>가장 먼저 초기화</b>되어야 한다.</li>
+    <li><code>my.cnf</code> 에 <code>early-plugin-load</code> 로 등록한다.</li>
+    <li>키 파일 경로도 지정할 수 있는데, <b>MySQL 서버 1대당 1개의 키</b>를 가져야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">my.cnf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">early-plugin-load = keyring_file.so
+keyring-file-data-path = /etc/mysql/keyring.keyring</code></pre>
+  </div>
+
+  <h4>재부팅 이후</h4>
+  <ul>
+    <li><code>SHOW PLUGINS</code> 로 설치된 플러그인을 확인한다.</li>
+    <li>최초에는 키 값이 비어 있다. <code>ALTER INSTANCE ROTATE INNODB MASTER KEY</code> 를 실행하면 새 키가 생성된다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.34 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>keyring_file</code> <b>플러그인은 8.0.34에서 deprecated</b> 되었다. 지금 새로 구성한다면 같은 역할을 하는 <b>컴포넌트</b>인 <code>component_keyring_file</code> 을 쓴다. 컴포넌트는 <code>early-plugin-load</code> 대신 데이터 디렉터리의 <code>mysqld.my</code> 매니페스트 파일과 별도의 컴포넌트 설정 파일로 구성한다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/keyring-component-installation.html">MySQL 8.0 Reference Manual — Keyring Component Installation</a>)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>키링은 <code>early-plugin-load</code> 로 <b>가장 먼저</b> 올린다.</li>
+      <li><code>keyring_file</code> 은 <b>키를 평문으로</b> 저장한다 — 파일 권한과 백업 격리가 곧 보안이다.</li>
+      <li>최초 키는 <code>ALTER INSTANCE ROTATE INNODB MASTER KEY</code> 를 한 번 실행해야 생긴다.</li>
+      <li>8.0.34+ 신규 구성은 <code>component_keyring_file</code> 로.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-3</div>
+    <h3>테이블 암호화</h3>
+    <p class="item-tagline">애플리케이션 암호화는 인덱스를 포기하지만, DB 암호화는 포기하지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    DB단 암호화는 <b>인덱스 작업을 모두 마친 뒤 마지막에 페이지를 암호화</b>한다. 그래서 범위 검색도 정렬도 그대로 된다.
+  </div>
+
+  <h4>테이블 생성</h4>
+  <ul>
+    <li>키링 플러그인은 마스터 키 생성·관리만 담당한다. 그 이후 테이블을 만들고 쓰는 방법은 어느 키링을 쓰든 동일하다.</li>
+    <li>테이블 생성 시 끝에 <code>ENCRYPTION='Y'</code> 를 붙이면 된다.</li>
+    <li><code>default_table_encryption</code> 을 켜면 <b>모든 테이블이 기본적으로 암호화</b>되어 생성된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">encrypt.sql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE TABLE encrypt_test (
+  id INT PRIMARY KEY AUTO_INCREMENT
+) ENCRYPTION="Y";
+
+SET default_table_encryption = OFF;</code></pre>
+  </div>
+
+  <h4>애플리케이션 암호화와의 비교</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>암호화 시점</th><th>인덱스 활용</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>애플리케이션 암호화</td>
+          <td>INSERT 전, 애플리케이션에서</td>
+          <td class="t-center t-no">범위·정렬·LIKE 불가. 동등 비교만 가능</td>
+        </tr>
+        <tr>
+          <td>DB(TDE) 암호화</td>
+          <td>데이터 페이지를 디스크에 쓸 때</td>
+          <td class="t-center t-ok">제약 없음 — 인덱스 작업은 평문 상태에서 끝난다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>유즈케이스에 따라 다르지만, <b>큰 제약이 없다면 DB단 암호화를 권장</b>한다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">둘은 배타적이지 않다 <span class="badge b-blue">보강</span></p>
+      <p>TDE는 <b>디스크·백업 파일이 유출됐을 때</b>를 막는 방어선이다. DB 접속 권한을 가진 공격자에게는 아무 의미가 없다 — <code>SELECT</code> 하면 평문이 나온다. 주민번호처럼 <b>DBA에게조차 보이면 안 되는</b> 값은 여전히 애플리케이션 암호화가 필요하다.</p>
+    </div>
+  </div>
+
+  <h4>테이블스페이스 이동</h4>
+  <ul>
+    <li>레코드를 덤프했다가 복구하는 것보다 <b>테이블스페이스 파일을 그대로 옮기는 편이 훨씬 빠르다.</b></li>
+    <li>암호화되지 않은 테이블은 단순 명령으로 옮길 수 있다.</li>
+  </ul>
+
+  <h5>암호화된 테이블스페이스 이동</h5>
+  <ul>
+    <li><code>FLUSH TABLES &lt;source_table&gt; FOR EXPORT</code> 를 실행하면 <b>임시 마스터 키</b>가 발급되어 <code>&lt;source_table&gt;.cfg</code> 파일에 기록된다.</li>
+    <li>암호화된 테이블은 <code>.ibd</code> 뿐 아니라 <b>임시 마스터 키가 담긴 <code>.cfg</code> 파일도 반드시 함께 복사</b>해야 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>ENCRYPTION='Y'</code> 하나로 테이블 암호화가 켜진다. 전역 기본값은 <code>default_table_encryption</code>.</li>
+      <li>DB 암호화는 <b>인덱스를 온전히 쓸 수 있다</b> — 애플리케이션 암호화의 가장 큰 손실을 피한다.</li>
+      <li>단, TDE는 <b>파일 유출에 대한 방어</b>일 뿐이다. 접속 권한 기반 위협은 막지 못한다.</li>
+      <li>암호화 테이블 이동에는 <code>.ibd</code> 와 <code>.cfg</code> <b>둘 다</b> 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-4</div>
+    <h3>언두 로그 및 리두 로그 암호화</h3>
+    <p class="item-tagline">테이블을 암호화해도 <b>로그 파일에는 평문이 흐른다.</b> 별도로 켜야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    로그 암호화는 <b>켠 시점 이후부터</b>만 적용된다. 그래서 예전 키를 며칠, 길게는 몇 달 보관해야 할 수도 있다.
+  </div>
+
+  <h4>왜 별도 설정이 필요한가</h4>
+  <ul>
+    <li>디스크의 데이터 파일이 암호화되어도 <b>리두 로그와 언두 로그는 평문으로 저장</b>된다.</li>
+    <li>이 로그들은 테이블이 아니라 <b>외부 파일시스템</b>에 저장되므로 그대로 노출된다.</li>
+    <li><code>innodb_undo_log_encrypt</code>, <code>innodb_redo_log_encrypt</code> 로 각각 암호화 여부를 지정한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">my.cnf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">innodb_undo_log_encrypt = ON
+innodb_redo_log_encrypt = ON</code></pre>
+  </div>
+
+  <h4>암호화 시점</h4>
+  <ul>
+    <li>기존에는 평문으로 저장되다가, <b>암호화를 켜는 순간부터</b> 암호화되어 저장된다.</li>
+    <li>비활성화하면 마찬가지로 <b>그 이후부터</b> 평문으로 저장된다.</li>
+    <li>즉 하나의 로그 파일 집합 안에 평문 구간과 암호문 구간이 섞일 수 있다.</li>
+    <li>상황에 따라 <b>며칠 또는 몇 달 동안</b> 예전 암호화 키가 필요할 수도 있다.</li>
+  </ul>
+
+  <h4>사용되는 키</h4>
+  <ul>
+    <li>각각 <b>별도의 테이블스페이스 키</b>로 암호화된다.</li>
+    <li>실제 테이블을 암호화하는 키가 아니라 <b>새로운 테이블스페이스 키를 발급</b>받아 쓴다.</li>
+    <li>발급된 키는 리두·언두 로그 파일의 <b>헤더</b>에 저장된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테이블 암호화와 <b>로그 암호화는 별개</b>다. 각각 켜야 한다.</li>
+      <li>암호화는 <b>설정 시점 이후 기록분</b>에만 적용된다 — 과거 데이터는 소급되지 않는다.</li>
+      <li>키는 별도 발급되어 각 로그 파일 헤더에 저장된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-5</div>
+    <h3>바이너리 로그 암호화</h3>
+    <p class="item-tagline">바이너리 로그는 <b>장기간 보관</b>되기에, 암호화의 필요성이 다른 로그보다 크다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    바이너리 로그 암호화는 <b>디스크에 저장된 파일만</b> 보호한다. 소스 → 레플리카 <b>네트워크 구간은 별개</b>이며 TLS/SSL이 담당한다.
+  </div>
+
+  <h4>대상 범위</h4>
+  <ul>
+    <li>리두·언두 로그와 달리 바이너리 로그는 특수한 목적(시점 복구, 감사) 때문에 <b>장기간 디스크에 보관될 수 있다.</b></li>
+    <li>바이너리 로그 암호화는 <b>실제 디스크에 저장된 파일</b>에 대해서만 적용된다.
+      <ul>
+        <li>소스 ↔ 레플리카 <b>네트워크 구간의 암호화는 제공하지 않는다.</b></li>
+        <li>네트워크 구간까지 필요하면 <b>TLS/SSL 통신</b>으로 별도 처리해야 한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>암호화 키 관리</h4>
+  <ul>
+    <li>동일하게 <b>파일 키</b>로 암호화해서 디스크에 저장하고, 파일 키는 각 로그의 <b>헤더</b>에 담는다.</li>
+    <li><code>ALTER INSTANCE ROTATE INNODB MASTER KEY</code> 로 마스터 키를 변경할 수 있다.</li>
+  </ul>
+
+  <h5>마스터 키 변경 시 벌어지는 일</h5>
+  <ol class="steps">
+    <li><div class="step-title">새 로그 암호화 키 발급</div><p>시퀀스 번호를 증가시키고, 새 키를 만들어 키링 파일에 저장한다.</p></li>
+    <li><div class="step-title">로그 파일 스위칭</div><p>바이너리 로그 파일과 릴레이 로그 파일을 새 파일로 교체한다.</p></li>
+    <li><div class="step-title">새 파일에 적용</div><p>새 바이너리 로그 파일 키로 파일 키를 암호화해 각 로그 파일에 저장한다.</p></li>
+    <li><div class="step-title">기존 파일 재암호화</div><p>기존 바이너리·릴레이 로그의 파일 키를 읽어 새 키로 다시 암호화해 저장한다.</p></li>
+    <li><div class="step-title">옛 키 제거</div><p>기존 바이너리 로그 암호화 키를 키링에서 삭제한다.</p></li>
+  </ol>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW BINARY LOGS;
++---------------+-----------+-----------+
+| Log_name      | File_size | Encrypted |
++---------------+-----------+-----------+
+| binlog.000001 |       668 | Yes       |
+| binlog.000002 |  89088804 | Yes       |
++---------------+-----------+-----------+
+2 rows in set (0.00 sec)</code></pre>
+  </div>
+
+  <h4>mysqlbinlog 로 읽기</h4>
+  <ul>
+    <li>한 번 암호화되면 <b>암호화 키 없이는 복호화가 불가능</b>하다.</li>
+    <li>그런데 그 키는 MySQL 서버가 쥐고 있으므로, <b>로컬 파일을 직접 열어서는 읽을 수 없다.</b></li>
+    <li><code>--read-from-remote-server</code> 옵션을 주면 <b>서버에게 복호화된 내용을 요청</b>하는 방식이라 읽을 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ mysqlbinlog --read-from-remote-server \
+    --start-position=mysql-bin.000001 \
+    --stop-position=mysql-bin.000002 \
+    --database=test \
+    --user=root --password=password \
+    --host=127.0.0.1 --port=3306</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "바이너리 로그 암호화 키는 MySQL 서버가 갖고 있어서 <b>복호화가 불가능</b>하다"고 두 번 연달아 적혀 있는데, 앞뒤가 맞지 않는다. 정확히는 <b>서버 밖에서(로컬 파일 직접 읽기로는) 복호화할 수 없다</b>는 뜻이다. 그래서 <code>--read-from-remote-server</code> 로 서버에 요청하면 읽을 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>바이너리 로그 암호화는 <b>디스크 파일 전용</b>. 네트워크 구간은 TLS/SSL의 몫이다.</li>
+      <li>마스터 키 로테이션은 <b>로그 파일 스위칭 + 기존 파일 키 재암호화</b>를 동반한다.</li>
+      <li>암호화된 바이너리 로그는 <code>mysqlbinlog --read-from-remote-server</code> 로만 읽을 수 있다.</li>
+    </ul>
+  </div>
+</article>

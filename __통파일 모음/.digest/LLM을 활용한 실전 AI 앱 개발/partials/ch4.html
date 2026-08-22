@@ -1,0 +1,262 @@
+<article class="item" id="item-4-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-1</div>
+    <h3>코딩 테스트 통과하기 — 사전 학습과 지도 미세 조정</h3>
+    <p class="item-tagline">다음 단어를 잘 맞히는 것과 사람 말을 잘 듣는 것은 다른 능력이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    사전 학습과 지도 미세 조정은 <b>학습 방식이 아니라 학습 데이터가 다르다</b>. 둘 다 "다음 토큰 맞히기"를 하지만, 무엇으로 맞히기를 시키느냐가 모델의 성격을 바꾼다.
+  </div>
+
+  <h4>LLM 의 사전 학습</h4>
+  <p>언어 모델은 결국 <b>다음에 올 단어의 확률을 예측하는 모델</b>이다. 학습할 때는 데이터의 일부를 입력으로 넣고 바로 다음에 나오는 정답 토큰을 맞히도록 시킨다. 이 과정을 방대한 텍스트에 대해 반복하면 모델은 어떤 맥락 뒤에 어떤 단어가 오는지를 익힌다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["원시 텍스트 코퍼스"] --> B["사전 학습<br>다음 토큰 예측"]
+  B --> C["기본 모델<br>언어는 안다"]
+  D["지시-응답 데이터셋"] --> E["지도 미세 조정<br>다음 토큰 예측"]
+  C --> E
+  E --> F["정렬된 모델<br>요청에 답한다"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>학습 알고리즘은 두 단계가 같고, 먹이는 데이터만 다르다</b> — 그래서 지도 미세 조정도 인과적 언어 모델링이라 부른다.</div>
+  </div>
+
+  <h4>지도 미세 조정</h4>
+  <p>지도 미세 조정(SFT)은 모델이 <b>요청의 형식을 해석</b>하고, <b>응답의 형태를 갖춰 작성</b>하고, <b>요청과 응답이 잘 연결되도록</b> 추가로 학습시키는 단계다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>용어</th><th>뜻</th></tr></thead>
+      <tbody>
+        <tr><td><b>지도</b>(supervised)</td><td>학습 데이터에 정답(모범 응답)이 포함되어 있다는 의미</td></tr>
+        <tr><td><b>지시사항</b>(instruction)</td><td>사용자의 요구사항을 표현하는 문장</td></tr>
+        <tr><td><b>정렬</b>(alignment)</td><td>미세 조정을 통해 LLM 이 사용자 요청에 맞춰 응답하게 되는 것</td></tr>
+        <tr><td><b>인과적 언어 모델링</b></td><td>앞의 토큰만 보고 다음 토큰을 예측하는 방식. 사전 학습과 SFT 가 공유한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>딥러닝 모델은 기본적으로 <b>학습 데이터에 있는 행동을 배운다</b>. 학습 데이터에 "요청에 응답하는" 형태의 데이터가 적으면 그 행동은 잘 배우지 못한다. 인터넷 텍스트를 그대로 먹인 기본 모델이 질문에 답하는 대신 질문을 이어서 써버리는 이유가 여기에 있다.</p>
+
+  <h4>좋은 데이터셋이 갖춰야 할 조건</h4>
+  <ul>
+    <li>지시 데이터셋의 <b>지시사항이 다양한 형태</b>일수록, 그리고 <b>응답 데이터의 품질이 높을수록</b> 정렬된 모델의 답변 품질이 높아진다.</li>
+    <li>코드를 학습시킬 때도 <b>교육적 가치가 높은 코드</b>가 더 좋다. 주석이 잘 달려 있고 설명이 충실한 코드를 말한다.</li>
+    <li>결국 <b>데이터의 품질이 높으면 더 많은 양으로 학습할 때보다도 높은 성능</b>에 도달할 수 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>이 "양보다 질" 주장은 두 갈래 연구가 뒷받침한다. 마이크로소프트의 <b>phi</b> 계열은 교과서 수준의 합성 데이터로 훨씬 작은 모델이 큰 모델을 따라잡을 수 있음을 보였고, 메타의 <b>LIMA</b> 는 엄선된 1,000건의 지시-응답만으로도 상당한 정렬 성능이 나온다고 보고했다. SFT 단계는 새 지식을 넣는 단계가 아니라 <b>이미 아는 것을 꺼내는 형식을 가르치는 단계</b>에 가깝다는 관점이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>사전 학습 = 대규모 텍스트로 다음 토큰 예측 → <b>언어를 아는</b> 기본 모델.</li>
+      <li>지도 미세 조정 = 지시-응답 데이터로 같은 방식 학습 → <b>요청에 답하는</b> 모델. 이 과정을 정렬이라 한다.</li>
+      <li>모델은 학습 데이터에 있는 행동만 배운다. 데이터에 없는 행동은 기대할 수 없다.</li>
+      <li>지시사항의 다양성과 응답의 품질이 양보다 중요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-2</div>
+    <h3>채점 모델로 코드 가독성 높이기</h3>
+    <p class="item-tagline">"이 코드 몇 점?"은 어렵지만 "둘 중 뭐가 나아?"는 쉽다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    절대 점수를 매긴 데이터셋은 만들기 어렵다. 그래서 <b>둘 중 하나를 고르게 하는 선호 데이터셋</b>을 만들고, 그걸로 점수를 매길 줄 아는 리워드 모델을 대신 학습시킨다.
+  </div>
+
+  <h4>선호 데이터셋</h4>
+  <p>코드 A 와 B 를 비교해 더 가독성 높은 쪽을 <b>선호 데이터</b>, 선택되지 않은 쪽을 <b>비선호 데이터</b>로 분류한다. 이렇게 사람이 고른 쌍을 모은 것이 <b>선호 데이터셋</b>이다.</p>
+
+  <p>왜 코드 하나만 보고 점수를 매기지 않을까? <b>절대 점수를 일관되게 부여하는 것은 사람에게도 어렵기 때문</b>이다. 평가자마다 기준이 다르고 같은 사람도 시점에 따라 흔들린다. 반면 두 코드를 나란히 놓고 나은 쪽을 고르는 일은 비교적 쉽고 일관적이다.</p>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">비선호</span><span class="code-spacer"></span></div>
+<pre><code class="language-python">def sum_even(nums):
+    even_sum = sum(n for n in nums if n % 2 == 0)
+    return even_sum</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">선호</span><span class="code-spacer"></span></div>
+<pre><code class="language-python">def sum_of_even_numbers(numbers_list):
+    """
+    Calculate the sum of all even numbers in a given list
+
+    Params:
+    numbers_list (list): A list of integers
+
+    Returns:
+    int: The sum of all even numbers in the list
+    """
+    even_numbers = [number for number in numbers_list if number % 2 == 0]
+    total_sum = sum(even_numbers)
+    return total_sum</code></pre>
+    </div>
+  </div>
+
+  <p>이런 쌍을 모아 <b>선호 데이터에 비선호 데이터보다 높은 점수를 주도록</b> 채점 모델을 학습시킨다.</p>
+
+  <h4>리워드 모델</h4>
+  <ol class="steps">
+    <li><div class="step-title">여러 응답 생성</div><p>지도 미세 조정을 마친 LLM 에 지시사항을 넣어 응답 A / B / C 를 미리 여러 개 만든다.</p></li>
+    <li><div class="step-title">사람이 순위를 매김</div><p>레이블러가 응답들을 비교해 순위를 정한다. 이 결과가 선호 데이터셋이 된다.</p></li>
+    <li><div class="step-title">리워드 모델 학습</div><p>선호 데이터셋으로 "이 응답은 몇 점짜리인가"를 출력하는 별도의 모델을 학습시킨다.</p></li>
+  </ol>
+
+  <p>LLM 은 사용자의 요청에 맞춰 답을 주다 보니 차별적인 답변을 생성하는 등의 문제가 있었다. OpenAI 는 이를 제어하기 위해 <b>생성한 답변의 점수를 평가하는 리워드 모델</b>을 도입했다.</p>
+
+  <h4>높은 코드 가독성 점수를 향해</h4>
+
+  <h5>강화 학습</h5>
+  <p>강화 학습에서는 <b>에이전트</b>가 <b>환경</b> 안에서 <b>행동</b>을 하고, 그에 따라 <b>상태</b>가 바뀌며 <b>보상</b>이 발생한다. 에이전트는 더 많은 보상을 받도록 자신을 수정해 가며 학습한다.</p>
+
+  <h5>RLHF — 사람의 피드백을 활용한 강화 학습</h5>
+  <p>RLHF(Reinforcement Learning from Human Feedback)는 리워드 모델이 생성 텍스트를 평가해 점수를 매기고, 그 점수를 보상으로 삼아 언어 모델을 강화 학습으로 다듬는 방식이다. 강화 학습 관점에서 보면 <b>토큰 하나를 생성하는 것이 하나의 행동</b>이다. 다만 일반적인 강화 학습과 달리, 여기서는 <b>전체 생성 결과에 대해 리워드 모델의 점수가 한 번 주어진다</b>.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 이 약어가 <code>RHLF</code> 로 적혀 있는데 올바른 표기는 <b>RLHF</b>(<b>R</b>einforcement <b>L</b>earning from <b>H</b>uman <b>F</b>eedback)다. 이 정리본에서는 전부 RLHF 로 통일했다.</p>
+    </div>
+  </div>
+
+  <h5>보상 해킹</h5>
+  <p>보상만 높게 받으려는 편법이 생기는 현상을 <b>보상 해킹</b>(reward hacking)이라 한다. 평가 점수는 올라가지만 다른 능력이 깎이거나, 점수만 높게 받는 우회로가 만들어진다. 예를 들어 <b>일부러 짧은 코드를 써서 "간결하니 가독성이 높다"고 판정받는</b> 식이다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  SFT["지도 미세 조정 모델<br>기준점"] --> POL["학습 중인 정책 모델"]
+  POL -->|"생성"| OUT["응답"]
+  OUT --> RM["리워드 모델"]
+  RM -->|"보상 점수"| POL
+  SFT -.->|"KL 페널티<br>너무 멀어지지 마"| POL
+      </pre>
+    </div>
+    <div class="figure-cap"><b>PPO 의 핵심은 점선 화살표다</b> — 기준 모델에서 크게 벗어나지 못하게 묶어두면서 보상만 올린다.</div>
+  </div>
+
+  <h4>PPO — 보상 해킹 피하기</h4>
+  <p><b>PPO</b>(Proximal Policy Optimization, 근접 정책 최적화)는 보상 해킹을 피하기 위해 쓴다. 지도 미세 조정 모델을 기준으로 삼고, 학습 중인 모델이 <b>그 기준에서 너무 멀어지지 않는 가까운 범위 안에서</b> 리워드 모델의 높은 점수를 찾도록 제한한다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 PPO 를 <code>Proximal Preference Optimization</code> 이라 풀어썼는데, 정확한 이름은 <b>Proximal Policy Optimization</b> 이다. 노트가 함께 적은 한국어 번역 "근접 정책 최적화"가 오히려 맞다. <code>Preference</code> 가 들어가는 쪽은 뒤에 나오는 <b>DPO</b>(Direct <b>Preference</b> Optimization)다 — 둘을 헷갈리기 쉽다.</p>
+    </div>
+  </div>
+
+  <h4>RLHF, 멋지지만 피할 수 있다면</h4>
+  <ul>
+    <li>OpenAI 는 RLHF 로 편향성/공격성 등 AI 서비스에서 자주 문제되는 부분을 효과적으로 제어했다.</li>
+    <li>하지만 <b>결과물만큼이나 쓰기가 어렵다</b>. 리워드 모델 학습 과정 자체가 까다롭고 비용도 많이 든다.</li>
+    <li>그래서 최근에는 <b>강화 학습도 리워드 모델도 쓰지 않고</b> 사람의 선호를 학습하는 기술이 나왔다 — 다음 절의 DPO 다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>절대 점수 라벨링은 어렵고, 쌍 비교는 쉽다 → <b>선호 데이터셋</b>.</li>
+      <li>선호 데이터셋으로 <b>리워드 모델</b>을 학습시켜 점수를 자동화한다.</li>
+      <li>RLHF = 리워드 모델의 점수를 보상으로 삼는 강화 학습. 토큰 생성 하나가 행동이다.</li>
+      <li>보상만 노리는 편법이 <b>보상 해킹</b>이고, 이를 막는 장치가 <b>PPO</b>(근접 정책 최적화)다.</li>
+      <li>RLHF 는 효과적이지만 비싸고 불안정하다는 게 다음 장으로 넘어가는 이유다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-3</div>
+    <h3>강화 학습이 꼭 필요한가</h3>
+    <p class="item-tagline">기각 샘플링과 DPO — 강화 학습 없이 선호를 배우는 두 갈래.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>DPO 는 리워드 모델도 강화 학습도 없이 선호 데이터셋으로 언어 모델을 직접 학습시킨다.</b> RLHF 의 3단계 파이프라인이 1단계로 줄어든다.
+  </div>
+
+  <h4>기각 샘플링</h4>
+  <p>지도 미세 조정을 마친 LLM 으로 <b>여러 응답을 생성</b>하고, 그중 리워드 모델이 가장 높은 점수를 준 응답만 모아 <b>다시 지도 미세 조정</b>을 수행한다. 강화 학습을 쓰지 않으니 학습이 비교적 안정적이고, 방법이 간단하고 직관적인데도 효과가 좋아 널리 쓰인다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["SFT 모델"] -->|"한 지시사항당<br>N개 생성"| B["응답 후보들"]
+  B --> C["리워드 모델 채점"]
+  C -->|"최고점만 남김"| D["새 SFT 데이터셋"]
+  D -->|"다시 지도 미세 조정"| A
+      </pre>
+    </div>
+    <div class="figure-cap"><b>기각 샘플링은 강화 학습이 아니라 필터링이다</b> — 생성 → 채점 → 상위만 남겨 재학습하는 루프를 돈다.</div>
+  </div>
+
+  <h5>메타가 밟은 순서</h5>
+  <ol class="steps">
+    <li><div class="step-title">자기 지도 학습으로 사전 학습</div><p>대용량 데이터로 다음 단어 예측(언어 모델링)을 수행해 기본 모델을 만든다.</p></li>
+    <li><div class="step-title">선호 데이터셋 구축</div><p>사람의 피드백을 반영한 선호 데이터셋을 만든다.</p></li>
+    <li><div class="step-title">기각 샘플링으로 먼저 안정화</div><p>바로 PPO 로 가지 않고, 기각 샘플링으로 더 빠르고 안정적으로 사람의 선호를 학습시킨다.</p></li>
+    <li><div class="step-title">그 다음에 PPO</div><p>어느 정도 정렬된 뒤에 강화 학습을 적용한다.</p></li>
+  </ol>
+
+  <h4>DPO — Direct Preference Optimization</h4>
+  <p>RLHF 는 선호 데이터셋으로 <b>리워드 모델</b>을 만들고, 그 리워드 모델이 언어 모델의 출력을 평가하며 강화 학습을 돌린다. 반면 <b>DPO 는 선호 데이터셋으로 언어 모델을 곧바로 학습시킨다</b>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>RLHF (PPO)</th><th>DPO</th></tr></thead>
+      <tbody>
+        <tr><td>리워드 모델</td><td class="t-center t-ok">필요</td><td class="t-center t-no">불필요</td></tr>
+        <tr><td>강화 학습</td><td class="t-center t-ok">필요</td><td class="t-center t-no">불필요</td></tr>
+        <tr><td>참고 모델</td><td>SFT 모델 (KL 제약의 기준)</td><td>SFT 모델 (학습 정도 비교의 기준)</td></tr>
+        <tr><td>학습 단계 수</td><td>SFT → 리워드 모델 → 강화 학습</td><td>SFT → 선호 학습</td></tr>
+        <tr><td>안정성</td><td>튜닝 까다로움, 비용 큼</td><td>지도 학습에 가까워 안정적</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>DPO 도 <b>참고 모델</b>(reference model)을 둔다. 학습하지 않는 학습 전 모델을 옆에 두고 비교하면서, 학습이 제대로 되고 있는지 — 그리고 원래 능력에서 지나치게 벗어나지 않는지 — 를 확인한다. 선호 학습에서 참고 모델로는 <b>지도 미세 조정을 마친 모델</b>을 쓰는 게 일반적이다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">결론</p>
+      <p>DPO 로 학습하면 <b>별도의 리워드 모델이 필요 없고 강화 학습도 쓰지 않는다</b>. 선호 데이터셋 하나로 언어 모델을 바로 정렬하는 것이 DPO 의 전부다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>기각 샘플링</b>: N개 생성 → 리워드 모델로 채점 → 최고점만 모아 재-SFT. 강화 학습 없이도 효과가 좋다.</li>
+      <li>메타는 PPO 이전에 기각 샘플링을 먼저 돌려 안정적으로 선호를 학습시켰다.</li>
+      <li><b>DPO</b>: 선호 데이터셋으로 언어 모델을 직접 학습. 리워드 모델도 강화 학습도 없다.</li>
+      <li>DPO 의 참고 모델은 보통 SFT 를 마친 모델이며, 학습 진행 상황을 비교하는 기준 역할을 한다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,416 @@
+<article class="item" id="item-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5</div>
+    <h3>Connection과 Channel</h3>
+    <p class="item-tagline">TCP 연결은 비싸고, 채널은 싸다. 대신 채널은 공유하면 안 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    Connection은 <b>TCP 연결 하나</b>, Channel은 그 위에 다중화된 <b>가상 연결</b>이다. 프로세스당 커넥션은 소수로, 작업 단위는 채널로 나눈다.
+  </div>
+
+  <h4>왜 두 겹인가</h4>
+  <p>
+    AMQP는 오래 살아 있는 TCP 연결을 전제로 만들어졌다. 연결을 맺는 일(TCP 핸드셰이크 + TLS + AMQP 핸드셰이크 +
+    인증)은 무겁고, 브로커 쪽에서도 커넥션마다 Erlang 프로세스와 파일 디스크립터를 잡는다. 그래서 연결은 오래 쓰고,
+    동시 작업은 그 안의 <b>채널</b>로 나눈다. 채널을 여는 건 프레임 몇 개면 끝난다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph APP["Node.js 프로세스"]
+    CH1["Channel 1: 발행"]
+    CH2["Channel 2: 컨슈머 A"]
+    CH3["Channel 3: 컨슈머 B"]
+  end
+  CH1 --> CONN["Connection (TCP 하나)"]
+  CH2 --> CONN
+  CH3 --> CONN
+  CONN --> BROKER["RabbitMQ 브로커"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>커넥션 하나, 채널 여럿</b> — 채널은 프레임에 채널 번호를 실어 하나의 TCP 위에서 다중화된다.</div>
+  </div>
+
+  <h4>채널을 나누는 기준</h4>
+  <ul>
+    <li><b>컨슈머마다 채널 하나.</b> ack의 delivery tag는 채널 단위로 매겨지고, 채널이 닫히면 그 채널의 미확인 메시지가 전부 requeue된다. 컨슈머를 섞으면 하나가 죽을 때 다른 하나도 말려든다.</li>
+    <li><b>발행용 채널과 소비용 채널을 분리.</b> 특히 퍼블리셔 컨펌을 쓰는 채널은 따로 두는 게 깔끔하다.</li>
+    <li><b>동시에 여러 곳에서 같은 채널을 쓰지 않는다.</b> amqplib의 Channel 객체는 스레드/동시성 안전을 보장하지 않는다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">connection churn</p>
+      <p>
+        HTTP 요청마다 <code>amqp.connect()</code>를 호출하는 코드는 RabbitMQ에서 가장 유명한 안티패턴이다.
+        공식 프로덕션 체크리스트가 <b>connection churn</b>이라는 이름으로 명시적으로 경고한다.
+        연결은 앱 부팅 때 만들어 프로세스 수명 내내 재사용하고, 끊어지면 재연결한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">발행자와 소비자의 커넥션도 분리 <span class="badge b-blue">보강</span></p>
+      <p>
+        브로커가 메모리 압박을 받으면 <b>발행하는 커넥션을 블록</b>한다(ITEM 31). 이때 소비 전용 커넥션이
+        따로 있으면 컨슈머는 계속 돌면서 큐를 비울 수 있다. 같은 커넥션을 공유하면 밀린 큐를 비워야 할
+        컨슈머까지 같이 멈춰 교착에 가까운 상황이 된다. 공식 문서도 발행/소비 커넥션 분리를 권장한다.
+      </p>
+    </div>
+  </div>
+
+  <h4>하트비트</h4>
+  <p>
+    죽은 TCP 연결은 양쪽 다 한동안 모른다. AMQP는 <b>heartbeat</b> 프레임으로 이를 감지한다. 기본값은 클라이언트와
+    서버가 협상하며 보통 60초다. 공식 문서는 네트워크 혼잡 시 오탐을 막기 위해 <b>5초 미만으로 내리지 말라</b>고 한다.
+  </p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>커넥션은 오래, 적게. 채널은 가볍게, 용도별로.</li>
+      <li>컨슈머마다 채널을 따로 두고, 채널을 동시에 공유하지 않는다.</li>
+      <li>발행 커넥션과 소비 커넥션을 분리하면 플로우 컨트롤 상황에서 컨슈머가 살아남는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6</div>
+    <h3>Exchange 네 종류</h3>
+    <p class="item-tagline">exchange는 메시지를 저장하지 않는다. 어디로 보낼지만 정한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    exchange는 <b>라우팅 함수</b>다. 입력은 routing key와 헤더, 출력은 "이 메시지를 어느 큐들에 복사할 것인가"이다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타입</th><th>라우팅 기준</th><th>전형적 용도</th></tr></thead>
+      <tbody>
+        <tr><td><code>direct</code></td><td>routing key <b>완전 일치</b></td><td>작업 분배, 로그 레벨별 분리</td></tr>
+        <tr><td><code>fanout</code></td><td>기준 없음. 바인딩된 <b>모든 큐</b>에 복사</td><td>브로드캐스트, 캐시 무효화</td></tr>
+        <tr><td><code>topic</code></td><td>routing key <b>패턴 매칭</b></td><td>도메인 이벤트 버스 (가장 많이 씀)</td></tr>
+        <tr><td><code>headers</code></td><td>메시지 <b>헤더</b> 값 매칭 (<code>x-match</code>)</td><td>routing key로 표현 못 하는 다차원 조건</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  M["메시지 routing key = order.paid.kr"] --> D{{"direct"}}
+  M --> F{{"fanout"}}
+  M --> T{{"topic"}}
+  D -->|"order.paid.kr 만"| DQ["정확히 일치하는 큐"]
+  F -->|"조건 없음"| FQ["바인딩된 큐 전부"]
+  T -->|"order.# / *.paid.* 등"| TQ["패턴에 맞는 큐 전부"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 메시지, 다른 판단</b> — exchange 타입은 "누가 이 메시지를 받을 자격이 있나"를 정하는 규칙이다.</div>
+  </div>
+
+  <h4>기본 exchange</h4>
+  <p>
+    이름이 빈 문자열(<code>""</code>)인 direct exchange가 브로커에 미리 선언되어 있다. 모든 큐는 자동으로
+    <b>자기 이름과 동일한 routing key</b>로 여기에 바인딩된다. 그래서 <code>sendToQueue('email', buf)</code>가
+    큐 이름만으로 동작한다. 튜토리얼과 간단한 작업 큐에서는 이걸 쓰지만, 실서비스 토폴로지에서는
+    <b>이름 있는 exchange를 명시적으로 선언</b>하는 편이 낫다. 나중에 소비자를 늘릴 여지가 생긴다.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">topology.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// durable: true 여야 브로커 재시작 후에도 exchange가 남는다.
+await ch.assertExchange('user.events', 'topic', { durable: true });
+
+// 라우팅 실패한 메시지를 흘려보낼 곳을 지정할 수도 있다 (ITEM 14)
+await ch.assertExchange('order.events', 'topic', {
+  durable: true,
+  alternateExchange: 'unrouted',
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">exchange를 exchange에 묶을 수도 있다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>channel.bindExchange(dest, source, pattern)</code>으로 exchange끼리 연결하는
+        <b>exchange-to-exchange 바인딩</b>이 있다. 팀별로 exchange를 나눠 놓고 상위 이벤트 버스에서
+        일부만 흘려보내는 계층 구조를 만들 때 쓴다. 처음에는 필요 없지만, 나중에 토폴로지가 커질 때
+        이런 게 있다는 걸 알면 큐를 무한정 늘리지 않게 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>exchange는 저장하지 않는다. 라우팅만 한다. 갈 곳이 없으면 메시지는 그냥 버려진다.</li>
+      <li>실무에서는 <code>topic</code>이 기본값에 가깝다. <code>direct</code>는 topic의 특수 케이스로 볼 수 있다.</li>
+      <li>이름 없는 기본 exchange는 큐 이름 = routing key 규칙으로 동작하는 편의 장치다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7</div>
+    <h3>Binding과 라우팅 키</h3>
+    <p class="item-tagline">라우팅 키는 주소가 아니라 메시지에 대한 설명이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    binding은 <b>"이 exchange의 이런 메시지는 이 큐로"</b>라는 규칙이다. 규칙을 여러 개 걸 수 있고, 하나도 안 걸 수도 있다.
+  </div>
+
+  <h4>topic 와일드카드</h4>
+  <p>
+    topic exchange의 routing key는 <b>점으로 구분된 단어들</b>이다(최대 255바이트). 바인딩 패턴에서 두 개의
+    특수문자를 쓸 수 있다.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문자</th><th>의미</th><th>예시 패턴</th><th>매칭</th></tr></thead>
+      <tbody>
+        <tr><td><code>*</code></td><td><b>정확히 한 단어</b></td><td><code>order.*.kr</code></td><td><code>order.paid.kr</code> ✓ / <code>order.kr</code> ✗</td></tr>
+        <tr><td><code>#</code></td><td><b>0개 이상의 단어</b></td><td><code>order.#</code></td><td><code>order</code> ✓ / <code>order.paid.kr</code> ✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bindings.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertExchange('order.events', 'topic', { durable: true });
+
+// 결제 완료만 처리하는 큐
+await ch.bindQueue('invoice.issue', 'order.events', 'order.paid');
+
+// 주문 도메인의 모든 이벤트를 적재하는 큐
+await ch.bindQueue('audit.log', 'order.events', 'order.#');
+
+// 한 큐에 규칙을 여러 개 걸 수 있다
+await ch.bindQueue('alerting', 'order.events', 'order.failed');
+await ch.bindQueue('alerting', 'order.events', 'payment.failed');</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">한 큐에 두 규칙이 동시에 맞으면?</p>
+      <p>
+        메시지는 <b>큐당 한 번만</b> 들어간다. <code>order.#</code>와 <code>*.paid</code>가 같은 큐에 걸려 있고
+        <code>order.paid</code> 메시지가 오면, 큐에는 사본이 하나만 생긴다. 반대로 <b>서로 다른 큐</b>가 각각
+        매칭되면 큐 개수만큼 사본이 만들어진다. "큐 단위 중복은 없고, 큐 사이에는 복사"라고 기억하면 된다.
+      </p>
+    </div>
+  </div>
+
+  <h4>라우팅 키 네이밍</h4>
+  <p>
+    라우팅 키는 나중에 바꾸기가 아주 어렵다. 이미 남이 걸어둔 바인딩을 전부 찾아야 하기 때문이다.
+    처음부터 <b>계층 구조</b>로 잡아 두면 오래간다.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">&lt;도메인&gt;.&lt;엔티티&gt;.&lt;사건&gt;
+
+order.payment.succeeded
+order.payment.failed
+user.profile.updated
+inventory.stock.depleted</code></pre>
+  </div>
+  <p>
+    이렇게 두면 <code>order.#</code>(주문 도메인 전부), <code>*.payment.*</code>(모든 결제 사건),
+    <code>*.*.failed</code>(모든 실패)처럼 나중에 필요한 축으로 자유롭게 잘라낼 수 있다.
+  </p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>binding은 exchange와 큐 사이의 규칙이다. n:m으로 걸 수 있다.</li>
+      <li><code>*</code>는 한 단어, <code>#</code>은 0개 이상 단어.</li>
+      <li>같은 큐에 여러 규칙이 맞아도 사본은 하나. 다른 큐끼리는 각각 복사된다.</li>
+      <li>라우팅 키는 <code>도메인.엔티티.사건</code> 계층으로 설계한다. 나중에 못 바꾼다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 8</div>
+    <h3>Queue의 속성과 arguments</h3>
+    <p class="item-tagline">큐 선언은 멱등하지만, 속성이 다르면 멱등이 아니라 에러다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    큐의 성격은 <b>표준 속성 4개</b>와 <b><code>x-</code> 접두사 인자들</b>로 정해진다. 인자는 <b>선언 시점에 고정</b>되고, 나중에 바꾸려면 큐를 지워야 한다.
+  </div>
+
+  <h4>표준 속성</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>속성</th><th>뜻</th><th>실무 값</th></tr></thead>
+      <tbody>
+        <tr><td><code>durable</code></td><td>브로커 재시작 후에도 큐 정의가 남는가</td><td class="t-ok"><code>true</code></td></tr>
+        <tr><td><code>exclusive</code></td><td>선언한 커넥션만 쓸 수 있고, 끊기면 삭제</td><td>RPC 응답 큐 정도에만</td></tr>
+        <tr><td><code>autoDelete</code></td><td>마지막 컨슈머가 떠나면 삭제</td><td>임시 큐에만</td></tr>
+        <tr><td><code>arguments</code></td><td><code>x-</code> 인자 맵</td><td>큐 타입, TTL, DLX 등</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>durable</code>은 큐만 살린다</p>
+      <p>
+        <code>durable: true</code>는 <b>큐라는 그릇</b>이 재시작 후에도 존재한다는 뜻이지, 안에 든 메시지가
+        살아남는다는 뜻이 아니다. 메시지가 살아남으려면 발행할 때 <code>persistent: true</code>를 줘야 한다.
+        둘 다 있어야 유실을 막는다. (quorum queue와 stream은 항상 durable이라 이 고민이 사라진다.)
+      </p>
+    </div>
+  </div>
+
+  <h4>자주 쓰는 인자</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">queue.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',              // classic | quorum | stream
+    'x-dead-letter-exchange': 'order.dlx', // 실패/만료 시 보낼 exchange
+    'x-delivery-limit': 5,                 // 재배달 5회 초과 시 dead-letter (quorum)
+    'x-message-ttl': 3600000,              // 큐 안 메시지 수명 (ms)
+    'x-max-length': 100000,                // 큐 길이 상한
+    'x-overflow': 'reject-publish',        // 초과 시 발행 거부 (기본은 drop-head)
+  },
+});</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">PRECONDITION_FAILED - inequivalent arg</p>
+      <p>
+        이미 있는 큐를 <b>다른 인자</b>로 <code>assertQueue</code>하면 이 에러와 함께 <b>채널이 닫힌다</b>.
+        큐 인자는 사후 변경이 불가능하다. 그래서 실무에서는 자주 바뀔 값(TTL, 길이 제한, DLX)을 인자 대신
+        <b>policy</b>로 거는 걸 권장한다. policy는 운영 중에 <code>rabbitmqctl set_policy</code>나 관리 UI로
+        바꿀 수 있다. 자세한 건 <b>ITEM 29</b>.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>durable</code>은 큐를, <code>persistent</code>는 메시지를 살린다. 둘은 별개다.</li>
+      <li>큐 인자는 선언 시 고정이다. 바꾸려면 큐를 지우고 다시 만들어야 한다.</li>
+      <li>변할 여지가 있는 설정(TTL, DLX, 길이)은 인자보다 <b>policy</b>로 거는 게 안전하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9</div>
+    <h3>메시지의 구조</h3>
+    <p class="item-tagline">브로커는 payload를 안 본다. 대신 properties와 headers는 본다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>properties</b>는 프로토콜이 정의한 고정 필드, <b>headers</b>는 내가 마음대로 넣는 맵이다. 브로커가 라우팅/만료에 쓰는 건 properties 쪽이다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  MSG["AMQP 메시지"] --> P["properties: 프로토콜 정의 필드"]
+  MSG --> H["headers: 자유 형식 맵"]
+  MSG --> B["body: 그냥 바이트 배열"]
+  P --> P1["deliveryMode / priority / expiration"]
+  P --> P2["contentType / messageId / correlationId / replyTo / timestamp"]
+  H --> H1["x-death, x-delivery-count 등 브로커가 넣는 것"]
+  H --> H2["traceId, tenantId 등 내가 넣는 것"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세 층</b> — body는 브로커에게 불투명하다. 라우팅과 수명 관리는 전부 properties/headers로 한다.</div>
+  </div>
+
+  <h4>실무에서 반드시 챙기는 properties</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>amqplib 옵션</th><th>왜 중요한가</th></tr></thead>
+      <tbody>
+        <tr><td><code>delivery_mode</code></td><td><code>persistent: true</code></td><td>2로 설정되어 디스크에 기록된다. 없으면 재시작 시 유실</td></tr>
+        <tr><td><code>content_type</code></td><td><code>contentType</code></td><td>컨슈머가 역직렬화 방식을 고를 근거</td></tr>
+        <tr><td><code>message_id</code></td><td><code>messageId</code></td><td><b>멱등 처리의 키</b>. 중복 감지에 쓴다 (ITEM 15)</td></tr>
+        <tr><td><code>correlation_id</code></td><td><code>correlationId</code></td><td>요청-응답 짝짓기, 분산 추적</td></tr>
+        <tr><td><code>reply_to</code></td><td><code>replyTo</code></td><td>RPC 패턴에서 응답 큐 이름</td></tr>
+        <tr><td><code>timestamp</code></td><td><code>timestamp</code></td><td>지연 측정, 오래된 메시지 판별</td></tr>
+        <tr><td><code>priority</code></td><td><code>priority</code></td><td>0~31. quorum queue는 별도 선언 없이 항상 동작</td></tr>
+        <tr><td><code>expiration</code></td><td><code>expiration</code></td><td>이 메시지만의 TTL(ms, 문자열). 지연 큐 패턴의 재료</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">publish.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">ch.publish(
+  'order.events',
+  'order.payment.succeeded',
+  Buffer.from(JSON.stringify(payload)),
+  {
+    persistent: true,
+    contentType: 'application/json',
+    messageId: event.id,          // 컨슈머가 중복 판정에 쓸 키
+    correlationId: ctx.traceId,
+    timestamp: Date.now(),
+    headers: { tenantId: ctx.tenantId, schemaVersion: 2 },
+  },
+);</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">payload는 작게 <span class="badge b-blue">보강</span></p>
+      <p>
+        메시지 본문에 이미지 바이너리나 거대한 JSON을 그대로 싣는 건 피한다. 브로커 메모리와 디스크를 그대로
+        먹고, 큐가 밀리는 순간 그 압박이 클러스터 전체로 번진다. 큰 데이터는 오브젝트 스토리지에 두고
+        <b>메시지에는 키만</b> 싣는 <em>claim check</em> 패턴이 정석이다. 참고로 4.3에서 32 KiB 이하 메시지의
+        메모리 오버헤드가 절반으로 줄었는데, 이 크기 대역을 기본 타깃으로 본다는 신호이기도 하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>body는 브로커에게 불투명한 바이트다. 의미 있는 정보는 properties/headers에 둔다.</li>
+      <li><code>persistent: true</code>는 습관처럼 붙인다. 안 붙이면 재시작 때 사라진다.</li>
+      <li><code>messageId</code>는 나중에 멱등 처리를 가능하게 하는 최소 투자다.</li>
+      <li>큰 payload는 싣지 말고 참조만 보낸다.</li>
+    </ul>
+  </div>
+</article>

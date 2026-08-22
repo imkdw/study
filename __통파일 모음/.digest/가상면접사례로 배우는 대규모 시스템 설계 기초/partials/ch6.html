@@ -1,0 +1,531 @@
+<article class="item" id="item-26" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-1</div>
+    <h3>키-값 저장소란</h3>
+    <p class="item-tagline">키 하나로만 열 수 있는 서랍. 그 단순함이 곧 확장성의 근거다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    키-값 저장소가 빠르고 잘 나뉘는 이유는 <b>접근 경로가 키 하나뿐</b>이기 때문이다. 조인도, 범위 검색도 없기에 데이터를 마음대로 흩뿌릴 수 있다.
+  </div>
+
+  <ul>
+    <li>키-값 데이터베이스라고도 불리는 비관계형 데이터베이스다.</li>
+    <li>고유 식별자를 키로 가져야 한다.</li>
+    <li>특정 키에 매핑된 값은 <b>키를 통해서만</b> 접근할 수 있다.</li>
+    <li>키는 일반 텍스트일 수도, 해시값일 수도 있다. 값은 아무 값이나 가능하다.</li>
+    <li>키는 짧을수록 좋다.</li>
+    <li>대표적인 예로 AWS DynamoDB, Redis가 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">key examples</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">일반 텍스트 : "last_logged_in_at"
+해시값      : "f7a7b9c7"</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>키</th><th>값</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">1</td><td class="dg-mono">{"name": "John", "age": 30}</td></tr>
+        <tr><td class="dg-mono">2</td><td class="dg-mono">{"name": "Jane", "age": 25}</td></tr>
+        <tr><td class="dg-mono">3</td><td class="dg-mono">{"name": "Doe", "age": 40}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>키-값 저장소는 키를 통해서만 값에 접근하는 비관계형 DB다.</li>
+      <li>키는 짧게, 값은 무엇이든.</li>
+      <li>접근 경로가 하나뿐이라는 제약이 곧 수평 확장의 자유를 만든다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-27" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-2</div>
+    <h3>문제 이해 및 설계 범위</h3>
+    <p class="item-tagline">완벽한 설계는 없다. 있는 것은 어떤 균형점을 골랐는지 뿐이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이 장의 모든 기법은 <b>읽기 성능 / 쓰기 성능 / 메모리 사용량 / 일관성</b> 네 축 사이의 저울을 어디에 놓느냐의 문제로 환원된다.
+  </div>
+
+  <ul>
+    <li>완벽한 설계란 없다.</li>
+    <li>읽기와 쓰기, 그리고 메모리 사용량 사이에서 균형점을 찾아야 한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 장에서 흔히 잡는 요구사항 <span class="badge b-blue">보강</span></p>
+      <ul>
+        <li>키-값 쌍의 크기는 10KB 이하</li>
+        <li>큰 데이터를 저장할 수 있어야 한다</li>
+        <li>높은 가용성 — 장애가 있어도 빠르게 응답</li>
+        <li>높은 규모 확장성 — 트래픽에 따라 서버 증설/삭제 자동화</li>
+        <li>조절 가능한 데이터 일관성</li>
+        <li>낮은 응답 지연</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>정답이 아니라 균형점을 고르는 설계다.</li>
+      <li>읽기 / 쓰기 / 메모리 / 일관성이 서로를 끌어당긴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-28" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-3</div>
+    <h3>단일 서버 키-값 저장소</h3>
+    <p class="item-tagline">메모리 위의 해시 테이블. 빠르지만 곧 벽에 부딪힌다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    단일 서버 설계는 <b>메모리가 유한하다</b>는 사실 하나 때문에 무너진다. 압축과 디스크 이전은 그 벽을 미룰 뿐이다.
+  </div>
+
+  <ul>
+    <li>서버 한 대만 쓰는 키-값 저장소 설계는 간단하다.</li>
+    <li>가장 직관적인 방법은 키-값 쌍 전부를 메모리에 해시 테이블로 저장하는 것이다.</li>
+    <li>빠른 접근 속도를 보장하지만, 모든 데이터를 메모리에 두는 것은 불가능하다.</li>
+    <li>데이터를 압축하거나, 사용률이 낮은 데이터를 디스크로 내리는 등의 방법으로 미룰 수 있다.</li>
+    <li>그래도 더 많은 데이터를 담으려면 결국 <b>분산 키-값 저장소</b>가 필요하다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메모리 해시 테이블 = 가장 빠르고 가장 단순한 구현.</li>
+      <li>압축과 디스크 이전은 임시방편일 뿐이다.</li>
+      <li>결국 분산으로 가야 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-29" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-4</div>
+    <h3>분산 키-값 저장소</h3>
+    <p class="item-tagline">CAP에서 무엇을 포기할지 고르는 순간부터 설계가 갈라진다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    분산 시스템에서 P(파티션 감내)는 <b>선택 사항이 아니다</b>. 네트워크는 반드시 끊긴다. 그러므로 실제 선택지는 C와 A 둘 중 하나다.
+  </div>
+
+  <ul>
+    <li>키-값 쌍을 여러 서버에 분산하므로 <b>분산 해시 테이블</b>이라고도 부른다.</li>
+    <li>분산 시스템을 설계할 때는 CAP 정리를 이해해야 한다.</li>
+  </ul>
+
+  <h4>CAP 정리</h4>
+
+  <h5>Consistency (일관성)</h5>
+  <ul><li>분산 시스템에 접근하는 클라이언트는 언제나 같은 데이터를 봐야 한다.</li></ul>
+
+  <h5>Availability (가용성)</h5>
+  <ul><li>일부 노드에 장애가 발생해도 클라이언트는 항상 응답을 받아야 한다.</li></ul>
+
+  <h5>Partition Tolerance (파티션 감내)</h5>
+  <ul>
+    <li>네트워크에 파티션이 생기더라도 시스템은 계속 동작해야 한다.</li>
+    <li>여기서 파티션이란 두 노드 사이에 통신 장애가 발생한 상태를 뜻한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 260" width="460" role="img" aria-label="CAP 정리의 세 원과 CP AP CA 영역">
+        <circle cx="230" cy="105" r="82" class="venn-a"/>
+        <circle cx="180" cy="175" r="82" class="venn-b"/>
+        <circle cx="280" cy="175" r="82" class="venn-a"/>
+        <circle cx="230" cy="105" r="82" class="venn-a-s"/>
+        <circle cx="180" cy="175" r="82" class="venn-b-s"/>
+        <circle cx="280" cy="175" r="82" class="venn-a-s"/>
+
+        <text x="230" y="52" class="dg-text dg-mono" font-size="13" text-anchor="middle">Consistency</text>
+        <text x="118" y="220" class="dg-text dg-mono" font-size="13" text-anchor="middle">Availability</text>
+        <text x="348" y="220" class="dg-text dg-mono" font-size="13" text-anchor="middle">Partition tol.</text>
+
+        <text x="181" y="132" class="dg-text dg-mono" font-size="12" text-anchor="middle">CA</text>
+        <text x="181" y="147" class="dg-text-sub" font-size="10" text-anchor="middle">실재하지 않음</text>
+
+        <text x="281" y="132" class="dg-text dg-mono" font-size="12" text-anchor="middle">CP</text>
+        <text x="281" y="147" class="dg-text-sub" font-size="10" text-anchor="middle">은행 / 결제</text>
+
+        <text x="230" y="196" class="dg-text dg-mono" font-size="12" text-anchor="middle">AP</text>
+        <text x="230" y="211" class="dg-text-sub" font-size="10" text-anchor="middle">Dynamo / Cassandra</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>세 개를 다 가질 수는 없다</b> — 그리고 현실에서는 P를 뺄 수 없으므로, 실제 결정은 CP와 AP 사이에서만 일어난다.</div>
+  </div>
+
+  <h5>CP 시스템</h5>
+  <ul><li>일관성과 파티션 감내를 지원한다. <b>가용성을 희생</b>한다.</li></ul>
+
+  <h5>AP 시스템</h5>
+  <ul><li>가용성과 파티션 감내를 지원한다. <b>데이터 일관성을 희생</b>한다.</li></ul>
+
+  <h5>CA 시스템</h5>
+  <ul>
+    <li>일관성과 가용성을 지원하는 저장소다.</li>
+    <li>분산 시스템은 반드시 파티션을 감내할 수 있어야 하는데 CA는 그것을 포기한 것이므로, <b>실세계에 CA 시스템은 존재하지 않는다</b>.</li>
+  </ul>
+
+  <h4>구체적인 사례</h4>
+
+  <h5>이상적 상태</h5>
+  <ul>
+    <li>이상적인 환경이라면 네트워크 파티션이 발생하지 않는다.</li>
+    <li>n1에 기록된 데이터는 자동으로 n2, n3에도 복제된다.</li>
+  </ul>
+
+  <h5>실세계의 분산 시스템</h5>
+  <ul>
+    <li>분산 시스템은 파티션 문제를 피할 수 없다.</li>
+    <li>파티션이 발생하면 일관성과 가용성 중 하나를 골라야 한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph OK["정상 상태"]
+    N1["n1"] <--> N2["n2"]
+    N2 <--> N3["n3"]
+    N1 <--> N3
+  end
+  subgraph SPLIT["n3 이 끊긴 상태"]
+    M1["n1"] <--> M2["n2"]
+    M1 -.->|"통신 두절"| M3["n3<br>(오래된 데이터)"]
+  end
+  SPLIT --> CH{"n3 에 읽기 요청이 오면?"}
+  CH -->|"CP: 거부한다"| CP["일관성 유지<br>가용성 포기"]
+  CH -->|"AP: 옛 값이라도 준다"| AP["가용성 유지<br>일관성 포기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>파티션이 생긴 순간 강제로 갈림길에 선다</b> — 오래된 값을 주느냐, 아무것도 주지 않느냐. 이 선택에 중립은 없다.</div>
+  </div>
+
+  <h4>데이터 파티션</h4>
+  <ul>
+    <li>대규모 애플리케이션에서 모든 데이터를 한 서버에 담는 것은 불가능하다.</li>
+    <li>가장 단순한 해결책은 데이터를 작은 파티션으로 쪼개 여러 대에 나눠 담는 것이다.</li>
+  </ul>
+
+  <h5>고려 사항</h5>
+  <ul>
+    <li>데이터를 여러 서버에 고르게 분산할 수 있을까?</li>
+    <li>노드가 추가되거나 삭제될 때 데이터 이동을 최소화할 수 있을까?</li>
+  </ul>
+
+  <h5>안정 해시</h5>
+  <ul>
+    <li>위 두 조건을 만족시키는 도구가 5장의 안정 해시다.</li>
+    <li><b>규모 확장 자동화</b> — 시스템 부하에 따라 서버를 자동으로 추가/삭제할 수 있다.</li>
+    <li><b>다양성</b> — 서버 용량에 맞게 가상 노드 수를 조정할 수 있다. 고성능 서버는 더 많은 가상 노드를 갖는다.</li>
+  </ul>
+
+  <h4>데이터 다중화</h4>
+  <ul>
+    <li>여러 노드에 다중화된 데이터는 적절히 동기화되어야 한다.</li>
+    <li>이때 <b>정족수 합의(Quorum Consensus)</b> 프로토콜을 사용한다.</li>
+    <li>이 프로토콜을 쓰면 읽기/쓰기 연산 모두에서 일관성을 보장할 수 있다.</li>
+  </ul>
+
+  <h5>정족수 프로토콜</h5>
+  <ul>
+    <li>W, R, N을 정하는 일은 응답 지연과 데이터 일관성 사이의 타협점을 찾는 일이다.</li>
+    <li><b>N</b> — 사본의 개수</li>
+    <li><b>W</b> — 쓰기 연산에 대한 정족수. 쓰기가 성공했다고 보려면 W개 서버로부터 성공 응답을 받아야 한다.</li>
+    <li><b>R</b> — 읽기 연산에 대한 정족수. 읽기가 성공했다고 보려면 R개 서버로부터 응답을 받아야 한다.</li>
+  </ul>
+
+  <h5>W, R, N을 정하는 방법</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>설정</th><th>성격</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">R = 1, W = N</td><td>빠른 읽기에 최적화</td><td>쓰기가 느려진다</td></tr>
+        <tr><td class="dg-mono">W = 1, R = N</td><td>빠른 쓰기에 최적화</td><td>읽기가 느려진다</td></tr>
+        <tr><td class="dg-mono">W + R &gt; N</td><td class="t-ok">강한 일관성 보장</td><td>보통 N = 3, W = R = 2</td></tr>
+        <tr><td class="dg-mono">W + R ≤ N</td><td class="t-no">강한 일관성 미보장</td><td>대신 지연이 낮다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">W + R &gt; N 이 왜 강한 일관성인가 <span class="badge b-blue">보강</span></p>
+      <p>쓰기에 참여한 W개 노드와 읽기에 참여한 R개 노드의 합이 N을 넘으면, <b>비둘기집 원리에 의해 최소 한 노드는 반드시 겹친다</b>. 그 겹치는 노드가 최신 값을 갖고 있으므로 읽기가 최신 데이터를 못 볼 수 없다. N=3, W=R=2가 표준 설정인 이유다.</p>
+    </div>
+  </div>
+
+  <h4>일관성 모델</h4>
+  <ul>
+    <li>키-값 저장소를 설계할 때 중요한 요소이며, 데이터 일관성의 수준을 결정한다.</li>
+  </ul>
+
+  <h5>강한(strong) 일관성</h5>
+  <ul>
+    <li>모든 읽기 연산은 가장 최근에 갱신된 결과를 반환한다.</li>
+    <li>클라이언트는 절대로 오래된 데이터를 보지 않는다.</li>
+    <li>일반적으로 모든 사본에 쓰기 결과가 반영될 때까지 읽기/쓰기를 금지한다.</li>
+    <li>따라서 고가용성 시스템에는 적합하지 않다.</li>
+  </ul>
+
+  <h5>약한(weak) 일관성</h5>
+  <ul><li>읽기 연산이 가장 최근 갱신 결과를 반환하지 못할 수도 있다.</li></ul>
+
+  <h5>결과적(eventual) 일관성</h5>
+  <ul><li>갱신 결과가 결국에는 모든 사본에 동기화되는 모델이다. DynamoDB와 Cassandra가 채택한 모델이다.</li></ul>
+
+  <h4>비일관성 해소 기법 : 데이터 버저닝</h4>
+  <ul>
+    <li>데이터를 다중화하면 가용성은 올라가지만 사본 간 일관성이 깨질 수 있다.</li>
+    <li>이를 위해 버저닝(Versioning), 벡터 시계(Vector Clock) 같은 기법을 쓴다.</li>
+  </ul>
+
+  <h5>버저닝</h5>
+  <ul>
+    <li>데이터를 변경할 때마다 그 데이터의 새로운 버전을 만드는 것이다.</li>
+    <li>각 버전의 데이터는 변경 불가능(immutable)하다.</li>
+    <li>하지만 이 방식만으로는 원래 값을 덮어써 잃어버릴 수 있다.</li>
+    <li>벡터 시계가 이 문제를 해결한다.</li>
+  </ul>
+
+  <h5>벡터 시계 (Vector Clock)</h5>
+  <ul>
+    <li><code>[서버, 버전]</code>의 순서쌍을 데이터에 매다는 방식이다.</li>
+    <li>어떤 버전이 선행인지, 후행인지, 충돌인지 판별하는 데 쓴다.</li>
+    <li>형식은 <code>D([S1, v1], [S2, v2] ... [Sn, vn])</code>으로 표현한다. D는 데이터, v는 버전 카운터, S는 서버 번호다.</li>
+    <li><code>[Si, vi]</code>가 이미 있으면 vi를 증가시키고, 없으면 새로운 <code>[Si, 1]</code>을 만든다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  D1["D1 / Sx:1"] -->|"Sx 가 갱신"| D2["D2 / Sx:2"]
+  D2 -->|"Sy 가 갱신"| D3["D3 / Sx:2 Sy:1"]
+  D2 -->|"Sz 가 갱신"| D4["D4 / Sx:2 Sz:1"]
+  D3 --> CONF["D5 / Sx:3 Sy:1 Sz:1<br>충돌 — 클라이언트가 해소"]
+  D4 --> CONF
+      </pre>
+    </div>
+    <div class="figure-cap"><b>가지가 갈라지면 충돌이다</b> — D3과 D4는 서로를 모르므로 어느 쪽이 최신인지 시스템이 정할 수 없다. 그래서 클라이언트에게 넘긴다.</div>
+  </div>
+
+  <h4>충돌 감지</h4>
+  <ul>
+    <li>충돌은 클라이언트에서 해결해야 하는 문제다.</li>
+    <li>단점은 클라이언트 구현이 복잡해지고, <code>[서버:버전]</code> 순서쌍의 개수가 아주 빠르게 늘어난다는 점이다.</li>
+    <li>이를 해결하려면 길이에 임계치를 두고, 길어지면 오래된 순서쌍부터 제거해야 한다.</li>
+    <li>다만 그렇게 하면 버전 간 선후 관계를 정확히 판단할 수 없어 충돌 해소의 효율이 떨어진다.</li>
+    <li>아마존은 DynamoDB 운영에서 이 문제가 실제로 발생한 적이 없다고 보고했다.</li>
+  </ul>
+
+  <h4>장애 처리</h4>
+  <ul>
+    <li>장애를 어떻게 다룰지는 매우 중요한 문제다.</li>
+    <li>다양한 장애 감지(failure detection) 기법과 장애 해소(failure resolution) 전략이 있다.</li>
+  </ul>
+
+  <h5>장애 감지</h5>
+  <ul>
+    <li>서버 한 대가 "A가 죽었다"고 말했다고 바로 장애 처리를 시작하지 않는다.</li>
+    <li>보통 <b>2대 이상의 서버가 똑같이 A가 죽었다고 판단</b>해야 그때 장애 처리를 시작한다.</li>
+  </ul>
+
+  <h5>멀티캐스팅 채널</h5>
+  <ul>
+    <li>모든 노드 사이에 멀티캐스팅 채널을 만들어 서버 생사를 판단한다.</li>
+    <li>가장 간단하지만 서버가 많아지면 효율적이지 않다. 노드가 n개면 연결이 n(n−1)개다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  s0["s0"] --> s1["s1"]
+  s0 --> s2["s2"]
+  s0 --> s3["s3"]
+  s1 --> s0
+  s1 --> s2
+  s1 --> s3
+  s2 --> s0
+  s2 --> s1
+  s2 --> s3
+  s3 --> s0
+  s3 --> s1
+  s3 --> s2
+      </pre>
+    </div>
+    <div class="figure-cap"><b>노드 4개에 화살표가 12개</b> — 노드가 100개면 9,900개가 된다. 이 폭발이 가십 프로토콜로 넘어가는 이유다.</div>
+  </div>
+
+  <h5>가십(gossip) 프로토콜</h5>
+  <ol class="steps">
+    <li><div class="step-title">각 노드가 멤버십 목록을 유지한다</div><p>목록은 멤버 아이디와 박동 카운터의 쌍으로 이루어진다.</p></li>
+    <li><div class="step-title">자기 박동 카운터를 주기적으로 올린다</div><p>"나는 아직 살아 있다"는 표시다.</p></li>
+    <li><div class="step-title">무작위 노드들에게 목록을 보낸다</div><p>전체가 아니라 몇 개만 골라 보낸다. 이것이 통신량 폭발을 막는 지점이다.</p></li>
+    <li><div class="step-title">받은 쪽은 자기 목록과 비교해 갱신한다</div><p>더 최신 정보가 있으면 자기 목록을 업데이트한다.</p></li>
+    <li><div class="step-title">일정 시간 갱신이 없으면 죽었다고 본다</div><p>어떤 멤버의 박동 카운터가 지정된 시간 동안 갱신되지 않으면 장애로 판단한다.</p></li>
+  </ol>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>멤버 아이디</th><th>박동 카운터</th><th>마지막 갱신 시각</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">s0</td><td class="t-center">1</td><td class="dg-mono">2021-01-01 00:00:00</td></tr>
+        <tr><td class="dg-mono">s1</td><td class="t-center">2</td><td class="dg-mono">2021-01-01 00:00:00</td></tr>
+        <tr><td class="dg-mono">s2</td><td class="t-center">3</td><td class="dg-mono">2021-01-01 00:00:00</td></tr>
+        <tr><td class="dg-mono">s3</td><td class="t-center">4</td><td class="dg-mono">2021-01-01 00:00:00</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>장애 해소</h4>
+
+  <h5>일시적 장애 처리 — 임시 위탁 (hinted handoff)</h5>
+  <ul>
+    <li>가십 프로토콜로 장애를 감지한 시스템은 가용성 보장을 위해 조치를 취해야 한다.</li>
+    <li>특정 노드에 장애가 나면 다른 노드가 그 역할을 임시로 물려받는다.</li>
+    <li>장애 노드가 복구되면 대신 받아 둔 데이터를 원래 노드로 인계한다.</li>
+  </ul>
+
+  <h5>영구적 장애 처리 — 반-엔트로피(anti-entropy) 프로토콜</h5>
+  <ul>
+    <li>사본 간 일관성이 망가진 데이터를 관리하기 위해 <b>머클(Merkle) 트리</b>를 사용한다.</li>
+  </ul>
+  <ol class="steps">
+    <li><div class="step-title">키 공간을 버킷 단위로 나눈다</div></li>
+    <li><div class="step-title">각 키에 균등 분포 해시 함수를 적용해 해시값을 계산한다</div></li>
+    <li><div class="step-title">버킷별 해시값을 계산해 그 값을 레이블로 갖는 노드를 만든다</div></li>
+    <li><div class="step-title">자식 노드의 레이블로부터 새 해시값을 계산해 이진 트리를 상향식으로 구성한다</div><p>루트 해시가 같으면 두 사본은 동일하다. 다르면 다른 가지만 따라 내려가며 차이가 나는 버킷을 찾는다.</p></li>
+  </ol>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">머클 트리가 아끼는 것</p>
+      <p>모든 키를 하나씩 비교하면 O(키 개수)의 통신이 필요하다. 머클 트리를 쓰면 <b>다른 부분만 로그 시간에 좁혀 들어가므로</b>, 대부분이 동일한 두 사본을 비교하는 비용이 거의 공짜가 된다.</p>
+    </div>
+  </div>
+
+  <h4>데이터 센터 장애 처리</h4>
+  <ul><li>실제로는 다른 데이터 센터에 걸친 이중화가 필요하다.</li></ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>P는 포기할 수 없으므로 실제 선택은 CP와 AP 사이다.</li>
+      <li>파티션은 안정 해시로, 다중화 일관성은 정족수(W+R&gt;N)로 다룬다.</li>
+      <li>버전 충돌은 벡터 시계로 감지하고, 해소는 클라이언트 몫이다.</li>
+      <li>장애 감지는 가십, 일시 장애는 임시 위탁, 영구 장애는 머클 트리.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-30" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-5</div>
+    <h3>시스템 아키텍처와 카산드라의 읽기/쓰기 경로</h3>
+    <p class="item-tagline">쓰기는 로그에 덧붙이고, 읽기는 블룸 필터로 헛걸음을 줄인다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    LSM 계열 저장소의 요령은 <b>쓰기를 항상 순차 쓰기로 만드는 것</b>이다. 무작위 쓰기를 커밋 로그와 메모리 캐시가 흡수하고, 디스크에는 정렬된 덩어리만 한꺼번에 내려간다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  C["클라이언트"] --> CO["조율자 노드 (coordinator)"]
+  CO --> N0["노드 s0"]
+  CO --> N1["노드 s1"]
+  CO --> N2["노드 s2"]
+  N0 -.->|"가십"| N1
+  N1 -.->|"가십"| N2
+  N2 -.->|"가십"| N0
+      </pre>
+    </div>
+    <div class="figure-cap"><b>중앙 마스터가 없다</b> — 클라이언트가 접속한 아무 노드나 조율자가 되고, 노드들은 가십으로 서로의 상태를 공유한다. 이것이 무중단 확장의 구조적 근거다.</div>
+  </div>
+
+  <h4>쓰기 경로</h4>
+  <ol class="steps">
+    <li><div class="step-title">커밋 로그에 기록한다</div><p>쓰기 요청이 오면 먼저 디스크의 커밋 로그에 덧붙인다. 순차 쓰기라 빠르고, 장애가 나도 복구할 수 있다.</p></li>
+    <li><div class="step-title">메모리 캐시에 기록한다</div><p>같은 내용을 메모리(memtable)에도 반영한다. 이후 읽기는 여기서 즉시 처리된다.</p></li>
+    <li><div class="step-title">임계치를 넘으면 SSTable로 내려쓴다</div><p>메모리 캐시가 가득 차거나 사전에 정의된 임계치에 도달하면 디스크의 <code>SSTable</code>에 기록한다. <b>SSTable(Sorted String Table)</b>은 키-값 쌍을 정렬된 순서로 저장하는 테이블이다.</p></li>
+  </ol>
+
+  <h4>읽기 경로</h4>
+
+  <h5>메모리에 캐싱된 데이터가 있는 경우</h5>
+  <ol class="steps">
+    <li><div class="step-title">메모리 캐시를 확인한다</div></li>
+    <li><div class="step-title">있으면 그대로 반환한다</div><p>디스크에 손을 대지 않는다.</p></li>
+  </ol>
+
+  <h5>메모리에 캐싱된 데이터가 없는 경우</h5>
+  <ol class="steps">
+    <li><div class="step-title">캐시를 확인하고 없으면 블룸 필터를 검사한다</div></li>
+    <li><div class="step-title">어떤 SSTable에 키가 있는지 좁힌다</div><p>블룸 필터는 "확실히 없음" 또는 "아마 있음"만 답한다. 확실히 없는 SSTable을 읽는 헛걸음을 없애 준다.</p></li>
+    <li><div class="step-title">해당 SSTable에서 데이터를 가져와 반환한다</div></li>
+  </ol>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  R["읽기 요청"] --> M{"메모리 캐시에 있나?"}
+  M -->|"있음"| OUT["즉시 반환"]
+  M -->|"없음"| BF["블룸 필터 검사"]
+  BF -->|"확실히 없음"| SKIP["해당 SSTable 건너뜀"]
+  BF -->|"아마 있음"| SS[("SSTable 읽기")]
+  SS --> OUT
+  W["쓰기 요청"] --> CL[("커밋 로그 (append-only)")]
+  CL --> MEM["메모리 캐시 (memtable)"]
+  MEM -->|"임계치 초과"| SS
+      </pre>
+    </div>
+    <div class="figure-cap"><b>쓰기는 항상 덧붙이기, 읽기는 필터로 좁히기</b> — 커밋 로그의 append-only 성질은 19장 메시지 큐의 WAL과 정확히 같은 아이디어다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">블룸 필터는 왜 틀릴 수 있는가 <span class="badge b-blue">보강</span></p>
+      <p>블룸 필터는 비트 배열 위에 여러 해시 함수를 찍는 확률적 자료구조다. 다른 키들이 우연히 같은 비트를 모두 채우면 <b>없는 키를 "아마 있음"이라 답할 수 있다(거짓 양성)</b>. 반대로 "없음"이라 답한 경우는 절대 틀리지 않는다. 이 비대칭성 덕에 "헛걸음을 줄이는 용도"로만 안전하게 쓸 수 있다. 9장 웹 크롤러의 방문 URL 판별에서도 같은 이유로 등장한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>중앙 마스터 없이 조율자 노드 + 가십으로 클러스터가 굴러간다.</li>
+      <li>쓰기: 커밋 로그 → memtable → 임계치 초과 시 SSTable 플러시.</li>
+      <li>읽기: memtable → 블룸 필터로 SSTable 후보 좁히기 → 읽기.</li>
+      <li>블룸 필터는 거짓 양성만 있고 거짓 음성은 없다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,4428 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RabbitMQ</title>
+<meta name="description" content="BullMQ 경험자가 RabbitMQ로 넘어갈 때 필요한 개념/운영/Node.js 실전 정리. RabbitMQ 4.3 기준.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%233182F6%22%2F%3E%3Ctext%20x%3D%2232%22%20y%3D%2243%22%20font-size%3D%2230%22%20font-family%3D%22system-ui%2Csans-serif%22%20font-weight%3D%22bold%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EMQ%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+/* ==========================================================================
+   study-digest / Toss Design System 기반 학습자료 스타일시트
+   - 폰트: Pretendard Variable (본문) + JetBrains Mono (코드)
+   - 팔레트: Toss Product Sans 계열 그레이 스케일 + Toss Blue
+   - 목표: 책처럼 읽히는 조판 (17px / 1.78 / 760px 컬럼)
+   ========================================================================== */
+
+/* --------------------------------------------------------- 1. 디자인 토큰 */
+:root {
+  /* Toss grey scale */
+  --grey-50:  #F9FAFB;
+  --grey-100: #F2F4F6;
+  --grey-200: #E5E8EB;
+  --grey-300: #D1D6DB;
+  --grey-400: #B0B8C1;
+  --grey-500: #8B95A1;
+  --grey-600: #6B7684;
+  --grey-700: #4E5968;
+  --grey-800: #333D4B;
+  --grey-900: #191F28;
+
+  /* Toss accent */
+  --blue:        #3182F6;
+  --blue-strong: #1B64DA;
+  --blue-weak:   #E8F3FF;
+  --red:         #F04452;
+  --red-weak:    #FEF0F1;
+  --green:       #15C47E;
+  --green-weak:  #EAFBF3;
+  --yellow:      #FFC22E;
+  --yellow-weak: #FFF9E7;
+  --purple:      #7F5AF0;
+  --purple-weak: #F1EDFE;
+
+  /* semantic */
+  --bg:            #FFFFFF;
+  --bg-sunken:     var(--grey-50);
+  --surface:       #FFFFFF;
+  --surface-alt:   var(--grey-50);
+  --border:        var(--grey-200);
+  --border-strong: var(--grey-300);
+  --text:          var(--grey-900);
+  --text-sub:      var(--grey-700);
+  --text-muted:    var(--grey-600);
+  --text-faint:    var(--grey-500);
+  --accent:        var(--blue);
+  --accent-weak:   var(--blue-weak);
+
+  /* code surface (light) */
+  --code-bg:      #1E2028;
+  --code-bg-soft: var(--grey-50);
+  --code-border:  #2C2F3A;
+  --code-text:    #D6DEEB;
+
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.06);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.10);
+
+  /* radii */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+
+  /* metrics */
+  --measure: 760px;
+  --sidebar-w: 300px;
+  --topbar-h: 56px;
+
+  /* type */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+               system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+               Menlo, monospace;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg:            #16181D;
+  --bg-sunken:     #101215;
+  --surface:       #1C1F25;
+  --surface-alt:   #21242B;
+  --border:        #2C3038;
+  --border-strong: #3A3F49;
+  --text:          #EDEFF2;
+  --text-sub:      #C3C8D0;
+  --text-muted:    #9AA1AC;
+  --text-faint:    #7C838F;
+  --accent:        #4E8FF7;
+  --accent-weak:   #16233A;
+
+  --blue-weak:   #16233A;
+  --red-weak:    #2E1A1D;
+  --green-weak:  #12271F;
+  --yellow-weak: #2B2415;
+  --purple-weak: #211B36;
+
+  --code-bg:      #12141A;
+  --code-bg-soft: #1C1F25;
+  --code-border:  #2C3038;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.35);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.45);
+
+  color-scheme: dark;
+}
+
+/* --------------------------------------------------------- 2. 리셋 / 기본 */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--topbar-h) + 24px);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.78;
+  letter-spacing: -0.003em;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  transition: background-color .2s ease, color .2s ease;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+img { max-width: 100%; height: auto; }
+
+::selection { background: var(--accent-weak); color: var(--text); }
+
+/* --------------------------------------------------------- 3. 레이아웃 */
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ---- 사이드바 */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--border);
+  padding: 20px 0 64px;
+}
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 20px 16px;
+}
+.brand-mark {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--blue) 0%, #5CA0FF 100%);
+  color: #fff;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 15px; letter-spacing: -.03em;
+  box-shadow: 0 2px 8px rgba(49,130,246,.35);
+}
+.brand-text { min-width: 0; }
+.brand-title {
+  font-size: 15px; font-weight: 700; letter-spacing: -.02em;
+  color: var(--text); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand-sub { font-size: 12px; color: var(--text-faint); line-height: 1.4; }
+
+.search-wrap { padding: 0 16px 12px; }
+.search-box {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+.search-box svg { flex: none; color: var(--text-faint); }
+.search-box input {
+  border: 0; outline: 0; background: transparent; width: 100%;
+  font-family: inherit; font-size: 14px; color: var(--text);
+  letter-spacing: -.01em;
+}
+.search-box input::placeholder { color: var(--text-faint); }
+
+.nav { padding: 0 12px; }
+.nav-group { margin-bottom: 6px; }
+.nav-group-title {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0; background: transparent;
+  font-family: inherit;
+  font-size: 12.5px; font-weight: 700; letter-spacing: -.01em;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  text-align: left;
+}
+.nav-group-title:hover { background: var(--grey-100); color: var(--text-sub); }
+[data-theme="dark"] .nav-group-title:hover { background: var(--surface-alt); }
+.nav-group-title .chev {
+  margin-left: auto; flex: none;
+  transition: transform .18s ease;
+  color: var(--text-faint);
+}
+.nav-group.collapsed .chev { transform: rotate(-90deg); }
+.nav-group.collapsed .nav-list { display: none; }
+.nav-num {
+  flex: none;
+  display: inline-grid; place-items: center;
+  width: 20px; height: 20px; border-radius: 6px;
+  background: var(--grey-200); color: var(--text-muted);
+  font-size: 11px; font-weight: 700;
+}
+[data-theme="dark"] .nav-num { background: var(--surface-alt); }
+
+.nav-list { list-style: none; margin: 0; padding: 0 0 4px; }
+.nav-list a {
+  display: block;
+  padding: 6px 10px 6px 20px;
+  font-size: 13.5px; line-height: 1.5;
+  color: var(--text-muted);
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  position: relative;
+  transition: color .12s ease, background-color .12s ease;
+}
+.nav-list a::before {
+  content: ""; position: absolute; left: 9px; top: 50%;
+  width: 3px; height: 0; margin-top: -0px;
+  background: var(--accent); border-radius: 99px;
+  transition: height .16s ease, margin-top .16s ease;
+}
+.nav-list a:hover { color: var(--text); background: var(--grey-100); text-decoration: none; }
+[data-theme="dark"] .nav-list a:hover { background: var(--surface-alt); }
+.nav-list a.active {
+  color: var(--accent); font-weight: 600;
+  background: var(--accent-weak);
+}
+.nav-list a.active::before { height: 14px; margin-top: -7px; }
+.nav-list a .idx { color: var(--text-faint); font-variant-numeric: tabular-nums; margin-right: 5px; }
+.nav-list a.active .idx { color: var(--accent); }
+.nav-hidden { display: none !important; }
+
+/* ---- 상단 바 */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  height: var(--topbar-h);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 24px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-crumb {
+  font-size: 13px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.topbar-crumb b { color: var(--text-sub); font-weight: 600; }
+.topbar-spacer { flex: 1 1 auto; }
+.icon-btn {
+  flex: none;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .14s ease;
+}
+.icon-btn:hover { color: var(--text); border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+.icon-btn:active { transform: scale(.94); }
+.menu-btn { display: none; }
+
+.progress-rail {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: transparent;
+}
+.progress-bar {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--blue) 0%, #6BA9FF 100%);
+  transition: width .1s linear;
+}
+
+/* ---- 본문 */
+.main { min-width: 0; }
+.content {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 56px 24px 160px;
+}
+
+/* --------------------------------------------------------- 4. 표지 */
+.cover { padding: 24px 0 56px; }
+.cover-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .02em;
+  color: var(--accent);
+  background: var(--accent-weak);
+  padding: 5px 11px; border-radius: 99px;
+  margin-bottom: 18px;
+}
+.cover h1 {
+  font-size: 42px; line-height: 1.25; letter-spacing: -.035em;
+  font-weight: 800; margin: 0 0 14px;
+}
+.cover-lead {
+  font-size: 18px; line-height: 1.7; color: var(--text-muted);
+  margin: 0 0 28px; max-width: 62ch;
+}
+.cover-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 28px;
+}
+.stat {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+}
+.stat-val {
+  font-size: 26px; font-weight: 800; letter-spacing: -.03em;
+  line-height: 1.2; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.stat-val span { font-size: 14px; font-weight: 600; color: var(--text-faint); margin-left: 2px; }
+.stat-label { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+
+/* 챕터 카드 그리드 (표지 목차) */
+.chapter-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px; margin: 24px 0 0;
+}
+.chapter-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  text-decoration: none;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.chapter-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+  text-decoration: none;
+}
+.chapter-card .cc-num {
+  font-size: 12px; font-weight: 800; letter-spacing: .04em;
+  color: var(--accent);
+}
+.chapter-card .cc-title {
+  font-size: 15.5px; font-weight: 700; letter-spacing: -.02em;
+  color: var(--text); margin: 6px 0 4px; line-height: 1.45;
+}
+.chapter-card .cc-meta { font-size: 12.5px; color: var(--text-faint); }
+
+/* --------------------------------------------------------- 5. 타이포그래피 */
+.chapter-head {
+  margin: 96px 0 40px;
+  padding-top: 40px;
+  border-top: 1px solid var(--border);
+}
+.chapter-head:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
+.chapter-head .ch-label {
+  font-size: 13px; font-weight: 800; letter-spacing: .06em;
+  color: var(--accent); text-transform: uppercase;
+}
+.chapter-head h2 {
+  font-size: 32px; line-height: 1.34; letter-spacing: -.032em;
+  font-weight: 800; margin: 8px 0 12px;
+}
+.chapter-head .ch-lead {
+  font-size: 16.5px; color: var(--text-muted); margin: 0; line-height: 1.7;
+}
+
+.item { margin: 0 0 8px; padding: 44px 0 8px; scroll-margin-top: 80px; }
+.item + .item { border-top: 1px solid var(--border); }
+
+.item-head { margin-bottom: 22px; }
+.item-num {
+  display: inline-block;
+  font-size: 12px; font-weight: 800; letter-spacing: .04em;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.item h3 {
+  font-size: 25px; line-height: 1.42; letter-spacing: -.03em;
+  font-weight: 700; margin: 0;
+  scroll-margin-top: 80px;
+}
+.item-tagline {
+  margin: 10px 0 0;
+  font-size: 16px; line-height: 1.7; color: var(--text-muted);
+}
+
+.content h4 {
+  font-size: 18.5px; line-height: 1.55; letter-spacing: -.024em;
+  font-weight: 700; margin: 38px 0 12px;
+  scroll-margin-top: 80px;
+}
+.content h5 {
+  font-size: 15.5px; letter-spacing: -.015em; font-weight: 700;
+  margin: 26px 0 8px; color: var(--text-sub);
+}
+
+.content p { margin: 0 0 18px; }
+.content > p:last-child { margin-bottom: 0; }
+
+.content ul, .content ol { margin: 0 0 18px; padding-left: 22px; }
+.content li { margin: 0 0 7px; }
+.content li > ul, .content li > ol { margin: 7px 0 0; }
+.content ul { list-style: none; padding-left: 4px; }
+.content ul > li {
+  position: relative; padding-left: 18px;
+}
+.content ul > li::before {
+  content: ""; position: absolute; left: 3px; top: 12px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--grey-400);
+}
+[data-theme="dark"] .content ul > li::before { background: var(--grey-600); }
+.content ol { list-style: none; counter-reset: li; padding-left: 4px; }
+.content ol > li { position: relative; padding-left: 26px; counter-increment: li; }
+.content ol > li::before {
+  content: counter(li);
+  position: absolute; left: 0; top: 4px;
+  width: 19px; height: 19px; border-radius: 6px;
+  background: var(--grey-100); color: var(--text-muted);
+  font-size: 11.5px; font-weight: 700;
+  display: grid; place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+[data-theme="dark"] .content ol > li::before { background: var(--surface-alt); }
+
+strong, b { font-weight: 700; color: var(--text); }
+em { font-style: normal; background: linear-gradient(transparent 62%, var(--yellow-weak) 62%); padding: 0 1px; }
+[data-theme="dark"] em { background: linear-gradient(transparent 62%, rgba(255,194,46,.22) 62%); }
+
+hr {
+  border: 0; border-top: 1px solid var(--border);
+  margin: 40px 0;
+}
+
+blockquote {
+  margin: 0 0 18px; padding: 2px 0 2px 18px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+/* 인라인 코드 */
+:not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: .875em;
+  background: var(--grey-100);
+  color: var(--grey-800);
+  padding: .12em .38em;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font-weight: 500;
+  letter-spacing: 0;
+  word-break: break-all;
+}
+[data-theme="dark"] :not(pre) > code { background: var(--surface-alt); color: #E3E7EE; }
+
+/* --------------------------------------------------------- 6. 코드 블록 */
+.code {
+  margin: 0 0 20px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--code-border);
+  background: var(--code-bg);
+  box-shadow: var(--shadow-sm);
+}
+.code-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px 8px 14px;
+  background: rgba(255,255,255,.035);
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.code-dots { display: flex; gap: 6px; flex: none; }
+.code-dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+.code-dots i:nth-child(1) { background: #FF5F57; }
+.code-dots i:nth-child(2) { background: #FEBC2E; }
+.code-dots i:nth-child(3) { background: #28C840; }
+.code-file {
+  font-family: var(--font-mono);
+  font-size: 12px; color: #8A94A6; letter-spacing: 0;
+  margin-left: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.code-tag {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
+  padding: 2px 7px; border-radius: 99px; flex: none;
+}
+.code-tag.bad  { background: rgba(240,68,82,.16);  color: #FF8A93; }
+.code-tag.good { background: rgba(21,196,126,.16); color: #4FDCA5; }
+.code-spacer { flex: 1 1 auto; }
+.copy-btn {
+  flex: none;
+  border: 0; background: rgba(255,255,255,.06);
+  color: #8A94A6; cursor: pointer;
+  border-radius: 6px; padding: 4px 8px;
+  font-family: inherit; font-size: 11.5px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all .14s ease;
+}
+.copy-btn:hover { background: rgba(255,255,255,.12); color: #D6DEEB; }
+.copy-btn.done { color: #4FDCA5; }
+
+.code pre {
+  margin: 0; padding: 16px 18px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.72;
+  letter-spacing: 0;
+  tab-size: 2;
+}
+.code pre::-webkit-scrollbar { height: 8px; }
+.code pre::-webkit-scrollbar-thumb { background: #3A3F4B; border-radius: 99px; }
+.code code { font-family: inherit; background: none; border: 0; padding: 0; color: var(--code-text); }
+
+/* highlight.js 토큰 — VSCode Dark+ 계열 */
+.hljs-keyword, .hljs-literal, .hljs-symbol        { color: #C792EA; }
+.hljs-built_in                                     { color: #82AAFF; }
+.hljs-type, .hljs-class .hljs-title                { color: #4EC9B0; }
+.hljs-title, .hljs-title.function_                 { color: #82AAFF; }
+.hljs-string, .hljs-meta .hljs-string              { color: #C3E88D; }
+.hljs-number                                       { color: #F78C6C; }
+.hljs-comment, .hljs-quote                         { color: #6A7C94; font-style: italic; }
+.hljs-attr, .hljs-property, .hljs-attribute        { color: #9CDCFE; }
+.hljs-variable, .hljs-params                       { color: #D6DEEB; }
+.hljs-operator, .hljs-punctuation                  { color: #89DDFF; }
+.hljs-meta                                         { color: #FFCB6B; }
+.hljs-tag                                          { color: #F07178; }
+.hljs-name                                         { color: #F07178; }
+.hljs-regexp                                       { color: #89DDFF; }
+.hljs-deletion                                     { color: #FF8A93; }
+.hljs-addition                                     { color: #4FDCA5; }
+
+/* 코드 라인 하이라이트 / 에러 밑줄 */
+.code .err-line { display: block; background: rgba(240,68,82,.10); box-shadow: inset 3px 0 0 #F04452; margin: 0 -18px; padding: 0 18px; }
+.code .ok-line  { display: block; background: rgba(21,196,126,.10); box-shadow: inset 3px 0 0 #15C47E; margin: 0 -18px; padding: 0 18px; }
+
+/* 코드 나란히 비교 */
+.code-compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin: 0 0 20px;
+}
+.code-compare .code { margin: 0; min-width: 0; }
+.code-compare .code pre { font-size: 12.8px; }
+@media (max-width: 900px) { .code-compare { grid-template-columns: 1fr; } }
+
+/* --------------------------------------------------------- 7. IDE 호버 카드 */
+/* VSCode 툴팁 스크린샷을 대체하는 컴포넌트 */
+.ide {
+  margin: 0 0 20px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--code-border);
+  background: var(--code-bg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.ide-body {
+  padding: 16px 18px 18px;
+  font-family: var(--font-mono);
+  font-size: 13.5px; line-height: 1.72;
+  color: var(--code-text);
+  overflow-x: auto;
+}
+.ide-body pre { margin: 0; font: inherit; }
+.ide-hover-anchor {
+  border-bottom: 2px dotted #6A7C94;
+  cursor: help;
+}
+.hovercard {
+  display: block;
+  margin: 8px 0 4px 0;
+  max-width: 560px;
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.5);
+  overflow: hidden;
+  position: relative;
+}
+[data-theme="light"] .hovercard { box-shadow: 0 6px 22px rgba(0,0,0,.28); }
+.hovercard::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--blue);
+}
+.hovercard-sig {
+  padding: 9px 14px;
+  font-family: var(--font-mono);
+  font-size: 12.8px; line-height: 1.6;
+  color: #D6DEEB;
+  border-bottom: 1px solid #3C3C3C;
+  white-space: pre-wrap;
+}
+.hovercard-sig:last-child { border-bottom: 0; }
+.hovercard-doc {
+  padding: 9px 14px;
+  font-family: var(--font-sans);
+  font-size: 13px; line-height: 1.62; color: #B4BCC8;
+  letter-spacing: -.01em;
+}
+.hovercard-doc code {
+  font-family: var(--font-mono); font-size: 12px;
+  background: rgba(255,255,255,.08); border: 0; color: #D6DEEB;
+  padding: .1em .35em; border-radius: 4px;
+}
+.hovercard .kw   { color: #C792EA; }
+.hovercard .typ  { color: #4EC9B0; }
+.hovercard .str  { color: #C3E88D; }
+.hovercard .fn   { color: #82AAFF; }
+.hovercard .prop { color: #9CDCFE; }
+.hovercard .num  { color: #F78C6C; }
+.hovercard .dim  { color: #7E8AA0; }
+.ide-caption {
+  padding: 9px 14px;
+  background: rgba(255,255,255,.03);
+  border-top: 1px solid rgba(255,255,255,.07);
+  font-family: var(--font-sans);
+  font-size: 12.5px; color: #8A94A6; letter-spacing: -.01em;
+}
+
+/* 물결 밑줄 (TS 에러 표시) */
+.squiggly {
+  text-decoration: underline wavy #F04452;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.squiggly-warn {
+  text-decoration: underline wavy #FFC22E;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+/* --------------------------------------------------------- 8. 콜아웃 */
+.callout {
+  --c: var(--grey-500);
+  --cw: var(--grey-100);
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  border-radius: var(--r-md);
+  background: var(--cw);
+  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+  font-size: 15.5px; line-height: 1.72;
+}
+.callout > .ic {
+  width: 24px; height: 24px; border-radius: 7px;
+  background: var(--c); color: #fff;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 800;
+  margin-top: 2px;
+}
+.callout .callout-title {
+  font-size: 14px; font-weight: 700; letter-spacing: -.015em;
+  color: var(--c); margin: 0 0 4px;
+}
+[data-theme="dark"] .callout .callout-title { filter: brightness(1.25); }
+.callout p:last-child, .callout ul:last-child, .callout ol:last-child { margin-bottom: 0; }
+.callout .code:last-child { margin-bottom: 0; }
+.callout ul > li::before { background: color-mix(in srgb, var(--c) 60%, transparent); }
+
+.callout.tip     { --c: var(--blue);   --cw: var(--blue-weak); }
+.callout.warn    { --c: #E5A200;       --cw: var(--yellow-weak); }
+.callout.danger  { --c: var(--red);    --cw: var(--red-weak); }
+.callout.success { --c: var(--green);  --cw: var(--green-weak); }
+.callout.update  { --c: var(--purple); --cw: var(--purple-weak); }
+[data-theme="dark"] .callout.warn { --c: #FFC22E; }
+
+/* 요약 카드 */
+.summary {
+  margin: 32px 0 8px;
+  padding: 22px 24px;
+  border-radius: var(--r-lg);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+.summary-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 800; letter-spacing: -.01em;
+  color: var(--text-sub);
+  margin: 0 0 12px;
+}
+.summary-title::before {
+  content: ""; width: 4px; height: 15px; border-radius: 99px;
+  background: var(--accent);
+}
+.summary ul { margin-bottom: 0; }
+.summary li { font-size: 15.5px; }
+
+/* 핵심 한 줄 */
+.keypoint {
+  margin: 0 0 22px;
+  padding: 18px 22px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, var(--accent-weak) 0%, color-mix(in srgb, var(--accent-weak) 45%, var(--bg)) 100%);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  font-size: 16.5px; font-weight: 600; line-height: 1.66;
+  letter-spacing: -.018em;
+  color: var(--text);
+}
+.keypoint .kp-label {
+  display: block;
+  font-size: 11.5px; font-weight: 800; letter-spacing: .06em;
+  color: var(--accent); margin-bottom: 5px;
+}
+
+/* --------------------------------------------------------- 9. 표 */
+.table-wrap {
+  margin: 0 0 22px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.table-wrap::-webkit-scrollbar { height: 8px; }
+.table-wrap::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+table {
+  width: 100%; border-collapse: collapse;
+  font-size: 14.5px; line-height: 1.6;
+}
+thead th {
+  background: var(--surface-alt);
+  text-align: left;
+  font-size: 12.5px; font-weight: 700; letter-spacing: -.005em;
+  color: var(--text-muted);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--text-sub);
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-alt); }
+td code, th code { white-space: nowrap; }
+.t-center { text-align: center; }
+.t-ok  { color: var(--green); font-weight: 700; }
+.t-no  { color: var(--red);   font-weight: 700; }
+
+/* --------------------------------------------------------- 10. 다이어그램 */
+.figure {
+  margin: 0 0 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.figure-body {
+  padding: 24px 20px;
+  display: flex; justify-content: center; align-items: center;
+  overflow-x: auto;
+}
+.figure-body > svg { max-width: 100%; height: auto; }
+.figure-cap {
+  padding: 11px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+  font-size: 13px; color: var(--text-muted);
+  line-height: 1.6;
+}
+.figure-cap b { color: var(--text-sub); font-weight: 700; }
+.mermaid { display: flex; justify-content: center; }
+.mermaid svg { max-width: 100%; height: auto; }
+
+/* SVG 다이어그램 공통 클래스 */
+.dg-fill-bg     { fill: var(--surface); }
+.dg-fill-soft   { fill: var(--surface-alt); }
+.dg-stroke      { stroke: var(--border-strong); }
+.dg-text        { fill: var(--text); font-family: var(--font-sans); }
+.dg-text-sub    { fill: var(--text-muted); font-family: var(--font-sans); }
+.dg-mono        { font-family: var(--font-mono); }
+.dg-accent      { fill: var(--accent); }
+
+/* 벤 다이어그램 */
+.venn-a { fill: var(--blue);  opacity: .22; }
+.venn-b { fill: var(--green); opacity: .22; }
+.venn-a-s { stroke: var(--blue);  fill: none; stroke-width: 1.5; }
+.venn-b-s { stroke: var(--green); fill: none; stroke-width: 1.5; }
+
+/* 태그 / 뱃지 */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: -.005em;
+  padding: 3px 9px; border-radius: 99px;
+  background: var(--grey-100); color: var(--text-muted);
+  vertical-align: middle;
+}
+[data-theme="dark"] .badge { background: var(--surface-alt); }
+.badge.b-blue   { background: var(--blue-weak);   color: var(--blue); }
+.badge.b-red    { background: var(--red-weak);    color: var(--red); }
+.badge.b-green  { background: var(--green-weak);  color: var(--green); }
+.badge.b-purple { background: var(--purple-weak); color: var(--purple); }
+[data-theme="dark"] .badge.b-blue   { color: #7FB0FF; }
+[data-theme="dark"] .badge.b-red    { color: #FF8A93; }
+[data-theme="dark"] .badge.b-green  { color: #4FDCA5; }
+[data-theme="dark"] .badge.b-purple { color: #B49BFF; }
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+
+/* --------------------------------------------------------- 11. 스텝 / 타임라인 */
+.steps { margin: 0 0 22px; padding: 0; list-style: none; counter-reset: step; }
+.steps > li {
+  position: relative;
+  padding: 0 0 22px 40px;
+  counter-increment: step;
+  margin: 0;
+}
+.steps > li::before {
+  content: counter(step);
+  position: absolute; left: 0; top: 1px;
+  width: 26px; height: 26px; border-radius: 9px;
+  background: var(--accent); color: #fff;
+  font-size: 12.5px; font-weight: 800;
+  display: grid; place-items: center;
+  z-index: 1;
+}
+.steps > li::after {
+  content: ""; position: absolute; left: 12.5px; top: 30px; bottom: 2px;
+  width: 1.5px; background: var(--border);
+}
+.steps > li:last-child { padding-bottom: 0; }
+.steps > li:last-child::after { display: none; }
+.steps .step-title { font-weight: 700; letter-spacing: -.015em; margin-bottom: 3px; }
+.steps .step-title + p { color: var(--text-muted); font-size: 15.5px; }
+
+/* --------------------------------------------------------- 12. 하단 네비 */
+.pager {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 56px; padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+.pager a {
+  display: block; padding: 14px 18px;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  text-decoration: none; transition: all .16s ease;
+  background: var(--surface);
+}
+.pager a:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); text-decoration: none; }
+.pager .pg-dir { font-size: 12px; color: var(--text-faint); font-weight: 600; }
+.pager .pg-title { font-size: 14.5px; font-weight: 700; color: var(--text); letter-spacing: -.02em; margin-top: 2px; }
+.pager .next { text-align: right; }
+.pager .empty { visibility: hidden; }
+
+.footer {
+  max-width: var(--measure); margin: 0 auto;
+  padding: 32px 24px 72px;
+  font-size: 13px; color: var(--text-faint);
+  border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+}
+
+/* 맨 위로 */
+.to-top {
+  position: fixed; right: 28px; bottom: 28px; z-index: 45;
+  width: 42px; height: 42px; border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted);
+  display: grid; place-items: center; cursor: pointer;
+  box-shadow: var(--shadow-md);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  transform: translateY(8px);
+}
+.to-top.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.to-top:hover { color: var(--accent); border-color: var(--accent); }
+
+/* --------------------------------------------------------- 13. 반응형 */
+.scrim {
+  position: fixed; inset: 0; z-index: 49;
+  background: rgba(0,0,0,.4);
+  opacity: 0; pointer-events: none; transition: opacity .2s ease;
+}
+
+@media (max-width: 1024px) {
+  :root { --sidebar-w: 260px; }
+  .content { padding: 44px 20px 140px; }
+}
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .sidebar {
+    position: fixed; z-index: 50; left: 0; top: 0;
+    width: 292px; height: 100vh;
+    transform: translateX(-100%);
+    transition: transform .24s cubic-bezier(.32,.72,0,1);
+    box-shadow: var(--shadow-lg);
+  }
+  body.nav-open .sidebar { transform: translateX(0); }
+  body.nav-open .scrim { opacity: 1; pointer-events: auto; }
+  .menu-btn { display: grid; }
+  .cover h1 { font-size: 32px; }
+  .cover-lead { font-size: 16.5px; }
+  .chapter-head h2 { font-size: 26px; }
+  .item h3 { font-size: 21px; }
+  body { font-size: 16.5px; }
+  .content { padding: 32px 18px 120px; }
+  .pager { grid-template-columns: 1fr; }
+  .to-top { right: 16px; bottom: 16px; }
+}
+
+/* --------------------------------------------------------- 14. 인쇄 */
+@media print {
+  .sidebar, .topbar, .to-top, .copy-btn, .pager, .scrim { display: none !important; }
+  .layout { display: block; }
+  body { font-size: 11pt; background: #fff; color: #000; }
+  .content { max-width: none; padding: 0; }
+  .item { page-break-inside: avoid; }
+  .code { break-inside: avoid; }
+  .chapter-head { page-break-before: always; }
+}
+
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">MQ</div>
+      <div class="brand-text">
+        <div class="brand-title">RabbitMQ</div>
+        <div class="brand-sub">BullMQ 쓰던 사람을 위한 정리</div>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <label class="search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="searchInput" type="search" placeholder="검색 (⌘K)" autocomplete="off" spellcheck="false">
+      </label>
+    </div>
+
+    <nav class="nav" id="nav">
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 1</span>
+          <span>두 물건의 정체</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-1" data-chapter="두 물건의 정체" data-title="잡 큐와 메시지 브로커" data-keywords="job queue message broker bullmq rabbitmq redis amqp 차이"><span class="idx">1</span>잡 큐와 메시지 브로커</a></li>
+          <li><a href="#item-2" data-chapter="두 물건의 정체" data-title="BullMQ의 Queue와 RabbitMQ의 Queue는 다른 것이다" data-keywords="exchange binding routing key queue 라우팅 계층"><span class="idx">2</span>BullMQ의 Queue와 RabbitMQ의 Queue는 다른 것이다</a></li>
+          <li><a href="#item-3" data-chapter="두 물건의 정체" data-title="책임의 경계선 다시 긋기" data-keywords="worker consumer scheduler 책임 라이브러리 브로커 서버사이드"><span class="idx">3</span>책임의 경계선 다시 긋기</a></li>
+          <li><a href="#item-4" data-chapter="두 물건의 정체" data-title="그래서 언제 무엇을 쓰나" data-keywords="선택 기준 use case fanout event driven 백그라운드 작업"><span class="idx">4</span>그래서 언제 무엇을 쓰나</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 2</span>
+          <span>AMQP 0-9-1 모델</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-5" data-chapter="AMQP 0-9-1 모델" data-title="Connection과 Channel" data-keywords="connection channel multiplexing tcp heartbeat 채널 멀티플렉싱"><span class="idx">5</span>Connection과 Channel</a></li>
+          <li><a href="#item-6" data-chapter="AMQP 0-9-1 모델" data-title="Exchange 네 종류" data-keywords="direct fanout topic headers default exchange nameless"><span class="idx">6</span>Exchange 네 종류</a></li>
+          <li><a href="#item-7" data-chapter="AMQP 0-9-1 모델" data-title="Binding과 라우팅 키" data-keywords="binding routing key topic wildcard star hash 패턴"><span class="idx">7</span>Binding과 라우팅 키</a></li>
+          <li><a href="#item-8" data-chapter="AMQP 0-9-1 모델" data-title="Queue의 속성과 arguments" data-keywords="durable exclusive auto-delete x-arguments assertQueue 선언 멱등"><span class="idx">8</span>Queue의 속성과 arguments</a></li>
+          <li><a href="#item-9" data-chapter="AMQP 0-9-1 모델" data-title="메시지의 구조" data-keywords="properties headers payload persistent delivery_mode content-type correlation-id"><span class="idx">9</span>메시지의 구조</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 3</span>
+          <span>전달 보장</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-10" data-chapter="전달 보장" data-title="컨슈머 ack: 자동과 수동" data-keywords="basic.ack noAck delivery tag multiple 수동 확인"><span class="idx">10</span>컨슈머 ack: 자동과 수동</a></li>
+          <li><a href="#item-11" data-chapter="전달 보장" data-title="nack, reject, 그리고 requeue의 함정" data-keywords="basic.nack basic.reject requeue 무한루프 poison message"><span class="idx">11</span>nack, reject, 그리고 requeue의 함정</a></li>
+          <li><a href="#item-12" data-chapter="전달 보장" data-title="prefetch: 동시성의 진짜 손잡이" data-keywords="basic.qos prefetch concurrency 100 300 라운드로빈"><span class="idx">12</span>prefetch: 동시성의 진짜 손잡이</a></li>
+          <li><a href="#item-13" data-chapter="전달 보장" data-title="퍼블리셔 컨펌" data-keywords="confirm.select publisher confirms waitForConfirms createConfirmChannel 비동기"><span class="idx">13</span>퍼블리셔 컨펌</a></li>
+          <li><a href="#item-14" data-chapter="전달 보장" data-title="라우팅 실패는 에러가 아니다" data-keywords="mandatory basic.return unroutable alternate exchange 유실"><span class="idx">14</span>라우팅 실패는 에러가 아니다</a></li>
+          <li><a href="#item-15" data-chapter="전달 보장" data-title="at-least-once와 멱등성" data-keywords="idempotency 중복 처리 exactly once dedup messageId"><span class="idx">15</span>at-least-once와 멱등성</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 4</span>
+          <span>큐 타입 고르기</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-16" data-chapter="큐 타입 고르기" data-title="Classic, Quorum, Stream" data-keywords="x-queue-type classic quorum stream 큐 타입 비교"><span class="idx">16</span>Classic, Quorum, Stream</a></li>
+          <li><a href="#item-17" data-chapter="큐 타입 고르기" data-title="Quorum queue를 기본으로 두기" data-keywords="raft replication x-quorum-initial-group-size leader locator 제약"><span class="idx">17</span>Quorum queue를 기본으로 두기</a></li>
+          <li><a href="#item-18" data-chapter="큐 타입 고르기" data-title="Stream: 지우지 않는 큐" data-keywords="append-only log offset x-stream-offset retention kafka 유사"><span class="idx">18</span>Stream: 지우지 않는 큐</a></li>
+          <li><a href="#item-19" data-chapter="큐 타입 고르기" data-title="4.x에서 사라진 것들" data-keywords="mirroring ha-mode mnesia khepri transient classic queue 마이그레이션"><span class="idx">19</span>4.x에서 사라진 것들</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 5</span>
+          <span>실패와 재시도</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-20" data-chapter="실패와 재시도" data-title="DLX: 실패한 메시지의 종착지" data-keywords="dead letter exchange x-dead-letter-exchange x-death reason rejected expired maxlen"><span class="idx">20</span>DLX: 실패한 메시지의 종착지</a></li>
+          <li><a href="#item-21" data-chapter="실패와 재시도" data-title="delivery-limit와 poison message" data-keywords="x-delivery-limit x-delivery-count 20 무한 재시도 방지"><span class="idx">21</span>delivery-limit와 poison message</a></li>
+          <li><a href="#item-22" data-chapter="실패와 재시도" data-title="지연 재시도: 4.3의 백오프" data-keywords="x-delayed-retry-type x-delayed-retry-min max linear backoff returned failed"><span class="idx">22</span>지연 재시도: 4.3의 백오프</a></li>
+          <li><a href="#item-23" data-chapter="실패와 재시도" data-title="지연 메시지: TTL+DLX와 플러그인의 종말" data-keywords="x-message-ttl delayed message exchange plugin archived x-delay 스케줄링"><span class="idx">23</span>지연 메시지: TTL+DLX와 플러그인의 종말</a></li>
+          <li><a href="#item-24" data-chapter="실패와 재시도" data-title="재시도 아키텍처를 직접 설계하기" data-keywords="retry queue 계단식 parking lot 재처리 운영"><span class="idx">24</span>재시도 아키텍처를 직접 설계하기</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 6</span>
+          <span>Node.js 실전</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-25" data-chapter="Node.js 실전" data-title="연결과 채널의 수명주기" data-keywords="amqplib connect createChannel 재연결 reconnect connection churn heartbeat"><span class="idx">25</span>연결과 채널의 수명주기</a></li>
+          <li><a href="#item-26" data-chapter="Node.js 실전" data-title="컨슈머 템플릿" data-keywords="consume prefetch ack nack try catch 컨슈머 구현"><span class="idx">26</span>컨슈머 템플릿</a></li>
+          <li><a href="#item-27" data-chapter="Node.js 실전" data-title="퍼블리셔 템플릿" data-keywords="createConfirmChannel publish persistent mandatory outbox"><span class="idx">27</span>퍼블리셔 템플릿</a></li>
+          <li><a href="#item-28" data-chapter="Node.js 실전" data-title="Graceful shutdown" data-keywords="SIGTERM cancel consumerTag drain 종료 처리 k8s"><span class="idx">28</span>Graceful shutdown</a></li>
+          <li><a href="#item-29" data-chapter="Node.js 실전" data-title="토폴로지는 누가 선언하나" data-keywords="assertQueue definitions.json policy 배포 마이그레이션 PRECONDITION_FAILED"><span class="idx">29</span>토폴로지는 누가 선언하나</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 7</span>
+          <span>운영</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-30" data-chapter="운영" data-title="관리 UI와 봐야 할 지표" data-keywords="management plugin 15672 ready unacked publish rate consumer utilisation"><span class="idx">30</span>관리 UI와 봐야 할 지표</a></li>
+          <li><a href="#item-31" data-chapter="운영" data-title="알람과 flow control" data-keywords="vm_memory_high_watermark disk_free_limit 0.6 blocked connection.blocked 백프레셔"><span class="idx">31</span>알람과 flow control</a></li>
+          <li><a href="#item-32" data-chapter="운영" data-title="로컬 환경과 자주 밟는 지뢰" data-keywords="docker compose management 5672 15672 vhost 권한 함정 체크리스트"><span class="idx">32</span>로컬 환경과 자주 밟는 지뢰</a></li>
+        </ul>
+      </div>
+      <div class="nav-group">
+        <button class="nav-group-title" type="button">
+          <span class="nav-num">CH 8</span>
+          <span>치트시트</span>
+          <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="nav-list">
+          <li><a href="#item-33" data-chapter="치트시트" data-title="개념 대응표" data-keywords="cheatsheet 대응 mapping worker consumer job message"><span class="idx">33</span>개념 대응표</a></li>
+          <li><a href="#item-34" data-chapter="치트시트" data-title="BullMQ 기능별 RabbitMQ 구현법" data-keywords="delay priority rate limit flow repeatable progress result 구현"><span class="idx">34</span>BullMQ 기능별 RabbitMQ 구현법</a></li>
+        </ul>
+      </div>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="목차 열기">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="topbar-crumb" id="crumb">RabbitMQ</div>
+      <div class="topbar-spacer"></div>
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="다크 모드로 전환">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <div class="progress-rail"><div class="progress-bar" id="progressBar"></div></div>
+    </header>
+
+    <main class="content" id="content">
+    <section class="cover">
+      <div class="cover-eyebrow">STUDY DIGEST</div>
+      <h1>RabbitMQ</h1>
+      <p class="cover-lead">BullMQ는 <b>Redis 위에 얹은 잡 큐 라이브러리</b>이고, RabbitMQ는 <b>독립 프로세스로 도는 메시지 브로커</b>다. 이름이 둘 다 큐라서 같아 보이지만, 무엇이 내 코드의 책임이고 무엇이 브로커의 책임인지가 통째로 다르다. 이 문서는 그 경계선을 다시 그리는 것에서 시작해 AMQP 모델, 전달 보장, 큐 타입, 재시도 설계, amqplib 실전 코드, 운영 지표까지 한 번에 훑는다.</p>
+      <div class="cover-stats">
+        <div class="stat"><div class="stat-val">34<span>개</span></div><div class="stat-label">아이템</div></div>
+        <div class="stat"><div class="stat-val">8<span>개</span></div><div class="stat-label">챕터</div></div>
+        <div class="stat"><div class="stat-val">4.3</div><div class="stat-label">기준 버전</div></div>
+      </div>
+      <div class="callout tip"><div class="ic">i</div><div><p class="callout-title">이 문서의 기준 <span class="badge b-blue">2026-08</span></p><p>기준 버전은 <b>RabbitMQ 4.3.x</b>(4.3.5, 2026-08-17 릴리스)이고 프로토콜은 <b>AMQP 0-9-1</b>, 클라이언트는 Node.js <code>amqplib</code> 2.x다. 4.x에서 클래식 큐 미러링/Mnesia/지연 메시지 플러그인이 <b>사라졌기 때문에</b>, 인터넷에 돌아다니는 3.x 시절 자료를 그대로 따라 하면 안 되는 지점이 여러 곳 있다. 그런 부분은 본문에 표시해 두었다.</p></div></div>
+      <div class="chapter-grid">
+        <a class="chapter-card" href="#ch1">
+          <div class="cc-num">CH 1</div>
+          <div class="cc-title">두 물건의 정체</div>
+          <div class="cc-meta">4개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch2">
+          <div class="cc-num">CH 2</div>
+          <div class="cc-title">AMQP 0-9-1 모델</div>
+          <div class="cc-meta">5개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch3">
+          <div class="cc-num">CH 3</div>
+          <div class="cc-title">전달 보장</div>
+          <div class="cc-meta">6개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch4">
+          <div class="cc-num">CH 4</div>
+          <div class="cc-title">큐 타입 고르기</div>
+          <div class="cc-meta">4개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch5">
+          <div class="cc-num">CH 5</div>
+          <div class="cc-title">실패와 재시도</div>
+          <div class="cc-meta">5개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch6">
+          <div class="cc-num">CH 6</div>
+          <div class="cc-title">Node.js 실전</div>
+          <div class="cc-meta">5개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch7">
+          <div class="cc-num">CH 7</div>
+          <div class="cc-title">운영</div>
+          <div class="cc-meta">3개 아이템</div>
+        </a>
+        <a class="chapter-card" href="#ch8">
+          <div class="cc-num">CH 8</div>
+          <div class="cc-title">치트시트</div>
+          <div class="cc-meta">2개 아이템</div>
+        </a>
+      </div>
+    </section>
+    <section class="chapter-head" id="ch1" data-spy>
+      <div class="ch-label">CH 1</div>
+      <h2>잡 큐와 메시지 브로커는 다른 물건이다</h2>
+      <p class="ch-lead">BullMQ에서 RabbitMQ로 넘어갈 때 가장 먼저 갈아끼워야 하는 건 API가 아니라 <b>머릿속 모델</b>이다. 무엇이 라이브러리의 기능이었고 무엇이 브로커의 기능인지부터 분리한다.</p>
+    </section>
+
+<article class="item" id="item-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 1</div>
+    <h3>잡 큐와 메시지 브로커</h3>
+    <p class="item-tagline">BullMQ는 Redis 위에 얹은 라이브러리고, RabbitMQ는 그 자체로 서버다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    BullMQ는 <b>작업의 생애를 저장</b>하고, RabbitMQ는 <b>메시지를 전달만</b> 한다. 이 한 문장에서 나머지 차이가 전부 파생된다.
+  </div>
+
+  <h4>BullMQ: 서버가 없는 큐</h4>
+  <p>
+    BullMQ에는 설치할 브로커가 없다. Redis에 리스트/해시/정렬셋/스트림을 깔고, 그 위에서 Lua 스크립트로
+    원자적 상태 전이를 구현한 <b>클라이언트 라이브러리</b>다. <code>new Queue()</code>도 <code>new Worker()</code>도
+    전부 내 Node.js 프로세스 안의 객체이고, 둘은 Redis라는 공유 메모리를 통해서만 만난다.
+  </p>
+  <p>
+    그래서 BullMQ의 1급 개념은 메시지가 아니라 <b>잡(job)</b>이다. 잡에는 상태(<code>waiting</code> →
+    <code>active</code> → <code>completed</code> / <code>failed</code>)가 있고, 시도 횟수가 있고, 반환값이 있고,
+    진행률이 있다. 이 모든 게 Redis에 남기 때문에 나중에 조회할 수 있다.
+  </p>
+
+  <h4>RabbitMQ: 프로토콜을 말하는 서버</h4>
+  <p>
+    RabbitMQ는 Erlang/OTP로 짜인 별도 프로세스다. 5672 포트에서 <b>AMQP 0-9-1</b>이라는 바이너리 프로토콜을 말하고,
+    어떤 언어의 클라이언트든 그 프로토콜만 지키면 붙을 수 있다. Node.js, Java, Go, Python이 같은 큐를 공유하는 게
+    기본 전제다.
+  </p>
+  <p>
+    RabbitMQ에게 메시지는 <b>바이트 덩어리 + 헤더</b>일 뿐이다. 브로커는 그 안에 무슨 일이 적혀 있는지 모르고,
+    알 필요도 없다. 컨슈머가 ack하는 순간 메시지는 큐에서 사라진다. 잡 결과도, 진행률도, 완료 이력도
+    <b>개념 자체가 없다</b>.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph B["BullMQ"]
+    direction LR
+    BP["Producer 프로세스"] -->|"queue.add()"| BR[("Redis: 잡 상태 저장소")]
+    BR -->|"Lua 원자 연산"| BW["Worker 프로세스"]
+    BW -->|"결과/진행률 기록"| BR
+  end
+  subgraph R["RabbitMQ"]
+    direction LR
+    RP["Publisher 프로세스"] -->|"AMQP publish"| RB["RabbitMQ 브로커"]
+    RB -->|"AMQP deliver"| RC["Consumer 프로세스"]
+    RC -->|"ack 하면 삭제"| RB
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>저장소인가, 전달자인가</b> — BullMQ에서 Redis는 잡의 <em>기록</em>이 남는 곳이고, RabbitMQ에서 브로커는 메시지가 <em>지나가는</em> 곳이다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>BullMQ</th><th>RabbitMQ</th></tr></thead>
+      <tbody>
+        <tr><td>정체</td><td>Node.js 라이브러리</td><td>독립 브로커 서버</td></tr>
+        <tr><td>저장소</td><td>Redis (직접 소유)</td><td>자체 저장 엔진 (Raft/세그먼트 로그)</td></tr>
+        <tr><td>프로토콜</td><td>없음 (Redis 명령)</td><td>AMQP 0-9-1, AMQP 1.0, MQTT, STOMP</td></tr>
+        <tr><td>언어</td><td>Node.js 중심 (파이썬/파로 포팅본 존재)</td><td>언어 무관</td></tr>
+        <tr><td>1급 개념</td><td>Job</td><td>Message</td></tr>
+        <tr><td>처리 후</td><td>completed 셋에 이력이 남음</td><td class="t-no">ack 즉시 소멸</td></tr>
+        <tr><td>결과 반환</td><td class="t-ok">기본 지원 (<code>job.returnvalue</code>)</td><td class="t-no">없음 (RPC 패턴을 직접 구현)</td></tr>
+        <tr><td>라우팅</td><td class="t-no">없음 (큐 이름이 곧 목적지)</td><td class="t-ok">Exchange + Binding</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">가장 흔한 착각</p>
+      <p>
+        "큐니까 BullMQ에서 쓰던 기능이 다 있겠지"는 틀렸다. 진행률(<code>job.updateProgress</code>),
+        결과 조회(<code>job.returnvalue</code>), 완료 잡 목록, 잡 ID로 상태 조회 같은 것은 RabbitMQ에
+        <b>대응물이 없다</b>. 그런 게 필요하면 애플리케이션 DB에 직접 테이블을 만들어야 한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>BullMQ = Redis 위의 <b>잡 상태 머신</b>. RabbitMQ = 독립 프로세스인 <b>메시지 라우터</b>.</li>
+      <li>BullMQ는 잡의 이력이 남고, RabbitMQ는 ack 즉시 메시지가 사라진다.</li>
+      <li>RabbitMQ는 언어 중립 프로토콜이라 서비스 간 통신에 강하고, 대신 잡 관리 기능은 하나도 없다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2</div>
+    <h3>BullMQ의 Queue와 RabbitMQ의 Queue는 다른 것이다</h3>
+    <p class="item-tagline">RabbitMQ에서 발행자는 큐 이름을 모른다. 그게 전부다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ에는 발행자와 큐 사이에 <b>Exchange</b>라는 한 겹이 더 있다. 이 한 겹이 두 시스템의 설계 차이를 통째로 만든다.
+  </div>
+
+  <h4>BullMQ: 큐 이름이 곧 목적지</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bullmq.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const queue = new Queue('email');
+
+// 'email' 큐에 넣는다. 이 잡을 누가 가져갈지는 큐 이름이 이미 결정했다.
+await queue.add('welcome', { userId: 42 });</code></pre>
+  </div>
+  <p>
+    발행자가 <code>'email'</code>이라는 이름을 알고 있어야 한다. 이 잡을 알림 서비스도 같이 받아야 한다면?
+    <code>queue.add</code>를 한 번 더 호출하거나, 별도의 pub/sub을 하나 더 놓아야 한다. <b>발행자가 소비자 목록을 안다.</b>
+  </p>
+
+  <h4>RabbitMQ: 발행자는 exchange에만 던진다</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">publisher.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// exchange 이름과 routing key만 안다. 큐 이름은 모른다.
+channel.publish('user.events', 'user.created', Buffer.from(JSON.stringify({ userId: 42 })));</code></pre>
+  </div>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 소비자 쪽이 "나는 이런 메시지를 받겠다"고 선언한다.
+await channel.assertQueue('email.welcome', { durable: true });
+await channel.bindQueue('email.welcome', 'user.events', 'user.created');</code></pre>
+  </div>
+  <p>
+    나중에 알림 서비스가 같은 이벤트를 받고 싶어지면, <b>발행자 코드를 한 줄도 건드리지 않고</b>
+    자기 큐를 만들어 바인딩만 추가하면 된다. 발행자는 구독자가 몇 개인지 영원히 모른다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] -->|"routing key: user.created"| X{{"Exchange: user.events"}}
+  X -->|"binding: user.created"| Q1["Queue: email.welcome"]
+  X -->|"binding: user.*"| Q2["Queue: analytics.all"]
+  X -->|"binding: user.created"| Q3["Queue: crm.sync"]
+  Q1 --> C1["이메일 컨슈머"]
+  Q2 --> C2["분석 컨슈머"]
+  Q3 --> C3["CRM 컨슈머"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>한 번 발행, 여러 큐</b> — 큐를 하나 더 붙이는 일이 바인딩 한 줄이다. 이게 BullMQ에는 없는 축이다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">처음에 헷갈리는 <code>sendToQueue</code> <span class="badge b-blue">보강</span></p>
+      <p>
+        amqplib의 <code>channel.sendToQueue('email', buf)</code>는 BullMQ의 <code>queue.add</code>처럼 보인다.
+        하지만 실제로는 <b>이름 없는 기본 exchange(<code>""</code>)에 routing key를 큐 이름으로 넣어 발행</b>하는
+        축약형이다. 모든 큐는 자기 이름과 같은 routing key로 기본 exchange에 자동 바인딩되어 있기 때문에
+        그렇게 동작한다. 편하지만, 이걸로만 쓰면 RabbitMQ를 비싼 BullMQ로 쓰는 셈이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>BullMQ: 발행자가 <b>큐(목적지)</b>를 지정한다. RabbitMQ: 발행자가 <b>exchange + routing key(의도)</b>를 지정한다.</li>
+      <li>큐와 바인딩은 소비자 쪽 관심사다. 구독자 추가가 발행자 배포와 무관해진다.</li>
+      <li><code>sendToQueue</code>는 기본 exchange를 쓰는 축약형이다. 편의 문법이지 다른 모델이 아니다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 3</div>
+    <h3>책임의 경계선 다시 긋기</h3>
+    <p class="item-tagline">BullMQ가 대신 해주던 일 중 상당수는 이제 내 설계다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ가 보장하는 것은 사실상 <b>"큐에 넣은 메시지를 컨슈머에게 최소 한 번 전달한다"</b> 하나다. 그 위의 모든 것은 토폴로지 설계와 애플리케이션 코드다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기능</th><th>BullMQ</th><th>RabbitMQ</th></tr></thead>
+      <tbody>
+        <tr><td>재시도 횟수 제한</td><td><code>attempts: 5</code></td><td>큐 인자 <code>x-delivery-limit</code> (quorum queue)</td></tr>
+        <tr><td>지수 백오프</td><td><code>backoff: { type: 'exponential' }</code></td><td>4.3의 <code>x-delayed-retry-*</code>(선형) 또는 TTL+DLX 직접 구성</td></tr>
+        <tr><td>동시성</td><td><code>new Worker(..., { concurrency: 10 })</code></td><td><code>channel.prefetch(10)</code> + 컨슈머 개수</td></tr>
+        <tr><td>우선순위</td><td><code>priority: 1</code> (숫자 자유)</td><td>메시지 <code>priority</code> 속성, 0~31 (quorum queue는 항상 활성)</td></tr>
+        <tr><td>지연 실행</td><td><code>delay: 60000</code></td><td class="t-no">네이티브 없음. TTL+DLX 패턴</td></tr>
+        <tr><td>반복 작업(크론)</td><td class="t-ok">내장</td><td class="t-no">없음. 외부 스케줄러가 발행</td></tr>
+        <tr><td>레이트 리밋</td><td class="t-ok">내장</td><td class="t-no">없음. 컨슈머가 직접</td></tr>
+        <tr><td>잡 결과 조회</td><td class="t-ok">내장</td><td class="t-no">없음. RPC 패턴 또는 DB</td></tr>
+        <tr><td>진행률</td><td class="t-ok">내장</td><td class="t-no">없음</td></tr>
+        <tr><td>부모-자식 의존(Flow)</td><td class="t-ok">FlowProducer</td><td class="t-no">없음. 사가/오케스트레이터 직접</td></tr>
+        <tr><td>실패 격리</td><td>failed 셋에 보관</td><td class="t-ok">Dead Letter Exchange</td></tr>
+        <tr><td>다중 소비자 팬아웃</td><td class="t-no">없음</td><td class="t-ok">Exchange + Binding</td></tr>
+        <tr><td>발행 성공 확인</td><td>Redis 응답</td><td class="t-ok">Publisher Confirms</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4.3에서 브로커 쪽으로 넘어온 것들 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        예전에는 "재시도 제한도 백오프도 전부 애플리케이션 몫"이라고 설명했지만, 지금은 그렇지 않다.
+        quorum queue는 <code>x-delivery-limit</code>(기본 20)로 재배달 횟수를 세고, 4.3부터는
+        <code>x-delayed-retry-type</code> 계열 인자로 <b>선형 백오프 재시도</b>까지 브로커가 처리한다.
+        BullMQ의 <code>attempts</code>/<code>backoff</code>에 상당히 가까워진 지점이다. 자세한 건
+        <b>ITEM 21~22</b>에서 다룬다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">사고방식의 전환</p>
+      <p>
+        BullMQ에서는 <b>옵션 객체</b>로 표현하던 것을, RabbitMQ에서는 <b>큐와 exchange를 몇 개 어떻게 놓을지</b>로
+        표현한다. "재시도 3번 후 실패 처리"가 코드 한 줄이 아니라 <code>work</code> 큐 + <code>retry</code> 큐 +
+        <code>dlq</code> 큐 세 개의 그림이 된다. 대신 그 그림은 관리 UI에서 눈으로 보이고, 언어에 상관없이 공유된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>RabbitMQ의 보장은 "라우팅 + 최소 한 번 전달"까지다.</li>
+      <li>스케줄, 레이트 리밋, 결과, 진행률, 잡 의존성은 <b>없다</b>. 필요하면 직접 만든다.</li>
+      <li>대신 팬아웃, 라우팅, DLX, 발행 확인은 브로커가 훨씬 제대로 해준다.</li>
+      <li>옵션으로 풀던 문제를 이제 <b>토폴로지</b>로 푼다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 4</div>
+    <h3>그래서 언제 무엇을 쓰나</h3>
+    <p class="item-tagline">둘은 경쟁 관계가 아니다. 실무에서는 같이 쓰는 경우가 오히려 흔하다.</p>
+  </header>
+
+  <h4>BullMQ가 계속 나은 자리</h4>
+  <ul>
+    <li>한 서비스 안에서 끝나는 <b>백그라운드 작업</b>. 썸네일 생성, PDF 렌더, 리포트 집계.</li>
+    <li>작업의 <b>결과나 진행률을 사용자에게 보여줘야</b> 하는 경우.</li>
+    <li>크론/반복 작업, 레이트 리밋이 핵심인 경우. (외부 API 초당 10회 제한 같은)</li>
+    <li>부모-자식 작업 그래프(Flow)가 필요한 경우.</li>
+    <li>이미 Redis가 있고, 인프라를 하나라도 덜 늘리고 싶은 경우.</li>
+  </ul>
+
+  <h4>RabbitMQ가 필요해지는 자리</h4>
+  <ul>
+    <li><b>서비스 경계를 넘는 통신</b>. 특히 Node 아닌 언어의 서비스가 섞여 있을 때.</li>
+    <li>한 사건을 <b>여러 소비자가 각자</b> 처리해야 할 때(이벤트 팬아웃).</li>
+    <li>메시지 종류에 따라 <b>다른 처리 경로</b>로 갈라야 할 때(라우팅).</li>
+    <li>결제/정산처럼 <b>유실이 곧 사고</b>인 도메인. 퍼블리셔 컨펌 + quorum queue + DLX 조합이 필요할 때.</li>
+    <li>느린 컨슈머를 <b>브로커 차원의 백프레셔</b>로 눌러야 할 때.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["처리해야 할 일이 생겼다"] --> B{"다른 서비스도 알아야 하나?"}
+  B -->|"아니오"| C{"결과/진행률/크론이 필요한가?"}
+  C -->|"예"| D["BullMQ"]
+  C -->|"아니오"| E["둘 다 가능. 팀 표준을 따른다"]
+  B -->|"예"| F{"소비자가 여럿이거나 언어가 다른가?"}
+  F -->|"예"| G["RabbitMQ"]
+  F -->|"아니오"| H{"유실이 치명적인가?"}
+  H -->|"예"| G
+  H -->|"아니오"| E
+      </pre>
+    </div>
+    <div class="figure-cap"><b>고민의 순서</b> — "서비스 경계를 넘는가"가 첫 질문이다. 성능이 아니라 <em>경계</em>가 기준이다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">현실의 조합 <span class="badge b-blue">보강</span></p>
+      <p>
+        흔한 구성은 이렇다. 서비스 간 이벤트는 RabbitMQ로 흘리고, 각 서비스가 그 이벤트를 받아
+        <b>자기 안에서 처리할 무거운 작업은 BullMQ 잡으로 다시 만든다</b>. 브로커는 배달만 하고,
+        재시도/진행률/결과 같은 잡 관리는 서비스 내부에서 하는 셈이다. 이직한 회사에서 RabbitMQ를 쓴다고 해서
+        BullMQ 지식이 버려지는 게 아니라, 층이 하나 위로 올라간다고 보면 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>기준은 성능이 아니라 <b>경계</b>다. 서비스/언어 경계를 넘으면 RabbitMQ.</li>
+      <li>잡 관리 기능(결과, 진행률, 크론, 레이트 리밋)이 핵심이면 BullMQ.</li>
+      <li>둘을 계층으로 나눠 같이 쓰는 구성이 실무에서 가장 흔하다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch2" data-spy>
+      <div class="ch-label">CH 2</div>
+      <h2>AMQP 0-9-1 코어 모델</h2>
+      <p class="ch-lead">RabbitMQ를 안다는 건 사실상 AMQP 0-9-1의 다섯 개 명사 <b>Connection / Channel / Exchange / Queue / Binding</b>을 안다는 뜻이다. 여기만 정확히 잡으면 나머지는 전부 이 위의 옵션이다.</p>
+    </section>
+
+<article class="item" id="item-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5</div>
+    <h3>Connection과 Channel</h3>
+    <p class="item-tagline">TCP 연결은 비싸고, 채널은 싸다. 대신 채널은 공유하면 안 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    Connection은 <b>TCP 연결 하나</b>, Channel은 그 위에 다중화된 <b>가상 연결</b>이다. 프로세스당 커넥션은 소수로, 작업 단위는 채널로 나눈다.
+  </div>
+
+  <h4>왜 두 겹인가</h4>
+  <p>
+    AMQP는 오래 살아 있는 TCP 연결을 전제로 만들어졌다. 연결을 맺는 일(TCP 핸드셰이크 + TLS + AMQP 핸드셰이크 +
+    인증)은 무겁고, 브로커 쪽에서도 커넥션마다 Erlang 프로세스와 파일 디스크립터를 잡는다. 그래서 연결은 오래 쓰고,
+    동시 작업은 그 안의 <b>채널</b>로 나눈다. 채널을 여는 건 프레임 몇 개면 끝난다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph APP["Node.js 프로세스"]
+    CH1["Channel 1: 발행"]
+    CH2["Channel 2: 컨슈머 A"]
+    CH3["Channel 3: 컨슈머 B"]
+  end
+  CH1 --> CONN["Connection (TCP 하나)"]
+  CH2 --> CONN
+  CH3 --> CONN
+  CONN --> BROKER["RabbitMQ 브로커"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>커넥션 하나, 채널 여럿</b> — 채널은 프레임에 채널 번호를 실어 하나의 TCP 위에서 다중화된다.</div>
+  </div>
+
+  <h4>채널을 나누는 기준</h4>
+  <ul>
+    <li><b>컨슈머마다 채널 하나.</b> ack의 delivery tag는 채널 단위로 매겨지고, 채널이 닫히면 그 채널의 미확인 메시지가 전부 requeue된다. 컨슈머를 섞으면 하나가 죽을 때 다른 하나도 말려든다.</li>
+    <li><b>발행용 채널과 소비용 채널을 분리.</b> 특히 퍼블리셔 컨펌을 쓰는 채널은 따로 두는 게 깔끔하다.</li>
+    <li><b>동시에 여러 곳에서 같은 채널을 쓰지 않는다.</b> amqplib의 Channel 객체는 스레드/동시성 안전을 보장하지 않는다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">connection churn</p>
+      <p>
+        HTTP 요청마다 <code>amqp.connect()</code>를 호출하는 코드는 RabbitMQ에서 가장 유명한 안티패턴이다.
+        공식 프로덕션 체크리스트가 <b>connection churn</b>이라는 이름으로 명시적으로 경고한다.
+        연결은 앱 부팅 때 만들어 프로세스 수명 내내 재사용하고, 끊어지면 재연결한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">발행자와 소비자의 커넥션도 분리 <span class="badge b-blue">보강</span></p>
+      <p>
+        브로커가 메모리 압박을 받으면 <b>발행하는 커넥션을 블록</b>한다(ITEM 31). 이때 소비 전용 커넥션이
+        따로 있으면 컨슈머는 계속 돌면서 큐를 비울 수 있다. 같은 커넥션을 공유하면 밀린 큐를 비워야 할
+        컨슈머까지 같이 멈춰 교착에 가까운 상황이 된다. 공식 문서도 발행/소비 커넥션 분리를 권장한다.
+      </p>
+    </div>
+  </div>
+
+  <h4>하트비트</h4>
+  <p>
+    죽은 TCP 연결은 양쪽 다 한동안 모른다. AMQP는 <b>heartbeat</b> 프레임으로 이를 감지한다. 기본값은 클라이언트와
+    서버가 협상하며 보통 60초다. 공식 문서는 네트워크 혼잡 시 오탐을 막기 위해 <b>5초 미만으로 내리지 말라</b>고 한다.
+  </p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>커넥션은 오래, 적게. 채널은 가볍게, 용도별로.</li>
+      <li>컨슈머마다 채널을 따로 두고, 채널을 동시에 공유하지 않는다.</li>
+      <li>발행 커넥션과 소비 커넥션을 분리하면 플로우 컨트롤 상황에서 컨슈머가 살아남는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 6</div>
+    <h3>Exchange 네 종류</h3>
+    <p class="item-tagline">exchange는 메시지를 저장하지 않는다. 어디로 보낼지만 정한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    exchange는 <b>라우팅 함수</b>다. 입력은 routing key와 헤더, 출력은 "이 메시지를 어느 큐들에 복사할 것인가"이다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타입</th><th>라우팅 기준</th><th>전형적 용도</th></tr></thead>
+      <tbody>
+        <tr><td><code>direct</code></td><td>routing key <b>완전 일치</b></td><td>작업 분배, 로그 레벨별 분리</td></tr>
+        <tr><td><code>fanout</code></td><td>기준 없음. 바인딩된 <b>모든 큐</b>에 복사</td><td>브로드캐스트, 캐시 무효화</td></tr>
+        <tr><td><code>topic</code></td><td>routing key <b>패턴 매칭</b></td><td>도메인 이벤트 버스 (가장 많이 씀)</td></tr>
+        <tr><td><code>headers</code></td><td>메시지 <b>헤더</b> 값 매칭 (<code>x-match</code>)</td><td>routing key로 표현 못 하는 다차원 조건</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  M["메시지 routing key = order.paid.kr"] --> D{{"direct"}}
+  M --> F{{"fanout"}}
+  M --> T{{"topic"}}
+  D -->|"order.paid.kr 만"| DQ["정확히 일치하는 큐"]
+  F -->|"조건 없음"| FQ["바인딩된 큐 전부"]
+  T -->|"order.# / *.paid.* 등"| TQ["패턴에 맞는 큐 전부"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 메시지, 다른 판단</b> — exchange 타입은 "누가 이 메시지를 받을 자격이 있나"를 정하는 규칙이다.</div>
+  </div>
+
+  <h4>기본 exchange</h4>
+  <p>
+    이름이 빈 문자열(<code>""</code>)인 direct exchange가 브로커에 미리 선언되어 있다. 모든 큐는 자동으로
+    <b>자기 이름과 동일한 routing key</b>로 여기에 바인딩된다. 그래서 <code>sendToQueue('email', buf)</code>가
+    큐 이름만으로 동작한다. 튜토리얼과 간단한 작업 큐에서는 이걸 쓰지만, 실서비스 토폴로지에서는
+    <b>이름 있는 exchange를 명시적으로 선언</b>하는 편이 낫다. 나중에 소비자를 늘릴 여지가 생긴다.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">topology.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// durable: true 여야 브로커 재시작 후에도 exchange가 남는다.
+await ch.assertExchange('user.events', 'topic', { durable: true });
+
+// 라우팅 실패한 메시지를 흘려보낼 곳을 지정할 수도 있다 (ITEM 14)
+await ch.assertExchange('order.events', 'topic', {
+  durable: true,
+  alternateExchange: 'unrouted',
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">exchange를 exchange에 묶을 수도 있다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>channel.bindExchange(dest, source, pattern)</code>으로 exchange끼리 연결하는
+        <b>exchange-to-exchange 바인딩</b>이 있다. 팀별로 exchange를 나눠 놓고 상위 이벤트 버스에서
+        일부만 흘려보내는 계층 구조를 만들 때 쓴다. 처음에는 필요 없지만, 나중에 토폴로지가 커질 때
+        이런 게 있다는 걸 알면 큐를 무한정 늘리지 않게 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>exchange는 저장하지 않는다. 라우팅만 한다. 갈 곳이 없으면 메시지는 그냥 버려진다.</li>
+      <li>실무에서는 <code>topic</code>이 기본값에 가깝다. <code>direct</code>는 topic의 특수 케이스로 볼 수 있다.</li>
+      <li>이름 없는 기본 exchange는 큐 이름 = routing key 규칙으로 동작하는 편의 장치다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 7</div>
+    <h3>Binding과 라우팅 키</h3>
+    <p class="item-tagline">라우팅 키는 주소가 아니라 메시지에 대한 설명이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    binding은 <b>"이 exchange의 이런 메시지는 이 큐로"</b>라는 규칙이다. 규칙을 여러 개 걸 수 있고, 하나도 안 걸 수도 있다.
+  </div>
+
+  <h4>topic 와일드카드</h4>
+  <p>
+    topic exchange의 routing key는 <b>점으로 구분된 단어들</b>이다(최대 255바이트). 바인딩 패턴에서 두 개의
+    특수문자를 쓸 수 있다.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문자</th><th>의미</th><th>예시 패턴</th><th>매칭</th></tr></thead>
+      <tbody>
+        <tr><td><code>*</code></td><td><b>정확히 한 단어</b></td><td><code>order.*.kr</code></td><td><code>order.paid.kr</code> ✓ / <code>order.kr</code> ✗</td></tr>
+        <tr><td><code>#</code></td><td><b>0개 이상의 단어</b></td><td><code>order.#</code></td><td><code>order</code> ✓ / <code>order.paid.kr</code> ✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bindings.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertExchange('order.events', 'topic', { durable: true });
+
+// 결제 완료만 처리하는 큐
+await ch.bindQueue('invoice.issue', 'order.events', 'order.paid');
+
+// 주문 도메인의 모든 이벤트를 적재하는 큐
+await ch.bindQueue('audit.log', 'order.events', 'order.#');
+
+// 한 큐에 규칙을 여러 개 걸 수 있다
+await ch.bindQueue('alerting', 'order.events', 'order.failed');
+await ch.bindQueue('alerting', 'order.events', 'payment.failed');</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">한 큐에 두 규칙이 동시에 맞으면?</p>
+      <p>
+        메시지는 <b>큐당 한 번만</b> 들어간다. <code>order.#</code>와 <code>*.paid</code>가 같은 큐에 걸려 있고
+        <code>order.paid</code> 메시지가 오면, 큐에는 사본이 하나만 생긴다. 반대로 <b>서로 다른 큐</b>가 각각
+        매칭되면 큐 개수만큼 사본이 만들어진다. "큐 단위 중복은 없고, 큐 사이에는 복사"라고 기억하면 된다.
+      </p>
+    </div>
+  </div>
+
+  <h4>라우팅 키 네이밍</h4>
+  <p>
+    라우팅 키는 나중에 바꾸기가 아주 어렵다. 이미 남이 걸어둔 바인딩을 전부 찾아야 하기 때문이다.
+    처음부터 <b>계층 구조</b>로 잡아 두면 오래간다.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">&lt;도메인&gt;.&lt;엔티티&gt;.&lt;사건&gt;
+
+order.payment.succeeded
+order.payment.failed
+user.profile.updated
+inventory.stock.depleted</code></pre>
+  </div>
+  <p>
+    이렇게 두면 <code>order.#</code>(주문 도메인 전부), <code>*.payment.*</code>(모든 결제 사건),
+    <code>*.*.failed</code>(모든 실패)처럼 나중에 필요한 축으로 자유롭게 잘라낼 수 있다.
+  </p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>binding은 exchange와 큐 사이의 규칙이다. n:m으로 걸 수 있다.</li>
+      <li><code>*</code>는 한 단어, <code>#</code>은 0개 이상 단어.</li>
+      <li>같은 큐에 여러 규칙이 맞아도 사본은 하나. 다른 큐끼리는 각각 복사된다.</li>
+      <li>라우팅 키는 <code>도메인.엔티티.사건</code> 계층으로 설계한다. 나중에 못 바꾼다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 8</div>
+    <h3>Queue의 속성과 arguments</h3>
+    <p class="item-tagline">큐 선언은 멱등하지만, 속성이 다르면 멱등이 아니라 에러다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    큐의 성격은 <b>표준 속성 4개</b>와 <b><code>x-</code> 접두사 인자들</b>로 정해진다. 인자는 <b>선언 시점에 고정</b>되고, 나중에 바꾸려면 큐를 지워야 한다.
+  </div>
+
+  <h4>표준 속성</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>속성</th><th>뜻</th><th>실무 값</th></tr></thead>
+      <tbody>
+        <tr><td><code>durable</code></td><td>브로커 재시작 후에도 큐 정의가 남는가</td><td class="t-ok"><code>true</code></td></tr>
+        <tr><td><code>exclusive</code></td><td>선언한 커넥션만 쓸 수 있고, 끊기면 삭제</td><td>RPC 응답 큐 정도에만</td></tr>
+        <tr><td><code>autoDelete</code></td><td>마지막 컨슈머가 떠나면 삭제</td><td>임시 큐에만</td></tr>
+        <tr><td><code>arguments</code></td><td><code>x-</code> 인자 맵</td><td>큐 타입, TTL, DLX 등</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>durable</code>은 큐만 살린다</p>
+      <p>
+        <code>durable: true</code>는 <b>큐라는 그릇</b>이 재시작 후에도 존재한다는 뜻이지, 안에 든 메시지가
+        살아남는다는 뜻이 아니다. 메시지가 살아남으려면 발행할 때 <code>persistent: true</code>를 줘야 한다.
+        둘 다 있어야 유실을 막는다. (quorum queue와 stream은 항상 durable이라 이 고민이 사라진다.)
+      </p>
+    </div>
+  </div>
+
+  <h4>자주 쓰는 인자</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">queue.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',              // classic | quorum | stream
+    'x-dead-letter-exchange': 'order.dlx', // 실패/만료 시 보낼 exchange
+    'x-delivery-limit': 5,                 // 재배달 5회 초과 시 dead-letter (quorum)
+    'x-message-ttl': 3600000,              // 큐 안 메시지 수명 (ms)
+    'x-max-length': 100000,                // 큐 길이 상한
+    'x-overflow': 'reject-publish',        // 초과 시 발행 거부 (기본은 drop-head)
+  },
+});</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">PRECONDITION_FAILED - inequivalent arg</p>
+      <p>
+        이미 있는 큐를 <b>다른 인자</b>로 <code>assertQueue</code>하면 이 에러와 함께 <b>채널이 닫힌다</b>.
+        큐 인자는 사후 변경이 불가능하다. 그래서 실무에서는 자주 바뀔 값(TTL, 길이 제한, DLX)을 인자 대신
+        <b>policy</b>로 거는 걸 권장한다. policy는 운영 중에 <code>rabbitmqctl set_policy</code>나 관리 UI로
+        바꿀 수 있다. 자세한 건 <b>ITEM 29</b>.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>durable</code>은 큐를, <code>persistent</code>는 메시지를 살린다. 둘은 별개다.</li>
+      <li>큐 인자는 선언 시 고정이다. 바꾸려면 큐를 지우고 다시 만들어야 한다.</li>
+      <li>변할 여지가 있는 설정(TTL, DLX, 길이)은 인자보다 <b>policy</b>로 거는 게 안전하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9</div>
+    <h3>메시지의 구조</h3>
+    <p class="item-tagline">브로커는 payload를 안 본다. 대신 properties와 headers는 본다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>properties</b>는 프로토콜이 정의한 고정 필드, <b>headers</b>는 내가 마음대로 넣는 맵이다. 브로커가 라우팅/만료에 쓰는 건 properties 쪽이다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  MSG["AMQP 메시지"] --> P["properties: 프로토콜 정의 필드"]
+  MSG --> H["headers: 자유 형식 맵"]
+  MSG --> B["body: 그냥 바이트 배열"]
+  P --> P1["deliveryMode / priority / expiration"]
+  P --> P2["contentType / messageId / correlationId / replyTo / timestamp"]
+  H --> H1["x-death, x-delivery-count 등 브로커가 넣는 것"]
+  H --> H2["traceId, tenantId 등 내가 넣는 것"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세 층</b> — body는 브로커에게 불투명하다. 라우팅과 수명 관리는 전부 properties/headers로 한다.</div>
+  </div>
+
+  <h4>실무에서 반드시 챙기는 properties</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>amqplib 옵션</th><th>왜 중요한가</th></tr></thead>
+      <tbody>
+        <tr><td><code>delivery_mode</code></td><td><code>persistent: true</code></td><td>2로 설정되어 디스크에 기록된다. 없으면 재시작 시 유실</td></tr>
+        <tr><td><code>content_type</code></td><td><code>contentType</code></td><td>컨슈머가 역직렬화 방식을 고를 근거</td></tr>
+        <tr><td><code>message_id</code></td><td><code>messageId</code></td><td><b>멱등 처리의 키</b>. 중복 감지에 쓴다 (ITEM 15)</td></tr>
+        <tr><td><code>correlation_id</code></td><td><code>correlationId</code></td><td>요청-응답 짝짓기, 분산 추적</td></tr>
+        <tr><td><code>reply_to</code></td><td><code>replyTo</code></td><td>RPC 패턴에서 응답 큐 이름</td></tr>
+        <tr><td><code>timestamp</code></td><td><code>timestamp</code></td><td>지연 측정, 오래된 메시지 판별</td></tr>
+        <tr><td><code>priority</code></td><td><code>priority</code></td><td>0~31. quorum queue는 별도 선언 없이 항상 동작</td></tr>
+        <tr><td><code>expiration</code></td><td><code>expiration</code></td><td>이 메시지만의 TTL(ms, 문자열). 지연 큐 패턴의 재료</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">publish.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">ch.publish(
+  'order.events',
+  'order.payment.succeeded',
+  Buffer.from(JSON.stringify(payload)),
+  {
+    persistent: true,
+    contentType: 'application/json',
+    messageId: event.id,          // 컨슈머가 중복 판정에 쓸 키
+    correlationId: ctx.traceId,
+    timestamp: Date.now(),
+    headers: { tenantId: ctx.tenantId, schemaVersion: 2 },
+  },
+);</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">payload는 작게 <span class="badge b-blue">보강</span></p>
+      <p>
+        메시지 본문에 이미지 바이너리나 거대한 JSON을 그대로 싣는 건 피한다. 브로커 메모리와 디스크를 그대로
+        먹고, 큐가 밀리는 순간 그 압박이 클러스터 전체로 번진다. 큰 데이터는 오브젝트 스토리지에 두고
+        <b>메시지에는 키만</b> 싣는 <em>claim check</em> 패턴이 정석이다. 참고로 4.3에서 32 KiB 이하 메시지의
+        메모리 오버헤드가 절반으로 줄었는데, 이 크기 대역을 기본 타깃으로 본다는 신호이기도 하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>body는 브로커에게 불투명한 바이트다. 의미 있는 정보는 properties/headers에 둔다.</li>
+      <li><code>persistent: true</code>는 습관처럼 붙인다. 안 붙이면 재시작 때 사라진다.</li>
+      <li><code>messageId</code>는 나중에 멱등 처리를 가능하게 하는 최소 투자다.</li>
+      <li>큰 payload는 싣지 말고 참조만 보낸다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch3" data-spy>
+      <div class="ch-label">CH 3</div>
+      <h2>전달 보장: ack와 confirm</h2>
+      <p class="ch-lead">메시지를 잃지 않는 일은 브로커 혼자 못 한다. <b>발행 쪽 확인(publisher confirms)</b>과 <b>소비 쪽 확인(consumer acknowledgements)</b>이 양쪽에서 맞물려야 한다. BullMQ가 Lua 스크립트 뒤에 숨겨 두었던 것이 여기서는 전부 내 코드로 나온다.</p>
+    </section>
+
+<article class="item" id="item-10" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 10</div>
+    <h3>컨슈머 ack: 자동과 수동</h3>
+    <p class="item-tagline">ack는 "받았다"가 아니라 "다 처리했다"는 뜻이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>noAck: true</code>는 <b>전송한 순간 처리 완료로 간주</b>한다. 컨슈머가 그 직후 죽으면 메시지는 그냥 사라진다.
+  </div>
+
+  <h4>두 가지 모드</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>자동 ack (<code>noAck: true</code>)</th><th>수동 ack (기본)</th></tr></thead>
+      <tbody>
+        <tr><td>확정 시점</td><td>브로커가 소켓에 쓴 직후</td><td>내가 <code>ch.ack()</code>를 부를 때</td></tr>
+        <tr><td>유실</td><td class="t-no">컨슈머 크래시 시 유실</td><td class="t-ok">미확인 메시지는 requeue</td></tr>
+        <tr><td>흐름 제어</td><td class="t-no">prefetch가 안 먹는다</td><td class="t-ok">prefetch로 제어</td></tr>
+        <tr><td>쓸 자리</td><td>유실해도 되는 메트릭/로그 스트림</td><td>그 외 전부</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    공식 문서는 자동 ack를 두고 <b>"안전하지 않으며 모든 워크로드에 적합하지 않다"</b>고 못박는다.
+    실무 기본값은 수동 ack다.
+  </p>
+
+  <h4>delivery tag</h4>
+  <p>
+    브로커는 배달마다 <b>채널 범위의 단조 증가 정수</b>를 붙인다. ack는 반드시 <b>배달받은 그 채널에서</b> 해야 하고,
+    다른 채널에서 하면 프로토콜 예외로 연결이 끊긴다. amqplib에서는 메시지 객체를 그대로 넘기므로
+    (<code>ch.ack(msg)</code>) 태그를 직접 만질 일은 드물다.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.consume('order.payment', async (msg) => {
+  if (!msg) return;                 // 컨슈머가 취소되면 null이 온다
+  try {
+    await handle(JSON.parse(msg.content.toString()));
+    ch.ack(msg);                    // 여기까지 와야 큐에서 지워진다
+  } catch (err) {
+    ch.nack(msg, false, false);     // 재큐 없이 DLX로
+  }
+}, { noAck: false });</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">배치 ack</p>
+      <p>
+        <code>ch.ack(msg, true)</code>는 <b>이 태그까지의 모든 미확인 배달</b>을 한 번에 확정한다
+        (<code>multiple</code> 플래그). 처리량이 아주 높은 컨슈머에서 네트워크 왕복을 줄이는 데 쓴다.
+        단, 중간에 실패한 게 하나라도 있으면 그것까지 같이 ack되므로 <b>순서대로 성공하는 파이프라인</b>에만 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">ack를 안 하고 오래 버티면 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        미확인 배달에는 <b>기본 30분</b>의 타임아웃(<code>consumer_timeout</code>)이 있다. 3.x 시절에는 이걸 넘기면
+        채널이 <code>PRECONDITION_FAILED</code>로 강제로 닫히면서 그 채널의 모든 배달이 requeue됐다. 4.3부터는
+        이 보호가 <b>quorum queue에 대해 큐 레벨에서 처리</b>되고, 채널을 끊는 대신 프로토콜에 맞는 방식으로
+        메시지만 회수한다. 그래도 30분 넘게 걸리는 작업이라면 메시지를 즉시 ack하고 진행 상태는
+        애플리케이션 DB에서 관리하는 쪽이 맞다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>수동 ack가 기본. <code>noAck: true</code>는 유실해도 되는 데이터에만.</li>
+      <li>ack는 배달받은 채널에서만 유효하다.</li>
+      <li>커넥션/채널이 끊기면 미확인 배달은 자동으로 requeue된다.</li>
+      <li>기본 미확인 타임아웃 30분. 그보다 긴 작업은 설계를 바꾼다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 11</div>
+    <h3>nack, reject, 그리고 requeue의 함정</h3>
+    <p class="item-tagline"><code>requeue: true</code>는 대부분의 경우 무한 루프의 다른 이름이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    실패했을 때 <code>nack(msg, false, <b>true</b>)</code>로 되돌리면, 같은 메시지가 즉시 다시 배달되어 <b>같은 이유로 또 실패</b>한다. 백오프가 없기 때문이다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>메서드</th><th>여러 건 처리</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td><code>ch.reject(msg, requeue)</code></td><td class="t-center t-no">✗</td><td>AMQP 표준</td></tr>
+        <tr><td><code>ch.nack(msg, allUpTo, requeue)</code></td><td class="t-center t-ok">✓</td><td>RabbitMQ 확장. 실무에서는 이것만 써도 된다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>requeue 플래그가 결정하는 것</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  F["처리 실패"] --> D{"requeue 값?"}
+  D -->|"true"| Q["큐로 즉시 복귀"]
+  Q --> R["같은 컨슈머가 곧바로 재수신"]
+  R --> F
+  D -->|"false"| X{"DLX가 설정돼 있나?"}
+  X -->|"예"| DLQ["Dead Letter Exchange 로"]
+  X -->|"아니오"| DROP["메시지 폐기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>requeue: true의 위험</b> — 결정론적으로 실패하는 메시지(스키마 오류, 없는 참조)는 CPU를 태우는 무한 루프가 된다.</div>
+  </div>
+
+  <h4>실패의 두 종류를 구분한다</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">error-policy.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">try {
+  await handle(payload);
+  ch.ack(msg);
+} catch (err) {
+  if (err instanceof TransientError) {
+    // 일시적 장애(DB 커넥션, 외부 API 5xx): 재시도할 가치가 있다.
+    // 단, 즉시 requeue 대신 재시도 큐로 보낸다 (ITEM 22, 24)
+    ch.nack(msg, false, false);
+  } else {
+    // 영구 실패(스키마 위반, 존재하지 않는 리소스): 재시도해도 결과가 같다.
+    ch.nack(msg, false, false);   // 바로 DLQ로
+  }
+}</code></pre>
+  </div>
+  <p>
+    두 갈래 모두 <code>requeue: false</code>인 게 포인트다. 재시도가 필요하면 <b>즉시 되돌리는 게 아니라
+    지연을 걸어 되돌린다</b>. 그 방법이 ITEM 22와 24다.
+  </p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>requeue: true</code>가 맞는 드문 경우</p>
+      <p>
+        컨슈머 <b>자신의 상태 문제</b>로 지금 이 인스턴스는 처리할 수 없지만 다른 인스턴스는 할 수 있을 때
+        (예: 로컬 캐시 미준비, 셧다운 진행 중) 정도다. 이때도 요청이 몰리면 핫루프가 되므로 짧은 대기를 넣거나
+        컨슈머를 취소하는 편이 낫다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>실무에서는 <code>nack</code> 하나로 통일해도 된다.</li>
+      <li><code>requeue: false</code>가 기본 전략. 재시도는 지연을 끼워서 한다.</li>
+      <li><code>requeue: false</code> + DLX 미설정 = 조용한 메시지 폐기다. DLX는 사실상 필수.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 12</div>
+    <h3>prefetch: 동시성의 진짜 손잡이</h3>
+    <p class="item-tagline">BullMQ의 <code>concurrency</code>에 가장 가까운 것.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    prefetch는 <b>한 컨슈머가 동시에 붙들 수 있는 미확인 메시지 수</b>다. 이 값을 안 정하면 브로커는 큐에 있는 걸 전부 밀어 넣는다.
+  </div>
+
+  <p>
+    <code>basic.qos</code>(amqplib의 <code>ch.prefetch(n)</code>)를 호출하지 않으면 기본값은 <b>무제한</b>이다.
+    컨슈머 하나가 10만 건을 통째로 받아 메모리에 쌓고, 다른 인스턴스는 놀게 된다. 수동 ack 모드에서만 의미가 있다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q["Queue: 미처리 10000건"] -->|"prefetch=1"| C1["컨슈머 A: 1건 처리 중"]
+  Q -->|"prefetch=1"| C2["컨슈머 B: 1건 처리 중"]
+  Q -.->|"prefetch 미설정"| C3["컨슈머 C: 10000건 전부 선점"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>prefetch는 부하 분산 손잡이이기도 하다</b> — 값이 클수록 한 인스턴스가 많이 선점한다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>작업 성격</th><th>권장 prefetch</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>건당 수 초 이상 걸리는 무거운 작업</td><td><b>1 ~ 5</b></td><td>공평한 분배가 처리량보다 중요</td></tr>
+        <tr><td>건당 수 ms 수준의 가벼운 작업</td><td><b>100 ~ 300</b></td><td>왕복 지연을 감추는 구간</td></tr>
+        <tr><td>매우 짧고 지연이 큰 네트워크</td><td>더 크게</td><td>단, 수확 체감이 빠르게 온다</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    공식 가이드도 <b>100~300 구간</b>을 처리량과 자원 소비의 균형점으로 제시하고, 그 이상은 수확 체감이라고
+    설명한다. <code>prefetch(1)</code>은 가장 안전하지만 지연이 큰 환경에서 처리량이 크게 떨어진다.
+  </p>
+
+  <h4>BullMQ concurrency와의 차이</h4>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">BullMQ</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">new Worker('email', handler, {
+  concurrency: 10,
+});
+// 한 워커가 최대 10개 잡을
+// 동시에 실행한다.</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">RabbitMQ</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.prefetch(10);
+await ch.consume(q, handler);
+// 미확인 10건까지 받아둘 뿐,
+// 동시 실행 여부는 내 핸들러가 정한다.</code></pre>
+    </div>
+  </div>
+  <p>
+    amqplib의 <code>consume</code> 콜백은 <b>순차 실행을 보장하지 않는다.</b> 콜백이 <code>async</code>이면
+    앞 건이 끝나기 전에 다음 건이 들어올 수 있다. 즉 실제 동시성은 <code>prefetch</code> 값이고,
+    이걸 넘는 동시 실행은 일어나지 않는다. 반대로 <b>순차 처리를 원하면 prefetch를 1로 두거나</b>
+    핸들러 안에서 직접 큐잉해야 한다.
+  </p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">global 플래그 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>ch.prefetch(n, true)</code>는 채널 전체에 걸쳐 n건으로 제한하고, 기본값(<code>false</code>)은
+        <b>컨슈머별</b>로 n건이다. 참고로 <b>quorum queue는 global QoS를 지원하지 않는다.</b>
+        컨슈머별 prefetch만 쓸 수 있으니, 채널 하나에 컨슈머를 여러 개 붙일 계획이면 이 점을 기억해 둔다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>prefetch를 설정하지 않으면 무제한이다. 반드시 명시한다.</li>
+      <li>무거운 작업은 1~5, 가벼운 작업은 100~300이 출발점.</li>
+      <li>prefetch가 사실상 컨슈머의 동시성 상한이다. 순차 보장은 prefetch=1.</li>
+      <li>quorum queue에서는 global QoS를 못 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-13" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 13</div>
+    <h3>퍼블리셔 컨펌</h3>
+    <p class="item-tagline"><code>publish()</code>가 true를 돌려줬다는 건 아무것도 보장하지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    기본 채널의 <code>publish()</code>는 <b>로컬 버퍼에 썼다</b>는 뜻일 뿐이다. 브로커가 실제로 받았는지 알려면 <b>confirm 모드</b>를 켜야 한다.
+  </div>
+
+  <p>
+    BullMQ에서는 <code>await queue.add()</code>가 Redis 응답까지 기다리기 때문에 이 고민이 없었다.
+    AMQP의 발행은 원래 <b>단방향(fire-and-forget)</b>이다. 브로커가 죽어 있거나 디스크가 꽉 찼어도
+    클라이언트는 모른다. 그래서 RabbitMQ는 <code>confirm.select</code>라는 확장을 제공한다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant P as Publisher
+  participant B as Broker
+  participant Q as Queue
+  P->>B: confirm.select (채널을 컨펌 모드로)
+  P->>B: basic.publish seq=1
+  B->>Q: 라우팅 후 저장
+  Q-->>B: 디스크 기록 완료
+  B-->>P: basic.ack seq=1
+  P->>B: basic.publish seq=2
+  B-->>P: basic.nack seq=2 (내부 오류)
+      </pre>
+    </div>
+    <div class="figure-cap"><b>컨펌은 비동기다</b> — 발행마다 순번이 붙고, ack/nack가 순서와 무관하게 돌아온다.</div>
+  </div>
+
+  <h4>ack가 오는 시점</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상황</th><th>ack 시점</th></tr></thead>
+      <tbody>
+        <tr><td>라우팅될 큐가 없음</td><td>라우팅 실패를 확인한 직후 (그래도 <b>ack</b>다)</td></tr>
+        <tr><td>persistent 메시지 → durable classic queue</td><td>디스크에 기록된 뒤</td></tr>
+        <tr><td>quorum queue</td><td>과반 복제본이 리더에게 확인한 뒤</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">라우팅 실패도 ack다</p>
+      <p>
+        갈 큐가 하나도 없어서 메시지가 버려져도 브로커는 <b>ack를 보낸다.</b> "브로커가 책임지고 받았다"와
+        "누군가 처리할 것이다"는 다른 얘기다. 라우팅 실패를 알고 싶으면 <code>mandatory</code>가 필요하다
+        (ITEM 14).
+      </p>
+    </div>
+  </div>
+
+  <h4>amqplib에서 쓰기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">confirm.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const ch = await conn.createConfirmChannel();
+
+// 방식 1: 건별 콜백 (권장) — 옵션 객체와 콜백이 필수 인자다
+ch.publish('order.events', 'order.paid', buf, { persistent: true }, (err) => {
+  if (err) markForRetry(buf);   // nack 또는 채널 종료
+  else markPublished(buf);
+});
+
+// 방식 2: 배치 후 한 번에 대기
+for (const e of events) ch.publish('order.events', e.key, e.buf, { persistent: true });
+await ch.waitForConfirms();     // 하나라도 nack면 reject</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">건별로 await하지 말 것</p>
+      <p>
+        <code>publish</code> 하나마다 컨펌을 <code>await</code>하면 왕복 지연이 그대로 처리량 상한이 된다.
+        persistent 메시지의 컨펌은 디스크 배치 기록 때문에 <b>수백 ms까지 걸릴 수 있다</b>고 공식 문서가 명시한다.
+        파이프라이닝(여러 건 발행 후 일괄 확인)이나 비동기 콜백으로 처리한다. 또한 컨펌은 <b>발행 순서대로
+        오지 않을 수 있으므로</b> 순서에 의존하는 코드를 쓰면 안 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>유실이 곤란한 발행에는 <code>createConfirmChannel()</code>을 쓴다.</li>
+      <li>ack = 브로커가 책임진다는 뜻. 처리된다는 뜻이 아니고, 라우팅 성공을 뜻하지도 않는다.</li>
+      <li>건별 <code>await</code>는 금물. 콜백이나 <code>waitForConfirms()</code> 배치를 쓴다.</li>
+      <li>컨펌 순서는 보장되지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 14</div>
+    <h3>라우팅 실패는 에러가 아니다</h3>
+    <p class="item-tagline">오타 하나로 메시지가 조용히 사라지는 게 RabbitMQ의 기본 동작이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    exchange가 갈 큐를 못 찾으면 메시지는 <b>말없이 버려진다</b>. 이걸 막는 장치가 <code>mandatory</code>와 <code>alternate-exchange</code>다.
+  </div>
+
+  <p>
+    BullMQ에는 없는 실패 유형이다. 큐 이름을 잘못 쓰면 BullMQ는 그 이름의 큐를 그냥 만들어버리지만,
+    RabbitMQ에서 routing key를 잘못 쓰면 <b>아무 일도 일어나지 않는다</b>. 로그도 없다. 신규 서비스 붙일 때
+    가장 많이 밟는 지뢰다.
+  </p>
+
+  <h4>1) mandatory + basic.return</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mandatory.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 반송된 메시지를 받는 핸들러를 먼저 등록한다
+ch.on('return', (msg) => {
+  logger.error({
+    exchange: msg.fields.exchange,
+    routingKey: msg.fields.routingKey,
+    replyText: msg.fields.replyText,   // NO_ROUTE
+  }, '라우팅 실패');
+});
+
+ch.publish('order.events', 'order.paidd', buf, {
+  persistent: true,
+  mandatory: true,      // 갈 큐가 없으면 되돌려 달라
+});</code></pre>
+  </div>
+  <p>
+    컨펌 모드와 같이 쓰면 <b><code>basic.return</code>이 <code>basic.ack</code>보다 먼저</b> 온다.
+    즉 "반송 이벤트가 안 왔고 ack가 왔다"면 최소한 어느 큐엔가 들어갔다는 뜻이 된다.
+  </p>
+
+  <h4>2) alternate exchange</h4>
+  <p>
+    exchange를 선언할 때 <code>alternateExchange</code>를 주면, 라우팅에 실패한 메시지를 그 exchange로
+    넘긴다. 여기에 <code>unrouted</code> 큐를 하나 걸어 두면 <b>잃어버린 메시지가 눈에 보이는 곳에 쌓인다</b>.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">alt-exchange.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertExchange('unrouted', 'fanout', { durable: true });
+await ch.assertQueue('unrouted.bucket', { durable: true, arguments: { 'x-queue-type': 'quorum' } });
+await ch.bindQueue('unrouted.bucket', 'unrouted', '');
+
+await ch.assertExchange('order.events', 'topic', {
+  durable: true,
+  alternateExchange: 'unrouted',
+});</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">둘 다 쓰는 게 정답</p>
+      <p>
+        <code>mandatory</code>는 <b>발행자가 즉시 알아차리게</b> 하고, alternate exchange는
+        <b>메시지를 잃지 않게</b> 한다. 역할이 다르니 같이 건다. <code>unrouted.bucket</code>의 길이에
+        알람을 걸어두면 새 서비스의 바인딩 누락을 배포 당일에 잡을 수 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>라우팅 실패는 예외가 아니라 정상 흐름이다. 기본은 조용한 폐기.</li>
+      <li><code>mandatory: true</code> + <code>channel.on('return')</code>으로 즉시 감지.</li>
+      <li>exchange에 <code>alternateExchange</code>를 걸어 미라우팅 메시지를 모은다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 15</div>
+    <h3>at-least-once와 멱등성</h3>
+    <p class="item-tagline">중복은 버그가 아니라 사양이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ의 보장은 <b>at-least-once</b>다. exactly-once는 브로커가 주는 게 아니라 <b>컨슈머가 만드는 성질</b>이다.
+  </div>
+
+  <h4>중복이 생기는 자리</h4>
+  <ol class="steps">
+    <li><div class="step-title">컨슈머가 처리는 끝냈는데 ack 직전에 죽는다</div><p>브로커는 미확인으로 보고 다른 컨슈머에게 다시 준다. 같은 일이 두 번 실행된다.</p></li>
+    <li><div class="step-title">네트워크가 끊겨 ack가 브로커에 도달하지 못한다</div><p>결과는 위와 같다.</p></li>
+    <li><div class="step-title">발행자가 컨펌을 못 받고 재발행한다</div><p>브로커는 이미 받았을 수 있다. 같은 메시지가 두 벌 생긴다.</p></li>
+  </ol>
+  <p>
+    <code>redelivered</code> 플래그(<code>msg.fields.redelivered</code>)가 <code>true</code>면 재배달이지만,
+    <b>이걸 중복 판정 기준으로 쓰면 안 된다.</b> 첫 배달에도 중복일 수 있고(3번 케이스),
+    재배달이어도 앞 시도가 아무것도 안 했을 수 있다.
+  </p>
+
+  <h4>컨슈머를 멱등하게 만드는 세 가지 방법</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방법</th><th>구현</th><th>적합한 곳</th></tr></thead>
+      <tbody>
+        <tr><td>자연 멱등</td><td><code>UPDATE ... SET status='paid'</code>처럼 몇 번 해도 같은 결과가 되게 쓴다</td><td>가능하면 항상 1순위</td></tr>
+        <tr><td>처리 기록 테이블</td><td><code>messageId</code>에 <b>유니크 제약</b>을 건 테이블에 먼저 insert. 중복이면 스킵</td><td>부작용이 있는 처리</td></tr>
+        <tr><td>조건부 갱신</td><td>버전/상태를 조건으로 건 업데이트. 영향 행이 0이면 이미 처리된 것</td><td>상태 머신이 있는 도메인</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">idempotent-consumer.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await db.transaction(async (tx) => {
+  // messageId 에 UNIQUE 제약. 이미 있으면 여기서 걸린다.
+  const inserted = await tx.insertProcessed(msg.properties.messageId);
+  if (!inserted) return;              // 이미 처리한 메시지
+
+  await tx.applyBusinessChange(payload);
+});
+ch.ack(msg);</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">"exactly once"라는 표현에 속지 않기</p>
+      <p>
+        BullMQ 문서도 exactly-once 시맨틱을 말하지만 <b>엣지 케이스에서는 at-least-once</b>임을 함께 밝힌다.
+        분산 시스템에서 진짜 exactly-once 전달은 불가능하고, 실제로 가능한 건 언제나
+        <b>at-least-once 전달 + 멱등한 처리</b>다. 이건 브로커를 바꿔도 달라지지 않는 성질이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>중복은 반드시 온다. 컨슈머를 멱등하게 짜는 것 외에 답이 없다.</li>
+      <li><code>redelivered</code> 플래그는 힌트일 뿐 중복 판정 근거가 아니다.</li>
+      <li><code>messageId</code> + 유니크 제약 + 트랜잭션이 가장 무난한 구현이다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch4" data-spy>
+      <div class="ch-label">CH 4</div>
+      <h2>큐 타입 고르기</h2>
+      <p class="ch-lead">RabbitMQ 4.x에서 큐 타입 선택은 <b>선택이 아니라 기본기</b>다. 3.x 시절의 상식(클래식 큐 + 미러링)이 통째로 사라졌기 때문이다.</p>
+    </section>
+
+<article class="item" id="item-16" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 16</div>
+    <h3>Classic, Quorum, Stream</h3>
+    <p class="item-tagline">큐 타입은 선언할 때 정하고, 나중에 못 바꾼다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ 4.x의 실질적 기본값은 <b>quorum queue</b>다. classic은 복제 기능이 제거되어 단일 노드용으로 남았고, stream은 큐라기보다 로그다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Classic</th><th>Quorum</th><th>Stream</th></tr></thead>
+      <tbody>
+        <tr><td>자료구조</td><td>큐</td><td>큐 (Raft 복제)</td><td>추가 전용 로그</td></tr>
+        <tr><td>복제</td><td class="t-no">없음 (4.x에서 제거)</td><td class="t-ok">Raft 과반</td><td class="t-ok">있음</td></tr>
+        <tr><td>내구성</td><td>durable / transient</td><td class="t-ok">항상 durable</td><td class="t-ok">항상 durable</td></tr>
+        <tr><td>소비 후</td><td>삭제</td><td>삭제</td><td class="t-ok">남아 있음 (재읽기 가능)</td></tr>
+        <tr><td>소비자 여럿</td><td>경합 분배</td><td>경합 분배</td><td>각자 오프셋으로 전체 읽기</td></tr>
+        <tr><td>우선순위</td><td><code>x-max-priority</code> 선언 필요</td><td class="t-ok">0~31 항상 사용 가능</td><td class="t-no">없음</td></tr>
+        <tr><td>TTL / DLX</td><td class="t-ok">지원</td><td class="t-ok">지원</td><td class="t-no">없음</td></tr>
+        <tr><td>exclusive</td><td class="t-ok">지원</td><td class="t-no">불가</td><td class="t-no">불가</td></tr>
+        <tr><td>주 용도</td><td>임시 큐, RPC 응답 큐</td><td><b>업무용 기본</b></td><td>대량 팬아웃, 이벤트 재생</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">queue-types.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 타입을 안 주면 classic 이 된다. 업무 큐라면 항상 명시한다.
+await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: { 'x-queue-type': 'quorum' },
+});
+
+await ch.assertQueue('audit.events', {
+  durable: true,
+  arguments: { 'x-queue-type': 'stream', 'x-max-age': '7D' },
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">타입은 사후 변경 불가</p>
+      <p>
+        <code>x-queue-type</code>은 선언 시에만 정해진다. classic → quorum 전환은 <b>새 큐를 만들고 트래픽을
+        옮기는 마이그레이션</b>이다. shovel 플러그인으로 기존 메시지를 옮기거나, 새 큐를 같은 exchange에
+        바인딩해 놓고 옛 큐가 비면 지우는 식으로 한다. 그래서 처음 만들 때 제대로 정하는 게 중요하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>업무 큐의 기본값은 quorum. 고민되면 quorum.</li>
+      <li>classic은 이제 임시/짧은 수명 큐용이다. 복제가 없다.</li>
+      <li>stream은 다른 물건이다. 큐 대체재가 아니라 로그다.</li>
+      <li>타입은 선언 시 고정. 바꾸려면 마이그레이션.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 17</div>
+    <h3>Quorum queue를 기본으로 두기</h3>
+    <p class="item-tagline">Raft 합의로 복제된다. 안전한 대신 규칙이 몇 개 붙는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    quorum queue는 <b>과반이 살아 있어야 동작</b>한다. 노드 3개 중 2개가 살아야 하고, 모든 메시지가 디스크에 기록된다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] --> L["Leader 복제본 (노드 1)"]
+  L --> F1["Follower (노드 2)"]
+  L --> F2["Follower (노드 3)"]
+  F1 -.->|"기록 확인"| L
+  F2 -.->|"기록 확인"| L
+  L -->|"과반 확인 후 confirm"| P
+      </pre>
+    </div>
+    <div class="figure-cap"><b>과반 합의</b> — 퍼블리셔 컨펌은 과반 복제본이 받아들인 뒤에 나간다. 그래서 confirm이 곧 내구성 보증이 된다.</div>
+  </div>
+
+  <h4>알아 둘 인자</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>인자</th><th>기본값</th><th>뜻</th></tr></thead>
+      <tbody>
+        <tr><td><code>x-quorum-initial-group-size</code></td><td>3</td><td>복제본 개수. 홀수로 둔다</td></tr>
+        <tr><td><code>x-delivery-limit</code></td><td>20</td><td>재배달 한도. 초과 시 dead-letter (-1이면 무제한)</td></tr>
+        <tr><td><code>x-queue-leader-locator</code></td><td><code>client-local</code></td><td>리더를 어느 노드에 둘지. 큐가 많으면 <code>balanced</code></td></tr>
+        <tr><td><code>x-consumer-timeout</code></td><td>(전역 30분)</td><td>큐별 미확인 타임아웃</td></tr>
+        <tr><td><code>x-delayed-retry-type</code></td><td><code>disabled</code></td><td>4.3의 지연 재시도 (ITEM 22)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>classic에 있던 게 없는 것들</h4>
+  <ul>
+    <li><b>비내구성 큐 불가.</b> 항상 durable이다.</li>
+    <li><b>exclusive 큐 불가.</b> RPC 응답 큐 같은 건 classic으로 만든다.</li>
+    <li><b>서버 생성 이름 불가.</b> 큐 이름을 내가 지어야 한다.</li>
+    <li><b>global QoS 불가.</b> 컨슈머별 prefetch만 쓴다.</li>
+    <li><b><code>x-max-priority</code> 불필요.</b> 0~31 우선순위가 항상 켜져 있다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4.3에서 좋아진 점 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        4.3은 quorum queue에 <b>32단계 엄격 우선순위</b>(관리 UI에서 우선순위별 메시지 수까지 보인다),
+        <b>지연 재시도</b>, <b>무제한 return</b>(<code>acquired-count</code>와 <code>delivery-count</code>를
+        분리 추적해, 컨슈머가 명시적으로 되돌린 횟수는 재배달 한도에 안 세는 것), 그리고
+        <b>32 KiB 이하 메시지의 메모리 오버헤드 50% 감소</b>를 넣었다. 3.x 시절 "quorum은 느리고 무겁다"는
+        평이 지금도 맞다고 보긴 어렵다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">단일 노드 개발 환경에서도 <span class="badge b-blue">보강</span></p>
+      <p>
+        노드가 하나뿐인 로컬 도커에서도 quorum queue는 잘 돈다(복제본 1개짜리 Raft 그룹). 운영과 같은 타입으로
+        개발하는 편이 낫다. classic으로 개발하다 운영에서 quorum으로 바꾸면 exclusive/global QoS 같은
+        제약에 배포 당일 걸린다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>과반 노드가 살아 있어야 쓰기가 된다. 홀수 개(보통 3개)로 구성한다.</li>
+      <li>항상 durable, exclusive 불가, global QoS 불가, 우선순위 항상 활성.</li>
+      <li><code>x-delivery-limit</code> 기본값 20이 무한 재시도를 자동으로 막아 준다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-18" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 18</div>
+    <h3>Stream: 지우지 않는 큐</h3>
+    <p class="item-tagline">Kafka를 써봤다면 익숙한 모델. 소비해도 메시지가 남는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    stream은 <b>추가 전용 로그</b>다. 소비는 읽기일 뿐이고, 메시지는 <b>보존 정책</b>에 따라 지워진다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph QQ["큐: 파괴적 소비"]
+    Q1["m1 m2 m3"] --> CA["컨슈머 A가 m1 처리 후 ack"]
+    CA --> Q2["남은 것: m2 m3"]
+  end
+  subgraph ST["스트림: 비파괴적 읽기"]
+    S["m1 m2 m3 m4 ..."]
+    S --> RA["리더 A: offset 2 에서 읽는 중"]
+    S --> RB["리더 B: offset 0 부터 다시 읽는 중"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>소비의 의미가 다르다</b> — 스트림에서 컨슈머는 자기 오프셋만 들고 있고, 데이터는 공유된다.</div>
+  </div>
+
+  <h4>선언과 읽기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">stream.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('events.stream', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'stream',
+    'x-max-age': '7D',                       // 7일 보존
+    'x-max-length-bytes': 20_000_000_000,    // 또는 크기 기준
+  },
+});
+
+// AMQP 0-9-1 로 읽을 때는 prefetch 가 필수다.
+await ch.prefetch(100);
+await ch.consume('events.stream', handler, {
+  noAck: false,
+  arguments: { 'x-stream-offset': 'first' },  // first | last | next | 숫자 | 타임스탬프
+});</code></pre>
+  </div>
+
+  <h4>언제 쓰나</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>이럴 때</th><th>선택</th></tr></thead>
+      <tbody>
+        <tr><td>같은 이벤트를 여러 팀이 각자 처리, 나중에 팀이 늘 수도 있음</td><td class="t-ok">Stream</td></tr>
+        <tr><td>버그 고친 뒤 지난 24시간을 다시 처리하고 싶음</td><td class="t-ok">Stream</td></tr>
+        <tr><td>초당 수십만 건의 적재성 이벤트</td><td class="t-ok">Stream</td></tr>
+        <tr><td>건별 재시도, DLX, TTL, 우선순위가 필요</td><td class="t-no">Quorum queue</td></tr>
+        <tr><td>작업 분배(하나의 일을 하나의 워커가)</td><td class="t-no">Quorum queue</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">stream에 없는 것</p>
+      <p>
+        <b>메시지 TTL, 우선순위, dead lettering이 전부 없다.</b> 개별 메시지를 실패 처리한다는 개념 자체가
+        없기 때문이다. 실패하면 오프셋을 안 올리고 다시 읽거나, 실패분을 별도 큐로 넘기는 걸 내가 짜야 한다.
+        전용 <b>stream 프로토콜</b>(포트 5552, 전용 클라이언트)을 쓰면 성능이 훨씬 좋지만 amqplib으로는
+        AMQP 0-9-1 경유로만 접근할 수 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>stream은 소비해도 안 지워지는 로그다. 오프셋으로 위치를 잡고 재생할 수 있다.</li>
+      <li>대량 팬아웃/재처리/감사 로그에 강하다.</li>
+      <li>TTL, 우선순위, DLX가 없으니 작업 큐 용도로는 쓰지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-19" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 19</div>
+    <h3>4.x에서 사라진 것들</h3>
+    <p class="item-tagline">검색해서 나오는 자료의 절반은 이미 유효하지 않다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    3.x 기준 블로그 글을 그대로 따라 하면 <b>존재하지 않는 기능</b>을 설정하게 된다. 특히 미러링, Mnesia, 지연 메시지 플러그인.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>사라진 것</th><th>언제</th><th>지금은</th></tr></thead>
+      <tbody>
+        <tr><td>클래식 큐 미러링 (<code>ha-mode</code>, <code>ha-params</code> policy)</td><td>4.0</td><td><b>quorum queue</b>로 대체</td></tr>
+        <tr><td>Mnesia 메타데이터 저장소</td><td>4.3에서 완전 제거</td><td><b>Khepri</b>가 유일한 저장소</td></tr>
+        <tr><td>네트워크 분단 처리 전략 (<code>pause_minority</code>, <code>autoheal</code> 등)</td><td>4.3</td><td>Raft가 처리. 설정 항목 자체가 없어짐</td></tr>
+        <tr><td><code>rabbitmq_delayed_message_exchange</code> 플러그인</td><td>2026-04 아카이브</td><td>4.3+에서 <b>로드되지 않는다</b> (ITEM 23)</td></tr>
+        <tr><td>transient non-exclusive 클래식 큐</td><td>4.3부터 기본 비활성</td><td>durable로 선언. 굳이 쓰려면 <code>deprecated_features.permit.transient_nonexcl_queues = true</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">이런 자료를 만나면 일단 의심한다</p>
+      <p>
+        <code>ha-mode: all</code>이라는 policy 설정이 나오면 3.x 자료다. <code>x-delayed-message</code>
+        exchange 타입으로 지연을 구현하라는 글도 마찬가지다. 두 가지 모두 <b>4.3에서는 아예 동작하지 않는다.</b>
+        RabbitMQ 자료를 읽을 때는 작성 시점과 대상 버전을 먼저 확인하는 습관이 필요하다.
+      </p>
+    </div>
+  </div>
+
+  <h4>Khepri가 뭔지 한 줄로</h4>
+  <p>
+    큐/exchange/바인딩/사용자 같은 <b>메타데이터</b>를 저장하는 내부 데이터베이스다. 옛 Mnesia는 네트워크 분단에
+    취약해 사람이 개입해야 하는 경우가 있었지만, Khepri는 Raft 기반이라 클러스터가 스스로 일관성을 지킨다.
+    애플리케이션 개발자가 직접 만질 일은 없지만, <b>클러스터 운영 절차가 바뀌었다</b>는 사실은 알아야 한다.
+  </p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>미러링은 없다. 복제가 필요하면 quorum queue.</li>
+      <li>Mnesia와 분단 처리 전략은 4.3에서 제거. Khepri가 유일한 메타데이터 저장소.</li>
+      <li>지연 메시지 플러그인은 아카이브됐고 4.3에서 못 쓴다.</li>
+      <li>검색 결과를 볼 때 버전을 먼저 확인한다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch5" data-spy>
+      <div class="ch-label">CH 5</div>
+      <h2>실패, 재시도, 지연</h2>
+      <p class="ch-lead">BullMQ의 <code>attempts</code>와 <code>backoff</code>가 한 줄이었다면, RabbitMQ에서는 그 한 줄이 <b>토폴로지 설계</b>가 된다. 대신 어떤 메시지가 왜 몇 번 실패했는지가 전부 눈에 보인다.</p>
+    </section>
+
+<article class="item" id="item-20" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 20</div>
+    <h3>DLX: 실패한 메시지의 종착지</h3>
+    <p class="item-tagline">BullMQ의 failed 셋에 해당하지만, 이건 진짜 큐다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    dead letter exchange는 <b>특별한 종류의 exchange가 아니다.</b> 그냥 평범한 exchange인데, 큐가 "여기로 버려라"고 지목했을 뿐이다.
+  </div>
+
+  <h4>메시지가 dead-letter되는 네 가지 경우</h4>
+  <ol class="steps">
+    <li><div class="step-title">컨슈머가 requeue 없이 거절</div><p><code>basic.reject</code> 또는 <code>basic.nack</code>에 <code>requeue=false</code>. 가장 흔한 경로.</p></li>
+    <li><div class="step-title">메시지 TTL 만료</div><p>메시지별 <code>expiration</code> 또는 큐의 <code>x-message-ttl</code>이 지났을 때.</p></li>
+    <li><div class="step-title">큐 길이 초과</div><p><code>x-max-length</code>/<code>x-max-length-bytes</code>를 넘겨 밀려난 메시지.</p></li>
+    <li><div class="step-title">재배달 한도 초과</div><p>quorum queue의 <code>x-delivery-limit</code>을 넘었을 때.</p></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">큐 자체가 만료되면 dead-letter되지 않는다</p>
+      <p>
+        <code>x-expires</code>로 <b>큐가 통째로 사라지는</b> 경우, 안에 있던 메시지는 DLX로 가지 않고 그냥 없어진다.
+        헷갈리기 쉬운 예외다.
+      </p>
+    </div>
+  </div>
+
+  <h4>구성</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dlx.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 1) DLX 와 DLQ 를 먼저 만든다
+await ch.assertExchange('order.dlx', 'topic', { durable: true });
+await ch.assertQueue('order.payment.dlq', {
+  durable: true,
+  arguments: { 'x-queue-type': 'quorum' },
+});
+await ch.bindQueue('order.payment.dlq', 'order.dlx', 'order.payment');
+
+// 2) 업무 큐가 그 DLX 를 지목한다
+await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-dead-letter-exchange': 'order.dlx',
+    'x-dead-letter-routing-key': 'order.payment',  // 생략하면 원래 routing key 유지
+  },
+});</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  X{{"order.events"}} --> WQ["order.payment (업무 큐)"]
+  WQ --> C["컨슈머"]
+  C -->|"nack requeue=false"| DLX{{"order.dlx"}}
+  DLX --> DLQ["order.payment.dlq"]
+  DLQ --> OPS["사람이 조사하거나 재투입"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>DLQ는 종점이자 대기실이다</b> — 원인을 고친 뒤 다시 업무 큐로 흘려보낼 수 있어야 한다.</div>
+  </div>
+
+  <h4>x-death 헤더 읽기</h4>
+  <p>
+    dead-letter된 메시지에는 <code>x-death</code> 헤더가 붙는다. <b>어느 큐에서, 왜, 몇 번, 언제</b>
+    버려졌는지가 배열로 쌓이고 <b>최신 항목이 앞</b>에 온다.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">x-death.json</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">{
+  "x-death": [
+    {
+      "count": 3,
+      "reason": "rejected",
+      "queue": "order.payment",
+      "exchange": "order.events",
+      "routing-keys": ["order.payment.requested"],
+      "time": "2026-08-22T04:11:07Z"
+    }
+  ]
+}</code></pre>
+  </div>
+  <p>
+    <code>reason</code>은 <code>rejected</code> / <code>expired</code> / <code>maxlen</code> /
+    <code>delivery_limit</code> 중 하나다. DLQ 컨슈머는 이 값만 봐도 "코드 버그로 거절된 건지, 그냥 늦어서
+    만료된 건지"를 구분할 수 있다.
+  </p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">DLX로 가는 길에도 유실이 있다 <span class="badge b-blue">보강</span></p>
+      <p>
+        기본 dead lettering은 <b>퍼블리셔 컨펌 없이</b> 재발행한다(at-most-once). 클러스터 상황에 따라
+        DLQ에 도착하지 못할 수 있다. quorum queue라면 policy로
+        <code>dead-letter-strategy: at-least-once</code>를 걸어 내부 컨펌을 켤 수 있는데,
+        <b><code>overflow: reject-publish</code>가 함께 필요하다.</b> 결제/정산처럼 실패 기록조차 잃으면
+        안 되는 큐에는 이 조합을 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>DLX는 평범한 exchange다. 큐가 <code>x-dead-letter-exchange</code>로 지목할 뿐.</li>
+      <li>거절/TTL만료/길이초과/재배달한도 네 가지가 dead-letter를 유발한다. 큐 만료는 아니다.</li>
+      <li><code>x-death</code>의 <code>reason</code>과 <code>count</code>가 사후 분석의 핵심 자료다.</li>
+      <li>중요한 큐라면 <code>dead-letter-strategy: at-least-once</code>를 검토한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-21" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 21</div>
+    <h3>delivery-limit와 poison message</h3>
+    <p class="item-tagline">BullMQ의 <code>attempts</code>에 가장 가까운 브로커 기능.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    quorum queue는 재배달 횟수를 <b>브로커가 직접</b> 센다. 기본 한도는 <b>20</b>이고, 넘으면 dead-letter된다.
+  </div>
+
+  <p>
+    poison message는 <b>처리할 때마다 반드시 실패하는 메시지</b>다. 스키마가 깨졌거나, 참조하는 리소스가
+    사라졌거나, 컨슈머 코드에 버그가 있는 경우다. 방치하면 이 한 건이 컨슈머 CPU를 영원히 태운다.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delivery-limit.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-delivery-limit': 5,                        // 5회 초과하면 포기
+    'x-dead-letter-exchange': 'order.dlx',        // 포기한 메시지는 여기로
+  },
+});</code></pre>
+  </div>
+
+  <p>
+    컨슈머는 현재 시도 횟수를 헤더로 볼 수 있다.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const attempt = (msg.properties.headers?.['x-delivery-count'] ?? 0) + 1;
+logger.warn({ attempt, messageId: msg.properties.messageId }, '재처리 시도');</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>BullMQ</th><th>RabbitMQ (quorum)</th></tr></thead>
+      <tbody>
+        <tr><td>설정 위치</td><td>잡 옵션 <code>attempts</code></td><td>큐 인자/policy <code>x-delivery-limit</code></td></tr>
+        <tr><td>단위</td><td>잡별로 다르게 가능</td><td class="t-no">큐 단위. 메시지별로 다르게 못 준다</td></tr>
+        <tr><td>기본값</td><td>1 (재시도 없음)</td><td>20</td></tr>
+        <tr><td>소진 후</td><td>failed 셋으로</td><td>DLX로 dead-letter</td></tr>
+        <tr><td>현재 시도 확인</td><td><code>job.attemptsMade</code></td><td><code>x-delivery-count</code> 헤더</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4.3: 명시적 return은 횟수에 안 센다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        4.3부터 한도 판정 기준이 <code>acquired-count</code>가 아니라 <b><code>delivery-count</code></b>로 바뀌었다.
+        컨슈머가 "지금은 내가 못 하니 다른 데 줘"라고 명시적으로 되돌리는 경우는 <b>무제한으로 허용</b>되고,
+        실제 실패로 인한 재배달만 한도에 반영된다. 셧다운 중 메시지를 되돌리는 패턴을 쓸 때 이 차이가 크다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">classic queue에는 이 기능이 없다</p>
+      <p>
+        classic queue를 쓴다면 재시도 횟수를 직접 세야 한다. 보통 <code>x-death</code>의 <code>count</code>를
+        읽거나, 커스텀 헤더에 시도 횟수를 담아 재발행하는 식으로 구현한다. quorum queue를 기본으로 두라는
+        권고에는 이 이유도 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>quorum queue의 <code>x-delivery-limit</code>이 무한 재시도를 막는 안전장치다. 기본 20.</li>
+      <li>한도를 넘으면 DLX로 간다. DLX가 없으면 그냥 버려진다.</li>
+      <li>한도는 <b>큐 단위</b>다. 메시지별 재시도 횟수 차등은 애플리케이션에서 구현한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-22" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 22</div>
+    <h3>지연 재시도: 4.3의 백오프</h3>
+    <p class="item-tagline">드디어 브로커가 백오프를 해준다. 단, 선형이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ 4.3부터 quorum queue는 <b>재시도에 지연을 넣을 수 있다</b>. 실패한 메시지를 큐 내부에 잠시 치워 뒀다가 시간이 지나면 다시 배달 가능 상태로 만든다.
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delayed-retry.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-delayed-retry-type': 'failed',   // disabled | all | returned | failed
+    'x-delayed-retry-min': 5000,        // 최소 지연 5초
+    'x-delayed-retry-max': 60000,       // 최대 지연 60초
+    'x-delivery-limit': 8,
+    'x-dead-letter-exchange': 'order.dlx',
+  },
+});</code></pre>
+  </div>
+
+  <h4>지연 계산식</h4>
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">선형 백오프</p>
+      <p>
+        <code>지연 = min(min_delay × delivery_count, max_delay)</code><br>
+        min 5초 / max 60초라면 5초 → 10초 → 15초 → ... → 60초에서 고정된다. BullMQ의 지수 백오프
+        (<code>2^n × delay</code>)와 달리 <b>선형</b>이라는 점만 주의하면 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>x-delayed-retry-type</code></th><th>어떤 경우에 지연을 거는가</th></tr></thead>
+      <tbody>
+        <tr><td><code>disabled</code></td><td>기본값. 지연 없음</td></tr>
+        <tr><td><code>returned</code></td><td>컨슈머가 명시적으로 되돌린 경우</td></tr>
+        <tr><td><code>failed</code></td><td>실패로 되돌아온 경우 (컨슈머 크래시, 타임아웃 등)</td></tr>
+        <tr><td><code>all</code></td><td>되돌아온 모든 경우</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q["order.payment 큐"] --> C["컨슈머"]
+  C -->|"실패"| S["큐 내부 대기 영역"]
+  S -->|"min x count 만큼 지연"| Q
+  Q -->|"delivery-limit 초과"| DLX{{"order.dlx"}}
+      </pre>
+    </div>
+    <div class="figure-cap"><b>큐 밖으로 안 나간다</b> — 별도 재시도 큐를 만들 필요 없이 원래 큐 안에서 지연이 처리된다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">4.2 이하라면 못 쓴다</p>
+      <p>
+        이 기능은 <b>4.3에서 추가</b>됐고 <b>quorum queue 전용</b>이다. 이직할 회사의 브로커 버전을 먼저
+        확인하자. 4.2 이하이거나 classic queue를 쓴다면 ITEM 23~24의 TTL+DLX 방식으로 직접 만들어야 한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>4.3 + quorum queue에서는 백오프 재시도가 큐 인자 세 개로 끝난다.</li>
+      <li>지연은 <b>선형</b>이다. <code>min × 시도횟수</code>, 상한은 <code>max</code>.</li>
+      <li>재시도 큐를 따로 만들 필요가 없어서 토폴로지가 훨씬 단순해진다.</li>
+      <li>4.2 이하라면 이 기능이 없다. 버전 확인이 먼저다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-23" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 23</div>
+    <h3>지연 메시지: TTL+DLX와 플러그인의 종말</h3>
+    <p class="item-tagline">BullMQ의 <code>delay: 60000</code>에 해당하는 기능은 RabbitMQ에 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    "10분 뒤에 이 메시지를 처리해라"는 <b>네이티브 기능이 아니다.</b> TTL이 만료되면 DLX로 흘러가는 성질을 이용해 흉내 낸다.
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">delayed message exchange 플러그인은 끝났다 <span class="badge b-red">주의</span></p>
+      <p>
+        검색하면 반드시 나오는 <code>rabbitmq_delayed_message_exchange</code>(<code>x-delayed-message</code>
+        exchange 타입 + <code>x-delay</code> 헤더)는 <b>2026년 4월 16일 저장소가 아카이브됐다.</b>
+        Mnesia에 의존했는데 Mnesia가 4.3에서 완전히 제거되면서 <b>4.3 이상 오픈소스 버전에서는 로드되지 않는다.</b>
+        원래도 "지연 메시지를 단일 노드 테이블에 저장하므로 그 노드가 죽으면 전부 유실"되고 대량 사용에
+        부적합하다는 경고가 붙어 있던 물건이다. 새 코드에서 이 경로를 택하지 않는다.
+      </p>
+    </div>
+  </div>
+
+  <h4>정석: TTL + DLX 지연 큐</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] -->|"발행"| DQ["delay.5s 큐: 컨슈머 없음, TTL 5초, DLX 지정"]
+  DQ -->|"5초 뒤 TTL 만료"| DLX{{"work.exchange"}}
+  DLX --> WQ["order.payment 업무 큐"]
+  WQ --> C["컨슈머"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>컨슈머 없는 큐를 타이머로 쓴다</b> — 아무도 안 꺼내가면 TTL이 만료되고, 만료된 메시지는 DLX로 나간다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delay-queue.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 지연 전용 큐: 컨슈머를 절대 붙이지 않는다
+await ch.assertQueue('delay.30s', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-message-ttl': 30000,                    // 30초 뒤 만료
+    'x-dead-letter-exchange': 'work.exchange', // 만료되면 업무 exchange 로
+    'x-dead-letter-routing-key': 'order.payment',
+  },
+});
+
+// 30초 뒤에 처리하고 싶으면 이 큐로 보낸다
+ch.sendToQueue('delay.30s', buf, { persistent: true });</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">메시지별 TTL을 섞으면 머리에서 막힌다</p>
+      <p>
+        큐는 FIFO다. 메시지마다 <code>expiration</code>을 다르게 줘서 한 큐에 넣으면,
+        <b>맨 앞 메시지의 TTL이 끝나야 그 뒤가 검사된다.</b> 60초짜리가 앞에 있으면 뒤의 5초짜리는
+        60초를 기다린다. 그래서 지연 큐는 <code>delay.5s</code>, <code>delay.30s</code>,
+        <code>delay.5m</code>처럼 <b>지연 단계별로 큐를 따로</b> 만들고 큐 인자
+        <code>x-message-ttl</code>로 고정하는 게 정석이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">긴 지연은 브로커에 맡기지 않는다 <span class="badge b-blue">보강</span></p>
+      <p>
+        "3일 뒤 리마인드", "한 달 뒤 구독 갱신" 같은 건 메시지 브로커의 일이 아니다. DB 테이블에
+        실행 시각을 저장하고 스케줄러가 그 시각에 메시지를 발행하는 구조가 맞다. 브로커의 지연 패턴은
+        <b>초~시간 단위 재시도</b>까지가 적정선이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>지연 발행은 네이티브 기능이 아니다. TTL 만료 → DLX 흐름으로 만든다.</li>
+      <li>지연 플러그인은 아카이브됐고 4.3에서 못 쓴다. 새로 쓰지 않는다.</li>
+      <li>지연 큐는 <b>단계별로 분리</b>한다. 한 큐에 여러 TTL을 섞으면 head-of-line 블로킹이 생긴다.</li>
+      <li>일 단위 이상 지연은 DB + 스케줄러로 뺀다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-24" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 24</div>
+    <h3>재시도 아키텍처를 직접 설계하기</h3>
+    <p class="item-tagline">BullMQ 옵션 두 줄이 여기서는 그림 한 장이 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    4.3 + quorum queue면 <b>큐 인자만으로</b> 끝난다. 그게 안 되는 환경이면 <b>업무 큐 / 재시도 큐 / DLQ</b> 3단 구조를 직접 만든다.
+  </div>
+
+  <h4>패턴 A — 4.3 quorum queue (권장)</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag good">가장 단순</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-delayed-retry-type': 'all',
+    'x-delayed-retry-min': 2000,
+    'x-delayed-retry-max': 120000,
+    'x-delivery-limit': 6,
+    'x-dead-letter-exchange': 'order.dlx',
+  },
+});
+// 컨슈머는 실패하면 nack(msg, false, false) 하나만 하면 된다.</code></pre>
+  </div>
+
+  <h4>패턴 B — TTL+DLX 3단 구조</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  IN{{"work.exchange"}} --> W["order.payment 업무 큐"]
+  W --> C["컨슈머"]
+  C -->|"실패: retry.exchange 로 재발행"| RX{{"retry.exchange"}}
+  RX --> R1["retry.10s TTL 10초"]
+  RX --> R2["retry.60s TTL 60초"]
+  RX --> R3["retry.300s TTL 300초"]
+  R1 --> IN
+  R2 --> IN
+  R3 --> IN
+  C -->|"한도 초과"| DLX{{"order.dlx"}}
+  DLX --> DLQ["order.payment.dlq"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>계단식 재시도</b> — 시도 횟수에 따라 다른 TTL의 재시도 큐로 보내면 지수 백오프를 흉내 낼 수 있다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">retry-router.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const LEVELS = [10, 60, 300];   // 초 단위 재시도 단계
+
+function onFailure(ch, msg) {
+  const attempt = Number(msg.properties.headers?.attempt ?? 0);
+  if (attempt >= LEVELS.length) {
+    ch.nack(msg, false, false);            // DLX 로 보낸다
+    return;
+  }
+  ch.publish('retry.exchange', `retry.${LEVELS[attempt]}s`, msg.content, {
+    ...msg.properties,
+    headers: { ...msg.properties.headers, attempt: attempt + 1 },
+    persistent: true,
+  });
+  ch.ack(msg);                             // 원본은 확정 처리
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">"재발행 후 ack"의 위험</p>
+      <p>
+        위 코드는 재발행이 성공한 뒤 원본을 ack한다. 하지만 <b>재발행과 ack 사이에 프로세스가 죽으면</b>
+        원본이 requeue되어 메시지가 두 벌이 된다. 그래서 발행에는 <b>컨펌 채널</b>을 쓰고,
+        컨슈머는 어차피 멱등해야 한다(ITEM 15). 이 복잡도가 싫으면 그게 바로 패턴 A를 쓸 이유다.
+      </p>
+    </div>
+  </div>
+
+  <h4>DLQ 이후를 반드시 설계한다</h4>
+  <ul>
+    <li><b>알람.</b> DLQ 메시지 수에 임계값을 걸어 둔다. 아무도 안 보는 DLQ는 그냥 쓰레기통이다.</li>
+    <li><b>재투입 경로.</b> 원인을 고친 뒤 DLQ → 업무 큐로 되돌리는 스크립트나 관리 화면을 미리 만든다. shovel 플러그인으로 큐 사이 이동을 걸 수도 있다.</li>
+    <li><b>보존.</b> DLQ에 <code>x-max-length</code>를 걸어 무한정 쌓이지 않게 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>4.3 + quorum이면 재시도는 큐 인자만으로 끝난다. 이걸 1순위로 검토한다.</li>
+      <li>안 되면 재시도 큐를 지연 단계별로 만들고 헤더로 시도 횟수를 관리한다.</li>
+      <li>재발행 방식은 중복 위험이 있다. 컨펌 + 멱등 컨슈머가 전제다.</li>
+      <li>DLQ에 알람과 재투입 경로가 없으면 DLQ를 만든 의미가 없다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch6" data-spy>
+      <div class="ch-label">CH 6</div>
+      <h2>Node.js 실전: amqplib</h2>
+      <p class="ch-lead">amqplib은 프로토콜을 거의 그대로 노출한다. 친절하지 않은 대신 숨기는 것도 없다. 실무에서 반드시 직접 짜야 하는 네 가지 뼈대를 정리한다.</p>
+    </section>
+
+<article class="item" id="item-25" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 25</div>
+    <h3>연결과 채널의 수명주기</h3>
+    <p class="item-tagline">재연결은 기본값이 아니다. 켜거나, 직접 짜거나 둘 중 하나다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    BullMQ에서는 ioredis가 재연결을 알아서 했다. amqplib은 <b>옵션을 켜야</b> 복구하고, 켜지 않으면 끊긴 커넥션 객체는 그대로 끝이다.
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">amqplib에 자동 복구가 생겼다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        오랫동안 amqplib의 대표적인 불편함은 "자동 재연결이 없다"는 것이었고, 그래서
+        <code>amqp-connection-manager</code> 같은 래퍼를 얹는 게 관행이었다. 하지만
+        <b>1.1.0에서 opt-in 커넥션 복구가 들어갔고</b>, 1.2.0부터는 <b>타입 정의도 패키지에 번들</b>되어
+        <code>@types/amqplib</code>이 더 이상 필요 없다. 현재 최신은 <b>2.0.1</b>이다.
+        회사 코드가 0.10.x 대라면 이 기능이 없으니, <code>package.json</code>의 버전부터 확인하자.
+      </p>
+    </div>
+  </div>
+
+  <h4>1) 복구를 켜는 방식 (amqplib 1.1.0+)</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">connection.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">import amqp from 'amqplib';
+
+const conn = await amqp.connect(process.env.AMQP_URL!, {
+  heartbeat: 30,
+  clientProperties: { connection_name: `${process.env.SERVICE_NAME}-${process.pid}` },
+  recovery: {
+    initialDelay: 200,     // 첫 재시도 지연
+    maxDelay: 5000,        // 지연 상한
+    factor: 2,             // 지수 백오프 배수
+    jitter: 0.2,           // thundering herd 방지
+    maxRetries: Infinity,
+    // 재연결에 성공할 때마다 호출된다. 여기서 토폴로지와 컨슈머를 다시 만든다.
+    async setup(model) {
+      const ch = await model.createChannel();
+      await ch.prefetch(20);
+      await ch.assertQueue('order.payment', { durable: true, arguments: { 'x-queue-type': 'quorum' } });
+      await ch.consume('order.payment', handler, { noAck: false });
+    },
+  },
+});
+
+conn.on('disconnect', (err) => logger.warn({ err }, 'amqp 연결 끊김'));
+conn.on('reconnect-scheduled', ({ attempt, delay }) => logger.info({ attempt, delay }, '재연결 예약'));
+conn.on('connect', () => logger.info('amqp 재연결 완료'));</code></pre>
+  </div>
+  <p>
+    <code>setup</code>이 핵심이다. 재연결하면 <b>채널이 전부 새로 만들어지므로</b> prefetch, 토폴로지, 컨슈머를
+    여기서 다시 세워야 한다. 이걸 빼먹으면 "연결은 살아났는데 아무것도 소비하지 않는" 상태가 된다.
+  </p>
+
+  <h4>2) 복구를 안 쓰거나 구버전일 때</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">connection-legacy.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">import amqp, { type ChannelModel } from 'amqplib';
+
+let conn: ChannelModel | null = null;
+let closing = false;
+
+export async function getConnection(): Promise&lt;ChannelModel&gt; {
+  if (conn) return conn;
+
+  conn = await amqp.connect(process.env.AMQP_URL!, { heartbeat: 30 });
+
+  // error 를 안 잡으면 프로세스가 죽는다. 반드시 등록한다.
+  conn.on('error', (err) => logger.error({ err }, 'amqp connection error'));
+  conn.on('close', () => {
+    conn = null;
+    if (!closing) scheduleReconnect();      // 지수 백오프로 재시도
+  });
+
+  return conn;
+}</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title"><code>'error'</code> 핸들러를 빼먹으면</p>
+      <p>
+        amqplib의 Connection과 Channel은 EventEmitter다. Node.js에서 핸들러 없는 <code>'error'</code>
+        이벤트는 <b>예외를 던져 프로세스를 종료시킨다.</b> 브로커가 잠깐 재시작했을 뿐인데 앱 전체가
+        죽는 사고가 여기서 나온다. 커넥션과 <b>모든 채널</b>에 <code>'error'</code>와 <code>'close'</code>를 건다.
+      </p>
+    </div>
+  </div>
+
+  <h4>재연결 후 반드시 다시 해야 하는 것</h4>
+  <ol class="steps">
+    <li><div class="step-title">채널을 새로 연다</div><p>옛 채널 객체는 무효다. 참조를 들고 있으면 안 된다.</p></li>
+    <li><div class="step-title">prefetch를 다시 설정한다</div><p>채널 단위 설정이므로 새 채널에는 안 걸려 있다.</p></li>
+    <li><div class="step-title">토폴로지를 다시 선언한다</div><p><code>assertExchange</code>/<code>assertQueue</code>/<code>bindQueue</code>는 멱등하므로 매번 호출해도 안전하다.</p></li>
+    <li><div class="step-title">컨슈머를 다시 등록한다</div><p><code>consume</code>은 채널에 붙어 있던 것이라 같이 사라진다.</p></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">채널 하나를 전역으로 돌려쓰지 않기</p>
+      <p>
+        채널은 하나만 잘못돼도 <b>통째로 닫힌다.</b> 예를 들어 없는 exchange에 발행하거나 인자가 다른
+        <code>assertQueue</code>를 호출하면 그 채널이 죽는다. 전역 채널 하나를 공유하고 있었다면
+        모든 발행과 소비가 동시에 멈춘다. 용도별로 채널을 나누는 진짜 이유가 이것이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">대안 라이브러리 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>rabbitmq-client</code>는 자동 재연결, TypeScript 지원, Consumer/Publisher/RPCClient 추상화를
+        기본 제공하고 의존성이 없다. 성능은 amqplib과 비슷하다. 다만 회사 코드가 amqplib이라면
+        <b>라이브러리를 바꾸자고 하기 전에</b> 위의 <code>recovery</code> 옵션을 켜는 쪽이 훨씬 싼 개선이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>amqplib 1.1.0+는 <code>recovery</code> 옵션으로 자동 재연결을 제공한다. 기본은 꺼져 있다.</li>
+      <li><code>setup</code> 콜백에서 채널/prefetch/토폴로지/컨슈머를 전부 다시 세운다.</li>
+      <li><code>'error'</code> 핸들러 누락은 프로세스 종료로 이어진다.</li>
+      <li><code>connection_name</code>을 채워두면 관리 UI에서 누가 붙었는지 보인다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-26" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 26</div>
+    <h3>컨슈머 템플릿</h3>
+    <p class="item-tagline">try / catch / ack / nack의 네 갈래만 정확히 잡으면 된다.</p>
+  </header>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-tag good">기본형</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">export async function startConsumer() {
+  const conn = await getConnection();
+  const ch = await conn.createChannel();
+
+  ch.on('error', (err) => logger.error({ err }, 'channel error'));
+  ch.on('close', () => scheduleRestart());
+
+  await ch.prefetch(20);                       // 채널을 새로 열 때마다 필요
+
+  await ch.assertQueue('order.payment', {
+    durable: true,
+    arguments: {
+      'x-queue-type': 'quorum',
+      'x-delivery-limit': 5,
+      'x-dead-letter-exchange': 'order.dlx',
+    },
+  });
+  await ch.bindQueue('order.payment', 'order.events', 'order.payment.requested');
+
+  const { consumerTag } = await ch.consume('order.payment', async (msg) => {
+    if (msg === null) return;                  // 컨슈머가 취소됨
+
+    const attempt = Number(msg.properties.headers?.['x-delivery-count'] ?? 0) + 1;
+    try {
+      const payload = JSON.parse(msg.content.toString());
+      await handlePayment(payload, { messageId: msg.properties.messageId });
+      ch.ack(msg);
+    } catch (err) {
+      logger.error({ err, attempt, messageId: msg.properties.messageId }, '처리 실패');
+      ch.nack(msg, false, false);              // 재시도/DLX 는 브로커가 판단
+    }
+  }, { noAck: false });
+
+  return { ch, consumerTag };
+}</code></pre>
+  </div>
+
+  <h4>이 코드가 지키고 있는 것들</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>지점</th><th>왜 이렇게 하나</th></tr></thead>
+      <tbody>
+        <tr><td><code>msg === null</code> 체크</td><td>컨슈머가 취소되면 콜백이 <code>null</code>로 한 번 불린다</td></tr>
+        <tr><td><code>prefetch</code>를 <code>consume</code>보다 먼저</td><td>나중에 걸면 이미 밀려든 메시지에는 안 먹는다</td></tr>
+        <tr><td>핸들러 전체를 try로 감쌈</td><td><code>JSON.parse</code> 실패도 잡아야 한다. 안 잡으면 unhandled rejection</td></tr>
+        <tr><td><code>requeue: false</code></td><td>즉시 재큐는 핫루프. 재시도 정책은 큐 설정에 맡긴다</td></tr>
+        <tr><td>ack/nack가 모든 경로에 정확히 한 번</td><td>빠지면 메시지가 미확인으로 남아 prefetch를 잠식한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">가장 흔한 버그: ack 누락</p>
+      <p>
+        <code>if (조건) return;</code>처럼 <b>중간에서 빠져나가는 분기</b>에서 ack를 안 하면, 그 메시지는
+        영원히 미확인 상태로 남는다. prefetch 20이면 이런 게 20건 쌓이는 순간 컨슈머가 완전히 멈춘다.
+        관리 UI의 <b>Unacked</b> 수치가 계속 오르고 안 내려간다면 거의 이 문제다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">중복 처리 방어는 별도로 <span class="badge b-blue">보강</span></p>
+      <p>
+        위 템플릿은 전달 보장까지만 다룬다. <code>handlePayment</code> 안에서 <code>messageId</code> 기반
+        멱등 처리(ITEM 15)를 반드시 함께 구현한다. RabbitMQ는 at-least-once이므로 이 방어가 없으면
+        네트워크가 한 번 흔들릴 때 결제가 두 번 잡힐 수 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>모든 경로에서 ack 또는 nack가 정확히 한 번 일어나야 한다.</li>
+      <li><code>prefetch</code>는 <code>consume</code> 전에, 채널을 열 때마다.</li>
+      <li>핸들러 전체를 try로 감싼다. 파싱 실패도 실패다.</li>
+      <li>Unacked가 안 줄면 ack 누락을 먼저 의심한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-27" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 27</div>
+    <h3>퍼블리셔 템플릿</h3>
+    <p class="item-tagline">발행이 성공했다는 걸 알아야 트랜잭션을 닫을 수 있다.</p>
+  </header>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">publisher.ts</span><span class="code-tag good">기본형</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">let pubCh: amqp.ConfirmChannel | null = null;
+
+async function getPublishChannel() {
+  if (pubCh) return pubCh;
+  const conn = await getConnection();
+  pubCh = await conn.createConfirmChannel();
+  pubCh.on('error', (err) => logger.error({ err }, 'publish channel error'));
+  pubCh.on('close', () => { pubCh = null; });
+  pubCh.on('return', (msg) => {
+    logger.error({ routingKey: msg.fields.routingKey }, 'NO_ROUTE: 바인딩 누락 의심');
+  });
+  return pubCh;
+}
+
+export function publishEvent(routingKey: string, payload: unknown, messageId: string) {
+  return new Promise&lt;void&gt;(async (resolve, reject) => {
+    const ch = await getPublishChannel();
+    ch.publish(
+      'order.events',
+      routingKey,
+      Buffer.from(JSON.stringify(payload)),
+      {
+        persistent: true,
+        mandatory: true,
+        contentType: 'application/json',
+        messageId,
+        timestamp: Date.now(),
+      },
+      (err) => (err ? reject(err) : resolve()),
+    );
+  });
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">DB 커밋과 발행 사이의 틈</p>
+      <p>
+        "DB에 저장하고 이벤트를 발행한다"는 코드는 <b>두 개의 원자적 연산</b>이다. 커밋 직후 프로세스가 죽으면
+        DB에는 남고 이벤트는 안 나간다. 반대 순서면 이벤트만 나가고 DB에는 없다. RabbitMQ에는 이걸 해결할
+        기능이 없다.
+      </p>
+      <p>
+        정석은 <b>transactional outbox</b>다. 같은 트랜잭션 안에서 <code>outbox</code> 테이블에 이벤트를
+        INSERT하고, 별도 워커가 그 테이블을 읽어 발행한 뒤 발행 완료 표시를 한다. 발행이 두 번 될 수는 있어도
+        누락되지는 않는다. 그래서 컨슈머 멱등성이 다시 전제가 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">AMQP 트랜잭션(<code>tx.select</code>)은 답이 아니다</p>
+      <p>
+        AMQP에는 채널 트랜잭션이 있지만 <b>느리고, DB 트랜잭션과 묶이지도 않는다.</b> 실무에서는 거의
+        쓰지 않는다. 발행 신뢰성은 퍼블리셔 컨펌 + outbox로 푼다.
+      </p>
+    </div>
+  </div>
+
+  <h4>배치 발행</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">batch.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const ch = await getPublishChannel();
+for (const e of events) {
+  ch.publish('order.events', e.key, e.buf, { persistent: true, messageId: e.id });
+}
+await ch.waitForConfirms();   // 전부 확인될 때까지. 하나라도 nack 면 throw
+await markAllPublished(events);</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>발행 채널은 <code>createConfirmChannel()</code>로, <code>'return'</code> 핸들러까지 함께 건다.</li>
+      <li><code>persistent</code> + <code>mandatory</code> + <code>messageId</code>는 기본 세트.</li>
+      <li>DB와 발행의 원자성은 outbox 패턴으로 푼다. AMQP 트랜잭션은 쓰지 않는다.</li>
+      <li>대량 발행은 <code>waitForConfirms()</code> 배치로.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-28" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 28</div>
+    <h3>Graceful shutdown</h3>
+    <p class="item-tagline">배포할 때마다 메시지가 재처리된다면 이 코드가 없는 것이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    종료 순서는 <b>컨슈머 취소 → 진행 중인 작업 완료 → 채널 닫기 → 커넥션 닫기</b>다. 순서를 지키지 않으면 미확인 메시지가 requeue되어 중복 처리된다.
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">shutdown.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const inFlight = new Set&lt;Promise&lt;void&gt;&gt;();
+
+async function shutdown() {
+  closing = true;
+
+  // 1) 새 메시지 수신을 멈춘다. 이미 받은 건 계속 처리된다.
+  await ch.cancel(consumerTag);
+
+  // 2) 진행 중인 처리를 기다린다 (타임아웃 포함)
+  await Promise.race([
+    Promise.allSettled([...inFlight]),
+    new Promise((r) => setTimeout(r, 25_000)),
+  ]);
+
+  // 3) 채널 → 커넥션 순으로 닫는다
+  await ch.close();
+  await conn.close();
+  process.exit(0);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  S["SIGTERM 수신"] --> A["ch.cancel: 새 배달 중단"]
+  A --> B["진행 중 작업 완료 대기"]
+  B --> C["ch.close"]
+  C --> D["conn.close"]
+  D --> E["프로세스 종료"]
+  S -.->|"이 단계를 건너뛰면"| X["미확인 메시지가 전부 requeue 되어 중복 처리"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>순서가 곧 정확성</b> — <code>cancel</code> 없이 커넥션을 닫으면 처리 중이던 메시지가 통째로 되돌아간다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">쿠버네티스라면 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>terminationGracePeriodSeconds</code>가 위의 대기 시간보다 커야 한다. 기본값은 30초라서
+        25초 대기를 두면 빠듯하다. 처리 시간이 긴 컨슈머라면 grace period를 늘리고, 그래도 부족하면
+        애초에 <b>메시지를 먼저 ack하고 진행 상태를 DB로 관리</b>하는 구조로 바꾸는 게 맞다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>cancel</code> → 대기 → <code>close</code> 순서를 지킨다.</li>
+      <li>이 코드가 없으면 배포할 때마다 prefetch 개수만큼 중복 처리가 발생한다.</li>
+      <li>grace period와 대기 시간을 함께 맞춘다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-29" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 29</div>
+    <h3>토폴로지는 누가 선언하나</h3>
+    <p class="item-tagline">앱이 <code>assertQueue</code>를 부르는 게 항상 정답은 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    큐 인자는 <b>선언 시 고정</b>이므로, 앱 코드에 박아 두면 설정을 바꿀 때마다 배포가 필요하고 그마저도 실패한다. 자주 바뀌는 값은 <b>policy</b>로 뺀다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>장점</th><th>단점</th></tr></thead>
+      <tbody>
+        <tr><td>앱이 <code>assertQueue</code></td><td>코드와 함께 관리, 로컬 개발 편함</td><td>인자 변경 시 <code>PRECONDITION_FAILED</code>, 앱마다 중복 선언</td></tr>
+        <tr><td><code>definitions.json</code> 임포트</td><td>토폴로지를 한곳에서 형상 관리</td><td>브로커 배포 파이프라인이 따로 필요</td></tr>
+        <tr><td><b>policy</b></td><td class="t-ok">운영 중 무중단 변경 가능</td><td>policy로 설정 가능한 항목만</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>인자 대신 policy로 빼면 좋은 것들</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">policy.sh</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">rabbitmqctl set_policy order-retry \
+  "^order\." \
+  '{"dead-letter-exchange":"order.dlx",
+    "delivery-limit":5,
+    "delayed-retry-type":"all",
+    "delayed-retry-min":2000,
+    "delayed-retry-max":120000,
+    "max-length":500000}' \
+  --apply-to queues</code></pre>
+  </div>
+  <p>
+    policy는 <b>이름 패턴으로 여러 큐에 한 번에</b> 적용되고, 운영 중에 값을 바꿔도 큐를 다시 만들 필요가 없다.
+    공식 문서도 dead lettering 설정을 인자보다 policy로 하라고 권한다. 큐 선언에는
+    <code>x-queue-type</code>처럼 <b>절대 안 바뀌는 것만</b> 남긴다.
+  </p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">policy와 인자가 겹치면</p>
+      <p>
+        같은 항목을 큐 인자와 policy 양쪽에 걸면 <b>큐 인자가 이긴다.</b> 그래서 policy로 관리하기로 했다면
+        앱 코드에서 그 인자를 <b>지워야</b> 한다. 남겨두면 "policy를 바꿨는데 왜 안 먹지"로 몇 시간을 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">실무 절충안</p>
+      <p>
+        exchange와 큐의 <b>존재와 타입</b>은 앱이 <code>assertQueue</code>로 선언하되(로컬 개발이 쉬워진다),
+        DLX/재시도/길이 제한 같은 <b>운영 파라미터는 policy</b>로 뺀다. 바인딩은 소비하는 쪽 앱이 선언한다.
+        이렇게 나누면 "누가 뭘 소비하는지"는 코드에 남고, "얼마나 참아줄지"는 운영이 쥐게 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>큐 인자는 사후 변경 불가. 앱 코드에 박을수록 나중에 아프다.</li>
+      <li>DLX/재시도/길이 제한은 policy로 빼면 무중단 변경이 된다.</li>
+      <li>같은 항목이 인자와 policy에 둘 다 있으면 인자가 이긴다.</li>
+      <li>선언은 앱, 운영 파라미터는 policy가 무난한 분담이다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch7" data-spy>
+      <div class="ch-label">CH 7</div>
+      <h2>운영: 무엇을 보고 무엇을 막나</h2>
+      <p class="ch-lead">브로커가 별도 프로세스라는 말은 <b>별도로 죽을 수 있다</b>는 뜻이다. Redis 하나 보던 시절과 달리 봐야 할 지표가 늘어난다.</p>
+    </section>
+
+<article class="item" id="item-30" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 30</div>
+    <h3>관리 UI와 봐야 할 지표</h3>
+    <p class="item-tagline">Ready와 Unacked 두 숫자만 봐도 절반은 진단된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>Ready</b>는 아무도 안 가져간 메시지, <b>Unacked</b>는 누군가 붙들고 있는 메시지다. 둘 중 어느 쪽이 쌓이느냐로 원인이 갈린다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>증상</th><th>해석</th><th>조치</th></tr></thead>
+      <tbody>
+        <tr><td><b>Ready</b>가 계속 증가</td><td>컨슈머 처리 능력 부족, 또는 컨슈머가 아예 없음</td><td>컨슈머 인스턴스 증설, prefetch 상향, 큐에 Consumers 수 확인</td></tr>
+        <tr><td><b>Unacked</b>가 증가만 하고 안 줄어듦</td><td>ack 누락 또는 핸들러가 멈춤(무한 대기)</td><td>ack 경로 점검, 외부 호출 타임아웃 설정</td></tr>
+        <tr><td>Unacked ≈ prefetch × 컨슈머 수에서 고정</td><td>정상. 포화 상태로 돌고 있음</td><td>처리량이 부족하면 컨슈머 증설</td></tr>
+        <tr><td>Publish rate만 있고 Deliver rate가 0</td><td>바인딩이 없거나 컨슈머 미등록</td><td>바인딩 확인, unrouted 큐 확인</td></tr>
+        <tr><td>DLQ 길이 증가</td><td>지속적 처리 실패</td><td><code>x-death</code>의 reason으로 원인 분류</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>관리 UI 켜기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">rabbitmq-plugins enable rabbitmq_management
+# 브라우저에서 http://localhost:15672
+# 도커의 management 태그 이미지에는 이미 켜져 있다</code></pre>
+  </div>
+
+  <h4>UI에서 실제로 보는 화면</h4>
+  <ul>
+    <li><b>Queues 탭</b> — 큐별 Ready / Unacked / Total, Consumers 수, 큐 타입. 정렬해서 이상한 큐를 먼저 찾는다.</li>
+    <li><b>큐 상세의 Get messages</b> — 메시지를 실제로 꺼내 본다. <code>Ack Mode</code>를 <b>Nack message requeue true</b>로 두지 않으면 <b>메시지가 사라지니</b> 주의한다.</li>
+    <li><b>Connections / Channels</b> — <code>connection_name</code>을 채워 두면 어느 서비스가 붙었는지 바로 보인다. Channel 수가 계속 늘면 채널 누수다.</li>
+    <li><b>Exchanges 탭의 바인딩</b> — 새 서비스 배포 후 바인딩이 실제로 걸렸는지 확인하는 곳.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">알람으로 걸어 둘 것 <span class="badge b-blue">보강</span></p>
+      <p>
+        Prometheus 플러그인(<code>rabbitmq_prometheus</code>)을 켜면 지표를 그대로 긁어갈 수 있다.
+        최소한 이 네 개는 알람을 건다. <b>큐별 Ready 수</b>(임계 초과), <b>DLQ 길이</b>(0보다 큼),
+        <b>unrouted 큐 길이</b>(0보다 큼), <b>컨슈머 수 0</b>(있어야 할 큐에 컨슈머가 없음).
+        마지막 것이 배포 사고를 가장 빨리 잡아준다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Ready가 쌓이면 처리 능력 문제, Unacked가 쌓이면 컨슈머 코드 문제다.</li>
+      <li>Get messages는 기본 설정으로 누르면 메시지를 소비해 버린다.</li>
+      <li>DLQ 길이, unrouted 길이, 컨슈머 수 0에 알람을 건다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-31" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 31</div>
+    <h3>알람과 flow control</h3>
+    <p class="item-tagline">브로커는 죽는 대신 발행자를 멈춰 세운다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    메모리나 디스크가 임계에 닿으면 RabbitMQ는 <b>발행하는 커넥션을 블록</b>한다. 앱에서는 <code>publish</code>가 조용히 멈춘 것처럼 보인다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>설정</th><th>기본값</th><th>권장</th></tr></thead>
+      <tbody>
+        <tr><td><code>vm_memory_high_watermark.relative</code></td><td>0.6 (RAM의 60%)</td><td>0.4 ~ 0.7 범위. 0.7 이상은 모니터링이 확실할 때만</td></tr>
+        <tr><td><code>disk_free_limit.absolute</code></td><td>50MB</td><td class="t-no">운영에는 절대 부족. <b>4GB 이상</b>으로 올린다</td></tr>
+        <tr><td>파일 디스크립터</td><td>OS 기본</td><td>최소 50K, 필요하면 500K까지</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] -->|"publish"| B["브로커"]
+  B --> M{"메모리 60% 초과?"}
+  M -->|"아니오"| Q["큐에 저장"]
+  M -->|"예"| BL["connection.blocked 전송 후 발행 차단"]
+  BL --> C["컨슈머가 큐를 비우면"]
+  C --> UB["connection.unblocked 후 재개"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>백프레셔는 기능이다</b> — 브로커가 OOM으로 죽는 대신 발행 쪽을 눌러 시스템을 살린다.</div>
+  </div>
+
+  <h4>앱에서 감지하기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">blocked.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">conn.on('blocked', (reason) => {
+  logger.error({ reason }, '브로커가 발행을 차단했다');
+  metrics.gauge('amqp.blocked', 1);
+});
+conn.on('unblocked', () => {
+  logger.info('발행 차단 해제');
+  metrics.gauge('amqp.blocked', 0);
+});</code></pre>
+  </div>
+  <p>
+    이 이벤트를 안 잡으면 "발행이 멈췄는데 에러는 없는" 상황을 디버깅하느라 오래 헤맨다. 반드시 로깅과
+    알람을 건다.
+  </p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">발행/소비 커넥션 분리가 여기서 효과를 낸다</p>
+      <p>
+        블록은 <b>커넥션 단위</b>다. 발행과 소비가 같은 커넥션을 공유하면 블록된 순간 컨슈머까지 멈춰
+        큐를 비울 주체가 사라진다. ITEM 5에서 커넥션을 나누라고 한 이유가 이것이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">근본 원인은 대개 큐 길이 <span class="badge b-blue">보강</span></p>
+      <p>
+        메모리 알람이 뜨는 진짜 이유는 대부분 <b>컨슈머가 멈춰 큐가 무한정 자란 것</b>이다.
+        브로커 메모리를 늘리는 건 시간을 버는 것뿐이다. 업무 큐에는 <code>x-max-length</code>와
+        <code>x-overflow</code>를 걸어 상한을 두고, 넘치면 DLQ로 흘리거나 발행을 거부하게 설계한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메모리 60%, 디스크 여유 부족 시 발행 커넥션이 블록된다. 에러가 아니라 대기다.</li>
+      <li><code>disk_free_limit</code> 기본값 50MB는 운영에 쓰면 안 된다.</li>
+      <li><code>'blocked'</code>/<code>'unblocked'</code> 이벤트를 반드시 로깅한다.</li>
+      <li>큐 길이 상한을 걸어 알람 자체가 안 뜨게 하는 게 근본 대책이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-32" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 32</div>
+    <h3>로컬 환경과 자주 밟는 지뢰</h3>
+    <p class="item-tagline">처음 한 달 동안 만날 문제는 대체로 이 목록 안에 있다.</p>
+  </header>
+
+  <h4>docker compose</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose.yml</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # 관리 UI
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+      RABBITMQ_DEFAULT_VHOST: /dev
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 5
+volumes:
+  rabbitmq-data:</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">vhost는 URL에 인코딩해서 넣는다</p>
+      <p>
+        vhost <code>/dev</code>에 붙으려면 접속 URL이 <code>amqp://app:app@localhost:5672/%2Fdev</code>가 된다.
+        슬래시를 <code>%2F</code>로 인코딩하지 않으면 <b>기본 vhost <code>/</code></b>에 붙어서
+        "큐를 만들었는데 UI에 안 보이는" 상황이 된다. 처음 이틀 안에 반드시 한 번 겪는다.
+      </p>
+    </div>
+  </div>
+
+  <h4>체크리스트</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>증상</th><th>원인</th></tr></thead>
+      <tbody>
+        <tr><td>메시지를 보냈는데 큐에 안 들어온다</td><td>바인딩 누락 또는 routing key 오타. <code>mandatory</code>를 안 켜서 조용히 폐기됨 (ITEM 14)</td></tr>
+        <tr><td>큐를 만들었는데 UI에 없다</td><td>다른 vhost에 붙었다</td></tr>
+        <tr><td><code>PRECONDITION_FAILED - inequivalent arg</code></td><td>기존 큐와 다른 인자로 <code>assertQueue</code>. 큐를 지우거나 인자를 맞춘다</td></tr>
+        <tr><td><code>ACCESS_REFUSED</code></td><td><code>guest</code> 계정은 <b>localhost에서만</b> 접속 가능. 컨테이너 밖에서는 별도 계정을 만든다</td></tr>
+        <tr><td>브로커 재시작 후 메시지가 사라졌다</td><td><code>persistent: true</code> 누락 또는 큐가 durable이 아님</td></tr>
+        <tr><td>컨슈머 하나가 전부 가져가고 나머지가 논다</td><td><code>prefetch</code> 미설정 (기본 무제한)</td></tr>
+        <tr><td>Unacked만 쌓이고 안 줄어든다</td><td>ack 누락 경로가 있다</td></tr>
+        <tr><td>같은 메시지가 무한 반복된다</td><td><code>nack(msg, false, true)</code>로 즉시 재큐 중. <code>false</code>로 바꾸고 DLX를 건다</td></tr>
+        <tr><td>배포할 때마다 중복 처리가 난다</td><td>graceful shutdown 부재 (ITEM 28)</td></tr>
+        <tr><td>브로커 재시작 때 앱이 통째로 죽는다</td><td>커넥션/채널의 <code>'error'</code> 핸들러 누락</td></tr>
+        <tr><td>발행이 멈췄는데 에러가 없다</td><td>메모리/디스크 알람으로 커넥션이 블록됨 (ITEM 31)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">입사 첫 주에 물어볼 것</p>
+      <p>
+        <b>브로커 버전</b>(4.3 여부에 따라 재시도 설계가 달라진다), <b>큐 타입</b>(classic인지 quorum인지),
+        <b>클라이언트 라이브러리</b>(amqplib인지 래퍼인지), <b>토폴로지 선언 주체</b>(앱인지 definitions인지 policy인지),
+        <b>DLQ 운영 방식</b>(누가 보고 어떻게 재투입하는지). 이 다섯 개면 기존 코드를 읽을 좌표가 잡힌다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>로컬은 <code>rabbitmq:4-management</code> 이미지 하나면 충분하다.</li>
+      <li>vhost는 URL에 <code>%2F</code>로 인코딩한다.</li>
+      <li>대부분의 초기 문제는 바인딩 누락, prefetch 미설정, ack 누락, 에러 핸들러 누락 넷 중 하나다.</li>
+    </ul>
+  </div>
+</article>
+
+    <section class="chapter-head" id="ch8" data-spy>
+      <div class="ch-label">CH 8</div>
+      <h2>BullMQ → RabbitMQ 치트시트</h2>
+      <p class="ch-lead">머리에 남는 건 결국 대응표다. 개념 대응과 기능별 구현법을 한 장으로 압축한다.</p>
+    </section>
+
+<article class="item" id="item-33" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 33</div>
+    <h3>개념 대응표</h3>
+    <p class="item-tagline">단어를 바꿔 끼우는 표. 다만 일대일 대응이 아닌 칸을 눈여겨본다.</p>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>BullMQ</th><th>RabbitMQ</th><th>주의</th></tr></thead>
+      <tbody>
+        <tr><td><code>Queue</code> (생산자 핸들)</td><td>Channel + Exchange</td><td>발행 대상이 큐가 아니라 exchange다</td></tr>
+        <tr><td>큐 이름</td><td>exchange + routing key</td><td>목적지가 아니라 <b>의도</b>를 적는다</td></tr>
+        <tr><td><code>Worker</code></td><td>Consumer (<code>basic.consume</code>)</td><td>동시 실행 제어는 prefetch로</td></tr>
+        <tr><td><code>Job</code></td><td>Message</td><td>메시지에는 상태도 결과도 없다</td></tr>
+        <tr><td><code>job.data</code></td><td><code>msg.content</code> (Buffer)</td><td>직렬화/역직렬화는 내 몫</td></tr>
+        <tr><td><code>job.id</code></td><td><code>properties.messageId</code></td><td>중복 제거를 자동으로 해주지 않는다</td></tr>
+        <tr><td><code>job.attemptsMade</code></td><td><code>x-delivery-count</code> 헤더</td><td>quorum queue에서만</td></tr>
+        <tr><td>잡 완료</td><td><code>ch.ack(msg)</code></td><td>ack 후 메시지는 사라진다</td></tr>
+        <tr><td>잡 실패</td><td><code>ch.nack(msg, false, false)</code></td><td>DLX가 없으면 그냥 폐기</td></tr>
+        <tr><td><code>failed</code> 셋</td><td>Dead Letter Queue</td><td>진짜 큐라서 재투입이 자연스럽다</td></tr>
+        <tr><td><code>completed</code> 셋</td><td class="t-no">없음</td><td>필요하면 애플리케이션 DB에 남긴다</td></tr>
+        <tr><td><code>concurrency</code></td><td><code>ch.prefetch(n)</code></td><td>정확히 같지는 않다 (ITEM 12)</td></tr>
+        <tr><td><code>attempts</code></td><td><code>x-delivery-limit</code></td><td>큐 단위 설정</td></tr>
+        <tr><td><code>backoff</code></td><td><code>x-delayed-retry-*</code> (4.3+)</td><td>지수가 아니라 <b>선형</b></td></tr>
+        <tr><td><code>delay</code></td><td class="t-no">없음. TTL+DLX로 구현</td><td>단계별 지연 큐를 만든다</td></tr>
+        <tr><td><code>priority</code></td><td><code>properties.priority</code> 0~31</td><td>quorum은 선언 없이 사용 가능</td></tr>
+        <tr><td>Redis</td><td>브로커 자체 저장소</td><td>운영 대상이 하나 늘어난다</td></tr>
+        <tr><td>없음</td><td>Exchange / Binding</td><td class="t-ok">RabbitMQ가 얻는 것</td></tr>
+        <tr><td>없음</td><td>Publisher Confirms</td><td class="t-ok">RabbitMQ가 얻는 것</td></tr>
+        <tr><td>없음</td><td>Stream</td><td class="t-ok">RabbitMQ가 얻는 것</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>어휘의 대응보다 <b>없음</b>이라고 적힌 칸이 중요하다. 거기가 직접 만들어야 할 부분이다.</li>
+      <li>BullMQ가 잡 관리에서 앞서고, RabbitMQ가 라우팅과 전달 보장에서 앞선다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-34" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 34</div>
+    <h3>BullMQ 기능별 RabbitMQ 구현법</h3>
+    <p class="item-tagline">"이거 BullMQ에선 한 줄이었는데"를 만날 때 펴 보는 장.</p>
+  </header>
+
+  <h4>1. 재시도 3회 + 백오프</h4>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">BullMQ</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await queue.add('pay', data, {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 2000 },
+});</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">RabbitMQ 4.3</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 큐를 선언할 때 한 번만
+arguments: {
+  'x-queue-type': 'quorum',
+  'x-delivery-limit': 3,
+  'x-delayed-retry-type': 'all',
+  'x-delayed-retry-min': 2000,
+  'x-delayed-retry-max': 60000,
+  'x-dead-letter-exchange': 'app.dlx',
+}</code></pre>
+    </div>
+  </div>
+
+  <h4>2. 5분 뒤 실행</h4>
+  <p>
+    TTL 300초짜리 지연 큐를 만들고 DLX를 업무 exchange로 지정한 뒤 그 큐로 발행한다(ITEM 23).
+    지연 값이 여러 개면 <b>값마다 큐를 따로</b> 만든다. 일 단위 이상이면 DB + 스케줄러로 뺀다.
+  </p>
+
+  <h4>3. 레이트 리밋 (외부 API 초당 10회)</h4>
+  <p>
+    브로커에는 없다. 컨슈머 쪽에서 만든다. 가장 단순한 방법은 <b>prefetch를 낮추고 처리에 인위적 간격</b>을
+    두는 것이고, 정확한 제어가 필요하면 Redis 기반 토큰 버킷을 컨슈머 앞에 두거나
+    <b>이 구간만 BullMQ를 유지</b>하는 게 현실적이다.
+  </p>
+
+  <h4>4. 크론 / 반복 작업</h4>
+  <p>
+    RabbitMQ에 스케줄러는 없다. 쿠버네티스 CronJob, 애플리케이션 내 스케줄러, 또는 BullMQ의 repeatable job이
+    <b>메시지를 발행</b>하게 한다. 브로커는 배달만 한다.
+  </p>
+
+  <h4>5. 잡 결과 받아오기 (RPC)</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">rpc.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 요청자: 응답 전용 임시 큐를 만들고 replyTo/correlationId 로 짝을 맞춘다
+const { queue: replyTo } = await ch.assertQueue('', { exclusive: true });
+const correlationId = randomUUID();
+
+await ch.consume(replyTo, (msg) => {
+  if (msg?.properties.correlationId === correlationId) resolve(msg.content);
+}, { noAck: true });
+
+ch.sendToQueue('rpc.calc', payload, { replyTo, correlationId });</code></pre>
+  </div>
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">RPC는 최후의 수단</p>
+      <p>
+        메시지 브로커로 동기 요청-응답을 흉내 내면 브로커 장애가 곧 API 장애가 되고, 타임아웃과 응답 큐 정리를
+        전부 직접 관리해야 한다. 정말 응답이 필요하면 HTTP/gRPC를 쓰고, 브로커는 비동기 흐름에 쓰는 게 낫다.
+      </p>
+    </div>
+  </div>
+
+  <h4>6. 진행률 표시</h4>
+  <p>
+    대응물이 없다. 컨슈머가 애플리케이션 DB나 Redis에 진행률을 쓰고, 프런트가 그걸 폴링하거나 SSE로 받는다.
+    브로커를 경유시키지 않는다.
+  </p>
+
+  <h4>7. 부모-자식 작업 (Flow)</h4>
+  <p>
+    없다. 여러 단계를 엮어야 하면 <b>각 단계가 다음 단계 이벤트를 발행</b>하는 코레오그래피로 풀거나,
+    상태를 들고 있는 오케스트레이터(사가) 서비스를 둔다. 이 지점은 BullMQ가 확실히 편하다.
+  </p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">마지막 조언</p>
+      <p>
+        RabbitMQ를 <b>BullMQ 대체재로 보면 계속 불편하다.</b> 잡 관리 도구가 아니라
+        <b>서비스 사이의 배관</b>으로 보는 순간 설계가 자연스러워진다. 배관은 라우팅과 유실 방지에 집중하고,
+        잡 관리가 필요한 자리에는 여전히 BullMQ를 써도 된다. 두 개를 겹쳐 쓰는 건 타협이 아니라
+        각자 잘하는 일을 시키는 것이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>재시도/백오프/우선순위/DLQ는 RabbitMQ 4.3에서 브로커 설정으로 해결된다.</li>
+      <li>지연, 레이트 리밋, 크론, 진행률, 잡 의존성은 <b>내가 만들거나 다른 도구로</b> 푼다.</li>
+      <li>RPC는 가능하지만 권장하지 않는다.</li>
+      <li>브로커는 배관, 잡 관리는 별개 층. 이 구분이 설계의 출발점이다.</li>
+    </ul>
+  </div>
+</article>
+    </main>
+
+    <footer class="footer">
+      <span>출처: RabbitMQ 공식 문서(rabbitmq.com/docs), RabbitMQ 4.3 릴리스 노트, amqplib 2.0.1 문서/CHANGELOG, BullMQ 공식 문서. 기준일 2026-08-22.</span>
+    </footer>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<button class="to-top" id="toTop" type="button" aria-label="맨 위로">
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M5 12l7-7 7 7"/></svg>
+</button>
+
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/typescript.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/sql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/pgsql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/ini.min.js"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  window.mermaid = mermaid;
+  window.dispatchEvent(new Event("load"));
+</script>
+<script>
+/* ==========================================================================
+   study-digest 런타임
+   - 테마 토글 / 사이드바 / 검색 / 스크롤 스파이 / 진행바 / 코드 복사 / mermaid
+   ========================================================================== */
+(function () {
+  "use strict";
+
+  var doc = document;
+  var body = doc.body;
+  var STORE_KEY = "study-digest:theme";
+
+  /* ---------------------------------------------------- 테마 */
+  function applyTheme(t) {
+    doc.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem(STORE_KEY, t); } catch (e) {}
+    var btn = doc.getElementById("themeBtn");
+    if (btn) btn.setAttribute("aria-label", t === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환");
+    renderMermaid(t);
+  }
+
+  function initTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
+    var t = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    doc.documentElement.setAttribute("data-theme", t);
+    var btn = doc.getElementById("themeBtn");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        applyTheme(doc.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+      });
+    }
+  }
+
+  /* ---------------------------------------------------- 사이드바 (모바일) */
+  function initNavDrawer() {
+    var menuBtn = doc.getElementById("menuBtn");
+    var scrim = doc.getElementById("scrim");
+    function close() { body.classList.remove("nav-open"); }
+    if (menuBtn) menuBtn.addEventListener("click", function () { body.classList.toggle("nav-open"); });
+    if (scrim) scrim.addEventListener("click", close);
+    doc.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+    Array.prototype.forEach.call(doc.querySelectorAll(".nav-list a"), function (a) {
+      a.addEventListener("click", function () { if (window.innerWidth <= 860) close(); });
+    });
+  }
+
+  /* ---------------------------------------------------- 챕터 접기 */
+  function initNavGroups() {
+    Array.prototype.forEach.call(doc.querySelectorAll(".nav-group-title"), function (btn) {
+      btn.addEventListener("click", function () {
+        btn.parentNode.classList.toggle("collapsed");
+      });
+    });
+  }
+
+  /* ---------------------------------------------------- 검색 */
+  function initSearch() {
+    var input = doc.getElementById("searchInput");
+    if (!input) return;
+    var links = Array.prototype.slice.call(doc.querySelectorAll(".nav-list a"));
+    var groups = Array.prototype.slice.call(doc.querySelectorAll(".nav-group"));
+
+    // 검색 인덱스: 링크 텍스트 + data-keywords
+    var index = links.map(function (a) {
+      return {
+        el: a,
+        text: ((a.textContent || "") + " " + (a.getAttribute("data-keywords") || "")).toLowerCase()
+      };
+    });
+
+    function run(q) {
+      q = q.trim().toLowerCase();
+      if (!q) {
+        index.forEach(function (r) { r.el.classList.remove("nav-hidden"); });
+        groups.forEach(function (g) { g.classList.remove("nav-hidden"); });
+        return;
+      }
+      var terms = q.split(/\s+/);
+      index.forEach(function (r) {
+        var hit = terms.every(function (t) { return r.text.indexOf(t) !== -1; });
+        r.el.classList.toggle("nav-hidden", !hit);
+      });
+      groups.forEach(function (g) {
+        g.classList.remove("collapsed");
+        var any = g.querySelectorAll(".nav-list a:not(.nav-hidden)").length > 0;
+        g.classList.toggle("nav-hidden", !any);
+      });
+    }
+
+    input.addEventListener("input", function () { run(input.value); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { input.value = ""; run(""); input.blur(); }
+      if (e.key === "Enter") {
+        var first = doc.querySelector(".nav-list a:not(.nav-hidden)");
+        if (first) first.click();
+      }
+    });
+    doc.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); input.focus(); input.select(); }
+      if (e.key === "/" && doc.activeElement !== input && !/^(INPUT|TEXTAREA)$/.test(doc.activeElement.tagName)) {
+        e.preventDefault(); input.focus();
+      }
+    });
+  }
+
+  /* ---------------------------------------------------- 스크롤 스파이 + 진행바 */
+  function initScrollSpy() {
+    var targets = Array.prototype.slice.call(doc.querySelectorAll("[data-spy]"));
+    var links = {};
+    Array.prototype.forEach.call(doc.querySelectorAll(".nav-list a"), function (a) {
+      var id = a.getAttribute("href");
+      if (id && id.charAt(0) === "#") links[id.slice(1)] = a;
+    });
+    var crumb = doc.getElementById("crumb");
+    var bar = doc.getElementById("progressBar");
+    var toTop = doc.getElementById("toTop");
+    var current = null;
+
+    function setActive(id) {
+      if (id === current) return;
+      current = id;
+      Object.keys(links).forEach(function (k) { links[k].classList.toggle("active", k === id); });
+      var a = links[id];
+      if (a) {
+        if (crumb) {
+          var ch = a.getAttribute("data-chapter") || "";
+          crumb.innerHTML = ch ? ch + " <span style='opacity:.4'>›</span> <b></b>" : "<b></b>";
+          crumb.querySelector("b").textContent = a.getAttribute("data-title") || a.textContent.trim();
+        }
+        // 활성 항목이 사이드바 밖이면 스크롤
+        var side = doc.querySelector(".sidebar");
+        if (side) {
+          var r = a.getBoundingClientRect(), sr = side.getBoundingClientRect();
+          if (r.top < sr.top + 40 || r.bottom > sr.bottom - 40) {
+            side.scrollTop += r.top - sr.top - sr.height / 2;
+          }
+        }
+      }
+    }
+
+    var ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        var y = window.scrollY || window.pageYOffset;
+        var h = doc.documentElement.scrollHeight - window.innerHeight;
+        if (bar) bar.style.width = (h > 0 ? Math.min(100, (y / h) * 100) : 0) + "%";
+        if (toTop) toTop.classList.toggle("show", y > 700);
+
+        var probe = y + 120;
+        var found = null;
+        for (var i = 0; i < targets.length; i++) {
+          if (targets[i].offsetTop <= probe) found = targets[i].id;
+          else break;
+        }
+        if (found) setActive(found);
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    onScroll();
+
+    if (toTop) toTop.addEventListener("click", function () { window.scrollTo({ top: 0, behavior: "smooth" }); });
+  }
+
+  /* ---------------------------------------------------- 코드 복사 */
+  function initCopy() {
+    Array.prototype.forEach.call(doc.querySelectorAll(".code"), function (block) {
+      var head = block.querySelector(".code-head");
+      var pre = block.querySelector("pre");
+      if (!head || !pre || head.querySelector(".copy-btn")) return;
+      var btn = doc.createElement("button");
+      btn.className = "copy-btn";
+      btn.type = "button";
+      btn.textContent = "복사";
+      btn.addEventListener("click", function () {
+        var text = pre.innerText;
+        var done = function () {
+          btn.textContent = "복사됨";
+          btn.classList.add("done");
+          setTimeout(function () { btn.textContent = "복사"; btn.classList.remove("done"); }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () {});
+        } else {
+          var ta = doc.createElement("textarea");
+          ta.value = text; doc.body.appendChild(ta); ta.select();
+          try { doc.execCommand("copy"); done(); } catch (e) {}
+          doc.body.removeChild(ta);
+        }
+      });
+      head.appendChild(btn);
+    });
+  }
+
+  /* ---------------------------------------------------- 문법 강조 */
+  function initHighlight() {
+    if (!window.hljs) return;
+    Array.prototype.forEach.call(doc.querySelectorAll(".code pre > code"), function (el) {
+      if (el.dataset.hl) return;
+      try { window.hljs.highlightElement(el); } catch (e) {}
+      el.dataset.hl = "1";
+    });
+  }
+
+  /* ---------------------------------------------------- mermaid */
+  var mermaidSources = null;
+  function renderMermaid(theme) {
+    if (!window.mermaid) return;
+    var nodes = Array.prototype.slice.call(doc.querySelectorAll(".mermaid"));
+    if (!nodes.length) return;
+    if (!mermaidSources) {
+      mermaidSources = nodes.map(function (n) { return n.textContent; });
+    }
+    var dark = (theme || doc.documentElement.getAttribute("data-theme")) === "dark";
+    nodes.forEach(function (n, i) {
+      n.removeAttribute("data-processed");
+      n.innerHTML = mermaidSources[i];
+    });
+    try {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "loose",
+        fontFamily: '"Pretendard Variable", Pretendard, system-ui, sans-serif',
+        theme: dark ? "dark" : "base",
+        themeVariables: dark
+          ? {
+              primaryColor: "#1F2937", primaryTextColor: "#EDEFF2", primaryBorderColor: "#4E8FF7",
+              lineColor: "#7C838F", secondaryColor: "#21242B", tertiaryColor: "#1C1F25",
+              fontSize: "14px", background: "#16181D",
+              mainBkg: "#1F2937", nodeBorder: "#4E8FF7", clusterBkg: "#191C22",
+              clusterBorder: "#3A3F49", edgeLabelBackground: "#16181D", titleColor: "#EDEFF2"
+            }
+          : {
+              primaryColor: "#E8F3FF", primaryTextColor: "#191F28", primaryBorderColor: "#3182F6",
+              lineColor: "#8B95A1", secondaryColor: "#F2F4F6", tertiaryColor: "#F9FAFB",
+              fontSize: "14px", background: "#FFFFFF",
+              mainBkg: "#E8F3FF", nodeBorder: "#3182F6", clusterBkg: "#F9FAFB",
+              clusterBorder: "#E5E8EB", edgeLabelBackground: "#FFFFFF", titleColor: "#191F28"
+            },
+        flowchart: { curve: "basis", padding: 14, useMaxWidth: true },
+        sequence: { useMaxWidth: true },
+        gantt: { useMaxWidth: true }
+      });
+      window.mermaid.run({ nodes: nodes });
+    } catch (e) { /* mermaid 미로딩 시 원문 유지 */ }
+  }
+
+  /* ---------------------------------------------------- 부팅 */
+  function boot() {
+    initTheme();
+    initNavDrawer();
+    initNavGroups();
+    initSearch();
+    initScrollSpy();
+    initCopy();
+    initHighlight();
+    renderMermaid();
+  }
+
+  if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", boot);
+  else boot();
+
+  // CDN 로딩이 늦는 경우 대비
+  window.addEventListener("load", function () {
+    initHighlight();
+    renderMermaid();
+  });
+})();
+
+</script>
+</body>
+</html>

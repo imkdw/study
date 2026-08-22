@@ -1,0 +1,857 @@
+<article class="item" id="item-4-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-1</div>
+    <h3>sorted set을 활용한 실시간 리더보드</h3>
+    <p class="item-tagline">정렬은 읽을 때 하는 일이라는 상식을 뒤집는다. sorted set 은 <b>쓸 때 이미 정렬해서</b> 넣는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    리더보드의 비용은 정렬에 있다. sorted set 은 데이터가 들어가는 순간 제자리를 찾아 들어가므로 조회 시 정렬 비용이 <b>0</b> 이다.
+  </div>
+
+  <ul>
+    <li>리더보드는 사용자의 스코어를 기반으로 다른 사용자와 비교해 순위를 정하는 형태다</li>
+    <li>사용자 기준이라 계산해야 할 데이터가 유저 수에 따라 가파르게 늘어난다</li>
+    <li>sorted set 을 쓰면 데이터가 저장될 때부터 정렬되어 들어간다
+      <ul><li>유저의 스코어를 가중치로 저장하면 읽어올 때마다 정렬할 필요가 없다</li></ul>
+    </li>
+  </ul>
+
+  <h4>ZADD 로 데이터 저장</h4>
+  <p>스코어를 기준으로 오름차순 정렬된 데이터가 저장된다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zadd score:240911 28 player:286
+(integer) 1
+127.0.0.1:6379&gt; zadd score:240911 400 player:234
+(integer) 1
+127.0.0.1:6379&gt; zadd score:240911 45 player:101
+(integer) 1
+127.0.0.1:6379&gt; zadd score:240911 357 player:24
+(integer) 1
+127.0.0.1:6379&gt; zadd score:240911 199 player:143
+(integer) 1</code></pre>
+  </div>
+
+  <h4>ZRANGE 로 데이터 불러오기</h4>
+  <p>조회하면 오름차순 정렬된 데이터가 그대로 반환된다. 넣은 순서와는 아무 관계가 없다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zrange score:240911 0 -1 withscores
+ 1) "player:286"
+ 2) "28"
+ 3) "player:101"
+ 4) "45"
+ 5) "player:143"
+ 6) "199"
+ 7) "player:24"
+ 8) "357"
+ 9) "player:234"
+10) "400"</code></pre>
+  </div>
+
+  <h4>ZREVRANGE 로 상위 3명 불러오기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zrevrange score:240911 0 2 withscores
+1) "player:234"
+2) "400"
+3) "player:24"
+4) "357"
+5) "player:143"
+6) "199"</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Redis 6.2 이후 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>ZREVRANGE</code> 는 6.2.0 부터 deprecated 다. <code>ZRANGE key start stop REV</code> 로 대체할 수 있고, 이쪽이 <code>BYSCORE</code>/<code>BYLEX</code>/<code>LIMIT</code> 까지 한 커맨드에서 조합되므로 새로 쓰는 코드라면 이 형태를 권한다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zrange score:240911 0 2 rev withscores
+1) "player:234"
+2) "400"
+3) "player:24"
+4) "357"
+5) "player:143"
+6) "199"</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4>ZADD 또는 ZINCRBY 로 스코어 업데이트하기</h4>
+  <ul>
+    <li><code>ZADD</code> 로 같은 멤버를 다시 넣으면 스코어가 <b>덮어써지고</b> 순서가 재정렬된다</li>
+    <li><code>ZINCRBY</code> 는 기존 스코어에 <b>더한다</b>. 반환값은 더해진 뒤의 스코어다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zadd score:240911 500 player:101
+(integer) 0
+127.0.0.1:6379&gt; zrevrange score:240911 0 2 withscores
+1) "player:101"
+2) "500"
+3) "player:234"
+4) "400"
+5) "player:24"
+6) "357"
+127.0.0.1:6379&gt; zincrby score:240911 200 player:234
+"600"
+127.0.0.1:6379&gt; zrevrange score:240911 0 2 withscores
+1) "player:234"
+2) "600"
+3) "player:101"
+4) "500"
+5) "player:24"
+6) "357"</code></pre>
+  </div>
+
+  <p><code>zadd</code> 가 <code>(integer) 0</code> 을 돌려준 것은 실패가 아니다. <b>새로 추가된 멤버 수</b>가 0 이라는 뜻이며, 기존 멤버의 스코어는 정상적으로 갱신됐다.</p>
+
+  <h4>ZUNIONSTORE 로 스코어 합산하기</h4>
+  <ul>
+    <li>RDB 에서는 데이터를 가져와 선수별로 더하고 다시 정렬하는 작업이 필요하다</li>
+    <li>레디스는 <code>ZUNIONSTORE</code> 한 줄로 끝난다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; ZUNIONSTORE score:2409 3 score:240911 score:240912 score:240913
+(integer) 5
+127.0.0.1:6379&gt; zrange score:2409 0 -1 withscores
+ 1) "player:286"
+ 2) "84"
+ 3) "player:143"
+ 4) "597"
+ 5) "player:24"
+ 6) "1071"
+ 7) "player:101"
+ 8) "1500"
+ 9) "player:234"
+10) "1800"</code></pre>
+  </div>
+
+  <p>세 번째 인자 <code>3</code> 은 <b>뒤따르는 키가 몇 개인지</b> 알려 주는 숫자다. 이걸 빼먹으면 문법 에러가 난다.</p>
+
+  <p>또한 <code>WEIGHTS</code> 옵션으로 각 키의 스코어에 배수를 곱해 합칠 수 있다. 이벤트 기간의 점수만 두 배로 치는 식이다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; ZUNIONSTORE score:2409x2 3 score:240911 score:240912 score:240913 WEIGHTS 2 2 2
+(integer) 5
+127.0.0.1:6379&gt; zrange score:2409x2 0 -1 withscores
+ 1) "player:286"
+ 2) "112"
+ 3) "player:143"
+ 4) "796"
+ 5) "player:24"
+ 6) "1428"
+ 7) "player:101"
+ 8) "2000"
+ 9) "player:234"
+10) "2400"</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">클러스터에서는 키가 같은 슬롯에 있어야 한다</p>
+      <p><code>ZUNIONSTORE</code> 처럼 여러 키를 한 번에 다루는 커맨드는 클러스터 모드에서 대상 키들이 <b>같은 해시 슬롯</b>에 있어야 실행된다. 일별 키를 합칠 계획이라면 처음부터 <code>score:{2409}11</code> 처럼 해시태그를 넣어 두자. (<a href="#item-10-2">10-2 해시태그</a> 참고)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>sorted set 은 저장 시점에 정렬을 끝내므로 리더보드 조회가 O(log N + M) 이다.</li>
+      <li>점수 덮어쓰기는 <code>ZADD</code>, 누적은 <code>ZINCRBY</code>. <code>ZADD</code> 의 반환 0 은 실패가 아니라 "새로 추가된 멤버 없음"이다.</li>
+      <li>기간별 집계는 <code>ZUNIONSTORE</code> 로 서버에서 처리한다. <code>WEIGHTS</code> 로 가중치도 줄 수 있다.</li>
+      <li>새 코드에서는 <code>ZREVRANGE</code> 대신 <code>ZRANGE ... REV</code> 를 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-2</div>
+    <h3>sorted set을 활용한 최근 검색 기록</h3>
+    <p class="item-tagline">스코어 자리에 점수 대신 <b>시각</b>을 넣으면, 같은 자료구조가 최신순 목록이 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    검색 기록에 필요한 세 가지 — 중복 제거, 최신순 정렬, 개수 제한 — 을 sorted set 하나가 전부 처리한다.
+  </div>
+
+  <ul>
+    <li>RDB 에서는 이런 작업이 필요하다
+      <ul>
+        <li>기존에 있던 키워드인지 확인하고 새로 추가하거나 날짜를 갱신</li>
+        <li>주기적으로 오래된 데이터를 삭제하고, 조회할 때마다 정렬</li>
+      </ul>
+    </li>
+    <li>레디스에서는
+      <ul>
+        <li>저장될 때부터 중복을 허용하지 않는다</li>
+        <li>검색한 날짜를 스코어로 저장하면 알아서 정렬된다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>ZADD 로 검색값 추가하기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zadd search-keyword:123 20240911112233 smoke
+(integer) 1
+127.0.0.1:6379&gt; zadd search-keyword:123 20240911112533 fish
+(integer) 1
+127.0.0.1:6379&gt; zadd search-keyword:123 20240911115933 lol
+(integer) 1</code></pre>
+  </div>
+
+  <h4>ZREVRANGE 로 최근 검색값 가져오기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zrevrange search-keyword:123 0 -1 withscores
+1) "lol"
+2) "20240911115933"
+3) "fish"
+4) "20240911112533"
+5) "smoke"
+6) "20240911112233"</code></pre>
+  </div>
+
+  <h4>ZADD 로 검색일 갱신하기</h4>
+  <p>같은 키워드를 다시 검색하면 새 항목이 생기는 게 아니라 <b>스코어만 갱신</b>되고 맨 앞으로 온다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zadd search-keyword:123 20240912112533 fish
+(integer) 0
+127.0.0.1:6379&gt; zrevrange search-keyword:123 0 -1 withscores
+1) "fish"
+2) "20240912112533"
+3) "lol"
+4) "20240911115933"
+5) "smoke"
+6) "20240911112233"</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">스코어에 무엇을 넣을 것인가 <span class="badge b-blue">보강</span></p>
+      <p>여기서는 <code>20240911112233</code> 같은 <b>사람이 읽는 형식</b>을 스코어로 썼다. sorted set 의 스코어는 배정밀도 부동소수점이라 정수를 정확히 표현할 수 있는 한계가 2<sup>53</sup> (약 9007조) 이므로 초 단위까지의 이 형식은 안전하다. 다만 밀리초까지 붙인 17자리(<code>20240911112233123</code>)는 그 한계를 넘어 값이 뭉개진다. 밀리초가 필요하면 유닉스 타임스탬프(밀리초)를 쓰는 편이 안전하다.</p>
+    </div>
+  </div>
+
+  <h4>ZREMRANGEBYRANK + 음수 인덱스로 최대 저장값 제어하기</h4>
+  <ul>
+    <li><code>ZREMRANGEBYRANK key start stop</code> 을 <code>ZADD</code> 직후에 같이 호출한다</li>
+    <li>음수 인덱스는 마지막 값을 -1 로 두고 역순으로 커진다. -1, -2, -3, ...</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 175" width="620" role="img" aria-label="여섯 개 키워드의 양수 인덱스와 음수 인덱스 대응 관계">
+        <rect x="20" y="55" width="95" height="46" rx="8" class="dg-fill-soft"/>
+        <rect x="20" y="55" width="95" height="46" rx="8" class="dg-stroke" fill="none"/>
+        <rect x="120" y="55" width="95" height="46" rx="8" class="dg-fill-soft"/>
+        <rect x="120" y="55" width="95" height="46" rx="8" class="dg-stroke" fill="none"/>
+        <rect x="220" y="55" width="95" height="46" rx="8" class="dg-fill-soft"/>
+        <rect x="220" y="55" width="95" height="46" rx="8" class="dg-stroke" fill="none"/>
+        <rect x="320" y="55" width="95" height="46" rx="8" class="dg-fill-soft"/>
+        <rect x="320" y="55" width="95" height="46" rx="8" class="dg-stroke" fill="none"/>
+        <rect x="420" y="55" width="95" height="46" rx="8" class="dg-fill-soft"/>
+        <rect x="420" y="55" width="95" height="46" rx="8" class="dg-stroke" fill="none"/>
+        <rect x="520" y="55" width="95" height="46" rx="8" class="dg-fill-bg"/>
+        <rect x="520" y="55" width="95" height="46" rx="8" class="dg-stroke" fill="none" stroke-dasharray="4 3"/>
+
+        <text x="67" y="84" class="dg-text dg-mono" font-size="13" text-anchor="middle">fish</text>
+        <text x="167" y="84" class="dg-text dg-mono" font-size="13" text-anchor="middle">lol</text>
+        <text x="267" y="84" class="dg-text dg-mono" font-size="13" text-anchor="middle">smoke</text>
+        <text x="367" y="84" class="dg-text dg-mono" font-size="13" text-anchor="middle">haha</text>
+        <text x="467" y="84" class="dg-text dg-mono" font-size="13" text-anchor="middle">vscode</text>
+        <text x="567" y="84" class="dg-text-sub dg-mono" font-size="13" text-anchor="middle">cursor</text>
+
+        <text x="67" y="125" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">-1</text>
+        <text x="167" y="125" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">-2</text>
+        <text x="267" y="125" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">-3</text>
+        <text x="367" y="125" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">-4</text>
+        <text x="467" y="125" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">-5</text>
+        <text x="567" y="125" class="dg-accent dg-mono" font-size="12" text-anchor="middle" font-weight="700">-6</text>
+
+        <text x="67" y="38" class="dg-text-sub" font-size="11" text-anchor="middle">최신</text>
+        <text x="567" y="38" class="dg-text-sub" font-size="11" text-anchor="middle">가장 오래됨</text>
+        <text x="567" y="152" class="dg-accent dg-mono" font-size="12" text-anchor="middle">삭제 대상</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>최신 5개만 남기려면 -6 을 지우면 된다</b> — 새 키워드를 넣은 직후 <code>zremrangebyrank key -6 -6</code> 을 호출하면 목록 길이가 항상 5로 유지된다. 스코어가 커질수록 최신이므로, 오름차순 랭크로는 가장 오래된 항목이 -6 자리에 온다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; zrevrange search-keyword:123 0 -1 withscores
+ 1) "fish"
+ 2) "20240912112533"
+ 3) "lol"
+ 4) "20240911115933"
+ 5) "smoke"
+ 6) "20240911112233"
+ 7) "haha"
+ 8) "20240911112233"
+ 9) "vscode"
+10) "20240910112233"
+11) "cursor"
+12) "20240909112233"
+127.0.0.1:6379&gt; zremrangebyrank search-keyword:123 -6 -6
+(integer) 1
+127.0.0.1:6379&gt; zrevrange search-keyword:123 0 -1 withscores
+ 1) "fish"
+ 2) "20240912112533"
+ 3) "lol"
+ 4) "20240911115933"
+ 5) "smoke"
+ 6) "20240911112233"
+ 7) "haha"
+ 8) "20240911112233"
+ 9) "vscode"
+10) "20240910112233"</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>스코어에 시각을 넣으면 sorted set 이 최신순 목록이 된다. 같은 키워드를 다시 넣는 것이 곧 "갱신"이다.</li>
+      <li><code>ZREMRANGEBYRANK key -N -N</code> 을 추가 직후에 호출하면 목록 길이를 N-1 개로 고정할 수 있다.</li>
+      <li>랭크 인덱스는 <b>오름차순 기준</b>이다. 최신순으로 보고 있어도 삭제 인덱스는 오름차순으로 계산해야 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-3</div>
+    <h3>set을 활용한 태그 기능</h3>
+    <p class="item-tagline">게시글에서 태그로, 태그에서 게시글로. 양방향 인덱스를 set 두 벌로 만든다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RDB 의 조인 테이블이 하던 일을, 방향이 다른 <b>두 벌의 set</b> 이 대신한다. 조회하려는 방향마다 인덱스를 하나씩 만드는 셈이다.
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>원문 노트의 제목과 소제목은 "sorted set" 으로 되어 있지만, 실제 실습 커맨드는 전부 <code>SADD</code>/<code>SMEMBERS</code>/<code>SINTER</code> 즉 <b>set</b> 이다. 태그는 순서가 필요 없고 중복 제거와 교집합만 필요하므로 set 이 맞는 선택이다. 이 문서에서는 set 기준으로 정리했다.</p>
+    </div>
+  </div>
+
+  <ul>
+    <li>RDB 에서의 구현: 게시글, 태그, 게시글-태그 조인 — 총 3개의 테이블이 필요하다</li>
+    <li>레디스에서의 구현: 태그 중복 체크를 따로 하지 않아도 된다 (set 이 알아서 막는다)</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P47["post:47:tags<br>it, redis, data"]
+  P22["post:22:tags<br>it, python"]
+  TIT["tag:it:posts<br>22, 47"]
+  TRD["tag:redis:posts<br>47"]
+  TPY["tag:python:posts<br>22"]
+  P47 -->|"게시글에서 태그로"| TIT
+  P22 -->|"게시글에서 태그로"| TIT
+  TIT -->|"태그에서 게시글로"| P47
+  TIT -->|"태그에서 게시글로"| P22
+  P47 --- TRD
+  P22 --- TPY
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 관계를 두 번 저장한다</b> — 레디스에는 조인이 없으므로 "이 글의 태그는?"과 "이 태그의 글은?" 두 질문에 각각 답할 set 을 따로 유지한다. 쓰기 비용이 두 배가 되는 대신 두 방향 모두 O(1)/O(N) 조회가 된다.</div>
+  </div>
+
+  <h4>SADD 로 게시글에 태그 추가하기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; sadd post:47:tags it redis data
+(integer) 3
+127.0.0.1:6379&gt; sadd post:22:tags it python
+(integer) 2</code></pre>
+  </div>
+
+  <h4>SADD 로 태그에 게시글 추가하기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; sadd tag:data:posts 47
+(integer) 1
+127.0.0.1:6379&gt; sadd tag:redis:posts 47
+(integer) 1
+127.0.0.1:6379&gt; sadd tag:it:posts 47
+(integer) 1
+127.0.0.1:6379&gt; sadd tag:it:posts 22
+(integer) 1
+127.0.0.1:6379&gt; sadd tag:python:posts 22
+(integer) 1</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">두 방향은 반드시 함께 갱신해야 한다</p>
+      <p>게시글을 지울 때 <code>post:47:tags</code> 만 지우면 <code>tag:it:posts</code> 에 47 이 유령처럼 남는다. 태그 추가/삭제는 두 키를 함께 다루는 <code>MULTI</code>/<code>EXEC</code> 또는 루아 스크립트로 묶는 편이 안전하다. (<a href="#item-13-2">13-2 레디스에서 트랜잭션</a> 참고)</p>
+    </div>
+  </div>
+
+  <h4>SMEMBERS 로 태그에 속한 게시글 목록 가져오기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; smembers tag:it:posts
+1) "22"
+2) "47"</code></pre>
+  </div>
+
+  <h4>SINTER 로 2개의 태그를 모두 포함하는 게시글 가져오기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; sinter tag:it:posts tag:python:posts
+1) "22"</code></pre>
+  </div>
+
+  <p>RDB 라면 조인 테이블을 두 번 걸고 <code>GROUP BY ... HAVING COUNT(*) = 2</code> 를 써야 하는 질의가 커맨드 한 줄이 된다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>태그는 set 두 벌(게시글→태그, 태그→게시글)로 구현한다. 조인이 없는 대신 인덱스를 방향별로 직접 만든다.</li>
+      <li>중복 태그 방지는 set 이 공짜로 해 준다. 별도 체크 로직이 필요 없다.</li>
+      <li>"태그 A 이면서 B" 는 <code>SINTER</code> 한 줄. 다만 삭제 시 두 방향을 함께 정리해야 데이터가 어긋나지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-4</div>
+    <h3>랜덤 데이터 추출</h3>
+    <p class="item-tagline"><code>ORDER BY RAND()</code> 가 전체 정렬을 부르는 동안, 레디스는 자료구조에서 하나를 그냥 집는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RDB 의 랜덤 추출은 <b>전체를 훑고 정렬한 뒤 하나를 고르는</b> 일이지만, 레디스의 랜덤 커맨드는 자료구조 내부에서 바로 하나를 집는다.
+  </div>
+
+  <ul>
+    <li>RDB 에서는 보통 <code>ORDER BY RAND()</code> 로 구현한다
+      <ul><li>정렬/필터링/개수 제한 등 여러 과정이 필요해서 데이터가 많으면 부하가 커진다</li></ul>
+    </li>
+    <li>레디스에서는 <code>RANDOMKEY</code> 로 랜덤 값을 <b>O(1)</b> 에 얻을 수 있다</li>
+  </ul>
+
+  <h4>RANDOMKEY 와 자료구조별 랜덤 커맨드</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>대상</th><th>커맨드</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>전체 키스페이스</td><td><code>RANDOMKEY</code></td><td>저장된 키 중 하나를 무작위로 반환</td></tr>
+        <tr><td>hash</td><td><code>HRANDFIELD</code></td><td>6.2 이상</td></tr>
+        <tr><td>set</td><td><code>SRANDMEMBER</code></td><td>꺼내지 않고 보기만 한다 (<code>SPOP</code> 은 꺼낸다)</td></tr>
+        <tr><td>sorted set</td><td><code>ZRANDMEMBER</code></td><td>6.2 이상</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에 set 용 커맨드가 <code>DRANTMEMBER</code> 로 적혀 있으나 실제 이름은 <code>SRANDMEMBER</code> 다. 참고로 <code>SRANDMEMBER</code> 는 값을 <b>남겨 둔 채</b> 읽고, <code>SPOP</code> 은 <b>꺼내면서 삭제</b>한다. 추첨처럼 중복 당첨을 막아야 하면 <code>SPOP</code>, 단순 샘플링이면 <code>SRANDMEMBER</code> 다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; hrandfield product:123
+"name"
+127.0.0.1:6379&gt; hrandfield product:123 1 withvalues
+1) "type"
+2) "string"</code></pre>
+  </div>
+
+  <h4>COUNT 의 부호가 중복 허용 여부를 정한다</h4>
+  <p><code>COUNT</code> 에 양수를 쓰면 중복 없이, 음수를 쓰면 중복을 허용해서 가져온다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; hrandfield person 2
+1) "name"
+2) "name:kimch"
+127.0.0.1:6379&gt; hrandfield person -2
+1) "name:dongwoo"
+2) "name:dongwoo"</code></pre>
+  </div>
+
+  <p>양수일 때는 요소 수보다 큰 값을 요청해도 <b>있는 만큼만</b> 돌아오지만, 음수일 때는 요청한 개수만큼 반드시 채워서 돌아온다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">RANDOMKEY 는 O(1) 이지만 무료는 아니다</p>
+      <p>만료된 키가 많이 쌓여 있으면 <code>RANDOMKEY</code> 가 유효한 키를 찾을 때까지 내부적으로 여러 번 재시도한다. 또한 이 커맨드는 <b>전체 키스페이스</b>를 대상으로 하므로 "이벤트 응모자 중 한 명"처럼 특정 집합에서 뽑아야 한다면 <code>SRANDMEMBER</code> 쪽이 의도에 맞는다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>랜덤 추출은 자료구조별 전용 커맨드를 쓴다 — <code>SRANDMEMBER</code>/<code>HRANDFIELD</code>/<code>ZRANDMEMBER</code>.</li>
+      <li><code>COUNT</code> 양수는 중복 없이, 음수는 중복을 허용해 개수를 반드시 채운다.</li>
+      <li>당첨자 추첨처럼 다시 뽑히면 안 되는 경우는 <code>SPOP</code>, 그냥 보기만 할 때는 <code>SRANDMEMBER</code>.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-5</div>
+    <h3>레디스에서 다양한 카운팅 방법</h3>
+    <p class="item-tagline">정확한 수가 필요한가, 대략의 수가 필요한가. 그 답에 따라 set 과 비트맵과 HyperLogLog 로 갈린다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    카운팅은 <b>정확도와 메모리의 거래</b>다. 유저 목록까지 필요하면 set, 존재 여부만 필요하면 비트맵, 개수만 필요하면 HyperLogLog.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방법</th><th>1000만 유저 기준 메모리</th><th>정확도</th><th>개별 조회</th></tr></thead>
+      <tbody>
+        <tr><td>set</td><td>수백 MB</td><td class="t-center t-ok">정확</td><td class="t-center t-ok">가능</td></tr>
+        <tr><td>bitmap</td><td>약 1.2MB</td><td class="t-center t-ok">정확</td><td class="t-center t-ok">가능 (정수 ID 필요)</td></tr>
+        <tr><td>HyperLogLog</td><td>12KB 고정</td><td class="t-center">오차 0.81%</td><td class="t-center t-no">불가</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>좋아요 처리하기</h4>
+  <ul>
+    <li>RDB 에서 초당 몇만 건의 카운트를 감당하기에는 부하가 심하다</li>
+    <li>set 에 좋아요를 누른 유저를 넣고 <code>SCARD</code> 로 개수를 세면 간단히 구현된다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; sadd comment-like:123 1 2 3 4 5
+(integer) 5
+127.0.0.1:6379&gt; scard comment-like:123
+(integer) 5</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "sorted set 을 사용해서"라고 적혀 있지만 실습 커맨드는 <code>SADD</code>/<code>SCARD</code> 즉 <b>set</b> 이다. 좋아요는 순위가 필요 없고 "같은 사람이 두 번 누르지 못하게" 하는 것이 목적이므로 set 이 맞다. <code>SCARD</code> 는 개수를 세지 않고 저장된 값을 읽으므로 <b>O(1)</b> 이다.</p>
+    </div>
+  </div>
+
+  <h4>읽지 않은 메시지 수 카운팅하기</h4>
+  <ul>
+    <li>레디스에 쌓아 두었다가 필요한 시점에 한 번에 꺼내 DB 를 갱신하는 방식으로 구현한다</li>
+    <li>RDB 의 부하를 최소화하고 성능을 끌어올릴 수 있다</li>
+    <li>예시 — 유저 아이디 123, 채널 아이디 4234 인 채널에 새 메시지 1건이 도착한 상황</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; hset user:234 channel:4234 1
+(integer) 1
+127.0.0.1:6379&gt; hincrby user:234 channel:4234 1
+(integer) 2
+127.0.0.1:6379&gt; hgetall user:234
+1) "channel:4234"
+2) "2"</code></pre>
+  </div>
+
+  <p>유저 하나에 hash 하나를 두고 채널을 필드로 삼으면, 유저의 모든 채널 뱃지를 <code>HGETALL</code> 한 번에 가져올 수 있다. <code>HINCRBY</code> 는 원자적이라 동시에 여러 메시지가 들어와도 카운트가 어긋나지 않는다.</p>
+
+  <h4>DAU 구하기</h4>
+  <ul>
+    <li>DAU 는 하루 동안 서비스에 방문한 사용자 수를 뜻한다</li>
+    <li>set 으로도 되지만 1000만 명이 방문했을 때 모든 유저 아이디를 저장하는 건 비효율적이다
+      <ul><li>가능하면 하나의 키당 2~300만 개 수준으로 값을 나누는 것이 좋다</li></ul>
+    </li>
+    <li>비트맵을 쓰면 메모리를 아끼면서 실시간 DAU 구현이 가능하다</li>
+    <li><b>유저 한 명이 비트 하나</b>이므로 1000만 명이 약 1.2MB 로 표현된다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 "1000만 명의 사용자는 1개의 비트로 표현이 가능"은 <b>1000만 명을 1비트에 담는다</b>는 뜻으로 읽힌다. 정확히는 <b>사용자 한 명이 1비트</b>를 차지하며, 1000만 비트 = 1250000바이트 = 약 1.2MB 다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 600 210" width="600" role="img" aria-label="세 날짜의 비트맵을 BITOP AND 로 교차해 연속 접속자를 구하는 과정">
+        <text x="70" y="46" class="dg-text dg-mono" font-size="12" text-anchor="end">dau:240910</text>
+        <text x="70" y="86" class="dg-text dg-mono" font-size="12" text-anchor="end">dau:240911</text>
+        <text x="70" y="126" class="dg-text dg-mono" font-size="12" text-anchor="end">dau:240912</text>
+        <text x="70" y="182" class="dg-accent dg-mono" font-size="12" text-anchor="end">dau:latest</text>
+
+        <rect x="85" y="30" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="85" y="30" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="120" y="30" width="30" height="24" rx="4" class="dg-fill-bg"/><rect x="120" y="30" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="155" y="30" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="155" y="30" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="190" y="30" width="30" height="24" rx="4" class="dg-fill-bg"/><rect x="190" y="30" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <text x="100" y="47" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="135" y="47" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">0</text>
+        <text x="170" y="47" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="205" y="47" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">0</text>
+
+        <rect x="85" y="70" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="85" y="70" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="120" y="70" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="120" y="70" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="155" y="70" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="155" y="70" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="190" y="70" width="30" height="24" rx="4" class="dg-fill-bg"/><rect x="190" y="70" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <text x="100" y="87" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="135" y="87" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="170" y="87" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="205" y="87" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">0</text>
+
+        <rect x="85" y="110" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="85" y="110" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="120" y="110" width="30" height="24" rx="4" class="dg-fill-bg"/><rect x="120" y="110" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="155" y="110" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="155" y="110" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="190" y="110" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="190" y="110" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <text x="100" y="127" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="135" y="127" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">0</text>
+        <text x="170" y="127" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+        <text x="205" y="127" class="dg-text dg-mono" font-size="12" text-anchor="middle">1</text>
+
+        <path d="M85 148 L220 148" class="dg-stroke" fill="none" stroke-width="1.4"/>
+        <text x="240" y="152" class="dg-text-sub dg-mono" font-size="12">BITOP AND</text>
+
+        <rect x="85" y="162" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="85" y="162" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="120" y="162" width="30" height="24" rx="4" class="dg-fill-bg"/><rect x="120" y="162" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="155" y="162" width="30" height="24" rx="4" class="dg-fill-soft"/><rect x="155" y="162" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <rect x="190" y="162" width="30" height="24" rx="4" class="dg-fill-bg"/><rect x="190" y="162" width="30" height="24" rx="4" class="dg-stroke" fill="none"/>
+        <text x="100" y="179" class="dg-accent dg-mono" font-size="12" text-anchor="middle" font-weight="700">1</text>
+        <text x="135" y="179" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">0</text>
+        <text x="170" y="179" class="dg-accent dg-mono" font-size="12" text-anchor="middle" font-weight="700">1</text>
+        <text x="205" y="179" class="dg-text-sub dg-mono" font-size="12" text-anchor="middle">0</text>
+
+        <text x="380" y="46" class="dg-text-sub" font-size="12">비트 자리 = 유저 ID</text>
+        <text x="380" y="70" class="dg-text-sub" font-size="12">1 = 그날 방문함</text>
+        <text x="380" y="183" class="dg-text-sub" font-size="12">3일 모두 켜진 자리만 남는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>비트 연산이 곧 집합 연산이다</b> — 날짜별 비트맵을 <code>BITOP AND</code> 로 겹치면 "3일 연속 접속자", <code>BITOP OR</code> 로 겹치면 "3일 중 한 번이라도 접속한 사람"이 된다. <code>BITCOUNT</code> 는 켜진 비트를 세어 인원수를 돌려준다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 유저 아이디가 14인 유저의 방문 시
+127.0.0.1:6379&gt; setbit dau:240912 14 1
+(integer) 0
+
+# 특정 일자 DAU 확인
+127.0.0.1:6379&gt; bitcount dau:240912
+(integer) 1
+
+# 3일 동안 연속 접속한 유저의 정보를 dau:latest로 저장
+127.0.0.1:6379&gt; bitop and dau:latest dau:240910 dau:240911 dau:240912
+(integer) 2
+127.0.0.1:6379&gt; bitcount dau:latest
+(integer) 1
+
+# 비트맵 원본 가져오기
+127.0.0.1:6379&gt; get dau:latest
+"\x00\x02"</code></pre>
+  </div>
+
+  <p>비트맵 내부 값을 직접 다루고 싶다면 <code>GET</code> 으로 통째로 꺼내 파이썬 등에서 파싱하면 된다. <code>BITOP</code> 의 반환값 2 는 인원수가 아니라 <b>결과 문자열의 바이트 길이</b>다.</p>
+
+  <h4>HyperLogLog 를 이용한 애플리케이션 미터링</h4>
+  <ul>
+    <li>클라우드 환경은 사용한 만큼 지불하는 정책을 가진다</li>
+    <li>과금 비용을 계산하기 위해 초당 수천 건 이상의 작업이 발생할 수 있다</li>
+    <li>이때 쓰는 미터링 솔루션은 높은 처리량과 낮은 대기시간을 가져야 한다</li>
+    <li>set 과 쓰임은 비슷하지만 용량이 <b>최대 12KB</b> 로 고정이라 효율적이다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 49483 로그 저장
+127.0.0.1:6379&gt; pfadd 240912:user:123 49483
+(integer) 1
+
+# 32714 로그 저장
+127.0.0.1:6379&gt; pfadd 240912:user:123 32714
+(integer) 1
+
+# 49483 을 다시 저장 (이미 반영된 값이라 0)
+127.0.0.1:6379&gt; pfadd 240912:user:123 49483
+(integer) 0
+
+# 중복되지 않은 데이터의 개수 확인
+127.0.0.1:6379&gt; pfcount 240912:user:123
+(integer) 2</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>좋아요/읽지 않은 수처럼 <b>누가</b>까지 필요한 카운팅은 set 과 hash 로. <code>SCARD</code> 와 <code>HINCRBY</code> 는 원자적이고 O(1) 이다.</li>
+      <li>DAU 는 비트맵. 유저 한 명이 1비트이며 1000만 명이 약 1.2MB. <code>BITOP</code> 으로 날짜 간 교집합/합집합을 만든다.</li>
+      <li>개수만 알면 되는 대규모 유니크 카운트는 HyperLogLog. 12KB 고정, 오차 0.81%, 대신 개별 조회는 불가능하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-6</div>
+    <h3>Geospatial Index를 이용한 위치 기반 앱</h3>
+    <p class="item-tagline">좌표를 저장하는 DB 는 많다. 좌표로 <b>연산까지</b> 해 주는 인메모리 저장소가 드물 뿐이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RDB 는 좌표를 <b>보관</b>하고 거리 계산은 애플리케이션이 한다. 레디스는 보관과 계산을 같은 자리에서 처리해 왕복을 없앤다.
+  </div>
+
+  <h4>위치 데이터</h4>
+  <ul>
+    <li>위치 데이터는 아주 다양한 곳에 쓰인다
+      <ul>
+        <li>현재 위치를 파악하고 목적지까지 안내하기</li>
+        <li>위치를 기반으로 맞춤 광고 제공하기</li>
+      </ul>
+    </li>
+    <li>위치 데이터의 요구사항
+      <ul>
+        <li>현재 위치 파악</li>
+        <li>이동에 따른 실시간 위치 업데이트</li>
+        <li>위치를 기준으로 근처 장소 검색</li>
+      </ul>
+    </li>
+    <li>보통 경도와 위도 쌍으로 표현한다</li>
+    <li>단순 읽기/쓰기라 간단해 보이지만 유저 수에 비례해 부하가 늘어난다</li>
+  </ul>
+
+  <h4>레디스의 위치 데이터</h4>
+  <ul>
+    <li>geo 자료구조를 통해 공간 정보 데이터를 처리할 수 있다</li>
+    <li>RDB 를 쓰는 경우 저장은 되지만 실제 연산 로직은 외부에서 처리해야 한다</li>
+    <li>레디스는 저장은 물론 실시간 위치 연산까지 제공해 빠른 응답 속도를 보장한다</li>
+    <li>geo set 과 pub/sub 를 결합하면 근처 사용자에게 실시간 알림을 보내는 식의 서비스도 만들 수 있다</li>
+  </ul>
+
+  <h4>geo set</h4>
+  <ul>
+    <li>위치 공간 관리에 특화된 자료구조로, 각 데이터는 경도/위도 쌍으로 저장된다</li>
+    <li>이미 존재하는 멤버에 <code>GEOADD</code> 를 다시 하면 좌표가 업데이트된다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트 본문의 <code>getadd</code> 는 <code>GEOADD</code> 의 오타다. 인자 순서도 헷갈리기 쉬운데 <b>경도(longitude) 가 먼저, 위도(latitude) 가 나중</b>이다. 지도 서비스는 대개 "위도, 경도" 순으로 표기하므로 순서가 뒤집히기 쉽다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 아이디가 142인 유저의 위치정보 저장
+127.0.0.1:6379&gt; geoadd user 50.1231231231 14.1421312 142
+(integer) 1
+
+# 같은 멤버에 다시 GEOADD 하면 좌표만 갱신된다 (반환값 0)
+127.0.0.1:6379&gt; geoadd user 23.51312412 51.2141421312 142
+(integer) 0</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 특정 위치에 레스토랑 등록
+127.0.0.1:6379&gt; geoadd restaurant 50.1241312 13.1231231 korea
+(integer) 1
+
+# 등록한 레스토랑의 위치 조회
+127.0.0.1:6379&gt; geopos restaurant korea
+1) 1) "50.12413233518600464"
+   2) "13.12312211861598144"
+
+# 현재 위치에서 10km 이내에 있는 곳 검색
+127.0.0.1:6379&gt; geosearch restaurant fromlonlat 50.123121 13.1231212312 byradius 10 km
+1) "korea"</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Redis 6.2 이후 <span class="badge b-purple">최신 반영</span></p>
+      <p>주변 검색에 오래 쓰이던 <code>GEORADIUS</code>/<code>GEORADIUSBYMEMBER</code> 는 6.2 부터 deprecated 이고, 노트에서 쓴 <code>GEOSEARCH</code> 가 그 자리를 대신한다. <code>GEOSEARCH</code> 는 원형(<code>BYRADIUS</code>)뿐 아니라 사각형(<code>BYBOX</code>) 검색을 지원하고, 기준점을 좌표(<code>FROMLONLAT</code>) 또는 기존 멤버(<code>FROMMEMBER</code>)로 지정할 수 있다. 결과를 다른 키에 저장하려면 <code>GEOSEARCHSTORE</code> 를 쓴다.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">geo 는 결국 sorted set 이다</p>
+      <p>내부적으로 좌표는 52비트 geohash 정수로 인코딩되어 sorted set 의 스코어에 들어간다. 그래서 멤버를 지울 때는 별도 커맨드가 아니라 <code>ZREM</code> 을 쓰고, 개수는 <code>ZCARD</code> 로 센다. 반대로 말하면 <b>키 하나가 통째로 한 노드에 올라간다</b>는 뜻이라, 전국 단위 데이터를 키 하나에 몰면 그 노드만 뜨거워진다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>geo set 은 좌표 저장과 거리/반경 연산을 서버에서 함께 처리해 왕복을 줄인다.</li>
+      <li>인자는 <b>경도 → 위도 → 멤버</b> 순. 같은 멤버에 다시 <code>GEOADD</code> 하면 좌표가 갱신된다.</li>
+      <li>주변 검색은 <code>GEOSEARCH</code> 를 쓴다. <code>GEORADIUS</code> 계열은 6.2 부터 deprecated 다.</li>
+      <li>내부가 sorted set 이므로 삭제는 <code>ZREM</code>, 개수는 <code>ZCARD</code>. 키 분산 설계도 sorted set 과 똑같이 고민해야 한다.</li>
+    </ul>
+  </div>
+</article>

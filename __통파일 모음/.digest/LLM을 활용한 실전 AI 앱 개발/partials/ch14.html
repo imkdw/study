@@ -1,0 +1,445 @@
+<article class="item" id="item-14-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-1</div>
+    <h3>멀티 모달 LLM</h3>
+    <p class="item-tagline">무거운 부품은 얼려두고, 사이를 잇는 프로젝터만 학습시킨다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    멀티 모달 LLM 은 처음부터 새로 만들지 않는다. <b>이미 잘 학습된 인코더/LLM/생성기를 그대로 두고, 그것들을 연결하는 프로젝터만 학습</b>시킨다.
+  </div>
+
+  <h4>멀티 모달 LLM 이란</h4>
+  <ul>
+    <li>텍스트뿐 아니라 <b>이미지/비디오/오디오</b> 등 다양한 형식의 데이터를 이해하고 생성할 수 있는 LLM 이다.</li>
+    <li>LLM 의 뛰어난 <b>언어 이해 능력과 추론 능력</b>을 중심에 두고, 그 주위에 다른 형식을 다루는 능력을 붙이는 방식으로 구현된다.</li>
+  </ul>
+
+  <h4>멀티 모달 LLM 의 구성요소</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  IMG["이미지 입력"] --> ME["모달리티 인코더<br>ViT / CLIP"]
+  ME --> IP["입력 프로젝터"]
+  IP --> LLM["LLM 백본"]
+  TXT["텍스트 입력"] --> LLM
+  LLM --> OUT["텍스트 출력"]
+  LLM --> OP["출력 프로젝터"]
+  OP --> MG["모달리티 생성기<br>디퓨전 모델"]
+  MG --> GIMG["이미지 출력"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>양 끝의 무거운 모델은 고정하고 가운데 두 프로젝터만 학습한다</b> — 적은 비용으로 모달리티를 붙이는 표준 설계다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구성요소</th><th>역할</th><th>학습 여부</th></tr></thead>
+      <tbody>
+        <tr><td><b>모달리티 인코더</b></td><td>이미지 등을 벡터 표현으로 변환</td><td class="t-center t-no">고정 (사전 학습 모델 사용)</td></tr>
+        <tr><td><b>입력 프로젝터</b></td><td>인코더의 출력을 LLM 이 받을 수 있는 형태로 변환</td><td class="t-center t-ok">학습</td></tr>
+        <tr><td><b>LLM 백본</b></td><td>이해와 추론의 중심</td><td class="t-center t-no">고정</td></tr>
+        <tr><td><b>출력 프로젝터</b></td><td>이미지 생성이 필요한지 판단하고, 필요하면 생성 프롬프트를 만든다</td><td class="t-center t-ok">학습</td></tr>
+        <tr><td><b>모달리티 생성기</b></td><td>실제로 이미지 등을 생성</td><td class="t-center t-no">고정</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>모달리티 인코더 / LLM 백본 / 모달리티 생성기</b>는 학습에 막대한 데이터와 연산량이 필요하다. 그래서 멀티 모달 LLM 학습 과정에서는 이들의 <b>파라미터를 업데이트하지 않고 사전 학습된 모델을 그대로 사용</b>한다. 대신 세 구성요소를 연결하는 <b>입력 프로젝터와 출력 프로젝터의 파라미터를 학습</b>시켜 멀티 모달 이해/생성 성능을 높인다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 <i>"이미지 형식의 데이터를 모달리티 인코더 / 입력 프로젝터를 통해서 <u>텍스트로 변환</u>해서 LLM 에 입력함"</i> 이라고 적었는데, 여기서 만들어지는 것은 <b>텍스트가 아니다</b>. 입력 프로젝터의 출력은 <b>LLM 의 토큰 임베딩과 같은 차원/같은 공간에 놓인 벡터</b>이며, 사람이 읽을 수 있는 문자열로 바뀌는 단계는 없다. LLM 입장에서는 <b>"텍스트 토큰인 것처럼 취급되는 이미지 벡터"</b>가 프롬프트 앞에 끼어드는 셈이다. 이 구분이 중요한 이유는, 만약 정말 텍스트로 바꾼다면 캡션 모델을 붙이는 것과 다를 바 없고 <b>이미지의 세부 정보가 캡션 길이만큼으로 압축돼 버리기 때문</b>이다.</p>
+    </div>
+  </div>
+
+  <h4>모달리티 인코더 — 비전 트랜스포머</h4>
+  <ul>
+    <li>이미지를 처리하는 모달리티 인코더로는 <b>비전 트랜스포머</b>(ViT)가 가장 많이 활용된다.</li>
+    <li>텍스트 처리를 위해 개발된 트랜스포머 아키텍처를 이미지에 적용한 모델이다.</li>
+    <li>이미지를 <b>패치</b> 단위로 잘라, 텍스트에서 단어를 처리하듯 일렬로 나열해 입력한다.</li>
+    <li>이미지 패치는 <b>사전(vocabulary)을 구축하기 어렵기 때문에</b>, 선형 변환을 통해 이미지 임베딩 벡터로 만들어 토큰 임베딩과 유사한 형태로 맞춘다.</li>
+    <li>OpenAI 의 <b>CLIP</b> 모델이 가장 많이 쓰인다. 이미지와 텍스트를 <b>같은 벡터 공간</b>에 임베딩하도록 만들어진 모델이다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 이미지에는 사전을 만들 수 없나 <span class="badge b-blue">보강</span></p>
+      <p>텍스트 토크나이저는 <b>유한한 사전</b>을 만들 수 있다 — "토크"는 9157번, 이렇게 정수 하나로 대응된다(<a href="#item-3-3">3-3</a>). 그런데 <b>16×16 픽셀 패치가 가질 수 있는 값의 경우의 수는 사실상 무한</b>하다. 똑같은 패치가 두 번 나오는 일도 거의 없다. 그래서 "패치 → 사전 인덱스 → 임베딩"이 아니라 <b>"패치 픽셀값 → 선형 변환 → 임베딩"</b> 으로 한 단계를 건너뛴다.</p>
+    </div>
+  </div>
+
+  <h4>LLM 으로 이미지를 생성하기</h4>
+  <p>LLM 의 생성 결과를 바탕으로 이미지를 만들려면 두 단계가 필요하다.</p>
+  <ol class="steps">
+    <li><div class="step-title">이미지 생성이 필요한지 판단</div><p>사용자의 요청이 이미지를 원하는 것인지 판별한다.</p></li>
+    <li><div class="step-title">어떤 이미지를 생성할지 결정</div><p>이미지 생성 모델에 넘길 적절한 프롬프트를 만든다.</p></li>
+  </ol>
+  <p>두 단계 모두 <b>출력 프로젝터</b>가 수행한다. 출력 프로젝터가 만든 이미지 생성 프롬프트는 <b>모달리티 생성기</b>에 전달되고, 최종적으로 이미지가 생성된다.</p>
+
+  <h4>멀티 모달 LLM 학습 과정</h4>
+  <p>사전 학습된 텍스트 전용 LLM 이 멀티 모달 입출력을 지원하려면 추가 훈련 단계를 거친다. 학습 과정은 <a href="#ch4">4장</a>의 LLM 과 동일한 구조다 — <b>사전 학습</b>과 <b>지시 데이터셋을 활용한 지시 학습</b>으로 나뉜다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>멀티 모달 LLM = LLM 을 중심에 두고 다른 형식을 다루는 능력을 덧붙인 것.</li>
+      <li>다섯 구성요소 중 <b>프로젝터 둘만 학습</b>하고 나머지 셋은 고정한다.</li>
+      <li>입력 프로젝터의 출력은 <b>텍스트가 아니라 LLM 임베딩 공간의 벡터</b>다.</li>
+      <li>ViT 는 이미지를 <b>패치</b>로 잘라 선형 변환으로 임베딩을 만든다 — 사전을 만들 수 없기 때문이다.</li>
+      <li>학습 과정은 LLM 과 같이 <b>사전 학습 + 지시 학습</b> 구조다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-2</div>
+    <h3>이미지와 텍스트를 연결하는 모델 CLIP</h3>
+    <p class="item-tagline">4억 개의 이미지-설명 쌍으로, 그림과 글을 같은 공간에 밀어 넣었다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>대조 학습</b> — 짝이 맞는 이미지-텍스트는 가깝게, 안 맞는 쌍은 멀게. 이 한 가지 목표로 두 모달리티가 하나의 벡터 공간을 공유하게 된다.
+  </div>
+
+  <h4>CLIP 이란</h4>
+  <ul>
+    <li><b>C</b>ontrastive <b>L</b>anguage-<b>I</b>mage <b>P</b>re-training. 텍스트와 이미지 데이터의 관계를 계산할 수 있도록 <b>텍스트 모델과 이미지 모델을 함께 학습</b>시킨 모델이다.</li>
+    <li>내부적으로 <b>텍스트 인코더와 이미지 인코더</b> 두 모델로 구성된다.</li>
+  </ul>
+
+  <h4>CLIP 모델의 학습 방법</h4>
+  <ul>
+    <li><b>서로 관련이 있는 이미지와 텍스트 쌍</b>을 활용한다 — 이미지와 그 이미지에 대한 설명이 대응된 데이터다.</li>
+    <li>연구팀은 인터넷에서 <b>50만 개의 검색어로 4억 개의 쌍 데이터</b>를 직접 구축했다.</li>
+    <li>이후 <b>대조 학습</b>으로 모델을 학습시킨다. 유사한 데이터 쌍은 더 가까워지게, 유사하지 않은 쌍은 더 멀어지도록 만드는 방법이다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">어디서 본 구조 <span class="badge b-blue">보강</span></p>
+      <p>대조 학습은 문장 임베딩 모델 학습에서도 쓰였다. <a href="#item-11-3">11-3</a> 의 <b>MNR 손실</b>이 정확히 같은 원리다 — 배치 안에서 짝이 맞는 쌍(대각선)은 당기고 나머지는 민다. CLIP 은 그 두 축이 <b>질문/본문</b> 대신 <b>이미지/텍스트</b> 인 버전이다. 그래서 배치 크기가 클수록 유리하다는 성질도 똑같이 적용되며, CLIP 이 거대한 배치로 학습된 이유이기도 하다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  I["이미지"] --> IE["이미지 인코더"]
+  T["텍스트"] --> TE["텍스트 인코더"]
+  IE --> V1["이미지 임베딩"]
+  TE --> V2["텍스트 임베딩"]
+  V1 --> S["공유 벡터 공간"]
+  V2 --> S
+  S -->|"짝이 맞으면 당긴다"| L["대조 학습"]
+  S -->|"안 맞으면 민다"| L
+      </pre>
+    </div>
+    <div class="figure-cap"><b>두 인코더의 출력이 같은 공간에 놓인다는 것이 CLIP 의 전부다</b> — <a href="#item-12-5">12-5</a> 에서 이미지로 텍스트를 검색할 수 있었던 이유가 여기 있다.</div>
+  </div>
+
+  <h4>CLIP 의 활용과 뛰어난 성능</h4>
+  <p>학습을 마친 CLIP 은 <b>제로샷 추론</b>을 수행할 수 있다. 사전 학습 데이터 외에 <b>특정 작업을 위한 데이터로 미세 조정하지 않은 상태</b>에서 추론하는 것을 말한다. 절차는 이렇다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">레이블을 문장으로 바꾼다</div><p>분류 레이블 <code>cat</code> 을 <code>A photo of a cat</code> 형태로 바꾸는 프롬프트 엔지니어링을 수행한다.</p></li>
+    <li><div class="step-title">양쪽을 임베딩으로 변환</div><p>텍스트는 텍스트 인코더로, 이미지는 이미지 인코더로 각각 임베딩한다.</p></li>
+    <li><div class="step-title">유사도가 가장 높은 레이블을 고른다</div><p>이미지 임베딩과 가장 가까운 텍스트 임베딩의 레이블이 분류 결과다.</p></li>
+  </ol>
+
+  <p>같은 유사도 계산을 뒤집으면 <b>이미지 검색</b>이 된다 — 텍스트로 이미지를 찾거나 이미지로 이미지를 찾을 수 있다.</p>
+
+  <h4>직접 활용하기</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">clip_zeroshot.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from transformers import CLIPProcessor, CLIPModel
+import requests
+from PIL import Image
+
+# 허깅페이스를 통한 CLIP 모델 활용
+model     = CLIPModel.from_pretrained('openai/clip-vit-large-patch14')
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
+url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+image = Image.open(requests.get(url, stream=True).raw)
+
+# "a photo of {object}" 형태의 후보 두 개를 정의
+inputs = processor(
+    text=["a photo of a cat", "a photo of a dog"],
+    images=image, return_tensors="pt", padding=True,
+)
+outputs = model(**inputs)
+logits_per_image = outputs.logits_per_image
+
+# 후보들에 대한 확률로 변환
+probs = logits_per_image.softmax(dim=-1)
+
+'''
+tensor([[9.9925e-01, 7.5487e-04]], grad_fn=&lt;SoftmaxBackward0&gt;)
+
+"a photo of a cat" 이 0.99925 → 이 이미지는 고양이다
+'''
+print(probs)</code></pre>
+  </div>
+
+  <p>이 모델은 <b>고양이/개 분류 작업을 위해 학습된 적이 없다</b>. 그런데도 99.9% 확신으로 맞힌다. 후보 목록을 바꾸면 그대로 다른 분류기가 된다 — 재학습 없이 <b>텍스트만 바꿔 분류 문제를 새로 정의</b>할 수 있다는 것이 제로샷의 위력이다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">softmax 값은 후보 목록에 종속된다 <span class="badge b-blue">보강</span></p>
+      <p><code>softmax</code> 는 <b>주어진 후보들 사이의 상대적 비율</b>을 낼 뿐이다. 후보에 "고양이"와 "개"만 있으면, 사진이 자동차여도 둘 중 하나에 높은 확률이 붙는다. "이 이미지가 고양이일 절대적 확신"이 아니라 <b>"준 후보 중에서는 고양이가 가장 그럴듯하다"</b> 로 읽어야 한다. 이 성질은 <a href="#item-10-2">10-2</a> 에서 본 CLIP 원시 유사도의 스케일 문제와 같은 뿌리다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>CLIP = 이미지 인코더 + 텍스트 인코더를 <b>함께</b> 학습시킨 모델.</li>
+      <li>학습 방법은 <b>대조 학습</b>. 짝이 맞는 쌍은 당기고 아닌 쌍은 민다 (MNR 손실과 같은 원리).</li>
+      <li>4억 개의 이미지-텍스트 쌍으로 학습됐다.</li>
+      <li><b>제로샷 추론</b>: 레이블을 <code>A photo of {object}</code> 문장으로 바꿔 유사도로 분류한다.</li>
+      <li>같은 구조로 <b>이미지 검색</b>이 가능해진다 (12-5 의 기반).</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-3</div>
+    <h3>텍스트로 이미지를 생성하는 모델 DALL-E</h3>
+    <p class="item-tagline">노이즈를 예측하고 걷어내기를 반복하면 그림이 나온다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    디퓨전 모델은 <b>이미지를 그리는 법이 아니라 노이즈를 알아보는 법</b>을 배운다. 완전한 노이즈에서 예측한 노이즈를 반복해서 빼면 이미지가 나타난다.
+  </div>
+
+  <h4>디퓨전 모델 원리</h4>
+  <ul>
+    <li>확산 현상에서 영감을 받아 만들어진 생성 모델이다.</li>
+    <li>이미지에서 <b>어떤 부분이 노이즈인지 예측하는 방식</b>으로 학습한다.</li>
+    <li>완전한 노이즈 상태의 이미지에서 노이즈를 예측하고 제거하기를 반복하면서, 점차 의미 있는 이미지를 생성한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  N["완전한 노이즈"] --> P1["노이즈 예측 / 제거"]
+  P1 --> S1["약간 형태가 보임"]
+  S1 --> P2["노이즈 예측 / 제거"]
+  P2 --> S2["윤곽이 잡힘"]
+  S2 --> P3["... 수십 회 반복 ..."]
+  P3 --> F["완성된 이미지"]
+  T["텍스트 임베딩"] -.->|"매 단계 참조"| P1
+  T -.-> P2
+  T -.-> P3
+      </pre>
+    </div>
+    <div class="figure-cap"><b>텍스트 임베딩은 매 제거 단계마다 참조된다</b> — 어떤 방향으로 노이즈를 걷어낼지를 텍스트가 안내한다.</div>
+  </div>
+
+  <h5>이미지에서 노이즈를 예측하는 모델</h5>
+  <ul>
+    <li>대표적으로 <b>U-Net</b> 이라는 <b>인코더-디코더</b> 모델을 많이 쓴다.</li>
+    <li>인코더-디코더는 <b>입력 데이터의 차원을 낮추는 인코딩 단계</b>와 <b>차원을 높이는 디코딩 단계</b>를 통해 데이터의 의미를 압축하는 모델 구조다.</li>
+    <li>U-Net 은 인코더-디코더 구조를 변형해 <b>그림의 위치 정보가 손실되는 것을 막는다</b>는 장점이 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">U-Net 이 위치 정보를 지키는 방법 <span class="badge b-blue">보강</span></p>
+      <p>일반적인 인코더-디코더는 정보를 좁은 병목으로 압축했다가 되살리므로 <b>"어디에" 무엇이 있었는지가 뭉개진다</b>. U-Net 은 같은 해상도의 인코더 층과 디코더 층을 <b>가로질러 직접 연결</b>(스킵 커넥션)한다. 노이즈 예측은 <b>픽셀 단위로 정확한 위치</b>가 필요한 작업이라 이 구조가 잘 맞는다. 이름의 U 자도 이 좌우 대칭 연결 모양에서 왔다.</p>
+    </div>
+  </div>
+
+  <h5>원하는 이미지를 만들려면</h5>
+  <ul>
+    <li>사람이 원하는 이미지를 만들려면, 디퓨전 모델에 노이즈를 넣으면서 <b>원하는 결과물의 형태를 텍스트 임베딩으로 변환해 함께 넣어준다</b>.</li>
+    <li>디퓨전 모델이 이 텍스트 임베딩을 참고해 원하는 이미지를 생성한다.</li>
+    <li>추가 정보는 <b>텍스트 임베딩일 수도 있고 이미지 임베딩일 수도 있다</b> — 이 유연함이 다음의 DALL-E 구조를 가능하게 한다.</li>
+  </ul>
+
+  <h4>DALL-E 모델</h4>
+  <p>CLIP 으로 텍스트 임베딩을 만들고, 그 임베딩을 활용해 <b>두 단계</b>를 거쳐 이미지를 생성한다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  T["입력 텍스트"] --> CE["CLIP 텍스트 인코더"]
+  CE --> TE["텍스트 임베딩"]
+  TE --> PR["프라이어 모델<br>디퓨전"]
+  PR --> IE["CLIP 이미지 임베딩"]
+  IE --> DC["디코더<br>디퓨전"]
+  DC --> LR["저해상도 이미지"]
+  LR --> UP["업샘플러 디퓨전 2단"]
+  UP --> HR["고해상도 이미지"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>텍스트 임베딩 → 이미지 임베딩 → 이미지</b> — 프라이어가 모달리티를 갈아타는 다리 역할을 한다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구성요소</th><th>입력</th><th>출력</th><th>정체</th></tr></thead>
+      <tbody>
+        <tr><td><b>프라이어 모델</b></td><td>텍스트 임베딩</td><td>CLIP 이미지 임베딩</td><td>디퓨전 모델</td></tr>
+        <tr><td><b>디코더</b></td><td>이미지 임베딩</td><td>저해상도 이미지</td><td>디퓨전 모델</td></tr>
+        <tr><td><b>업샘플러</b> (DALL-E 2)</td><td>저해상도 이미지</td><td>고해상도 이미지</td><td>디퓨전 모델 2개</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>프라이어 모델</b>은 텍스트 임베딩을 입력받아 이미지 임베딩을 예측하는 디퓨전 모델이다. 텍스트 임베딩을 참조해 노이즈 입력을 이미지 임베딩으로 변환한다.</p>
+  <p><b>디코더</b>는 이미지 임베딩을 참조해 이미지를 생성하는 디퓨전 모델이다. 디코더가 만든 이미지는 저해상도인데, DALL-E 2 에서는 <b>추가로 두 개의 디퓨전 모델</b>을 통해 고해상도로 변환한다.</p>
+
+  <h4>꼭 프라이어 모델을 거쳐야 할까</h4>
+  <p>구조만 보면 프라이어를 건너뛰고 <b>텍스트나 텍스트 임베딩을 바로 디퓨전 모델에 전달해</b> 이미지를 만드는 것도 가능하다. DALL-E 연구팀의 실험 결과, 차이는 <b>입력한 텍스트를 이미지에 반영하는 정도</b>에서 나타났다고 한다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">12-5 의 결과와 이어 보기 <span class="badge b-blue">보강</span></p>
+      <p><a href="#item-12-5">12-5</a> 의 (b) 패널이 이 이야기의 실물이다. GPT-4o 가 쓴 <b>긴 서술형 설명</b>으로 만든 그림은 원본과 색/자세가 크게 달랐고, <b>원본 프롬프트</b>(짧고 키워드가 나열된 형태)로 만든 (c)는 훨씬 충실했다. 텍스트가 이미지에 얼마나 반영되는지는 <b>같은 모델이라도 프롬프트의 형태</b>에 따라 크게 달라진다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>디퓨전 모델은 <b>노이즈를 예측</b>하도록 학습되고, 예측한 노이즈를 반복해 빼며 이미지를 만든다.</li>
+      <li>노이즈 예측에는 <b>U-Net</b> 을 쓴다 — 스킵 커넥션으로 위치 정보를 지킨다.</li>
+      <li>DALL-E = CLIP 텍스트 인코더 → <b>프라이어</b>(텍스트→이미지 임베딩) → <b>디코더</b>(임베딩→이미지) → 업샘플러.</li>
+      <li>세 구성요소가 전부 디퓨전 모델이다.</li>
+      <li>프라이어를 생략할 수도 있지만, <b>텍스트가 이미지에 반영되는 정도</b>에서 차이가 난다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-4</div>
+    <h3>LLaVA</h3>
+    <p class="item-tagline">GPT-4 는 이미지를 못 봤다 — 대신 캡션과 좌표를 읽고 대화 데이터를 지어냈다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    LLaVA 의 진짜 기여는 모델 구조가 아니라 <b>데이터</b>다. 이미지를 볼 수 없는 GPT-4 에게 <b>캡션과 박스 좌표</b>를 텍스트로 주고, 마치 이미지를 본 것처럼 대화 데이터를 만들게 했다.
+  </div>
+
+  <h4>LLaVA 란</h4>
+  <ul>
+    <li>이미지를 인식하는 <b>CLIP 모델과 LLM 을 결합</b>해, 이미지를 인식하고 그에 대한 텍스트를 생성할 수 있게 한 모델이다.</li>
+    <li>기존 DALL-E 는 이미지와 텍스트를 함께 다루는 멀티 모달이지만, <b>이미지에 대해 글을 생성하거나 대화를 나눌 수는 없었다</b>.</li>
+  </ul>
+
+  <h4>LLaVA 의 학습 데이터</h4>
+  <p>멀티 모달 대화 모델을 만들 때 가장 어려운 부분은 <b>데이터셋의 부족</b>이다. LLaVA 논문의 저자들은 <b>ChatGPT 와 GPT-4 로 학습 데이터셋을 구축</b>했다.</p>
+
+  <p>문제는 <b>당시 GPT-4 가 이미지를 인식할 수 없었다</b>는 점이다. 저자들은 이미지에 대한 <b>설명과 위치 정보</b>를 텍스트로 넘겨, GPT-4 가 이미지를 인식한 것처럼 동작하게 만들었다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  IMG["이미지 (직접 못 봄)"] --> CAP["캡션<br>이미지를 설명하는 문장"]
+  IMG --> BOX["박스<br>물체 + 좌표"]
+  CAP --> GPT["GPT-4<br>텍스트만 입력"]
+  BOX --> GPT
+  GPT --> D1["대화"]
+  GPT --> D2["자세한 설명"]
+  GPT --> D3["복잡한 추론"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>이미지를 텍스트로 번역해 넣는 우회로</b> — 캡션은 "무엇이", 박스는 "어디에"를 담당한다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>입력 데이터</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td><b>캡션</b></td><td>이미지를 설명하는 문장</td></tr>
+        <tr><td><b>박스</b></td><td>이미지에 어떤 물체가 있는지를 나타내는 물체와 위치 정보</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>생성된 데이터 유형</th><th>형태</th><th>난이도</th></tr></thead>
+      <tbody>
+        <tr><td><b>대화</b></td><td>사람이 이미지에 대해 질문하면 어시스턴트가 이미지를 보고 답변하는 형식</td><td>인식</td></tr>
+        <tr><td><b>자세한 설명</b></td><td>이미지 설명을 읽고 이미지에 대해 자세히 설명한 것</td><td>인식</td></tr>
+        <tr><td><b>복잡한 추론</b></td><td>답변을 위해 <b>단계별 추론</b>이 필요한 어려운 질문과 그 답변</td><td class="t-ok">추론</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>앞의 두 유형이 단순한 <b>인식과 설명</b>이라면, <b>복잡한 추론</b>은 답을 내기 위해 여러 단계를 거쳐야 하는 유형이다. 이 세 번째가 LLaVA 를 단순 캡셔닝 모델과 갈라놓는 지점이다.</p>
+
+  <h4>LLaVA 모델 구조</h4>
+  <ol class="steps">
+    <li><div class="step-title">이미지를 임베딩으로</div><p>입력 이미지를 <b>CLIP 의 이미지 인코더</b>에 통과시켜 이미지 임베딩으로 만든다.</p></li>
+    <li><div class="step-title">선형 층으로 변환</div><p><b>간단한 선형 층</b> 하나를 통과시켜 LLM 에 입력할 임베딩 토큰으로 만든다. 이것이 14-1 의 <b>입력 프로젝터</b>다.</p></li>
+    <li><div class="step-title">텍스트와 함께 입력</div><p>텍스트 지시사항은 토큰 임베딩으로 변환해, 이미지 임베딩과 함께 LLM 에 넣고 결과를 생성한다.</p></li>
+  </ol>
+
+  <p>여기서 <b>학습되는 것은 선형 층뿐</b>이라는 점이 중요하다. CLIP 인코더와 LLM 은 그대로 두고, <a href="#item-14-1">14-1</a> 에서 설명한 대로 <b>사이를 잇는 프로젝터만</b> 학습시킨다.</p>
+
+  <h4>LLaVA 1.5</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>바뀐 부분</th><th>이전</th><th>1.5</th></tr></thead>
+      <tbody>
+        <tr><td>이미지 인코더</td><td>CLIP ViT-L/14</td><td>CLIP ViT-L/14-336px</td></tr>
+        <tr><td>입력 프로젝터</td><td>선형 층 1개</td><td class="t-ok">2층 MLP</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>인코더 교체와 프로젝터 확장, 이 두 가지로 <b>성능을 대폭 끌어올렸다</b>.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 보완 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 <i>"이미지 인코더를 CLIP 의 ViT-L/14 에서 ViT-L/336px 로 변경"</i> 이라고 적어, 마치 <b>다른 아키텍처로 갈아탄 것</b>처럼 읽힌다. 정확히는 <b>같은 ViT-L/14 의 입력 해상도를 높인 변형</b>(<code>ViT-L/14-336px</code>)으로 바꾼 것이다. 입력 이미지가 224×224 에서 336×336 이 되면서 패치 수가 늘고, <b>LLM 이 받는 이미지 토큰이 많아져 세부 정보가 덜 손실된다</b>. 아키텍처 교체가 아니라 <b>해상도 상향</b>이라는 점이 성능 향상의 이유를 설명해 준다.</p>
+    </div>
+  </div>
+
+  <h4>LLaVA NeXT</h4>
+  <ul>
+    <li>LLaVA 1.5 를 더 발전시킨 모델로 성능이 한층 개선됐다.</li>
+    <li>오픈소스 모델 중 최고 성능을 달성했고, 일부 항목에서는 상업용 모델보다 나은 결과를 보였다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>LLaVA = <b>CLIP 이미지 인코더 + 선형 프로젝터 + LLM</b>. 구조는 단순하다.</li>
+      <li>기여의 핵심은 <b>학습 데이터 생성 방법</b> — 캡션과 박스 좌표로 GPT-4 를 우회 활용했다.</li>
+      <li>데이터 유형은 <b>대화 / 자세한 설명 / 복잡한 추론</b> 세 가지.</li>
+      <li>1.5 의 개선은 <b>해상도 상향(336px)</b> 과 <b>프로젝터를 2층 MLP 로 확장</b>한 것.</li>
+      <li>NeXT 는 오픈소스 최고 성능을 달성했다.</li>
+    </ul>
+  </div>
+</article>

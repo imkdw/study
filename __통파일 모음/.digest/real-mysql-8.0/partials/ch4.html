@@ -1,0 +1,1080 @@
+<article class="item" id="item-4-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-1</div>
+    <h3>MySQL 엔진 아키텍처</h3>
+    <p class="item-tagline">MySQL 엔진은 머리, 스토리지 엔진은 손발이다. 이 분리가 MySQL의 거의 모든 것을 설명한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    MySQL 엔진은 <b>하나</b>지만 스토리지 엔진은 <b>여럿</b>일 수 있고, 둘 사이의 유일한 통로가 <b>핸들러 API</b> 다.
+  </div>
+
+  <h4>두 개의 층</h4>
+  <p>MySQL 서버는 크게 두 부분으로 나뉜다.</p>
+  <ul>
+    <li><b>MySQL 엔진</b> — 사람의 머리 역할</li>
+    <li><b>스토리지 엔진</b> — 사람의 손, 발 역할</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  C["클라이언트"] --> H["커넥션 핸들러"]
+  subgraph ME["MySQL 엔진 (1개)"]
+    H --> P["SQL 파서 / 전처리기"]
+    P --> O["옵티마이저"]
+    O --> X["실행 엔진"]
+  end
+  X -->|"핸들러 API"| S1["InnoDB"]
+  X -->|"핸들러 API"| S2["MyISAM"]
+  X -->|"핸들러 API"| S3["MEMORY"]
+  S1 --> D["디스크 / 메모리"]
+  S2 --> D
+  S3 --> D
+      </pre>
+    </div>
+    <div class="figure-cap"><b>모든 데이터 읽기·쓰기는 핸들러 API 를 통과한다</b> — 그 위쪽은 스토리지 엔진이 무엇이든 동일하게 동작한다.</div>
+  </div>
+
+  <h5>MySQL 엔진</h5>
+  <ul>
+    <li><b>커넥션 핸들러</b> — 클라이언트의 접속과 쿼리 요청을 처리</li>
+    <li><b>SQL 파서 및 전처리기</b></li>
+    <li><b>옵티마이저</b> — 쿼리를 최적화된 형태로 실행</li>
+  </ul>
+
+  <h5>스토리지 엔진</h5>
+  <ul>
+    <li>디스크에 데이터를 저장하거나 읽어오는 부분을 담당한다.</li>
+    <li>MySQL 엔진은 1개지만 <b>스토리지 엔진은 여러 개를 동시에</b> 쓸 수 있다.</li>
+    <li>테이블 생성 시 어떤 스토리지 엔진을 쓸지 지정할 수 있다.</li>
+    <li>각 스토리지 엔진은 키 캐시, 버퍼 풀 같은 자기 자신의 캐시 기능을 내장한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; CREATE TABLE test_table (fd1 INT, fd2 INT) ENGINE=INNODB;
+Query OK, 0 rows affected (0.01 sec)</code></pre>
+  </div>
+
+  <h5>핸들러 API</h5>
+  <p>스토리지 엔진에 쓰기 또는 읽기를 요청하는 것을 <b>핸들러 API</b> 라고 부른다. 실제로 몇 번 호출되었는지는 상태 변수로 확인할 수 있다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SHOW GLOBAL STATUS LIKE 'Handler%';</code></pre>
+  </div>
+
+  <h4>MySQL 스레딩 구조</h4>
+  <p>MySQL 서버는 프로세스가 아니라 <b>스레드 기반</b>으로 동작한다. 스레드는 크게 포그라운드와 백그라운드로 나뉜다.</p>
+
+  <h5>포그라운드 스레드 (클라이언트 스레드)</h5>
+  <ul>
+    <li>접속된 클라이언트 수만큼 존재하며, 클라이언트가 요청한 쿼리 문장을 처리한다.</li>
+    <li>커넥션이 종료되면 스레드는 <b>스레드 캐시로 돌아간다.</b> 캐시가 이미 충분하면 스레드를 종료시킨다.
+      <ul><li>캐시 크기는 <code>thread_cache_size</code> 시스템 변수로 제어한다.</li></ul>
+    </li>
+    <li>데이터를 데이터 버퍼나 캐시에서 가져오고, 없으면 직접 디스크나 인덱스에서 가져온다.</li>
+  </ul>
+
+  <h5>MyISAM vs InnoDB — 쓰기를 누가 하는가</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>읽기</th><th>디스크 쓰기</th></tr></thead>
+      <tbody>
+        <tr><td>MyISAM</td><td>포그라운드</td><td class="t-center">포그라운드가 <b>전부</b> 수행</td></tr>
+        <tr><td>InnoDB</td><td>포그라운드</td><td class="t-center">버퍼/캐시까지만 포그라운드, <b>기록은 백그라운드</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>백그라운드 스레드</h5>
+  <ul>
+    <li>InnoDB는 여러 작업을 백그라운드에서 수행한다 — 로그를 디스크로 기록, 데이터를 버퍼로 읽어오기 등.</li>
+    <li><code>innodb_write_io_threads</code>, <code>innodb_read_io_threads</code> 로 스레드 개수를 설정한다.
+      <ul>
+        <li>읽기는 클라이언트 스레드가 처리하지만 <b>쓰기는 대부분 백그라운드</b>에서 처리한다.</li>
+        <li>내장 디스크를 쓰면 2~4개, DAS/SAN 같은 스토리지라면 감당 가능한 만큼 늘린다.</li>
+      </ul>
+    </li>
+  </ul>
+  <p>이 구조 때문에 InnoDB는 <b>데이터가 완전히 디스크에 저장될 때까지 기다리지 않고</b> 사용자에게 응답한다. 이것이 InnoDB가 빠른 이유이자, 리두 로그가 반드시 필요한 이유이기도 하다.</p>
+
+  <h4>메모리 할당 및 사용 구조</h4>
+  <p>크게 글로벌 메모리 영역과 로컬 메모리 영역으로 나뉜다. 구분 기준은 <b>여러 스레드가 공유하는 공간인가</b> 이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>할당 단위</th><th>공유 여부</th><th>대표 예</th></tr></thead>
+      <tbody>
+        <tr><td>글로벌 메모리</td><td>클라이언트 수와 <b>무관하게</b> 하나</td><td class="t-center t-ok">모든 스레드가 공유</td><td>테이블 캐시, InnoDB 버퍼 풀</td></tr>
+        <tr><td>로컬(세션) 메모리</td><td>클라이언트 스레드<b>별로</b></td><td class="t-center t-no">절대 공유되지 않음</td><td>정렬 버퍼, 조인 버퍼</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>글로벌 영역도 필요에 따라 여러 개를 잡을 수 있지만, 몇 개를 만들든 <b>모든 스레드가 공유</b>한다.</li>
+    <li>로컬 영역은 스레드별로 독립 할당된다. 가능성은 희박하지만 커넥션 수 × 버퍼 크기가 물리 메모리를 넘기면 장애로 이어질 수 있으니 적절한 크기 설정이 중요하다.</li>
+  </ul>
+
+  <h4>플러그인 스토리지 엔진 모델</h4>
+  <ul>
+    <li>기본 제공 스토리지 엔진 외에 <b>직접 개발해서</b> 붙일 수도 있다.</li>
+    <li>MySQL은 대부분의 작업을 MySQL 엔진에서 처리하고, <b>데이터 읽기/쓰기만</b> 스토리지 엔진에 맡긴다.</li>
+    <li>복잡한 쿼리 처리는 전부 쿼리 실행기(실행 엔진)의 몫이다.</li>
+    <li>따라서 하나의 쿼리를 볼 때 <b>어느 하위 작업이 어느 영역에서 처리되는지</b>를 구분할 수 있어야 한다. 실행 계획의 <code>Using where</code> 와 <code>Using index condition</code> 의 차이가 정확히 이 경계선이다.</li>
+  </ul>
+
+  <h5>핸들러</h5>
+  <p>프로그래밍에서 어떤 기능을 호출하기 위해 잡는 <b>운전대</b> 같은 것이다. MySQL 엔진이 스토리지 엔진을 제어할 때도 핸들러 API를 쓴다.</p>
+
+  <h4>컴포넌트</h4>
+  <p>기존 플러그인의 단점을 개선하려고 8.0에서 도입한 개념이다. 대표적으로 비밀번호 검증 플러그인(<code>validate_password</code>)이 컴포넌트로 옮겨 갔다.</p>
+
+  <h4>쿼리 실행 구조</h4>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title">쿼리 파서</div>
+      <p>요청된 쿼리를 <b>트리 형태의 구조</b>로 만들어 낸다. 문장의 기본 문법 오류는 이 단계에서 걸러진다.</p>
+    </li>
+    <li>
+      <div class="step-title">전처리기</div>
+      <p>파서의 결과물을 받아 객체 존재 여부, 접근 권한 등을 검증한다. 존재하지 않거나 권한이 없는 객체의 토큰이 여기서 걸러진다.</p>
+    </li>
+    <li>
+      <div class="step-title">옵티마이저</div>
+      <p>요청된 쿼리를 <b>어떻게 최소한의 비용으로 빠르게 처리할지</b> 결정한다. DBMS의 두뇌에 해당하고, 영향 범위가 가장 넓다.</p>
+    </li>
+    <li>
+      <div class="step-title">실행 엔진</div>
+      <p>회사로 치면 <b>중간 관리자</b>다 (옵티마이저는 경영진). 만들어진 계획대로 각 핸들러에게 작업을 요청하고, 받은 결과를 또 다른 핸들러로 전달한다.</p>
+    </li>
+    <li>
+      <div class="step-title">핸들러 (스토리지 엔진)</div>
+      <p>가장 밑단에서 실제 데이터의 읽기/쓰기를 담당한다. 핸들러는 결국 스토리지 엔진을 의미한다.</p>
+    </li>
+  </ol>
+
+  <h4>쿼리 캐시 — 8.0에서 완전히 제거</h4>
+  <ul>
+    <li>쿼리의 실행 결과를 메모리에 캐시해 두고, 동일한 쿼리가 오면 그대로 돌려주던 기능이다.</li>
+    <li>하지만 캐시 갱신 과정에서 수많은 버그가 발생했고, 오히려 성능 저하의 원인이 됐다.</li>
+    <li><b>8.0부터 쿼리 캐시 기능은 완전히 제거되었다.</b></li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 제거까지 했을까 <span class="badge b-blue">보강</span></p>
+      <p>쿼리 캐시는 해당 테이블에 <b>쓰기가 한 번이라도 일어나면 그 테이블과 관련된 캐시를 전부 무효화</b>했다. 쓰기가 조금이라도 섞인 워크로드에서는 캐시 무효화 비용과 그 과정의 글로벌 뮤텍스 경합이 캐시 이득을 넘어섰다.</p>
+    </div>
+  </div>
+
+  <h4>스레드 풀</h4>
+  <ul>
+    <li>커뮤니티 버전에는 없는 기능이라, 보통 Percona Server의 스레드 풀로 대체한다.</li>
+    <li>목적은 <b>CPU가 제한된 수의 스레드 처리에만 집중</b>하게 해서 컨텍스트 스위칭 등 자원 소모를 줄이는 것이다.</li>
+    <li>단순히 설치만 해서는 성능상 큰 변화가 없다.</li>
+  </ul>
+
+  <h5>Percona Server 기준 설정</h5>
+  <ul>
+    <li>기본적으로 <b>CPU 코어 개수만큼</b> 스레드 그룹을 만든다.
+      <ul>
+        <li><code>thread_pool_size</code> 로 조정 가능하지만, 대개 CPU 코어 수와 맞추는 것이 프로세서 친화도(affinity)에 좋다.</li>
+      </ul>
+    </li>
+    <li><code>thread_pool_oversubscribe</code> — 그룹당 추가 작업을 허용한다. 값이 너무 크면 스레드 풀이 비효율적으로 동작한다.</li>
+    <li><code>thread_pool_stall_limit</code> — 지정한 시간 동안 작업이 지연되면 새 스레드를 그룹에 추가한다. 단, <code>thread_pool_max_threads</code> 를 넘을 수는 없다.</li>
+  </ul>
+
+  <h4>트랜잭션 지원 메타데이터</h4>
+
+  <h5>데이터 딕셔너리 / 메타데이터</h5>
+  <ul>
+    <li>테이블의 구조 정보, 스토어드 프로그램 정보 등을 <b>데이터 딕셔너리(메타데이터)</b> 라고 부른다.</li>
+    <li>5.x에서는 <code>.frm</code> 파일에 저장했고, 스토어드 프로그램은 또 다른 곳에 저장됐다.</li>
+    <li>이런 <b>파일 기반 시스템은 서버가 비정상 종료되면 일관성이 보장되지 않는</b> 문제가 있었다.</li>
+  </ul>
+
+  <h5>8.0에서의 개선</h5>
+  <ul>
+    <li>모든 메타데이터가 파일시스템이 아니라 <b>InnoDB 테이블</b>에 저장되도록 바뀌었다.</li>
+    <li>MySQL DB는 통째로 <code>mysql.ibd</code> 라는 테이블스페이스에 저장된다.</li>
+    <li>InnoDB 테이블은 트랜잭션 기반으로 동작하므로 <b>완전 저장 또는 완전 삭제</b>가 보장된다. 즉 DDL이 원자적으로 처리된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>MySQL 엔진(1개) ↔ 스토리지 엔진(여러 개)의 유일한 통로는 <b>핸들러 API</b> 다.</li>
+      <li>포그라운드 = 클라이언트당 1개, 백그라운드 = InnoDB의 디스크 쓰기·로그 담당.</li>
+      <li>글로벌 메모리는 공유, 로컬(세션) 메모리는 스레드마다 독립.</li>
+      <li>쿼리 처리는 <b>파서 → 전처리기 → 옵티마이저 → 실행 엔진 → 핸들러</b> 5단계.</li>
+      <li>8.0에서 <b>쿼리 캐시는 제거</b>되고, <b>데이터 딕셔너리는 InnoDB 테이블</b>로 옮겨져 원자적 DDL이 가능해졌다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-2</div>
+    <h3>InnoDB 스토리지 엔진 아키텍처</h3>
+    <p class="item-tagline">버퍼 풀 · 리두 로그 · 언두 로그 세 축으로 InnoDB의 거의 전부가 설명된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    InnoDB의 성능은 <b>"랜덤 디스크 쓰기를 순차 로그 쓰기로 바꿔치기한다"</b> 는 한 문장으로 요약된다. 버퍼 풀이 변경을 모으고, 리두 로그가 그 안전을 보증한다.
+  </div>
+
+  <h4>InnoDB의 특징</h4>
+  <ul>
+    <li>스토리지 엔진 중 거의 유일하게 <b>레코드 기반 잠금</b>을 제공한다.</li>
+    <li>동시성 처리가 가능하고 안정적이며 성능이 좋다.</li>
+  </ul>
+
+  <h4>기본키에 의한 클러스터링</h4>
+  <ul>
+    <li>모든 테이블이 <b>기본키를 기준으로 클러스터링</b>되어 저장된다.</li>
+    <li>모든 세컨더리 인덱스는 레코드 주소 대신 <b>기본키 값을 논리적인 주소</b>로 사용한다.</li>
+    <li>기본키를 통한 스캔은 매우 빠르다. 실행 계획에서도 다른 보조 인덱스보다 기본키가 선택될 확률이 높다.</li>
+    <li>MyISAM은 클러스터링 키를 지원하지 않아, 기본키와 세컨더리 인덱스가 구조적으로 아무런 차이가 없다.</li>
+  </ul>
+
+  <h4>외래 키 지원</h4>
+  <ul>
+    <li>스토리지 엔진 레벨에서 제공하는 기능이라 MyISAM이나 MEMORY 테이블에서는 쓸 수 없다.</li>
+    <li>외래 키가 걸린 테이블에서 데이터를 변경하면 <b>연관 테이블의 데이터를 확인하는 과정</b>이 필요하다.
+      <ul><li>이 과정에서 잠금이 여러 테이블로 전파되어 <b>데드락이 발생할 수 있다.</b></li></ul>
+    </li>
+  </ul>
+
+  <h5>외래 키 체크 비활성화</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SET FOREIGN_KEY_CHECKS = 0;</code></pre>
+  </div>
+  <ul>
+    <li>일시적으로만 껐다 켜는 것을 권장한다.</li>
+    <li>비활성화되면 <b><code>ON DELETE CASCADE</code> 등 연쇄 동작도 함께 비활성화</b>된다.</li>
+    <li>기본적으로 해당 세션에만 적용되고, 글로벌로도 설정할 수 있다.</li>
+  </ul>
+
+  <h4>MVCC (Multi Version Concurrency Control)</h4>
+  <ul>
+    <li>레코드 레벨 트랜잭션을 지원하는 DBMS가 제공하는 기능으로, <b>잠금 없는 일관된 읽기</b>를 가능하게 한다.</li>
+    <li>"멀티 버전"은 하나의 레코드에 대해 <b>여러 개의 버전이 동시에 관리</b>된다는 의미다.</li>
+    <li>트랜잭션 격리 수준에 따라 어느 버전을 읽을지가 달라진다.</li>
+  </ul>
+
+  <h5>동작 예시</h5>
+  <ol class="steps">
+    <li>
+      <div class="step-title">INSERT 로 데이터 삽입</div>
+      <p>디스크에 데이터가 저장되고 InnoDB 버퍼 풀에도 해당 데이터가 올라온다.</p>
+    </li>
+    <li>
+      <div class="step-title">UPDATE 로 데이터 수정</div>
+      <p>디스크에 바로 반영되지 않는다. <b>변경 이전 값이 언두 로그로 백업</b>되고, 버퍼 풀의 페이지는 새 값으로 바뀐다.</p>
+    </li>
+    <li>
+      <div class="step-title">READ UNCOMMITTED 로 조회</div>
+      <p>버퍼 풀에 있는 <b>변경된(아직 커밋 안 된)</b> 데이터를 그대로 읽는다. 이것이 더티 리드다.</p>
+    </li>
+    <li>
+      <div class="step-title">READ COMMITTED 이상으로 조회</div>
+      <p><b>언두 로그에 백업된 변경 전 데이터</b>를 읽는다.</p>
+    </li>
+    <li>
+      <div class="step-title">COMMIT</div>
+      <p>버퍼 풀의 내용이 최종 상태로 확정된다. 언두 로그는 <b>다른 트랜잭션이 더 이상 참조하지 않을 때</b> 비로소 삭제된다.</p>
+    </li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>READ COMMITTED</code> 이상에서 <b>"실제 디스크에 저장된 데이터를 읽는다"</b> 고 적혀 있지만, 정확히는 <b>언두 로그에 백업된 변경 전 레코드</b>를 읽는다. 커밋되지 않은 변경은 디스크에 이미 반영되어 있을 수도 있으므로(더티 페이지 플러시), "디스크를 읽는다"는 설명으로는 격리가 성립하지 않는다. MVCC의 일관된 읽기는 <b>언제나 언두 로그가 보증</b>한다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-multi-versioning.html">MySQL 8.0 Reference Manual — InnoDB Multi-Versioning</a>)</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U["UPDATE 실행"] --> B["버퍼 풀 페이지 - 새 값으로 변경"]
+  U --> UL["언두 로그 - 변경 전 값 백업"]
+  R1["READ UNCOMMITTED"] --> B
+  R2["READ COMMITTED 이상"] --> UL
+      </pre>
+    </div>
+    <div class="figure-cap"><b>격리 수준이 곧 "어느 버전을 볼 것인가"의 선택이다</b> — 버퍼 풀의 최신 값인가, 언두 로그의 이전 값인가.</div>
+  </div>
+
+  <h5>단점</h5>
+  <p>트랜잭션이 오래 살아 있으면 그동안의 <b>언두 로그가 계속 쌓인다.</b> 언두 테이블스페이스가 비대해지는 대부분의 원인이 이것이다.</p>
+
+  <h4>잠금 없는 일관된 읽기 (Non-Locking Consistent Read)</h4>
+  <ul>
+    <li>MVCC 덕분에 읽기 작업에는 별도의 잠금이 필요 없다.</li>
+    <li>다만 장시간 트랜잭션은 여전히 문제이므로 <b>가능한 한 빨리 커밋하거나 롤백</b>해야 한다.</li>
+  </ul>
+
+  <h4>자동 데드락 감지</h4>
+  <ul>
+    <li>내부적으로 잠금 대기 관계를 <b>그래프 형태</b>로 관리한다.
+      <ul>
+        <li>데드락 감지 전용 스레드가 따로 있다.</li>
+        <li>주기적으로 잠금 대기 그래프를 검사해 교착 상태에 빠진 트랜잭션을 강제 종료한다.</li>
+        <li>어느 쪽을 죽일지는 <b>언두 로그의 양</b>을 기준으로 고른다 — 롤백 비용이 적은 쪽이 희생된다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>MySQL 엔진에서 관리하는 테이블 잠금</h5>
+  <ul>
+    <li><code>LOCK TABLES</code> 로 잠긴 테이블은 InnoDB의 데드락 감지 대상이 아니다.</li>
+    <li><code>innodb_table_locks</code> 시스템 변수로 제어하며, 특별한 이유가 없으면 활성화를 권장한다.</li>
+  </ul>
+
+  <h5>데드락 감지 스레드의 부하</h5>
+  <ul>
+    <li>동시 처리가 매우 많거나 잠금 개수가 많아지면 감지 스레드 자체가 느려진다.</li>
+    <li>감지 스레드는 잠금 목록 리스트에 <b>새로운 잠금을 걸고</b> 그래프를 탐색하기 때문에, 이것 자체가 병목이 될 수 있다.</li>
+    <li><code>innodb_deadlock_detect</code> 로 감지를 끌 수 있다. 단, 끄면 데드락이 나도 중재해 줄 주체가 없어 <b>무한 대기</b>가 발생한다.</li>
+    <li><code>innodb_lock_wait_timeout</code> 으로 일정 시간이 지나면 에러를 반환하게 할 수 있다.
+      <ul><li>감지를 끈 상황이라면 기본값 50초보다 <b>낮춰서</b> 쓰는 것을 권장한다.</li></ul>
+    </li>
+  </ul>
+
+  <h4>자동화된 장애 복구</h4>
+  <ul>
+    <li>완료되지 못한 트랜잭션에 대한 복구 작업이 기동 시 자동으로 진행된다.</li>
+    <li>웬만해선 문제가 없지만 하드웨어 이슈 등으로 손상이 발생하면 복구가 쉽지 않다. 자동 복구가 불가능한 손상이면 서버는 그냥 종료된다.</li>
+    <li><code>innodb_force_recovery</code> 로 강제 복구 레벨을 지정한다. <b>1~6까지 있고 값이 클수록 심각한 상황</b>이며 복구 가능성은 낮아진다.</li>
+    <li>어떤 레벨로도 안 되면 백업으로 DB를 재구축하는 것이 최선이다. 사실 <b>풀 백업 + 바이너리 로그 복구가 자동 복구보다 정확도가 높다.</b></li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>레벨</th><th>이름</th><th>동작</th><th>이후 조치</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>SRV_FORCE_IGNORE_CORRUPT</code></td><td>테이블스페이스의 데이터/인덱스 페이지 손상이 발견돼도 그냥 실행</td><td><code>mysqldump</code> 또는 <code>SELECT INTO OUTFILE</code> 로 DB 재구축</td></tr>
+        <tr><td>2</td><td><code>SRV_FORCE_NO_BACKGROUND</code></td><td>백그라운드 메인 스레드 없이 서버 실행</td><td>언두 로그 삭제 중 에러가 났다면 이 모드로 복구</td></tr>
+        <tr><td>3</td><td><code>SRV_FORCE_NO_TRX_UNDO</code></td><td>커밋되지 않은 트랜잭션을 <b>롤백하지 않고</b> 그대로 유지</td><td>기동되면 <code>mysqldump</code> 로 백업 후 재구축</td></tr>
+        <tr><td>4</td><td><code>SRV_FORCE_NO_IBUF_MERGE</code></td><td>INSERT BUFFER 손상을 무시하고 서버 시작</td><td>실제 데이터 부분이 아니므로 덤프 후 재구축</td></tr>
+        <tr><td>5</td><td><code>SRV_FORCE_NO_UNDO_LOG_SCAN</code></td><td>언두 레코드를 무시하고 실행 — 전부 커밋된 것처럼 처리</td><td>DB에 비정상 데이터가 남는다. 백업 후 재구축</td></tr>
+        <tr><td>6</td><td><code>SRV_FORCE_NO_LOG_REDO</code></td><td>리두 로그를 적용하지 않음 — 디스크에 기록되지 않은 변경은 소실</td><td>백업 후 재구축</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>InnoDB 버퍼 풀</h4>
+  <p>디스크의 데이터 파일이나 인덱스 정보를 <b>메모리에 캐시해 두는 공간</b>이다.</p>
+  <ul>
+    <li>일반적으로 INSERT / UPDATE 등을 수행하면 데이터 파일 여기저기에 흩어진 레코드를 변경하게 된다.</li>
+    <li>이는 랜덤 디스크 작업을 유발하지만, <b>버퍼 풀에서 한곳에 모아 두면 디스크 작업 횟수를 줄일 수 있다.</b></li>
+  </ul>
+
+  <h5>버퍼 풀 크기 설정</h5>
+  <ul>
+    <li>서버의 메모리 용량을 기준으로 정한다.</li>
+    <li>램이 8GB 미만이면 50%(약 4GB) 정도가 권장된다.</li>
+    <li>그 이상이면 50%를 시작점으로 잡고 <b>조금씩 늘려 가며</b> 최적점을 찾는다.</li>
+    <li><code>innodb_buffer_pool_size</code> 로 조정한다.
+      <ul>
+        <li>변경은 가능한 한 부하가 적은 시간대에 한다.</li>
+        <li><b>늘리는 것은 괜찮지만 줄이는 작업은 서비스 영향도가 매우 높다.</b></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>내부 잠금 경합</h5>
+  <ul>
+    <li>예전에는 버퍼 풀 전체를 관리하는 하나의 잠금 때문에 경합이 심했다.</li>
+    <li>현재는 <b>128MB 단위의 청크</b>로 쪼개서 관리한다.</li>
+    <li>인스턴스는 기본 8개지만, 1GB 미만의 버퍼 풀에서는 1개로 초기화된다.</li>
+    <li>메모리가 40GB 이하라면 기본값 8을 유지하고, 그 이상이면 <b>인스턴스당 5GB 정도</b>를 기준으로 잡는다.</li>
+  </ul>
+
+  <h5>버퍼 풀의 구조</h5>
+  <p>버퍼 풀이라는 거대한 메모리 공간을 <b>페이지 단위로 쪼개고</b>, 스토리지 엔진이 데이터가 필요할 때 읽어와서 각 조각에 담는다. 이 조각들을 관리하기 위해 세 개의 자료구조를 쓴다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  F["프리 리스트 (비어 있는 페이지)"] -->|"디스크에서 읽어옴"| L["LRU 리스트 (최근 읽은 페이지)"]
+  L -->|"다시 접근됨"| M["MRU 영역"]
+  M -->|"변경 발생"| FL["플러시 리스트 (더티 페이지)"]
+  FL -->|"디스크 동기화 후"| L
+  L -->|"오래 미사용"| F
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세 리스트는 서로 배타적이지 않다</b> — 한 페이지가 LRU 리스트에 있으면서 동시에 플러시 리스트에 올라 있을 수 있다.</div>
+  </div>
+
+  <ul>
+    <li><b>프리 리스트</b>
+      <ul>
+        <li>버퍼 풀에서 아직 사용자 데이터로 채워지지 않은 <b>비어 있는 영역</b>이다.</li>
+        <li>쿼리가 새로 디스크의 데이터를 읽어와야 할 때 여기서 가져다 쓴다.</li>
+      </ul>
+    </li>
+    <li><b>LRU (Least Recently Used) 리스트</b>
+      <ul>
+        <li>사실상 LRU와 MRU(Most Recently Used)가 합쳐진 구조다.</li>
+        <li>필요한 레코드가 페이지에 있는지 검사하고, 없으면 디스크에서 읽어와 LRU에 넣는다.</li>
+        <li>이미 페이지에 있다면 MRU 쪽으로 이동시킨다.</li>
+        <li>계속 사용되지 않으면 제거되고, 오래 쓰이지 않다가 다시 사용되면 MRU로 올라간다.</li>
+        <li>자주 접근된 페이지는 그 인덱스 키가 <b>어댑티브 해시 인덱스</b>에 추가된다.</li>
+      </ul>
+    </li>
+    <li><b>플러시 리스트</b>
+      <ul>
+        <li>디스크와 동기화되지 않은 페이지들을, <b>변경 시점 순서</b>로 관리한다.</li>
+        <li>한 번 이상 변경이 발생했다면 플러시 리스트에서 관리된다.</li>
+        <li>변경이 발생하면 리두 로그에 반영되고 이후 디스크에 기록된다.
+          <ul><li>단, 리두 로그에 기록되었다는 것이 <b>데이터 파일까지 기록되었음을 보장하지는 않는다.</b></li></ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>버퍼 풀과 리두 로그</h5>
+  <ul>
+    <li>버퍼 풀은 메모리가 허용하는 만큼 크게 잡을수록 쿼리 성능이 좋아진다.</li>
+    <li>버퍼 풀에는 <b>데이터 캐시</b>와 <b>쓰기 버퍼링</b> 두 역할이 있는데, 버퍼 풀만 키우는 것은 <b>캐시 기능만</b> 키우는 것이다. 쓰기 버퍼링을 늘리려면 리두 로그 공간도 함께 키워야 한다.</li>
+    <li>버퍼 풀이 100GB 미만이라면 리두 로그 전체 크기를 5~10GB로 잡고, 필요에 따라 늘려 가며 최적값을 찾는다.</li>
+  </ul>
+
+  <h5>클린 페이지 / 더티 페이지</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr><td>클린 페이지</td><td>디스크에서 읽은 상태 그대로, 전혀 변경되지 않은 데이터</td></tr>
+        <tr><td>더티 페이지</td><td>1회 이상 변경된 데이터. 버퍼 풀과 디스크의 상태가 다르므로 <b>언젠가는 디스크에 기록</b>되어야 한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>리두 로그 파일</h5>
+  <ul>
+    <li>1개 이상의 고정 크기 파일을 <b>순환 고리처럼</b> 이어서 사용한다.</li>
+    <li>재사용 가능한 공간과 불가능한 공간으로 나뉘는데, <b>활성 리두 로그</b>가 재사용 불가능한 부분이다.</li>
+    <li>계속 순환하므로 기록될 때마다 내부의 <b>LSN(Log Sequence Number)</b> 이 증가한다.</li>
+  </ul>
+
+  <h5>체크포인트</h5>
+  <ul>
+    <li>주기적으로 체크포인트 이벤트를 발생시켜 리두 로그와 버퍼 풀의 더티 페이지를 디스크와 동기화한다.</li>
+    <li>가장 최근 체크포인트의 LSN과 마지막 리두 로그 엔트리의 LSN의 <b>차이가 체크포인트 에이지</b> 다.</li>
+    <li>결국 체크포인트 에이지는 <b>활성 리두 로그 공간의 크기</b>를 뜻한다.</li>
+    <li>이벤트가 발생하면 체크포인트 LSN보다 작은 더티 페이지와 리두 로그 엔트리가 모두 디스크로 동기화된다.</li>
+  </ul>
+
+  <h4>버퍼 풀 플러시</h4>
+  <p>리두 로그 공간을 재활용하려면 오래된 엔트리가 쓰는 공간을 비워야 하고, 그러려면 <b>버퍼 풀의 더티 페이지가 먼저 디스크로 동기화</b>되어야 한다. 이를 성능상 악영향 없이 처리하려고 백그라운드에서 두 가지 플러시가 돈다.</p>
+
+  <h5>플러시 리스트 플러시</h5>
+  <ul>
+    <li><b>클리너 스레드</b>
+      <ul>
+        <li>더티 페이지를 디스크로 동기화하는 스레드다.</li>
+        <li><code>innodb_page_cleaners</code> 로 개수를 조정한다.</li>
+        <li>설정값이 버퍼 풀 인스턴스 수보다 크면 <code>innodb_buffer_pool_instances</code> 값으로 맞춰진다.</li>
+        <li>문제가 없다면 두 변수를 <b>같은 값</b>으로 두면 된다.</li>
+      </ul>
+    </li>
+    <li><b>더티 페이지의 최대 비율</b>
+      <ul>
+        <li>버퍼 풀 내에서 더티 페이지는 기본 <b>90%</b> 까지 점유할 수 있다 (<code>innodb_max_dirty_pages_pct</code>).</li>
+        <li>비율이 너무 크면 한 번에 많은 양을 동기화하느라 <b>Disk I/O Burst</b> 가 발생할 수 있다.</li>
+        <li><code>innodb_max_dirty_pages_pct_lwm</code> 은 일정 수준을 넘으면 <b>조금씩 미리</b> 동기화하도록 돕는다. 기본값 10%.</li>
+      </ul>
+    </li>
+    <li><b>디스크 읽기/쓰기 속도 조정</b>
+      <ul>
+        <li><code>innodb_io_capacity</code>, <code>innodb_io_capacity_max</code> 로 조정한다.</li>
+        <li>자체 알고리즘이 있어서 디스크가 1000 IOPS라고 그 값을 그대로 넣는다고 그대로 동작하진 않는다.</li>
+        <li>서버마다 디스크가 달라 일일이 맞추기 어려우므로 <b>어댑티브 플러시</b> 기능을 제공한다. 단순 비율이나 최댓값에 의존하지 않고 자체 알고리즘으로 처리한다.</li>
+      </ul>
+    </li>
+    <li><b>인접 페이지 묶어 쓰기 (neighbor flushing)</b>
+      <ul>
+        <li>HDD 시절에는 읽기/쓰기 헤드 이동이 매우 비쌌기에 인접 페이지를 묶어 쓰는 것이 이득이었다.</li>
+        <li>요즘은 대부분 SSD라 크게 신경 쓰지 않아도 되며, 현재는 기본적으로 비활성화되어 있다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>LRU 리스트 플러시</h5>
+  <ul>
+    <li>LRU 리스트에서 사용 빈도가 낮은 페이지를 밀어내기 위해 호출된다.</li>
+    <li>LRU 리스트의 <b>끝에서부터</b> <code>innodb_lru_scan_depth</code> 만큼 페이지를 스캔한다.</li>
+    <li>더티 페이지는 디스크에 동기화하고, 클린 페이지는 <b>프리 리스트로 옮긴다.</b></li>
+    <li>실제로는 버퍼 풀 인스턴스마다 그 깊이만큼 스캔하므로, 총 탐색 범위는 <code>innodb_lru_scan_depth × innodb_buffer_pool_instances</code> 다.</li>
+  </ul>
+
+  <h4>버퍼 풀 상태 백업과 복구</h4>
+  <p>디스크의 데이터가 버퍼 풀에 적재되어 있는지에 따라 <b>재시작 직후 성능이 극단적으로 갈린다.</b> 8.0에서는 자동 워밍업 과정이 추가되었다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 서버 셧다운 전, 버퍼 풀의 상태 백업
+mysql&gt; SET GLOBAL innodb_buffer_pool_dump_now = ON;
+
+-- 서버 재시작 후, 백업된 버퍼 풀의 상태 복구
+mysql&gt; SET GLOBAL innodb_buffer_pool_load_now = ON;</code></pre>
+  </div>
+
+  <h5>백업은 어디에 저장될까</h5>
+  <ul>
+    <li>데이터 디렉터리에 <code>ib_buffer_pool</code> 이라는 이름으로 생성된다.</li>
+    <li>버퍼 풀이 아무리 커도 파일은 매우 작다. <b>적재된 페이지의 메타데이터(테이블스페이스 ID, 페이지 번호)만</b> 저장하기 때문이다.</li>
+    <li>대신 복구는 오래 걸린다. 그 목록을 보고 <b>각 페이지를 실제로 디스크에서 다시 읽어야</b> 하기 때문이다.</li>
+    <li>그래서 복구가 진행 중일 때는 서비스를 재개하지 않는 편이 좋다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 진행 상황 확인
+mysql&gt; SHOW STATUS LIKE 'Innodb_buffer_pool_load_status';
+
+-- 복구 취소
+mysql&gt; SET GLOBAL innodb_buffer_pool_load_abort = ON;</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 진행 상황 확인 명령이 <code>SHOW STATUS LIKE 'Innodb_buffer_pool_size_dump_status'</code> 로 적혀 있고 결과가 <code>Empty set</code> 이었다. 실제 상태 변수 이름은 <b><code>Innodb_buffer_pool_dump_status</code></b>(백업 진행 상황)와 <b><code>Innodb_buffer_pool_load_status</code></b>(복구 진행 상황)다. 결과가 비어 있던 이유가 바로 변수명 오기다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/server-status-variables.html">MySQL 8.0 Server Status Variables</a>)</p>
+    </div>
+  </div>
+
+  <h5>버퍼 풀의 적재 내용 확인</h5>
+  <p><code>information_schema.innodb_cached_indexes</code> 테이블에서 어떤 인덱스의 페이지가 얼마나 적재되어 있는지 볼 수 있다. 정확한 확인은 어렵고 <b>대략 어느 정도 올라와 있는지</b> 정도만 파악할 수 있다.</p>
+
+  <h4>Double Write Buffer</h4>
+
+  <h5>Partial Page / Torn Page</h5>
+  <ul>
+    <li>리두 로그는 공간 낭비를 막기 위해 페이지의 <b>변경된 내용만</b> 기록한다.</li>
+    <li>그런데 더티 페이지를 디스크로 플러시하는 도중 <b>일부만 기록되면</b> 그 페이지는 리두 로그로도 복구할 수 없다. 시작 상태 자체가 깨져 있기 때문이다.</li>
+    <li>보통 하드웨어 오작동이나 시스템 비정상 종료로 발생한다.</li>
+  </ul>
+
+  <h5>Double Write 기법</h5>
+  <ul>
+    <li>이 문제를 막고 데이터 안정성을 보장하기 위해 쓴다.</li>
+    <li>실제 데이터 파일로 동기화하기 전에 <b>시스템 테이블스페이스의 Double Write Buffer에 먼저 한 번 기록</b>한다.</li>
+    <li>이후 스토리지 엔진이 각 더티 페이지를 원래 위치에 하나씩 랜덤 쓰기로 기록한다.</li>
+    <li>Double Write Buffer의 내용은 <b>실제 데이터 파일 쓰기가 중간에 실패했을 때 복원용으로만</b> 쓰인다.</li>
+  </ul>
+
+  <h5>동작 방식</h5>
+  <ol class="steps">
+    <li><div class="step-title">A, B, C 페이지를 Double Write Buffer에 순차 기록</div><p>한 번의 순차 쓰기라 비용이 크지 않다.</p></li>
+    <li><div class="step-title">A, B, C 를 데이터 파일의 제자리에 랜덤 쓰기</div><p>여기서 C 를 쓰다가 장애가 났다고 하자.</p></li>
+    <li><div class="step-title">재시작 시 검증</div><p>스토리지 엔진은 항상 Double Write Buffer와 데이터 파일의 페이지를 비교한다. 다른 내용을 담고 있다면 <b>Double Write Buffer의 온전한 페이지</b>로 덮어쓴다.</p></li>
+  </ol>
+
+  <h5>HDD 와 SSD</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>저장 장치</th><th>Double Write 부담</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>HDD</td><td class="t-center t-ok">작다</td><td>어차피 한 번의 <b>순차</b> 디스크 쓰기라 헤드 이동이 없다</td></tr>
+        <tr><td>SSD</td><td class="t-center t-no">상당하다</td><td>랜덤 I/O와 순차 I/O 비용이 비슷해서, 쓰기량이 두 배가 되는 것이 그대로 부담</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>써야 할까 말아야 할까</h5>
+  <ul>
+    <li>데이터 무결성이 매우 중요한 서비스에서는 쓰는 것이 맞다.</li>
+    <li>이미 성능을 위해 리두 로그 동기화 설정을 꺼 둔 상황이라면, 이것도 끄는 편이 일관적이다 — 어차피 그 설정에서는 무결성을 포기한 것이다.</li>
+  </ul>
+
+  <h4>언두 로그</h4>
+  <ul>
+    <li>언두(Undo) 로그는 DML로 <b>변경되기 이전 버전의 데이터를 백업</b>하는 로그다.</li>
+    <li>트랜잭션의 롤백 대비와, 격리 수준을 위한 동시성 제공(MVCC)에 쓰인다.</li>
+    <li>스토리지 엔진에서 매우 중요하지만 <b>관리 비용도 그만큼 크다.</b></li>
+  </ul>
+
+  <h5>언두 로그 모니터링</h5>
+  <ul>
+    <li>트랜잭션이 장시간 유지되는 것은 성능상 좋지 않다. 모니터링하면서 관리해야 한다.</li>
+    <li>INSERT의 언두 로그와 UPDATE/DELETE의 언두 로그는 <b>별개의 공간</b>에 보관된다.
+      <ul><li>UPDATE/DELETE는 MVCC 때문에 오래 필요하지만, <b>INSERT는 롤백에만 필요</b>해서 커밋 즉시 버릴 수 있기 때문이다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SHOW ENGINE INNODB STATUS \G</code></pre>
+  </div>
+
+  <h5>언두 테이블스페이스 관리</h5>
+  <ul>
+    <li>언두 로그가 저장되는 공간을 <b>언두 테이블스페이스</b> 라고 한다.</li>
+    <li>8.0부터 언두 로그는 항상 시스템 테이블스페이스 <b>외부의 별도 파일</b>에서 관리된다.</li>
+    <li>구조: 테이블스페이스 → 128개 이하의 롤백 세그먼트 → 각 세그먼트당 1개 이상의 언두 슬롯.</li>
+    <li>페이지 크기가 기본값 16KB일 때 최대 동시 트랜잭션 수를 어림할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">최대 트랜잭션 수 계산</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">(InnoDB 페이지 크기 / 16) × (롤백 세그먼트 개수) × (언두 테이블스페이스 개수)
+= (16384 / 16) × 128 × 1
+= 1024 × 128
+= 131,072</code></pre>
+  </div>
+
+  <p>기본값을 바꿀 이유는 거의 없다. 가급적 그대로 두는 것이 좋다.</p>
+
+  <h5>테이블스페이스 조회 · 추가 · 삭제</h5>
+  <p>8.0부터는 동적으로 관리할 수 있게 되었다.</p>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT TABLESPACE_NAME, FILE_NAME
+    -&gt; FROM information_schema.files
+    -&gt; WHERE FILE_TYPE LIKE 'UNDO LOG';
++-----------------+------------+
+| TABLESPACE_NAME | FILE_NAME  |
++-----------------+------------+
+| innodb_undo_001 | ./undo_001 |
+| innodb_undo_002 | ./undo_002 |
++-----------------+------------+
+2 rows in set (0.01 sec)</code></pre>
+  </div>
+
+  <h5>Undo Tablespace Truncate</h5>
+  <p>필요한 만큼만 남기고, 과도하게 할당된 공간을 <b>OS에 반납</b>하는 작업이다.</p>
+  <ul>
+    <li><b>자동 모드</b>
+      <ul>
+        <li>퍼지(purge) 스레드가 주기적으로 언두 로그 공간에서 불필요한 로그를 삭제한다.</li>
+        <li><code>innodb_undo_log_truncate</code> 로 ON/OFF, <code>innodb_purge_rseg_truncate_frequency</code> 로 주기를 조정한다.</li>
+      </ul>
+    </li>
+    <li><b>수동 모드</b>
+      <ul>
+        <li>자동화가 안 된 상태에서 문제가 생기면, 특정 언두 테이블스페이스를 <b>비활성화</b>해 두면 된다. 퍼지 스레드가 비활성 상태의 언두 테이블스페이스를 찾아 정리한다.</li>
+        <li>이 방식을 쓰려면 <b>테이블스페이스가 최소 3개</b> 있어야 한다 (하나를 빼도 서비스가 굴러가야 하므로).</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>체인지 버퍼</h4>
+  <ul>
+    <li>인덱스를 업데이트하려면 그 인덱스 페이지를 디스크에서 읽어야 한다. 인덱스가 많으면 이 비용이 매우 무겁다.</li>
+    <li>체인지 버퍼를 쓰면 <b>버퍼 풀 내부만 먼저 갱신하고</b> 사용자에게 결과를 반환할 수 있다.</li>
+    <li>이후 백그라운드 스레드가 실제 인덱스에 병합하는데, 이를 <b>체인지 버퍼 머지 스레드</b> 라고 한다.</li>
+    <li>INSERT, UPDATE, DELETE 모두 대상이며 작업 종류별로 활성화 여부를 제어할 수 있다.</li>
+    <li>기본적으로 버퍼 풀 메모리의 <b>25%</b> 까지 사용하며, <b>최대 50%</b> 까지 늘릴 수 있다 (<code>innodb_change_buffer_max_size</code>).</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT EVENT_NAME, CURRENT_NUMBER_OF_BYTES_USED
+    -&gt; FROM performance_schema.memory_summary_global_by_event_name
+    -&gt; WHERE EVENT_NAME='memory/innodb/ibuf0ibuf';
++-------------------------+------------------------------+
+| EVENT_NAME              | CURRENT_NUMBER_OF_BYTES_USED |
++-------------------------+------------------------------+
+| memory/innodb/ibuf0ibuf |                          136 |
++-------------------------+------------------------------+
+1 row in set (0.01 sec)</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>체인지 버퍼는 <b>세컨더리 인덱스 중 유니크하지 않은 것</b>에만 적용된다. 기본키나 유니크 인덱스는 중복 검사를 위해 어차피 그 페이지를 읽어야 하므로 지연시킬 수 없다. 유니크 인덱스의 쓰기가 일반 세컨더리 인덱스보다 느린 이유이기도 하다.</p>
+    </div>
+  </div>
+
+  <h4>리두 로그 및 로그 버퍼</h4>
+  <ul>
+    <li>데이터 파일에 미처 기록되지 못한 변경을 잃지 않게 해 주는 <b>안전장치</b> 다.</li>
+    <li>대부분의 DB는 쓰기보다 읽기 성능을 고려한 자료구조를 갖는다. 변경을 데이터 파일에 바로 기록하려면 상대적으로 큰 비용이 든다.</li>
+    <li>그래서 <b>쓰기 비용이 낮은(순차 append) 리두 로그</b> 를 따로 둔다.</li>
+  </ul>
+
+  <h5>innodb_flush_log_at_trx_commit</h5>
+  <p>가장 중요한 리두 로그 관련 변수다. <b>보통 1을 권장</b>한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>값</th><th>동작</th><th>장애 시 손실</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-center"><code>0</code></td>
+          <td>1초에 한 번 리두 로그를 디스크로 쓰고 동기화</td>
+          <td>서버가 비정상 종료되면 <b>커밋했어도 최대 1초분의 데이터가 유실</b>될 수 있다</td>
+        </tr>
+        <tr>
+          <td class="t-center"><code>1</code></td>
+          <td>트랜잭션이 커밋될 때마다 매번 <b>디스크 동기화까지</b> 수행</td>
+          <td class="t-ok">없음 (ACID의 D를 만족)</td>
+        </tr>
+        <tr>
+          <td class="t-center"><code>2</code></td>
+          <td>커밋마다 <b>기록은</b> 하지만 동기화(fsync)는 1초에 한 번</td>
+          <td>MySQL만 죽으면 복구 가능. <b>OS까지 함께 죽으면</b> 1초분 유실 가능</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>0과 2에서는 <code>innodb_flush_log_at_timeout</code> 으로 동기화 주기를 조정할 수 있다.</p>
+
+  <h5>로그 버퍼와 리두 로그 파일의 크기</h5>
+  <ul>
+    <li>리두 로그 파일들의 전체 크기는 <b>버퍼 풀의 쓰기 버퍼링 효율</b>을 결정하므로 신중히 정해야 한다.</li>
+    <li>과거에는 <code>innodb_log_file_size</code> × <code>innodb_log_files_in_group</code> 이 전체 리두 로그 크기였다.</li>
+    <li><b>로그 버퍼(<code>innodb_log_buffer_size</code>)의 기본값이 16MB</b> 이며, BLOB/TEXT 같은 큰 데이터를 자주 변경하면 더 크게 잡는 것이 좋다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "<b>리두 로그 파일</b>의 권장값은 16MB" 라고 적혀 있는데, 16MB는 <b>로그 버퍼</b>(<code>innodb_log_buffer_size</code>)의 기본값이다. 리두 로그 <b>파일</b>은 같은 문단에서 이미 "버퍼 풀 100GB 미만이면 5~10GB" 로 권장하고 있어 서로 모순된다. 두 개는 이름만 비슷할 뿐 완전히 다른 것 — 하나는 메모리 버퍼, 하나는 디스크 파일이다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-redo-log-buffer.html">MySQL 8.0 Reference Manual — Log Buffer</a>)</p>
+    </div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.30 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>innodb_log_file_size</code> 와 <code>innodb_log_files_in_group</code> 은 <b>8.0.30에서 deprecated</b> 되었고, 이제 <b><code>innodb_redo_log_capacity</code></b> 하나로 전체 리두 로그 용량을 지정한다 (기본값 100MB). 이 변수는 <b>온라인으로 변경 가능</b>해서, 예전처럼 리두 로그 크기를 바꾸려고 서버를 내릴 필요가 없다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html">MySQL 8.0 InnoDB Startup Options and System Variables</a>)</p>
+    </div>
+  </div>
+
+  <h5>리두 로그 아카이빙</h5>
+  <ul>
+    <li>엔터프라이즈 백업이나 XtraBackup과 함께 리두 로그를 아카이빙할 수 있다.</li>
+    <li>디렉터리를 만들고 <code>innodb_redo_log_archive_start</code> UDF로 시작한다. 이 <b>디렉터리는 700 권한</b>이어야 한다.</li>
+    <li>중지는 <code>innodb_redo_log_archive_stop</code> UDF. 진행 중이던 파일은 자동으로 지워지지 않으니 직접 삭제해야 한다.</li>
+    <li>아카이빙 도중 <b>세션 연결이 끊기면 작업이 취소</b>되고 진행 중이던 파일도 삭제된다.</li>
+  </ul>
+
+  <h5>리두 로그 활성화 및 비활성화</h5>
+  <ul>
+    <li>리두 로그는 트랜잭션 복구를 위해 항상 활성화되어 있고, 항상 디스크로 기록된다.</li>
+    <li>대용량 데이터 적재 시 시간 단축을 위해 <b>한시적으로</b> 끌 수 있다. 무거운 작업이 끝나면 <b>반드시 다시 켜야</b> 한다.</li>
+    <li>데이터 손실을 어느 정도 감수할 수 있는 상황이라면, 리두 로그를 완전히 끄는 것보다 <code>innodb_flush_log_at_trx_commit</code> 을 0이나 2로 두는 편이 낫다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag bad">적재가 끝나면 반드시 ENABLE</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; ALTER INSTANCE DISABLE INNODB REDO_LOG;
+Query OK, 0 rows affected (0.00 sec)</code></pre>
+  </div>
+
+  <h4>어댑티브 해시 인덱스</h4>
+  <ul>
+    <li>스토리지 엔진이 <b>자주 요청되는 데이터에 대해 자동으로 만들어 주는</b> 해시 인덱스다 (<code>innodb_adaptive_hash_index</code>).</li>
+    <li>B-Tree를 루트부터 내려가는 탐색 시간을 줄이려고 도입되었다.</li>
+  </ul>
+
+  <h5>인덱스가 관리되는 방법</h5>
+  <ul>
+    <li><b>인덱스 키 값</b> ↔ <b>그 키가 저장된 데이터 페이지의 주소</b>(버퍼 풀에 로딩된 메모리 주소) 쌍으로 관리된다.</li>
+    <li>인덱스 키 값은 <b>B-Tree 인덱스의 고유번호 + 실제 키 값</b> 의 조합으로 만들어진다.</li>
+  </ul>
+
+  <h5>왜 B-Tree 인덱스의 고유번호가 들어갈까</h5>
+  <ul>
+    <li>스토리지 엔진 안에서 어댑티브 해시 인덱스는 <b>하나만 존재</b>한다.</li>
+    <li>모든 B-Tree 인덱스에 대한 해시 엔트리가 그 하나의 해시 인덱스에 저장된다.</li>
+    <li>따라서 특정 키 값이 <b>어느 인덱스에 속한 것인지</b> 구분할 수단이 필요하다.</li>
+  </ul>
+
+  <h5>경합</h5>
+  <ul>
+    <li>예전 버전에서는 단일 메모리 객체라 경합이 매우 심했다.</li>
+    <li>8.0부터는 <b>파티션 개수를 지정</b>할 수 있다 (<code>innodb_adaptive_hash_index_parts</code>, 기본값 8).</li>
+    <li>어댑티브 해시 인덱스가 실제로 도움이 되는 워크로드라면 더 늘리는 것도 방법이다.</li>
+  </ul>
+
+  <h5>단점</h5>
+  <ul>
+    <li>버퍼 풀에 <b>이미 올라온</b> 페이지를 읽을 때 도움이 되는 기능이다. 실제 디스크에서 가져와야 하는 상황에는 별 도움이 안 된다.</li>
+    <li>일반 인덱스가 저장 공간을 차지하듯 <b>메모리를 차지</b>한다.</li>
+    <li>활성화되면 키의 존재 여부와 무관하게 일단 해시를 조회하므로, <b>효율이 없는 경우에도 비용을 계속 낸다.</b></li>
+  </ul>
+
+  <h5>쓸지 말지 어떻게 판단할까</h5>
+  <p>정확한 판단 방법은 서버의 상태 값을 직접 보는 것이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">사용 횟수 확인</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW ENGINE INNODB STATUS \G
+...
+Hash table size 34679, node heap has 0 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+Hash table size 34679, node heap has 0 buffer(s)
+1.03 hash searches/s, 2.64 non-hash searches/s</code></pre>
+  </div>
+  <p>초당 3.67회(1.03 + 2.64)의 검색 중 <b>1.03회만</b> 해시 인덱스를 탔다는 뜻이다. 적중률이 이 정도면 유지할 근거가 약하다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">자원 사용률 확인</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT EVENT_NAME, CURRENT_NUMBER_OF_BYTES_USED
+    -&gt; FROM performance_schema.memory_summary_global_by_event_name
+    -&gt; WHERE EVENT_NAME='memory/innodb/adaptive hash index';
++-----------------------------------+------------------------------+
+| EVENT_NAME                        | CURRENT_NUMBER_OF_BYTES_USED |
++-----------------------------------+------------------------------+
+| memory/innodb/adaptive hash index |                         1696 |
++-----------------------------------+------------------------------+
+1 row in set (0.00 sec)</code></pre>
+  </div>
+  <ul>
+    <li>CPU 사용률이 100%인 상황에서 해시 인덱스가 28%를 차지한다면 <b>효율적</b>이라고 본다.</li>
+    <li>CPU 사용률이 거의 0인데 해시 인덱스가 28%를 먹고 있다면 <b>끄는 편이 낫다.</b></li>
+  </ul>
+
+  <h4>InnoDB · MyISAM · MEMORY 엔진 비교</h4>
+  <ul>
+    <li>8.0 기준으로 시스템 테이블까지 포함해 <b>거의 모든 것이 InnoDB로 교체</b>되었다.</li>
+    <li>쿼리 처리용 임시 테이블에는 예전에 MEMORY 엔진을 썼으나, 현재는 <b>TempTable</b> 엔진을 쓴다.
+      <ul>
+        <li><code>internal_tmp_mem_storage_engine</code> 으로 어떤 엔진을 쓸지 설정할 수 있다.</li>
+        <li>MEMORY는 <b>가변 길이 타입을 지원하지 않아</b>(VARCHAR도 고정 길이로 잡는다) 점점 안 쓰는 추세다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>InnoDB는 <b>클러스터링 인덱스 + MVCC + 레코드 잠금</b> 세 가지가 기둥이다.</li>
+      <li>버퍼 풀은 <b>프리 / LRU / 플러시</b> 세 리스트로 관리되고, 리두 로그 재활용을 위해 두 가지 플러시가 백그라운드에서 돈다.</li>
+      <li>MVCC의 이전 버전은 언제나 <b>언두 로그</b>가 보관한다. 긴 트랜잭션이 언두를 부풀린다.</li>
+      <li>Double Write Buffer는 <b>Torn Page</b> 만을 위한 보험이다. SSD에서는 비용이 눈에 띈다.</li>
+      <li>8.0.30부터 리두 로그 크기는 <b><code>innodb_redo_log_capacity</code> 하나</b>로 온라인 조정한다.</li>
+      <li>어댑티브 해시 인덱스는 <b>공짜가 아니다.</b> hash / non-hash searches 비율을 보고 판단한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-3</div>
+    <h3>MyISAM 스토리지 엔진 아키텍처</h3>
+    <p class="item-tagline">키 캐시는 <b>인덱스만</b> 캐시한다. 데이터는 전적으로 OS 캐시에 맡긴다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    InnoDB의 버퍼 풀이 데이터와 인덱스를 모두 담는 반면, MyISAM의 키 캐시는 <b>인덱스만</b> 담는다. 이 한 가지 차이가 나머지를 전부 설명한다.
+  </div>
+
+  <h4>키 캐시</h4>
+  <ul>
+    <li>InnoDB의 버퍼 풀과 비슷한 역할이다.</li>
+    <li>오직 <b>인덱스만</b> 대상으로 작동하고, 쓰기 작업에 대해서는 부분적으로만 버퍼링한다.</li>
+  </ul>
+
+  <h4>운영체제의 캐시 및 버퍼</h4>
+  <ul>
+    <li>MyISAM 인덱스는 키 캐시 덕분에 디스크를 거치지 않고도 빠르게 검색된다.</li>
+    <li>하지만 <b>테이블의 데이터</b>는 캐시가 없어 항상 OS 레벨의 I/O로 이어진다.</li>
+    <li>그래서 키 캐시의 최대 크기는 OS 메모리의 <b>40% 정도</b>로 잡기를 권장한다 — 나머지는 OS의 파일 캐시가 데이터를 캐시하도록 남겨 두는 것이다.</li>
+  </ul>
+
+  <h4>데이터 파일과 기본키 인덱스 구조</h4>
+  <ul>
+    <li>InnoDB와 달리 레코드가 <b>생성되는 순서대로 쌓인다.</b> 데이터 파일이 사실상 힙(heap)처럼 쓰인다.</li>
+    <li>모든 레코드는 <b>ROWID</b> 라는 물리적 주솟값을 갖는다.</li>
+    <li>기본키와 세컨더리 인덱스 모두 이 ROWID를 포인터로 갖는다 — 즉 <b>기본키가 특별하지 않다.</b></li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph MyISAM
+    PK1["기본키 인덱스"] -->|"ROWID"| DF["데이터 파일 (힙)"]
+    SK1["세컨더리 인덱스"] -->|"ROWID"| DF
+  end
+  subgraph InnoDB
+    PK2["기본키 = 데이터 그 자체"] --> DATA["클러스터링 테이블"]
+    SK2["세컨더리 인덱스"] -->|"기본키 값"| PK2
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>MyISAM은 두 인덱스가 동등하고, InnoDB는 세컨더리가 기본키를 한 번 더 탄다</b> — 이것이 InnoDB에서 기본키 크기가 중요한 이유다.</div>
+  </div>
+
+  <h5>고정 길이 ROWID</h5>
+  <ul>
+    <li>테이블 생성 시 <code>MAX_ROWS</code> 옵션을 지정한 경우에 쓰인다.</li>
+    <li>4바이트 정수를 쓰며, <b>데이터가 추가된 순번</b>이 그대로 ROWID가 된다.</li>
+  </ul>
+
+  <h5>가변 길이 ROWID</h5>
+  <ul>
+    <li><code>MAX_ROWS</code> 를 지정하지 않으면 <code>myisam_data_pointer_size</code> 에 할당된 바이트 수만큼 쓴다.</li>
+    <li>기본값은 7이고, 실제로는 <b>2~7바이트</b> 사이의 값이 사용된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>키 캐시는 <b>인덱스 전용</b>. 데이터 캐싱은 OS에 위임하므로 키 캐시를 40% 이상 잡을 이유가 없다.</li>
+      <li>데이터 파일은 힙 구조, 모든 인덱스가 <b>ROWID</b> 로 레코드를 가리킨다 — 기본키에 특권이 없다.</li>
+      <li>ROWID는 <code>MAX_ROWS</code> 지정 시 고정 4바이트, 아니면 <code>myisam_data_pointer_size</code>(기본 7) 기준 가변.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-4</div>
+    <h3>MySQL 로그 파일</h3>
+    <p class="item-tagline">에러 로그는 사고 직후 가장 먼저 볼 파일이고, 슬로우 쿼리 로그는 사고 전에 볼 파일이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    에러 로그에서 <code>ready for connections</code> 를 찾아라. 이 줄 위쪽이 기동 과정, 아래쪽이 운영 중 발생한 일이다.
+  </div>
+
+  <h4>에러 로그 파일</h4>
+  <ul>
+    <li><code>my.cnf</code> 에 <code>log_error</code> 가 정의되어 있으면 그 경로에 생성된다.</li>
+    <li>정의되지 않았다면 <code>datadir</code> 에 <code>.err</code> 확장자로 생성된다.</li>
+  </ul>
+
+  <h5>기동 과정의 정보성 · 에러 메시지</h5>
+  <ul>
+    <li>설정 파일을 바꿨거나 DB가 비정상 재부팅된 경우, <b>설정한 변수 이름이나 값이 제대로 적용됐는지</b>를 여기서 확인한다.</li>
+    <li><code>mysqld: ready for connections</code> — 정상적으로 기동을 마쳤다는 뜻이다.</li>
+    <li><code>ignore</code> 가 보이면 — 구동은 됐지만 <b>일부 환경 변수가 무시</b>되었다는 뜻이다. 오타를 의심할 것.</li>
+    <li>그 외의 경우는 에러가 발생하면서 서버가 아예 기동되지 않는다.</li>
+  </ul>
+
+  <h5>비정상 종료 후의 트랜잭션 복구 메시지</h5>
+  <ul>
+    <li>InnoDB는 완료되지 못한 마지막 트랜잭션을 자동으로 복구한다.</li>
+    <li>이 과정에서 에러가 나면 메시지를 출력하고 서버는 다시 종료된다.</li>
+    <li>이때 <code>innodb_force_recovery</code> 를 써서 복구해야 할 수도 있다. (→ <a href="#item-4-2">4-2 자동화된 장애 복구</a>)</li>
+  </ul>
+
+  <h5>쿼리 처리 도중 발생하는 에러 메시지</h5>
+  <p>사전 예방이 어렵다. <b>에러 로그를 자주 들여다보는 것</b>이 숨은 문제를 찾는 가장 현실적인 방법이다.</p>
+
+  <h5>Aborted Connection — 비정상적으로 종료된 커넥션</h5>
+  <ul>
+    <li>네트워크 문제나 기타 원인으로 자주 발생한다.</li>
+    <li>특정 호스트에서 연결 에러가 <code>max_connect_errors</code> 를 넘으면 기록되고, 해당 호스트는 차단된다.</li>
+    <li>단순히 값을 높여도 되지만, <b>원인을 찾는 편이 낫다</b> — 커넥션 풀의 타임아웃 설정이 서버의 <code>wait_timeout</code> 보다 긴 경우가 흔한 원인이다.</li>
+  </ul>
+
+  <h5>InnoDB 모니터링 · 상태 조회 결과</h5>
+  <ul>
+    <li>테이블·락 모니터링이나 엔진 상태 조회는 <b>매우 큰 메시지</b>를 로그에 남긴다.</li>
+    <li>모니터링을 켰다면 사용 후 <b>반드시 다시 끄자.</b> 에러 로그 파일이 순식간에 불어난다.</li>
+  </ul>
+
+  <h5>MySQL의 종료 메시지</h5>
+  <ul>
+    <li>아무도 모르게 종료되거나 재부팅되는 경우가 가끔 있다.</li>
+    <li><code>Received SHUTDOWN from user ...</code> — 특정 사용자가 강제로 셧다운한 것이다.</li>
+    <li>아무 내용 없이 <b>16진수 주소값이 잔뜩 나오는 스택 트레이스</b>라면 세그멘테이션 폴트로 판단할 수 있다.</li>
+    <li>이 경우 해당 버전에 알려진 버그가 있는지 확인하고, 버전을 올리는 등 해결책을 빨리 찾아야 한다.</li>
+  </ul>
+
+  <h4>제너럴 쿼리 로그 (General Log)</h4>
+  <ul>
+    <li>MySQL에서 실행된 <b>모든 쿼리</b>를 기록한다.</li>
+    <li><code>log_output</code> 으로 테이블 또는 외부 파일에 저장할 수 있고, <code>general_log_file</code> 로 위치를 지정한다.</li>
+    <li>실행된 순서(시간) 단위로 저장된다.</li>
+    <li><b>성공/실패 구분 없이</b> 일단 요청이 들어온 쿼리는 모두 기록된다.</li>
+  </ul>
+
+  <h4>슬로우 쿼리 로그</h4>
+  <ul>
+    <li><code>long_query_time</code> 에 설정한 시간보다 오래 걸린 쿼리를 기록한다.</li>
+    <li><b>쿼리가 성공했을 때의 소요 시간</b>을 기준으로 판단하므로 <b>오류가 난 쿼리는 기록되지 않는다.</b></li>
+    <li>동일하게 <code>log_output</code> 으로 저장 방식을 결정한다.
+      <ul><li>제너럴·슬로우 모두 DB에 저장할 때 CSV 엔진을 쓰므로, 결국 CSV 파일에 저장하는 것과 같다.</li></ul>
+    </li>
+  </ul>
+
+  <h5>슬로우 쿼리 분석 — Lock_Time 의 함정</h5>
+  <ul>
+    <li>로그에는 <code>Time</code>, <code>User</code>, <code>Query_time</code>, <code>Lock_time</code> 등 여러 항목이 있다.</li>
+    <li><code>Lock_time</code> 이 0이 아니라고 해서 <b>무조건 락 대기가 있었다고 보면 안 된다.</b>
+      <ul>
+        <li>잠금 체크 같은 코드 실행 시간까지 포함된다.</li>
+        <li>값이 매우 작다면 무시해도 무방하다.</li>
+      </ul>
+    </li>
+    <li>InnoDB의 경우 <code>Lock_time</code> 은 <b>MySQL 엔진 레벨</b>에서 쓴 시간까지 포함한다. InnoDB 테이블만 접근하는 쿼리라면 이 값은 별로 도움이 되지 않는다.</li>
+  </ul>
+
+  <h5>슬로우 쿼리를 더 쉽게 분석하기</h5>
+  <p>기본 제공 로그는 읽기가 불친절하다. Percona Toolkit의 <b><code>pt-query-digest</code></b> 를 쓰면 쿼리를 정규화해 묶어 주고, 실행 횟수·총 소요 시간·평균 등을 한 화면에 정리해 준다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>에러 로그의 <code>ready for connections</code> 를 기준선으로 삼아 기동 문제와 운영 문제를 구분한다.</li>
+      <li><code>ignore</code> 메시지는 <b>설정 오타의 신호</b>다 — 서버는 떴지만 내 설정은 적용되지 않았다.</li>
+      <li>슬로우 쿼리 로그는 <b>성공한 쿼리만</b> 기록한다. 실패한 느린 쿼리는 여기 없다.</li>
+      <li>InnoDB만 쓰는 환경에서 <code>Lock_time</code> 은 신뢰할 지표가 아니다.</li>
+      <li>분석은 <code>pt-query-digest</code> 로.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,566 @@
+<article class="item" id="item-44" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-1</div>
+    <h3>채팅 시스템 요구사항</h3>
+    <p class="item-tagline">범위를 좁혀야 설계가 시작된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    "그룹 최대 100명"이라는 상한이 설계를 크게 바꾼다. 이 숫자가 작기 때문에 <b>수신자별로 메시지를 복사해도</b> 감당이 되기 때문이다.
+  </div>
+
+  <ul>
+    <li>1:1 채팅과 그룹 채팅을 지원한다.</li>
+    <li>모바일 앱과 웹 앱 모두 지원한다.</li>
+    <li>DAU 5,000만 명을 처리한다.</li>
+    <li>그룹 채팅은 최대 100명까지 지원한다.</li>
+    <li>주요 기능은 1:1 채팅, 그룹 채팅, 사용자 접속 상태 표시다.</li>
+    <li>메시지는 텍스트만 주고받을 수 있다.</li>
+    <li>메시지는 100,000자로 제한한다.</li>
+    <li>종단 간 암호화는 지원하지 않는다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>1:1 + 그룹(≤100명) + 접속 상태, 텍스트 전용, DAU 5,000만.</li>
+      <li>그룹 상한이 작다는 사실이 뒤의 "수신자별 큐 복사" 설계를 가능하게 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-45" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-2</div>
+    <h3>클라이언트와 채팅 서비스의 구조</h3>
+    <p class="item-tagline">폴링 → 롱 폴링 → 웹소켓. 서버가 먼저 말을 걸 수 있게 되기까지.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    HTTP는 클라이언트가 물어야만 답하는 프로토콜이다. 채팅에 필요한 것은 <b>서버가 먼저 말을 거는 능력</b>이고, 웹소켓이 그것을 준다.
+  </div>
+
+  <h4>기본적으로 제공해야 하는 기능</h4>
+  <ul>
+    <li>클라이언트들로부터 메시지를 수신한다.</li>
+    <li>메시지 수신자(recipient)를 결정하고 전달한다.</li>
+    <li>수신자가 접속 상태가 아니면 접속할 때까지 메시지를 보관한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["메시지 송신 클라이언트"] -->|"메시지"| S["채팅 서비스<br>1. 메시지 저장<br>2. 메시지 전달"]
+  S -->|"메시지"| B["메시지 수신 클라이언트"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>채팅 서비스가 하는 일은 두 가지뿐</b> — 저장하고 전달한다. 나머지 복잡함은 전부 "언제 / 어떻게 전달하느냐"에서 온다.</div>
+  </div>
+
+  <h4>폴링</h4>
+  <ul>
+    <li>클라이언트가 주기적으로 서버에 새 메시지가 있는지 묻는 방법이다.</li>
+    <li>메시지가 없어도 계속 API 요청을 처리해야 하므로 자원이 낭비된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant S as Server
+  C->>S: 1. 신규 메시지 있나?
+  S-->>C: 2. 없음
+  Note over C,S: 연결 종료 → 잠시 후 재시도
+  C->>S: 1. 신규 메시지 있나?
+  S-->>C: 2. 있음, 메시지 반환
+  Note over C,S: 연결 종료
+  C->>S: 1. 신규 메시지 있나?
+  S-->>C: 2. 없음
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세 번 물어 한 번 건졌다</b> — 폴링 주기를 짧게 하면 응답성은 좋아지지만 낭비되는 요청이 그만큼 늘어난다.</div>
+  </div>
+
+  <h4>롱 폴링</h4>
+  <ul>
+    <li>클라이언트는 새 메시지가 반환되거나 타임아웃될 때까지 연결을 유지한다.</li>
+    <li>일반 폴링과 마찬가지로 비효율적이다. 메시지를 받지 못한 클라이언트도 타임아웃되면 다시 서버에 연결한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant S as Server
+  C->>S: 1. 신규 메시지 있나?
+  Note over S: 메시지가 생길 때까지 대기
+  S-->>C: 2. 있음, 메시지 반환
+  Note over C,S: 3. 연결 종료 후 즉시 재연결
+  C->>S: 1. 신규 메시지 있나?
+  Note over S: 대기 … 타임아웃
+  S-->>C: (빈 응답)
+  Note over C,S: 3. 연결 종료 후 다시 재연결
+      </pre>
+    </div>
+    <div class="figure-cap"><b>빈 응답이 줄었을 뿐 구조는 같다</b> — 서버가 요청을 붙잡고 있으므로 연결 하나가 계속 점유된다. 15장에서는 이 성질이 오히려 장점이 된다.</div>
+  </div>
+
+  <h4>폴링의 문제점</h4>
+  <ul>
+    <li>로드밸런서 때문에 HTTP 요청이 이전과 같은 서버에 닿지 않을 수 있다. 기본적으로 로드밸런서는 라운드로빈으로 트래픽을 고루 나눈다.</li>
+    <li>서버 입장에서 클라이언트가 연결을 해제했는지 알 좋은 방법이 없다.</li>
+  </ul>
+
+  <h4>웹소켓</h4>
+  <ul>
+    <li>서버가 클라이언트에게 비동기 메시지를 보낼 때 가장 널리 쓰이는 기술이다.</li>
+    <li>한번 맺어진 연결은 <b>양방향</b>으로 동작한다.</li>
+    <li>최초에는 HTTP 요청이지만, 핸드셰이크 절차를 거쳐 웹소켓 연결로 업그레이드된다.</li>
+    <li>HTTP도 충분히 괜찮은 프로토콜이지만, 웹소켓은 양방향 메시지가 가능하므로 굳이 HTTP를 고집할 필요가 없다.</li>
+    <li>웹소켓 연결은 항구적으로 유지되어야 하므로, 서버 측에서 연결 관리를 효율적으로 해야 한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["메시지 전송 클라이언트"] <-->|"웹소켓 (양방향)"| S["채팅 서비스"]
+  S <-->|"웹소켓 (양방향)"| B["메시지 수신 클라이언트"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>화살표가 양쪽을 향한다</b> — 서버가 먼저 말을 걸 수 있다는 이 한 가지 차이가 채팅을 가능하게 만든다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>서버 주도 전송</th><th>연결 유지</th><th>낭비 요청</th><th>이 책에서 쓰이는 곳</th></tr></thead>
+      <tbody>
+        <tr><td>폴링</td><td class="t-center t-no">✗</td><td class="t-center t-no">✗</td><td class="t-center t-no">많음</td><td>—</td></tr>
+        <tr><td>롱 폴링</td><td class="t-center">유사 가능</td><td class="t-center t-ok">✓</td><td class="t-center">적음</td><td>15장 알림 서비스</td></tr>
+        <tr><td>웹소켓</td><td class="t-center t-ok">✓</td><td class="t-center t-ok">✓</td><td class="t-center t-ok">없음</td><td>12장 채팅 서버</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>폴링은 낭비, 롱 폴링은 절반의 해결, 웹소켓이 정답.</li>
+      <li>웹소켓은 HTTP 핸드셰이크로 시작해 양방향 연결로 업그레이드된다.</li>
+      <li>대가는 연결이 항구적이라는 것 — 서버가 연결 상태를 계속 들고 있어야 한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-46" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-3</div>
+    <h3>설계안</h3>
+    <p class="item-tagline">대부분은 무상태로 두고, 채팅 서버만 상태를 유지한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    1장에서 "모든 것을 무상태로"라고 했지만, 여기서는 <b>채팅 서버만 예외로 상태를 유지한다</b>. 웹소켓 연결 자체가 상태이기 때문이다.
+  </div>
+
+  <h4>무상태 서비스</h4>
+  <ul>
+    <li>로그인, 회원 가입, 사용자 프로필 표시 등을 위한 전통적인 요청/응답 서비스다.</li>
+    <li>많은 웹사이트와 앱이 보편적으로 제공하는 기능들이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  W["Web / App"] -->|"HTTP"| LB["로드밸런서"]
+  LB --> SD["서비스 탐색"]
+  LB --> AUTH["인증"]
+  LB --> GRP["그룹 관리"]
+  LB --> PROF["사용자 프로필"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>여기까지는 평범한 웹 서비스다</b> — 이 계층은 1-6의 무상태 웹 계층 그대로이므로 확장에 아무 제약이 없다.</div>
+  </div>
+
+  <h4>상태 유지 서비스</h4>
+  <ul>
+    <li>이 채팅 서비스에서 유일하게 상태 유지가 필요한 것은 <b>채팅 서비스</b>다.</li>
+    <li>각 클라이언트가 채팅 서버와 독립적인 네트워크 연결을 유지해야 하기 때문이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U1["User 1"] <-->|"웹소켓"| CS["Chatting Service"]
+  U2["User 2"] <-->|"웹소켓"| CS
+      </pre>
+    </div>
+    <div class="figure-cap"><b>연결이 곧 상태다</b> — 사용자 1이 서버 A에 붙어 있다는 사실을 서버 A만 알고 있으므로, 그 사용자에게 메시지를 보내려면 반드시 서버 A를 거쳐야 한다.</div>
+  </div>
+
+  <h4>제3자 서비스 연동</h4>
+  <ul>
+    <li>채팅 앱에서 가장 중요한 제3자 서비스는 <b>푸시 알림</b>이다.</li>
+    <li>앱이 꺼져 있어도 메시지를 알려야 하므로 푸시 알림과의 통합은 매우 중요하다. (10장 참조)</li>
+  </ul>
+
+  <h4>규모 확장성</h4>
+  <ul>
+    <li>트래픽이 적다면 서버 한 대로도 충분하다.</li>
+    <li>이때 따져 볼 것은 서버 한 대가 동시에 얼마나 많은 접속을 처리할 수 있는가다.</li>
+    <li>이론상 연결당 10KB 메모리가 든다면 10,000명은 100MB로 충분하다.</li>
+    <li>또한 단일 서버는 SPOF 위험이 있다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "연결당 10K 메모리라면 10,000명은 10GB"라고 적혀 있으나, 계산이 맞지 않는다. 10KB × 10,000 = <b>100MB</b>다. 10GB가 되려면 연결당 1MB가 들거나 사용자가 100만 명이어야 한다. 실제 채팅 서버 용량 산정에서 이 자릿수를 틀리면 서버 대수 추정이 100배 어긋나므로 주의할 지점이다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  W["Web / App"] -->|"HTTP"| LB["Load Balancer"]
+  W -->|"웹소켓"| RT["실시간 서비스"]
+  RT --- CS["채팅 서버<br>(메시지 중계)"]
+  RT --- PS["접속상태 서버<br>(유저 접속 여부 관리)"]
+  LB -->|"인증 등"| API["API 서버"]
+  API --- NOTI["알림 서버<br>(푸시알림 발송)"]
+  NOTI --- KV1[("Key-Value DB")]
+  API --- KV2[("Key-Value DB")]
+  CS --- KV3[("Key-Value DB<br>채팅 이력 관리")]
+  PS --- KV3
+      </pre>
+    </div>
+    <div class="figure-cap"><b>실시간 계층만 웹소켓을 쓴다</b> — 로그인/프로필 같은 평범한 요청은 여전히 HTTP로 로드밸런서를 거치고, 메시지 중계만 웹소켓 연결 위를 흐른다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>로그인/프로필 등은 무상태, 채팅 서버만 상태 유지.</li>
+      <li>웹소켓 연결 자체가 상태이므로 무상태화가 불가능하다.</li>
+      <li>서버 용량 산정 기준은 동시 연결 수 × 연결당 메모리다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-47" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-4</div>
+    <h3>채팅 시스템의 데이터베이스</h3>
+    <p class="item-tagline">일반 데이터는 RDBMS, 채팅 이력은 키-값 저장소.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    채팅 이력을 키-값 저장소에 두는 이유는 <b>쓰기가 압도적으로 많고, 읽기는 최근 데이터에만 몰리며, 오래된 데이터에 랜덤 접근할 일이 거의 없기</b> 때문이다.
+  </div>
+
+  <h4>일반적인 데이터</h4>
+  <ul>
+    <li>사용자 프로필, 설정, 친구 목록 같은 데이터가 여기 속한다.</li>
+    <li>일반적으로 안정성을 보장하는 RDBMS에 보관한다.</li>
+    <li>다중화와 샤딩은 이런 데이터의 가용성과 확장성을 보장하기 위해 보편적으로 쓰인다.</li>
+  </ul>
+
+  <h4>채팅 이력</h4>
+  <ul>
+    <li>채팅 이력 데이터의 양은 엄청나다. 페이스북이나 WhatsApp은 매일 600억 개의 메시지를 처리한다.</li>
+    <li>가장 빈번하게 쓰이는 데이터는 최근 메시지이며, 대부분의 오래된 메시지는 다시 보지 않는다.</li>
+    <li>하지만 검색이나 멘션 기능을 통해 과거 데이터에도 접근할 수 있어야 한다.</li>
+    <li>키-값 저장소는 수평 확장이 쉽고 데이터 접근 지연 시간이 낮다.</li>
+    <li>RDBMS는 오래된 데이터 접근이 느리다. 인덱스가 커지면 랜덤 액세스 처리 비용이 증가하기 때문이다.</li>
+  </ul>
+
+  <h4>데이터 모델</h4>
+
+  <h5>1:1 채팅을 위한 메시지 테이블</h5>
+  <ul>
+    <li>PK는 정수값으로, 메시지 순서를 쉽게 정할 수 있게 하는 역할도 겸한다.</li>
+    <li><code>created_at</code>으로는 정렬할 수 없다. 동시에 여러 메시지가 생성될 수 있기 때문이다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>column</th><th>type</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">message_id</td><td class="dg-mono">bigint</td><td>PK / 정렬 기준</td></tr>
+        <tr><td class="dg-mono">message_from</td><td class="dg-mono">bigint</td><td>보낸 사람</td></tr>
+        <tr><td class="dg-mono">message_to</td><td class="dg-mono">bigint</td><td>받는 사람</td></tr>
+        <tr><td class="dg-mono">content</td><td class="dg-mono">text</td><td>본문</td></tr>
+        <tr><td class="dg-mono">created_at</td><td class="dg-mono">date</td><td>표시용 (정렬용 아님)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>그룹 채팅을 위한 메시지 테이블</h5>
+  <ul>
+    <li>PK는 <code>channel_id</code> + <code>message_id</code> 복합키로 지정한다.</li>
+    <li><code>channel_id</code>는 파티션 키 역할도 겸한다. 같은 채널의 메시지가 같은 노드에 모이므로 채널 단위 조회가 빨라진다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>column</th><th>type</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">channel_id</td><td class="dg-mono">bigint</td><td>복합 PK / 파티션 키</td></tr>
+        <tr><td class="dg-mono">message_id</td><td class="dg-mono">bigint</td><td>복합 PK / 채널 내 정렬</td></tr>
+        <tr><td class="dg-mono">user_id</td><td class="dg-mono">bigint</td><td>보낸 사람</td></tr>
+        <tr><td class="dg-mono">content</td><td class="dg-mono">text</td><td>본문</td></tr>
+        <tr><td class="dg-mono">created_at</td><td class="dg-mono">date</td><td>표시용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>메시지 ID</h4>
+  <ul>
+    <li>요구사항 —
+      <ul>
+        <li><code>message_id</code>의 값은 고유해야 한다.</li>
+        <li>ID 값은 정렬 가능해야 하고, 시간 순서와 일치해야 한다.</li>
+      </ul>
+    </li>
+    <li>RDBMS라면 <code>auto_increment</code>로 해결할 수 있지만, NoSQL은 보통 지원하지 않는다.</li>
+    <li>NoSQL에서는 스노플레이크 같은 64비트 순서 번호 생성기나, 지역적 순서 번호 생성기를 쓴다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">전역 유일할 필요는 없다 <span class="badge b-blue">보강</span></p>
+      <p>메시지 ID는 <b>같은 채널 안에서만 유일하고 정렬 가능하면 충분</b>하다. 전역 유일성을 포기하면 채널마다 독립된 번호 생성기를 둘 수 있어 구현이 훨씬 간단해진다. 이것이 "지역적 순서 번호 생성기"의 의미다. 7장의 요구사항을 채팅이라는 문맥에서 완화한 사례로 읽으면 좋다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>프로필/설정/친구 목록은 RDBMS, 채팅 이력은 키-값 저장소.</li>
+      <li>1:1은 <code>message_id</code> 단일 PK, 그룹은 <code>channel_id</code>+<code>message_id</code> 복합 PK.</li>
+      <li>정렬은 <code>created_at</code>이 아니라 ID로. 동시 생성 때문이다.</li>
+      <li>ID는 채널 내에서만 유일해도 충분하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-48" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-5</div>
+    <h3>상세 설계</h3>
+    <p class="item-tagline">서버 찾기, 메시지 흐름, 여러 단말 동기화, 그리고 접속 상태.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    수신자별 <b>메시지 동기화 큐</b>가 이 장의 중심 부품이다. 큐 하나가 "단말 여러 개 동기화"와 "오프라인 사용자 보관"을 동시에 해결한다.
+  </div>
+
+  <h4>서비스 탐색</h4>
+  <ul>
+    <li>클라이언트에게 가장 적합한 채팅 서버를 추천하는 역할이다.</li>
+    <li>추천 기준으로는 위치나 서버의 용량 등이 있다.</li>
+    <li>대표적인 오픈소스로 Apache ZooKeeper가 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant U as 유저
+  participant LB as 로드밸런서
+  participant API as API 서버
+  participant Z as 서비스 탐색 (ZooKeeper)
+  participant CS as 채팅 서버
+  U->>LB: 1. 로그인
+  LB->>API: 2. 부하 분산
+  API->>Z: 3. 최적의 서버 선택 요청
+  Z-->>API: 채팅서버 2 를 추천
+  API-->>U: 채팅서버 2 주소
+  U->>CS: 4. 최적의 서버와 웹소켓 연결
+      </pre>
+    </div>
+    <div class="figure-cap"><b>연결 대상 서버를 로그인 시점에 확정한다</b> — 웹소켓 연결은 오래 유지되므로, 어느 서버에 붙일지는 신중하게 한 번만 결정한다.</div>
+  </div>
+
+  <h4>1:1 메시지 처리 흐름</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["유저 A"] -->|"1. 메시지 전송"| CS1["채팅서버 1"]
+  IDG["ID 생성기"] -->|"고유 ID 생성"| CS1
+  CS1 -->|"2. 큐로 전달"| MQ[["메시지 동기화 큐"]]
+  CS1 -->|"3. 메시지 저장"| KV[("키-값 저장소")]
+  MQ --> CS2["채팅서버 2"]
+  CS2 -->|"4a. 접속한 유저면<br>웹소켓으로 전달"| B["유저 B"]
+  CS2 -->|"4b. 미접속 유저면"| PUSH["푸시알림 서버"]
+  PUSH -->|"푸시 알림 발송"| B
+      </pre>
+    </div>
+    <div class="figure-cap"><b>접속 여부에 따라 4a와 4b로 갈린다</b> — 이 분기가 12-1 요구사항의 "수신자가 접속할 때까지 메시지를 보관한다"를 구현한 지점이다.</div>
+  </div>
+
+  <h4>여러 단말 사이의 메시지 동기화</h4>
+  <ul>
+    <li><code>cur_max_msg_id</code>는 각 단말에서 관측된, 마지막으로 수신한 메시지의 ID다.</li>
+    <li>두 조건을 만족하는 메시지를 새 메시지로 간주한다 —
+      <ul>
+        <li>수신자 ID가 현재 로그인한 사용자 ID와 같다.</li>
+        <li>키-값 저장소에 보관된 메시지로서, 그 ID가 <code>cur_max_msg_id</code>보다 크다.</li>
+      </ul>
+    </li>
+    <li><code>cur_max_msg_id</code>는 각 단말이 알아서 관리하면 되는 값이라, 새 메시지를 가져오는 동기화 작업을 쉽게 구현할 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 200" width="560" role="img" aria-label="한 사용자의 두 단말이 서로 다른 cur_max_msg_id 를 갖는 상태">
+        <rect x="150" y="80" width="260" height="60" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="200" y="105" class="dg-text" font-size="12">채팅서버 1</text>
+        <text x="330" y="102" class="dg-text-sub" font-size="11">+ 모바일 세션</text>
+        <text x="330" y="124" class="dg-text-sub" font-size="11">+ 노트북 세션</text>
+
+        <text x="60" y="40" class="dg-text" font-size="12" text-anchor="middle">유저의 핸드폰</text>
+        <text x="60" y="60" class="dg-text dg-mono" font-size="12" text-anchor="middle" fill="var(--accent)">cur_max_msg_id = 653</text>
+        <path d="M75 70 L165 82" class="dg-stroke" fill="none"/>
+
+        <text x="480" y="40" class="dg-text" font-size="12" text-anchor="middle">유저의 노트북</text>
+        <text x="480" y="60" class="dg-text dg-mono" font-size="12" text-anchor="middle" fill="var(--accent)">cur_max_msg_id = 842</text>
+        <path d="M465 70 L398 82" class="dg-stroke" fill="none"/>
+
+        <path d="M280 142 L280 165" class="dg-stroke" fill="none"/>
+        <text x="280" y="184" class="dg-text" font-size="12" text-anchor="middle">키-값 저장소</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>같은 사용자라도 단말마다 진도가 다르다</b> — 핸드폰은 653까지, 노트북은 842까지 봤다. 각 단말은 자기 숫자보다 큰 것만 가져오면 되므로 서버가 단말별 상태를 들고 있을 필요가 없다.</div>
+  </div>
+
+  <h4>소규모 그룹 채팅에서의 메시지 흐름</h4>
+  <ul>
+    <li>아래 방식은 소규모 그룹 채팅방에 적합하다.</li>
+    <li>WeChat은 최대 인원을 500명으로 제한해 놓았다.</li>
+    <li>새 메시지 여부는 자기 큐만 확인하면 되므로 메시지 동기화가 단순하다.</li>
+    <li>그룹이 크지 않다면 메시지를 수신자별로 복사해 큐에 넣는 비용이 문제가 되지 않는다.</li>
+    <li>한 명의 수신자는 여러 사용자로부터 오는 메시지를 수신할 수 있어야 한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["유저 A"] -->|"1. 메시지 전송"| CS["채팅 서버"]
+  CS -->|"수신자별 복사"| QB[["유저 B 의 동기화 큐"]]
+  CS -->|"수신자별 복사"| QC[["유저 C 의 동기화 큐"]]
+  QB -->|"2. 각자 큐에서 동기화"| B["유저 B"]
+  QC -->|"2. 각자 큐에서 동기화"| C["유저 C"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>메시지를 사람 수만큼 복사한다</b> — 11장 뉴스 피드의 쓰기 시점 팬아웃과 같은 전략이며, 그룹 상한이 100명이라 감당이 된다는 점이 전제다.</div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["유저 A"] -->|"1. A, B 가 메시지 발송"| CS1["채팅서버 1"]
+  B["유저 B"] --> CS2["채팅서버 2"]
+  CS1 -->|"2. 동일한 큐에 저장"| Q[["유저 C 의 메시지 동기화 큐"]]
+  CS2 --> Q
+  Q --> C["유저 C"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>수신자 쪽에서 보면 큐는 하나다</b> — 여러 사람이 보낸 메시지가 한 큐로 모이므로, 수신자는 자기 큐 하나만 보면 된다.</div>
+  </div>
+
+  <h4>접속 상태 표시</h4>
+
+  <h5>사용자 로그인</h5>
+  <ul>
+    <li>로그인이 완료되어 웹소켓 세션이 연결되면 키-값 저장소에 상태를 저장한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["유저 A"] -->|"웹소켓 연결"| PS["접속 상태 서버"]
+  PS --> KV[("키-값 저장소<br>status: online<br>last_active_at: Date")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>상태는 서버 메모리가 아니라 공유 저장소에 둔다</b> — 그래야 다른 서버에 붙은 친구들도 이 상태를 조회할 수 있다.</div>
+  </div>
+
+  <h5>로그아웃</h5>
+  <ul>
+    <li>키-값 저장소에 저장된 <code>status</code> 등이 <code>offline</code>으로 변경된다.</li>
+  </ul>
+
+  <h5>접속 장애</h5>
+  <ul>
+    <li>터널이나 지하철에서 인터넷이 순단되는 상황은 매우 흔하다. 이때 소켓 연결도 끊어진다.</li>
+    <li>간단하게는 접속이 끊어졌다 연결될 때마다 상태를 바꾸면 된다.</li>
+    <li>하지만 이는 지나치며 UX에도 좋지 않다. 상태 표시가 계속 깜빡이게 된다.</li>
+    <li>이 문제는 <b>박동 검사(heartbeat check)</b>로 해결할 수 있다.</li>
+  </ul>
+
+  <h5>박동 검사</h5>
+  <ul>
+    <li>주기적으로 박동 이벤트를 접속 상태 서버로 보낸다.</li>
+    <li>마지막 이벤트를 받은 지 x초 이내에 또 다른 박동 이벤트를 받으면 그 사용자는 계속 온라인으로 유지한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">6장의 가십 프로토콜과 같은 아이디어 <span class="badge b-blue">보강</span></p>
+      <p>박동 카운터가 일정 시간 갱신되지 않으면 죽었다고 판단하는 방식은 6-4 가십 프로토콜의 장애 감지와 정확히 같다. 다른 점은 대상이 <b>서버가 아니라 사용자</b>라는 것뿐이다. 판정 임계 시간을 짧게 잡으면 오탐이 늘고, 길게 잡으면 오프라인 표시가 늦는다는 트레이드오프도 동일하다.</p>
+    </div>
+  </div>
+
+  <h5>사용자의 상태 변화 감지하기</h5>
+  <ul>
+    <li>상태 정보 서버는 pub/sub 모델을 쓴다.</li>
+    <li>각 친구 관계마다 채널을 하나씩 지정한다.</li>
+    <li>이 방법은 그룹 크기가 작을 때 유용하다.</li>
+    <li>규모가 커져 비효율적이라면, 그룹 채팅에 입장하는 순간에만 상태를 가져오거나, 친구 리스트를 열 때 갱신하도록 유도하는 편이 낫다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["유저 A<br>(상태 변경)"] --> CH1["채널 A-B"]
+  A --> CH2["채널 A-C"]
+  A --> CH3["채널 A-D"]
+  B["유저 B"] -.->|"구독"| CH1
+  C["유저 C"] -.->|"구독"| CH2
+  D["유저 D"] -.->|"구독"| CH3
+      </pre>
+    </div>
+    <div class="figure-cap"><b>친구 관계 하나당 채널 하나</b> — 친구가 n명이면 채널도 n개다. 이 선형 증가가 대규모에서 감당이 안 되기 때문에 "입장 시점에만 조회"라는 대안이 나온다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>서비스 탐색(ZooKeeper)이 로그인 시점에 붙을 채팅 서버를 정한다.</li>
+      <li>메시지 동기화 큐가 다단말 동기화와 오프라인 보관을 함께 해결한다.</li>
+      <li>단말마다 <code>cur_max_msg_id</code>를 들고 있으므로 서버는 단말 상태를 몰라도 된다.</li>
+      <li>접속 상태는 박동 검사로 판정하고, 변화는 pub/sub으로 전파한다.</li>
+    </ul>
+  </div>
+</article>

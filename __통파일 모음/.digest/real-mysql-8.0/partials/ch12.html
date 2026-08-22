@@ -1,0 +1,201 @@
+<article class="item" id="item-12-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-1</div>
+    <h3>전문 검색</h3>
+    <p class="item-tagline">한글에는 <b>n-gram</b>. 형태소 분석에 들일 노력 대비 효과가 가장 확실한 선택지다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>ngram_token_size</code> 는 <b>인덱스 생성 후에 바꾸면 안 된다.</b> 그리고 그보다 짧은 검색어로는 아무것도 찾을 수 없다.
+  </div>
+
+  <h4>왜 n-gram 인가</h4>
+  <ul>
+    <li>단어를 분리해 형태소를 찾고 그것을 인덱싱하는 방식은 <b>서구권 언어에는 적합</b>하지만 한글·중국어에는 맞지 않는다.</li>
+    <li>대안으로 형태소나 어원과 무관하게 <b>토큰 기반으로 인덱싱</b>하는 n-gram 파서가 도입되었다.</li>
+    <li>한글은 형태소 분석만 해도 엄청난 노력과 시간이 드므로, <b>n-gram 검색이 한글 문서에 매우 유용하다.</b></li>
+  </ul>
+
+  <h4>전문 검색 인덱스의 생성과 검색</h4>
+  <ul>
+    <li>형태소 분석(서구권은 어근 분석) 또는 n-gram 파서로 <b>인덱싱할 토큰을 분리</b>한다.</li>
+    <li>MySQL은 기본적으로 <b>공백 같은 띄어쓰기 기준</b>으로 토큰을 나눠 인덱싱한다.</li>
+    <li><code>ngram_token_size</code> 로 토큰 길이를 제어하며 <b>1~10</b> 까지 설정 가능하다. 보통 <b>2~3</b> 이 적합하다.
+      <ul>
+        <li>길이에 따라 <b>bi-gram(2)</b>, <b>tri-gram(3)</b> 이라고 부른다.</li>
+        <li><b>인덱스 생성 이후에는 이 값을 바꾸면 안 된다.</b> 바꾸면 서버를 재시작해야 반영되고, 기존 인덱스와 불일치가 생긴다.</li>
+      </ul>
+    </li>
+    <li><b>n-gram 크기보다 짧은 검색어로는 결과가 나오지 않는다.</b> bi-gram 이면 1글자 검색은 아무것도 못 찾는다.</li>
+    <li>검색 쿼리가 들어오면 <b>검색어도 인덱싱할 때와 같은 방식으로</b> 토큰을 잘라 낸다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bi-gram 전문 검색 테이블</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE TABLE tb_bi_gram (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100),
+  body TEXT,
+  FULLTEXT INDEX fx_msg(title, body) WITH PARSER ngram
+);
+
+-- 2글자 이상이어야 검색된다
+SELECT * FROM tb_bi_gram
+WHERE MATCH(title, body) AGAINST ('word' IN BOOLEAN MODE);</code></pre>
+  </div>
+
+  <h4>전문 검색 쿼리 모드</h4>
+  <p>자연어 검색과 불리언 검색 두 가지를 지원한다. 지정하지 않으면 <b>자연어 검색</b>이 쓰인다.</p>
+
+  <h5>테스트 데이터</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">INSERT INTO tb_bi_gram VALUES
+  (NULL, 'Oracle',         'Oracle is database'),
+  (NULL, 'Mysql',          'Mysql is database'),
+  (NULL, 'Mysql article',  'Mysql is best open source database'),
+  (NULL, 'Oracle article', 'Oracle is best commercial database'),
+  (NULL, 'Mysql manual',   'Mysql manual is true guide for mysql');</code></pre>
+  </div>
+
+  <h5>자연어 검색 (Natural Language Mode)</h5>
+  <ul>
+    <li>검색어에 제시된 단어를 <b>많이 가진 순서대로 정렬</b>해 결과를 반환한다.</li>
+    <li>검색어가 문장이면 공백·개행으로 분리한 뒤 다시 토큰을 만들어 일치율을 계산한다.</li>
+    <li><code>.</code>, <code>,</code> 같은 문장 부호는 모두 무시된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT id, title, body,
+  MATCH(title, body) AGAINST ('MySQL' IN NATURAL LANGUAGE MODE) AS score
+FROM tb_bi_gram
+WHERE MATCH(title, body) AGAINST ('MySQL' IN NATURAL LANGUAGE MODE);</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>title</th><th>body</th><th>score</th></tr></thead>
+      <tbody>
+        <tr><td>5</td><td>Mysql manual</td><td>Mysql manual is true guide for mysql</td><td><b>0.5906</b></td></tr>
+        <tr><td>2</td><td>Mysql</td><td>Mysql is database</td><td>0.3937</td></tr>
+        <tr><td>3</td><td>Mysql article</td><td>Mysql is best open source database</td><td>0.3937</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>id 5는 <code>mysql</code> 이 <b>두 번</b> 등장해 점수가 가장 높다. 이 <code>score</code> 를 <code>ORDER BY</code> 에 쓰면 관련도순 정렬이 된다.</p>
+
+  <h5>불리언 검색 (Boolean Mode)</h5>
+  <ul>
+    <li>자연어 검색은 단어 존재 여부만 보지만, 불리언 검색은 <b>논리 연산</b>이 가능하다.</li>
+    <li><code>+</code> — 반드시 포함되어야 한다.</li>
+    <li><code>-</code> — 포함되지 않아야 한다.</li>
+    <li>아무 기호도 없으면 <b>포함된 단어 중 하나라도 있으면</b> 일치로 본다.</li>
+    <li><code>"..."</code> 로 묶으면 공백과 무관하게 <b>하나의 단어처럼</b> 취급된다.</li>
+    <li><code>mysql*</code> 같은 와일드카드 패턴도 지원하지만, <b>이미 2글자 토큰으로 검색되므로 굳이 쓸 필요는 없다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT id, title, body,
+  MATCH(title, body) AGAINST ('+Mysql -manual' IN BOOLEAN MODE) AS score
+FROM tb_bi_gram
+WHERE MATCH(title, body) AGAINST ('+Mysql -manual' IN BOOLEAN MODE);</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>title</th><th>body</th><th>score</th></tr></thead>
+      <tbody>
+        <tr><td>2</td><td>Mysql</td><td>Mysql is database</td><td>0.3937</td></tr>
+        <tr><td>3</td><td>Mysql article</td><td>Mysql is best open source database</td><td>0.3937</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>-manual</code> 때문에 아까 1위였던 id 5가 <b>결과에서 사라졌다.</b></p>
+
+  <h5>검색어 확장 (Query Expansion)</h5>
+  <ul>
+    <li>1차 검색 결과에서 <b>공통으로 발견되는 단어</b>를 모아 한 번 더 검색하는 방식이다.</li>
+    <li>단점 — 사용자가 딱 원하는 데이터만 가져올 수 없고, 전문 검색 쿼리를 <b>불필요하게 많이 실행</b>할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM tb_bi_gram
+WHERE MATCH(title, body) AGAINST('database' WITH QUERY EXPANSION);</code></pre>
+  </div>
+  <p><code>database</code> 하나로 검색했는데 <b>5건 전부</b>가 나온다 — 1차 결과에 공통으로 있던 <code>is</code>, <code>best</code> 같은 단어까지 2차 검색에 동원되기 때문이다.</p>
+
+  <h4>전문 검색 인덱스 디버깅</h4>
+  <ul>
+    <li>전문 검색은 <b>원본 값을 그대로 인덱싱하지 않고 가공</b>하므로 오류의 원인을 찾기 어렵다.</li>
+    <li><code>innodb_ft_aux_table</code> 을 지정하면 <code>information_schema</code> 에서 <b>인덱스의 실제 내부를 들여다볼 수 있다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">전문 검색 인덱스 내부 들여다보기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SET GLOBAL innodb_ft_aux_table = 'realmysql/tb_bi_gram';
+
+-- 전문 검색 인덱스의 설정 내용
+SELECT * FROM information_schema.innodb_ft_config;
+
+-- 인덱스가 가진 엔트리 목록
+-- 각 토큰이 어떤 레코드에 몇 번, 어느 위치에 쓰였는지 알려 준다
+SELECT * FROM information_schema.innodb_ft_index_table;
+
+-- 새 레코드는 바로 디스크가 아니라 캐시에 쌓였다가 일괄 저장된다
+-- (캐시 크기는 innodb_ft_cache_size)
+-- 여기서 실제로 어떻게 토크나이징 되었는지 볼 수 있다
+SELECT * FROM information_schema.innodb_ft_index_cache;
+
+-- 삭제된 레코드
+SELECT * FROM information_schema.innodb_ft_deleted;
+
+-- 현재 인덱스에서 삭제가 진행 중인 레코드
+SELECT * FROM information_schema.innodb_ft_being_deleted;</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">"왜 안 찾아지지?" 를 푸는 순서 <span class="badge b-blue">보강</span></p>
+      <p>① <code>innodb_ft_index_cache</code> 를 먼저 본다 — 방금 넣은 레코드가 아직 캐시에 있을 수 있다. ② 거기에 <b>내가 기대한 토큰이 실제로 있는지</b> 확인한다. ③ 없다면 <a href="#item-8-5">불용어</a>로 걸러졌거나 <code>ngram_token_size</code> 보다 짧은 것이다. 이 세 단계면 대부분의 "전문 검색이 안 된다" 는 풀린다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>한글 전문 검색은 <b>n-gram(<code>WITH PARSER ngram</code>)</b> 이 현실적인 답이다.</li>
+      <li><code>ngram_token_size</code> 는 <b>인덱스 생성 전에 확정</b>하고, 그보다 짧은 검색어는 못 찾는다는 점을 전제로 설계한다.</li>
+      <li>모드는 <b>자연어</b>(관련도 점수) / <b>불리언</b>(<code>+</code>, <code>-</code>, <code>"..."</code>) / <b>검색어 확장</b> 세 가지.</li>
+      <li>디버깅은 <code>innodb_ft_aux_table</code> + <code>information_schema.innodb_ft_*</code> 로 <b>인덱스 내부를 직접 확인</b>한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-2</div>
+    <h3>공간 검색</h3>
+    <p class="item-tagline">노트에서 건너뛴 절.</p>
+  </header>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 절은 학습하지 않았다</p>
+      <p>원본 노트에 <b>"패스"</b> 한 줄만 기록되어 있어 정리할 내용이 없다. 다만 관련 개념의 뼈대는 다른 절에 남아 있다 — 공간 인덱스의 구조는 <a href="#item-8-4">8-4 R-Tree 인덱스</a>, 공간 데이터 타입은 <a href="#item-15-6">15-6</a> 에서 다룬다.</p>
+    </div>
+  </div>
+</article>

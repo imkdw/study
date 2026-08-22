@@ -1,0 +1,1269 @@
+<article class="item" id="item-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-1</div>
+    <h3>모듈의 필요성</h3>
+    <p class="item-tagline">모듈은 파일 분할 도구가 아니라 "무엇을 감출지"를 정하는 도구다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    모듈이 주는 네 가지 중 <b>정보 은닉</b>이 가장 중요하다. 나머지 셋(분할/재사용/종속성 관리)은
+    은닉이 되어야 비로소 안전해진다.
+  </div>
+
+  <ul>
+    <li>코드를 <b>여러 파일로 분할</b>하는 방법을 제시해 준다.</li>
+    <li>코드를 <b>재사용</b>할 수 있다.</li>
+    <li>가능하면 <b>명료한 책임을 가진 인터페이스만</b> 외부에 공개한다(정보 은닉).</li>
+    <li><b>종속성</b>을 관리해 준다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>분할 / 재사용 / 은닉 / 종속성 관리 — 모듈이 해결하는 네 가지</li>
+      <li>이 중 은닉이 나머지의 전제 조건이다. 다 공개된 모듈은 분할해도 결합도가 그대로다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-2</div>
+    <h3>자바스크립트와 노드에서의 모듈 시스템</h3>
+    <p class="item-tagline">표준은 ESM 하나지만, 현실은 아직 두 개다.</p>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>CJS (CommonJS)</th><th>ESM (ES Module)</th></tr></thead>
+      <tbody>
+        <tr><td>키워드</td><td><code>require</code> / <code>module.exports</code></td><td><code>import</code> / <code>export</code></td></tr>
+        <tr><td>표준 여부</td><td class="t-center t-no">Node 고유 규약</td><td class="t-center t-ok">ECMAScript 표준</td></tr>
+        <tr><td>위상</td><td>이전에 유행했고, 대부분의 레거시가 여전히 여기 의존</td><td>현재 표준이자 기본값</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>모든 프로젝트가 ESM으로 넘어간 것은 아니다. 그래서 두 시스템의 <b>차이</b>와 <b>상호 운용</b>을
+    아는 것이 실무에서는 문법 자체보다 중요하다(<a href="#item-10">2-7</a>).</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>CJS = Node 고유 규약, ESM = 언어 표준</li>
+      <li>새 코드는 ESM, 그러나 CJS 를 만나는 일은 계속된다 → 상호 운용 지식이 필수</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-3</div>
+    <h3>모듈 시스템과 패턴</h3>
+    <p class="item-tagline">모듈 시스템이 없던 시절, 함수 스코프 하나로 은닉을 흉내 낸 것이 노출식 모듈 패턴이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>즉시 실행 함수로 감싸고 공개할 것만 return 한다.</b> 이 한 줄짜리 아이디어가
+    CJS 모듈 시스템의 구현 원리 그 자체다.
+  </div>
+
+  <h4>노출식 모듈 패턴</h4>
+  <ul>
+    <li>자바스크립트의 주요 문제점은 네임스페이스가 없어 모든 스크립트가 <b>전역으로 실행</b>된다는 것이다.</li>
+    <li>이는 내부 앱이나 종속성 라이브러리가 기능을 노출하는 동시에 스코프를 오염시킬 수 있다는 뜻이다.</li>
+    <li>전역 범위에 의존하는 것은 매우 위험하다. 앱이 확장됨에 따라 개별 기능 구현에 의존해야 하는 상황이 발생한다.</li>
+    <li>이 문제를 해결하는 기법을 <b>노출식 모듈 패턴(revealing module pattern)</b>이라 부른다.</li>
+  </ul>
+
+  <h4>예제 코드</h4>
+  <ul>
+    <li>즉시 실행 함수 표현(IIFE) 패턴을 사용한다.</li>
+    <li>함수 내부의 변수는 외부에서 접근할 수 없다.</li>
+    <li>선택적으로 노출시키고 싶은 것만 <code>return</code> 하여 접근하게 한다.</li>
+    <li>이 아이디어를 기반으로 하는 것이 CJS 모듈 시스템이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">revealing-module.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const myModule = (() =&gt; {
+  const privateFoo = () =&gt; {};
+  const privateBar = [];
+
+  const exported = {
+    publicFoo: () =&gt; {},
+    publicBar: () =&gt; {},
+  };
+
+  return exported;
+})();
+
+console.log(myModule); // { publicFoo: [Function: publicFoo], publicBar: [Function: publicBar] }
+console.log(myModule.privateFoo);</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">타입 에러</p>
+      <p><code>Property 'privateFoo' does not exist on type '{ publicFoo: () =&gt; void; publicBar: () =&gt; void; }'</code></p>
+      <p>클로저 안에 갇힌 변수는 타입 수준에서도, 런타임에서도 밖에서 닿을 수 없다.
+        <b>은닉이 규약이 아니라 언어 차원에서 강제</b>된다는 점이 이 패턴의 가치다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>전역 스코프 오염 문제 → IIFE 로 함수 스코프를 만들어 해결</li>
+      <li>공개할 것만 return, 나머지는 클로저에 갇혀 접근 불가</li>
+      <li>CJS 의 모듈 래퍼가 하는 일이 정확히 이것이다 → <a href="#item-7">2-4</a></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-4</div>
+    <h3>CJS 모듈</h3>
+    <p class="item-tagline">직접 구현해 보면 모듈 시스템은 마법이 아니라 "함수로 감싸고 캐싱하는 것"임을 알게 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    CJS의 성질은 전부 <b>"require 는 동기이고, 실행하면서 그래프를 그린다"</b>에서 파생된다.
+    캐시도, 순환 종속성의 불완전한 객체도, 조건부 <code>require</code> 가 가능한 것도 전부 여기서 나온다.
+  </div>
+
+  <h4>CJS 모듈</h4>
+  <ul>
+    <li>Node의 첫 번째 내장 모듈 시스템이다.</li>
+    <li><code>require</code> — 로컬 파일 시스템으로부터 모듈을 가져온다.</li>
+    <li><code>exports</code>, <code>module.exports</code> — 현재 모듈에서 공개하고 싶은 기능을 내보낸다.</li>
+  </ul>
+
+  <h4>직접 만드는 모듈 로더</h4>
+  <ul>
+    <li>모듈은 기본적으로 <b>함수로 래핑</b>된다.</li>
+    <li><code>exports</code> 에 해당하는 파라미터는 <code>module.exports</code> 로 초기화된다.</li>
+    <li>파일 시스템을 다룰 때 동기식 버전이 일반적으로 좋진 않지만, 여기서는 <b>의도적인 동기 방식</b>이라 괜찮다.</li>
+    <li>이런 방식에서는 여러 모듈을 불러올 때 <b>순서를 지키는 것</b>이 중요하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">loadModule.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import fs from "fs";
+
+function loadModule(filename: string, module: any, require: any) {
+  const wrappedSrc = `(function(module, exports, require) {
+    ${fs.readFileSync(filename, "utf-8")}
+  })(module, module.exports, require)`;
+  eval(wrappedSrc);
+}</code></pre>
+  </div>
+
+  <p><a href="#item-6">2-3</a>의 노출식 모듈 패턴과 나란히 놓고 보면 같은 그림이다.
+    IIFE 로 감싸 스코프를 만들고, 밖으로 낼 것만 <code>module.exports</code> 에 담는다.</p>
+
+  <h4>require 함수 구현하기</h4>
+  <ol class="steps">
+    <li><div class="step-title">모듈의 전체 경로(id)를 알아낸다</div><p><code>require.resolve</code> 알고리즘에 위임한다.</p></li>
+    <li><div class="step-title">이미 로딩된 경우 캐싱된 모듈을 반환한다</div><p>같은 파일은 두 번 평가되지 않는다.</p></li>
+    <li><div class="step-title">아직 로딩되지 않았다면 빈 모듈 메타데이터를 생성한다</div><p><code>{ exports: {}, id }</code> 형태.</p></li>
+    <li><div class="step-title">최초 로딩 전에 캐시에 먼저 등록한다</div><p>순환 종속성에서 무한 루프를 막는 것이 바로 이 순서다.</p></li>
+    <li><div class="step-title">모듈의 코드를 loadModule 로 가져와 실행하고 module.exports 를 반환한다</div><p></p></li>
+  </ol>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">require1.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import fs from "fs";
+
+function loadModule(filename: string, module: any, require: any) {
+  const wrappedSrc = `(function(module, exports, require) {
+    ${fs.readFileSync(filename, "utf-8")}
+  })(module, module.exports, require)`;
+  eval(wrappedSrc);
+}
+
+function require1(moduleName: string) {
+  console.log(`Require Invoked for module: ${moduleName}`);
+  const id = require1.resolve(moduleName);
+  if (require1.cache[id]) {
+    return require1.cache[id].exports;
+  }
+
+  // 모듈 메타데이터
+  const module = {
+    exports: {},
+    id,
+  };
+
+  // 캐시 업데이트 (실행 전에 먼저 넣는 것이 핵심)
+  require1.cache[id] = module;
+
+  // 모듈 로딩
+  loadModule(id, module, require1);
+
+  // 변수 반환
+  return module.exports;
+}
+
+require1.cache = {} as any;
+require1.resolve = (moduleName: string) =&gt; {
+  // 모듈의 전체 경로를 찾아냄
+  return moduleName;
+};</code></pre>
+  </div>
+
+  <p>이처럼 모듈 시스템은 마법이 아니다. 실제 구현체가 존재하고, 이를 편하게 쓰기 위해 래핑된 것뿐이다.</p>
+
+  <h4>모듈 정의</h4>
+  <ul>
+    <li><code>module.exports</code> 에 할당되지 않으면 모든 것이 비공개다.</li>
+    <li><code>require</code> 는 최초에만 실행하고 이후에는 캐싱된 것을 반환한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">module-def.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const dependency = require1("./anotherModule");
+function log() {}
+module.exports.run = () =&gt; {
+  log();
+};</code></pre>
+  </div>
+
+  <h4>module.exports vs exports</h4>
+  <ul>
+    <li><code>exports</code> 는 <code>module.exports</code> 를 가리키는 <b>참조값일 뿐</b>이다.</li>
+    <li>따라서 <code>exports = {}</code> 로 재할당해도 실제 <code>module.exports</code> 는 변하지 않는다.
+      <b>속성을 추가</b>하는 것만 유효하다.</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">아무것도 내보내지지 않음</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">exports = { run: () =&gt; {} };
+// 지역 변수만 갈아끼운 꼴
+</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">둘 다 동작</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">exports.run = () =&gt; {};
+// 또는
+module.exports = { run: () =&gt; {} };</code></pre>
+    </div>
+  </div>
+
+  <h4>require 함수는 동기적이다</h4>
+  <ul>
+    <li><code>require</code> 를 동기적으로 제한한 결정은 코드베이스 전체에 영향을 미친다.</li>
+    <li>이것이 Node 코어 라이브러리가 <b>동기/비동기 두 벌의 API</b>를 제공하는 큰 이유 중 하나다.</li>
+    <li>비동기로 동작하면 내보내는 시점에 모두 로딩되지 않았을 수 있어 위험하다.</li>
+    <li>초기에는 비동기로 제공했으나 복잡성 때문에 동기식으로 변경되었다.</li>
+  </ul>
+
+  <h4>해결(resolve) 알고리즘</h4>
+  <ul>
+    <li><b>종속성 지옥</b>이란 프로그램의 종속성들이 공통 라이브러리에 의존하지만 서로 호환되지 않는 버전을 필요로 하는 상황이다.</li>
+    <li>Node는 <b>모듈이 로딩되는 위치에 따라</b> 다른 버전의 모듈이 로딩될 수 있도록 한다.</li>
+    <li><code>resolve</code> 는 모듈 이름을 받아 모듈의 전체 경로를 반환한다. 이 경로가 로드 이후 모듈을 고유하게 식별하는 키가 된다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유형</th><th>조건</th><th>해석 방법</th></tr></thead>
+      <tbody>
+        <tr><td>파일 모듈 (절대)</td><td><code>/</code> 로 시작</td><td>절대 경로로 간주하고 그대로 반환</td></tr>
+        <tr><td>파일 모듈 (상대)</td><td><code>./</code> 로 시작</td><td>요청한 모듈의 위치를 기준으로 계산 후 반환</td></tr>
+        <tr><td>코어 모듈</td><td><code>/</code>, <code>./</code> 로 시작하지 않음</td><td>코어 Node 모듈에서 먼저 검색</td></tr>
+        <tr><td>패키지 모듈</td><td>일치하는 코어 모듈이 없음</td><td>요청 모듈 경로부터 <code>node_modules</code> 를 찾고, 없으면 상위로 올라가며 루트까지 반복</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  S["require('foo')"] --> Q1{"/ 또는 ./ 로 시작?"}
+  Q1 -->|"예"| F["파일 경로로 해석"]
+  Q1 -->|"아니오"| Q2{"코어 모듈?"}
+  Q2 -->|"예"| C["코어 모듈 반환"]
+  Q2 -->|"아니오"| N1["./node_modules/foo 탐색"]
+  N1 --> Q3{"찾았나?"}
+  Q3 -->|"예"| R["해당 경로 반환"]
+  Q3 -->|"아니오"| N2["상위 디렉터리로 이동"]
+  N2 --> Q4{"루트 도달?"}
+  Q4 -->|"아니오"| N1
+  Q4 -->|"예"| E["MODULE_NOT_FOUND"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>탐색이 "위로 올라가는" 구조라서 버전 공존이 가능하다</b> —
+      깊은 곳의 모듈은 자기 옆의 <code>node_modules</code> 를 먼저 만나므로,
+      상위와 다른 버전을 갖고 있어도 서로를 보지 못한다. 이것이 종속성 지옥을 막는 실제 메커니즘이다.</div>
+  </div>
+
+  <h4>모듈 캐시</h4>
+  <ul>
+    <li><code>require</code> 의 후속 호출은 캐시된 버전을 반환한다.</li>
+    <li>각 모듈은 <b>처음 로드될 때만</b> 로드되고 평가된다.</li>
+    <li><code>require.cache</code> 를 삭제해 테스트할 수 있지만, 일반적인 상황에서는 위험하다.</li>
+  </ul>
+
+  <h4>순환 종속성</h4>
+  <p><code>a</code> 가 <code>b</code> 를, <code>b</code> 가 <code>a</code> 를 의존하고, <code>main</code> 이 둘을 순서대로 불러오는 상황이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">a.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">exports.loaded = false;
+const bb = require("./b");
+module.exports = {
+  bb,
+  loaded: true,
+};</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">b.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">exports.loaded = false;
+const aa = require("./a");
+module.exports = {
+  aa,
+  loaded: true,
+};</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const a = require("./a");
+const b = require("./b");
+console.log("a -&gt;", JSON.stringify(a, null, 2));
+console.log("b -&gt;", JSON.stringify(b, null, 2));</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">a -&gt; {
+  "bb": {
+    "aa": {
+      "loaded": false
+    },
+    "loaded": true
+  },
+  "loaded": true
+}
+b -&gt; {
+  "aa": {
+    "loaded": false
+  },
+  "loaded": true
+}</code></pre>
+  </div>
+
+  <ul>
+    <li>CJS는 종속성의 <b>로드 순서에 따라 불완전한 상태</b>를 갖는다.</li>
+    <li><code>b.ts</code> 는 <code>a.ts</code> 의 <b>미완성 스냅샷</b>(<code>loaded: false</code>)을 붙잡게 된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant M as main
+  participant A as a
+  participant B as b
+  M->>A: require('./a')
+  A->>A: exports.loaded = false (캐시에 등록됨)
+  A->>B: require('./b')
+  B->>B: exports.loaded = false
+  B->>A: require('./a')
+  Note over B,A: a 는 캐시에 있으나 아직 미완성 → { loaded: false } 를 받음
+  B-->>A: module.exports = { aa: 미완성, loaded: true }
+  A-->>M: module.exports = { bb: 완성, loaded: true }
+  M->>B: require('./b') → 캐시 반환
+      </pre>
+    </div>
+    <div class="figure-cap"><b>먼저 요청된 쪽이 손해를 본다</b> — <code>a</code> 는 완성된 <code>b</code> 를 받지만,
+      <code>b</code> 는 아직 실행 중인 <code>a</code> 의 미완성 스냅샷을 받는다.
+      게다가 <code>module.exports</code> 를 통째로 재할당했기 때문에 나중에 채워 넣어도 <code>b</code> 가 잡은 참조는 갱신되지 않는다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">실무에서의 회피법 <span class="badge b-blue">보강</span></p>
+      <p>순환 종속성 자체를 제거하는 것이 정답이지만, 당장 어렵다면 두 가지 완화책이 있다.
+        <b>(1)</b> <code>module.exports</code> 를 통째로 재할당하지 말고 <code>exports.x = ...</code> 로 속성을 채운다 — 참조가 유지되므로 나중에 채운 값도 보인다.
+        <b>(2)</b> 최상단이 아니라 <b>실제로 쓰는 함수 안에서</b> <code>require</code> 한다 — 그 시점에는 상대 모듈이 이미 완성되어 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>모듈은 함수로 래핑되고, <code>exports</code> 는 <code>module.exports</code> 의 참조일 뿐이다</li>
+      <li><code>require</code> 는 동기다 → 코어가 동기/비동기 두 벌의 API 를 제공하는 배경</li>
+      <li>resolve 는 <code>node_modules</code> 를 위로 거슬러 올라가며 찾는다 → 버전 공존의 실제 메커니즘</li>
+      <li>모듈은 전체 경로를 키로 캐싱되고, 실행 <b>전에</b> 캐시에 등록된다</li>
+      <li>순환 종속성에서는 나중에 요청된 쪽이 미완성 스냅샷을 잡는다 — CJS 의 구조적 한계</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-5</div>
+    <h3>모듈 정의 패턴</h3>
+    <p class="item-tagline">무엇을 내보내느냐가 곧 모듈의 확장성과 결합도를 결정한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>명명된 exports → 함수 → 클래스 → 인스턴스</b> 순으로 갈수록 편의는 늘고 은닉은 줄어든다.
+    "얼마나 감출 것인가"와 "얼마나 확장하게 할 것인가"의 맞교환이다.
+  </div>
+
+  <h4>exports 지정하기 — named exports</h4>
+  <ul>
+    <li>퍼블릭 API를 공개하는 가장 기본적인 방법은 <code>exports</code> 에 속성을 할당하는 것이다.</li>
+    <li>CJS 명세는 퍼블릭 멤버를 공개하는 데 <code>exports</code> 변수만 사용하도록 하고 있다.</li>
+    <li>따라서 <code>exports</code> 로 지정하는 것이 <b>CJS 명세와 호환되는 유일한 방법</b>이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.ts / main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// logger.ts
+exports.info = (message: string) =&gt; {
+  // ...
+};
+
+exports.verbose = (message: string) =&gt; {
+  // ...
+};
+
+// main.ts
+const logger = require("./logger");
+logger.info("asd");
+logger.verbose("ads");</code></pre>
+  </div>
+
+  <h4>함수 내보내기</h4>
+  <ul>
+    <li>가장 일반적인 패턴 중 하나는 <code>module.exports</code> 변수 전체를 함수로 재할당하는 것이다(서브스택 패턴).</li>
+    <li>Node의 모듈성은 <b>SRP(단일 책임 원칙)</b>를 지킬 것을 강력히 권장한다.</li>
+    <li>단일 기능에 집중하게 만드는 완벽한 방법이며, 명백한 단일 진입점을 제공한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.ts / main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// logger.ts
+module.exports = (message: string) =&gt; {
+  // ...
+};
+
+module.exports.verbose = (message: string) =&gt; {
+  // ...
+};
+
+// main.ts
+const logger = require("./logger");
+logger("asd");
+logger.verbose("asd");</code></pre>
+  </div>
+
+  <p>주 진입점은 함수 하나로 두고, 부가 기능은 그 함수의 속성으로 매단다.
+    <a href="#item-1">1-1</a>의 "작은 외부 인터페이스"가 코드로 나타난 형태다.</p>
+
+  <h4>클래스 내보내기</h4>
+  <ul>
+    <li>단일 진입점을 제공하지만, 서브스택 패턴에 비해 <b>내부를 더 많이 노출</b>한다.</li>
+    <li>반대로 기능 확장에서는 훨씬 강력할 수 있다(상속, 오버라이드).</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.ts / main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// logger.ts
+class Logger {
+  name: string;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  log(message: string) {
+    // ...
+  }
+}
+
+module.exports = Logger;
+
+// main.ts
+const Logger = require("./logger");
+const dbLogger = new Logger("db");
+dbLogger.log("asd");</code></pre>
+  </div>
+
+  <h4>인스턴스 내보내기</h4>
+  <ul>
+    <li><code>require</code> 의 캐싱 메커니즘 덕분에 여러 모듈이 공유하는 <b>상태 저장 인스턴스</b>를 쉽게 정의할 수 있다.</li>
+    <li>싱글톤과 유사하지만, <b>전체 앱에서의 고유성을 보장하지는 못한다</b>(<a href="#item-26">7-4</a>).</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.ts / main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// logger.ts
+class Logger {
+  name: string;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  log(message: string) {
+    // ...
+  }
+}
+
+module.exports = new Logger("default");
+
+// main.ts
+const logger = require("./logger");
+logger.log("Hello");</code></pre>
+  </div>
+
+  <h4>다른 모듈 또는 전역 범위 수정</h4>
+  <ul>
+    <li>모듈은 아무것도 내보내지 않을 수도 있다. 대신 <b>이미 캐싱된 다른 모듈을 포함해 모든 객체를 수정</b>할 수 있다.</li>
+    <li>모듈이 전역 범위의 모듈이나 객체를 수정하는 것을 <b>몽키패치</b>라고 부른다.</li>
+    <li>실제로 적용하기엔 위험한 기술이며, 모든 부작용을 이해하고 신중히 사용해야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">patcher.ts / main.ts</span>
+      <span class="code-tag bad">신중히</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// patcher.ts
+require("./logger").customMessage = (message: string) =&gt; {
+  // ...
+};
+
+// main.ts
+require("./patcher");
+const logger = require("./logger");
+logger.customMessage("asd"); // 사용 가능</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">몽키패치가 위험한 이유</p>
+      <p>패치의 효과가 <b>import 순서에 의존</b>하고, 코드를 읽어도 어디서 바뀌었는지 추적할 수 없다.
+        다만 <a href="#item-29">8-1 프록시</a>의 "객체 확장" 기법이 사실상 같은 도구이므로,
+        <b>테스트 목적의 국소적 사용</b>까지 금지할 필요는 없다.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>패턴</th><th>진입점</th><th>내부 노출</th><th>확장성</th></tr></thead>
+      <tbody>
+        <tr><td>named exports</td><td>여러 개</td><td class="t-center t-ok">낮음</td><td>낮음</td></tr>
+        <tr><td>함수 내보내기</td><td class="t-center t-ok">하나</td><td class="t-center t-ok">낮음</td><td>낮음</td></tr>
+        <tr><td>클래스 내보내기</td><td class="t-center t-ok">하나</td><td class="t-center t-no">높음</td><td class="t-center t-ok">높음</td></tr>
+        <tr><td>인스턴스 내보내기</td><td class="t-center t-ok">하나</td><td class="t-center t-no">높음</td><td>중간 (상태 공유)</td></tr>
+        <tr><td>몽키패치</td><td>없음</td><td class="t-center t-no">전역</td><td>위험</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>named exports 는 CJS 명세와 호환되는 유일한 방식</li>
+      <li>함수 내보내기(서브스택 패턴)는 단일 진입점 + 최소 노출로 Node 철학에 가장 가깝다</li>
+      <li>클래스는 확장성을 주고 은닉을 뺏는다</li>
+      <li>인스턴스 내보내기는 모듈 캐시를 이용한 싱글톤 흉내 — 경로가 다르면 깨진다</li>
+      <li>몽키패치는 가능하지만 순서 의존적이고 추적 불가능하다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-6</div>
+    <h3>ESM 모듈</h3>
+    <p class="item-tagline">import 를 정적으로 제한한 대가로, 실행 전에 종속성 그래프 전체를 알 수 있게 되었다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    ESM 은 <b>파싱 → 인스턴스화 → 평가</b> 세 단계로 나뉜다.
+    코드를 실행하기 <b>전에</b> 그래프가 완성되기 때문에 트리 셰이킹과 라이브 바인딩이 가능해진다.
+  </div>
+
+  <h4>ESM 모듈</h4>
+  <ul>
+    <li>문법이 매우 간단하고, 순환 종속성 지원과 비동기 모듈 로딩을 제공한다.</li>
+    <li><code>import</code> 는 모듈의 <b>최상위 레벨</b>, 제어 흐름 구문 바깥에 기술되어야 한다.</li>
+    <li>실행 시 동적으로 생성할 수 없고 <b>상수 문자열</b>만 허용된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">not-allowed.ts</span>
+      <span class="code-tag bad">허용되지 않음</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">if (condition) {
+  import a from "a";
+} else {
+  import b from "b";
+}</code></pre>
+  </div>
+
+  <p>불필요한 제약처럼 보이지만, 이 제약 덕분에 CJS에서는 불가능했던 여러 시나리오가 열린다.
+    <b>트리 셰이킹</b> 같은 코드 최적화를 위한 종속성 트리의 정적 분석이 가능해지는 것이다.</p>
+
+  <h4>노드에서 ESM 사용</h4>
+  <ul>
+    <li>확장자를 <code>.mjs</code> 로 만들기</li>
+    <li><code>package.json</code> 에 <code>"type": "module"</code> 명시하기</li>
+  </ul>
+
+  <h4>exports, imports 지정하기</h4>
+  <p>ESM 에서는 모든 것이 private이며, <code>export</code> 된 것만 다른 모듈에서 접근할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export function log(message: string) {}
+
+export const DEFAULT_LEVEL = "info";
+
+export const LEVELS = {
+  error: 0,
+  debug: 1,
+};
+
+export class Logger {
+  // ...
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">main.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// 단일 export 불러오기
+import { log } from "./logger.js";
+
+// 모든 export 불러오기
+import * as logger from "./logger.js";
+logger.log("asd");
+
+// import 이름 바꾸기
+import { log as log2 } from "./logger.js";
+log2("asd");</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 예제는 <code>from "./logger.ts"</code> 처럼 <code>.ts</code> 확장자를 쓰고 있고 일부 <code>import</code> 문에는
+        <code>from</code> 이 빠져 있다. Node 의 ESM 은 <b>확장자를 생략할 수 없고</b>, 컴파일 결과물 기준인
+        <code>.js</code>(또는 <code>.mjs</code>)를 적어야 한다. TypeScript 에서도 ESM 대상이면 소스에
+        <code>.js</code> 를 쓰는 것이 표준이다.
+        (근거: <a href="https://nodejs.org/api/esm.html#mandatory-file-extensions">Node.js Docs — Mandatory file extensions</a>)</p>
+    </div>
+  </div>
+
+  <h4>export, import 기본값 설정하기</h4>
+  <ul>
+    <li>CJS의 <code>module.exports</code> 재할당과 동일한 역할이다.</li>
+    <li><b>default export</b>라고 부르며 <code>default</code> 키워드를 사용한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.js / main.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// logger.js
+export default class Logger {
+  // ...
+}
+
+// main.js
+import Logger from "./logger.js";
+const logger = new Logger();</code></pre>
+  </div>
+
+  <h4>혼합된 export</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.js / main.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// logger.js
+export default function log(message: string) {
+  // ...
+}
+
+export function info(message: string) {
+  // ...
+}
+
+// main.js
+import myLog, { info } from "./logger.js";
+myLog("asd");
+info("asd");</code></pre>
+  </div>
+
+  <h4>단일 export vs default export</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>명명된 export</th><th>default export</th></tr></thead>
+      <tbody>
+        <tr><td>무엇을 내보내는지</td><td class="t-center t-ok">명확함</td><td class="t-center t-no">불명확 (임포트 측이 이름을 정함)</td></tr>
+        <tr><td>단일 기능 연결</td><td>여러 개를 나열</td><td class="t-center t-ok">편리함</td></tr>
+        <tr><td>트리 셰이킹</td><td class="t-center t-ok">유리</td><td class="t-center t-no">특정 상황에서 어려워짐</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>모듈 식별자</h4>
+  <p><code>import</code> 구문에서 적재하고 싶은 모듈의 경로를 명시할 때 쓰이는 값이다.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>종류</th><th>예시</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>상대적 식별자</td><td><code>./logger.js</code>, <code>../logger.js</code></td><td>import 하는 파일의 경로를 기준으로 한 상대 경로</td></tr>
+        <tr><td>절대 식별자</td><td><code>file:///opt/config.js</code></td><td>직접적이고 명확한 경로. <b>ESM 에서만</b> 사용 가능하며 반드시 유효한 URL 이어야 한다</td></tr>
+        <tr><td>노출 식별자</td><td><code>express</code>, <code>http</code></td><td><code>node_modules</code> 의 패키지 또는 Node 코어 모듈</td></tr>
+        <tr><td>심층 import 식별자</td><td><code>express/lib/logger</code></td><td><code>node_modules</code> 안 패키지의 내부 경로</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에 적힌 <code>file://opt/config.js</code> 는 유효한 파일 URL 이 아니다.
+        <code>file://</code> 다음의 <code>opt</code> 가 <b>호스트명</b>으로 해석되기 때문이다.
+        올바른 형태는 슬래시 세 개인 <code>file:///opt/config.js</code> 다.
+        노트의 "<code>/</code>, <code>//</code> 가 선행되면 동작 안 함"이라는 서술은 이 점을 가리킨 것이 맞다.</p>
+    </div>
+  </div>
+
+  <h4>비동기 import</h4>
+  <ul>
+    <li><code>import</code> 구문은 기본적으로 정적이라 아래 케이스에서 제약이 생긴다.
+      <ul>
+        <li>사용자 언어에 맞는 번역 모듈만 불러오기</li>
+        <li>운영체제에 따라 다른 모듈 불러오기</li>
+      </ul>
+    </li>
+    <li><code>import()</code> 연산자는 비동기로 모듈을 불러오고 Promise 를 반환한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">strings-*.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// strings-ko.js
+export const HELLO = "안녕하세요";
+
+// strings-en.js
+export const HELLO = "Hello";
+
+// other languages...</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">main.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const SUPPORTED_LANGUAGES = ["ko", "en"];
+const selectedLanguage = process.argv[2]; // 터미널에서 입력받은 언어
+
+if (!SUPPORTED_LANGUAGES.includes(selectedLanguage)) {
+  console.error("NOT SUPPORTED LANGUAGE");
+  process.exit(1);
+}
+
+const translationModule = `./strings-${selectedLanguage}.js`;
+import(translationModule).then((strings) =&gt; {
+  console.log(strings.HELLO);
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>동적 <code>import()</code> 는 CJS 파일 안에서도 쓸 수 있다. CJS 에서 ESM 을 부르는
+        오래된 표준 우회로가 바로 이것이었다. 지금은 아래 "최신 반영"에서 보듯 조건부로
+        <code>require()</code> 도 가능해졌다.</p>
+    </div>
+  </div>
+
+  <h4>모듈 적재 이해하기</h4>
+  <p>인터프리터의 목표는 <b>모든 모듈의 종속성 그래프</b>를 만드는 것이다.
+    진입점에서 시작해 필요한 모든 코드가 탐색/평가될 때까지 <code>import</code> 를 재귀적인 DFS 로 따라간다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">1단계 — 모든 점들 찾기 (파싱)</div>
+      <p>모든 <code>import</code> 구문을 찾고, 재귀적으로 각 파일로부터 모듈의 내용을 적재한다.</p></li>
+    <li><div class="step-title">2단계 — 각 점들을 연결해서 길 만들기 (인스턴스화)</div>
+      <p>export 된 모든 개체에 대한 참조를 메모리에 유지한다. <code>import</code> / <code>export</code> 문에 참조가 생성되고
+        이들 간의 종속성 관계를 추적한다. <b>여기서 어떤 코드도 실행되지 않는다.</b></p></li>
+    <li><div class="step-title">3단계 — 올바른 순서로 길을 걷기 (평가)</div>
+      <p>마지막으로 코드를 실행해 실제 값을 얻는다.</p></li>
+  </ol>
+
+  <p>CJS의 경우 동적 성질로 인해 <b>그래프가 탐색되기 전에 파일을 실행</b>시킨다.
+    그래서 모든 코드가 이미 실행된 뒤에도 새로운 <code>require</code> 구문을 쓸 수 있다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph CJS["CJS — 실행하며 그래프를 그린다"]
+    C1["파일 실행"] --> C2["require 만나면 즉시 그 파일 실행"]
+    C2 --> C3["돌아와서 나머지 실행"]
+  end
+  subgraph ESM["ESM — 그래프를 다 그린 뒤 실행한다"]
+    E1["파싱: import 만 훑어 그래프 완성"] --> E2["인스턴스화: 참조만 연결, 실행 없음"]
+    E2 --> E3["평가: 후위 DFS 순서로 실행"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>이 한 장의 차이가 두 시스템의 모든 차이를 만든다</b> —
+      ESM 은 실행 전에 그래프가 확정되므로 트리 셰이킹과 라이브 바인딩이 가능하고,
+      대신 조건부 <code>import</code> 를 포기해야 한다. CJS 는 정반대다.</div>
+  </div>
+
+  <h5>읽기 전용 라이브 바인딩</h5>
+  <ul>
+    <li>import 된 모듈은 export 된 값에 대해 <b>읽기 전용으로 바인딩</b>된다.</li>
+    <li>즉 원래 모듈이 값을 바꾸면 그 변화가 그대로 보이지만, <b>import 한 쪽에서는 바꿀 수 없다</b>.</li>
+    <li>CJS 는 <code>require</code> 시 얕은 복사가 이루어지므로 이런 연동이 되지 않는다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">counter.js / main.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// counter.js
+export let count = 0;
+export function increment() {
+  count += 1;
+}
+
+// main.js
+import { count, increment } from "./counter.js";
+console.log(count); // 0
+increment();
+console.log(count); // 1  ← 라이브 바인딩. 복사본이었다면 여전히 0
+count += 1;</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">런타임 에러</p>
+      <p><code>TypeError: Assignment to constant variable.</code></p>
+      <p>Node v24.17.0 에서 직접 실행해 확인했다. import 바인딩은 읽기 전용이므로
+        임포트한 쪽에서의 재할당은 막힌다. 값을 바꾸려면 <b>모듈이 제공한 함수</b>(<code>increment</code>)를 통해야 한다.</p>
+    </div>
+  </div>
+
+  <h5>순환 종속성 분석</h5>
+  <ul>
+    <li>CJS와 동일한 형태의 순환 구조를 만들 수 있다.</li>
+    <li>하지만 CJS와 달리 <b><code>a</code> 와 <code>b</code> 가 서로에 대한 정보를 모두 온전히 가진다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">a.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import * as bModule from "./b.js";
+export let loaded = false;
+export const b = bModule;
+loaded = true;</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">b.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import * as aModule from "./a.js";
+export let loaded = false;
+export const a = aModule;
+loaded = true;</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">app.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import * as a from "./a.js";
+import * as b from "./b.js";
+console.log("a -&gt;", a);
+console.log("b -&gt; ", b);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">a -&gt; &lt;ref *1&gt; {
+  loaded: true,
+  b: { loaded: true, a: [Circular *1] }
+}
+b -&gt;  &lt;ref *1&gt; {
+  loaded: true,
+  a: { loaded: true, b: [Circular *1] }
+}</code></pre>
+  </div>
+
+  <p><a href="#item-7">2-4</a>의 CJS 결과와 나란히 놓고 보면 차이가 명확하다.
+    CJS 에서는 한쪽이 <code>loaded: false</code> 인 미완성 객체를 붙잡았지만, ESM 은 <b>양쪽 모두 <code>loaded: true</code></b> 다.
+    참조를 먼저 연결(2단계)하고 실행(3단계)을 나중에 하기 때문이다.</p>
+
+  <h5>1단계 — 파싱</h5>
+  <p>진입점인 <code>app.js</code> 부터 탐색을 시작하며, 이 단계에서는 오직 <code>import</code> 구문만 훑는다.</p>
+  <ol class="steps">
+    <li><div class="step-title">app.js → a.js 로 향한다</div><p></p></li>
+    <li><div class="step-title">a.js → b.js 로 향한다</div><p></p></li>
+    <li><div class="step-title">b.js 의 a.js import 는 이미 탐색했으므로 건너뛴다</div><p>순환을 여기서 끊는다.</p></li>
+    <li><div class="step-title">더 이상 import 가 없으므로 app.js 로 되돌아간다</div><p>결과적으로 <code>app → a → b</code> 종속성 그래프가 완성된다.</p></li>
+  </ol>
+
+  <h5>2단계 — 인스턴스화</h5>
+  <p>인터프리터가 각 모듈이 export 하는 속성을 찾아 메모리에 맵을 작성한다.</p>
+  <ol class="steps">
+    <li><div class="step-title">b 는 aModule 이라는 이름으로 a 의 export 를 연결</div><p></p></li>
+    <li><div class="step-title">a 는 bModule 이라는 이름으로 b 의 export 를 연결</div><p></p></li>
+    <li><div class="step-title">app 은 a, b 두 모듈의 모든 export 를 연결</div><p></p></li>
+    <li><div class="step-title">아직 인스턴스화는 되지 않았고 값에 대한 참조만 연결된다</div><p>여기가 CJS 와 갈라지는 결정적 지점이다.</p></li>
+  </ol>
+
+  <h5>3단계 — 평가</h5>
+  <ul>
+    <li>종속성 그래프에 그려진 모든 코드가 실행된다.</li>
+    <li>순서는 <b>후위 깊이 우선 탐색</b>으로, 잎에서 뿌리 방향으로 올라간다.</li>
+    <li>메인 비즈니스 로직을 수행하기 전에 모든 값이 초기화되는 것을 보장해 준다.
+      <code>b → a → app</code> 순으로 진행되고 최종적으로 <code>app.js</code> 의 코드가 실행된다.</li>
+  </ul>
+
+  <h5>모듈의 수정</h5>
+  <ul>
+    <li><code>export default</code> 로 내보낸 객체는 여전히 <b>속성 재할당</b>이 가능하다(바인딩 자체가 아니라 객체 내부이므로).</li>
+    <li>명명된 export 는 재할당이 불가능하지만, <code>module</code> 코어 모듈이 제공하는 API 로 우회할 수 있다.
+      <code>import { syncBuiltinESMExports } from "module"</code></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mock-read-file.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import fs from "fs";
+
+const originalReadFile = fs.readFile;
+let mockedResponse: any = null;
+
+function mockedReadFile(path: string, cb: (p1: any, p2: any) =&gt; void) {
+  setImmediate(() =&gt; {
+    cb(null, mockedResponse);
+  });
+}
+
+export function mockEnable(respondWith: any) {
+  mockedResponse = respondWith;
+  fs.readFile = mockedReadFile as any;
+}
+
+export function mockDisable() {
+  fs.readFile = originalReadFile;
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">main.js</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import fs from "fs";
+import { mockEnable, mockDisable } from "./mock-read-file.js";
+
+mockEnable(Buffer.from("Hello"));
+
+fs.readFile("fake", (err, data) =&gt; {
+  if (err) {
+    console.log(err);
+  }
+
+  console.log(data.toString()); // 'Hello'
+});
+
+mockDisable();</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Node 20.19 / 22.12 이후 <span class="badge b-purple">최신 반영</span></p>
+      <p>CJS 에서 ESM 을 부르려면 동적 <code>import()</code> 밖에 없다는 전제가 깨졌다.
+        <code>require(esm)</code> 이 Node v20.19+, v22.12+ 에서 플래그 없이 동작하며 v24 에서 안정화되었다.
+        반환값은 모듈 네임스페이스 객체라서 default export 는 <code>.default</code> 에 담긴다.
+        단 대상 모듈(과 그 종속성)이 <b>top-level await 를 쓰면</b> <code>ERR_REQUIRE_ASYNC_MODULE</code> 로 실패한다.
+        (근거: <a href="https://nodejs.org/api/modules.html#loading-ecmascript-modules-using-require">Node.js Docs — Loading ECMAScript modules using require()</a>)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>import</code> 는 최상위 + 상수 문자열만 → 대신 정적 분석과 트리 셰이킹을 얻는다</li>
+      <li>적재는 파싱 → 인스턴스화 → 평가 3단계. 실행은 마지막에 후위 DFS 순서로</li>
+      <li>라이브 바인딩: 원본이 바뀌면 보이지만, 임포트 측에서 재할당하면 <code>TypeError</code></li>
+      <li>순환 종속성에서 CJS 는 미완성 스냅샷을, ESM 은 완성된 참조를 준다</li>
+      <li>동적 <code>import()</code> 로 조건부 로딩 가능. 반대로 <code>require(esm)</code> 도 이제 가능하다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-7</div>
+    <h3>ESM과 CJS의 차이점과 상호 운용</h3>
+    <p class="item-tagline">둘을 섞어 쓸 때 실제로 발목을 잡는 것은 문법이 아니라 사라진 전역 변수들이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    ESM 파일에서는 <code>__dirname</code>, <code>__filename</code>, <code>require</code> 가 <b>존재하지 않는다.</b>
+    셋 다 재구성할 수 있고, 요즘은 재구성할 필요조차 없어졌다.
+  </div>
+
+  <h4>strict 모드에서의 ESM</h4>
+  <ul>
+    <li>ESM 은 기본적으로 모든 코드가 <code>"use strict"</code> 가 적용된 것처럼 작동한다.</li>
+    <li>그리고 이 동작은 <b>해제할 수 없다</b>.</li>
+  </ul>
+
+  <h4>ESM에서의 참조 유실</h4>
+  <p>ESM 에서는 CJS 의 몇 가지 중요한 참조가 정의되지 않는다 — <code>__dirname</code>, <code>__filename</code>, <code>require</code>, <code>module</code>, <code>exports</code>.
+    다행히 재구성할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dirname.mjs</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Node 20.11 / 21.2 이후 <span class="badge b-purple">최신 반영</span></p>
+      <p>이제 위의 두 줄짜리 변환 없이 <code>import.meta.dirname</code> 과 <code>import.meta.filename</code> 을
+        바로 쓸 수 있다. 값은 <code>fileURLToPath</code> 로 변환한 것과 동일한 절대 경로 문자열이다.
+        Node v24.17.0 에서 직접 실행해 확인했다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dirname.mjs</span>
+      <span class="code-tag good">Node 20.11+</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">console.log(import.meta.dirname);  // /Users/.../scratchpad
+console.log(import.meta.filename); // /Users/.../scratchpad/meta.mjs</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>require</code> 를 되살리려면 <span class="badge b-blue">보강</span></p>
+      <p>ESM 파일에서 CJS 전용 패키지를 꼭 <code>require</code> 로 불러야 한다면
+        <code>module</code> 코어 모듈의 <code>createRequire</code> 를 쓴다.<br>
+        <code>import { createRequire } from "module"; const require = createRequire(import.meta.url);</code></p>
+    </div>
+  </div>
+
+  <h4>this 키워드의 차이점</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>모듈 최상위의 <code>this</code></th><th>값</th></tr></thead>
+      <tbody>
+        <tr><td>ESM</td><td><code>undefined</code></td></tr>
+        <tr><td>CJS</td><td><code>module.exports</code> (= <code>exports</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>상호 운용</h4>
+  <ul>
+    <li>ESM 문법으로 CJS 모듈을 불러올 수 있다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "하지만 <code>export default</code>만 해당함"이라고 적혀 있으나,
+        <b>명명된 import 도 대체로 동작한다.</b> Node 는 <code>cjs-module-lexer</code> 로 CJS 파일을 정적 분석해
+        <code>exports.foo = ...</code> 형태의 할당을 찾아내고, 이를 명명된 export 로 노출한다.</p>
+      <p>Node v24.17.0 에서 <code>exports.info</code> / <code>exports.verbose</code> 를 가진 <code>.cjs</code> 파일을
+        <code>import pkg, { info, verbose } from "./legacy.cjs"</code> 로 불러 <b>정상 동작을 확인</b>했다.</p>
+      <p>다만 이는 <b>정적으로 탐지 가능할 때만</b> 통한다. 반복문이나 조건문 안에서 동적으로
+        <code>exports</code> 를 채우는 모듈은 탐지에 실패하므로, 그때는 default import 후 구조 분해해야 한다.
+        (근거: <a href="https://nodejs.org/api/esm.html#commonjs-namespaces">Node.js Docs — CommonJS Namespaces</a>)</p>
+    </div>
+  </div>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">정적 탐지 가능</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// legacy.cjs
+exports.info = () =&gt; "info!";
+exports.verbose = () =&gt; "verbose!";
+
+// main.mjs
+import { info, verbose } from "./legacy.cjs";
+// → 동작함</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">탐지 실패</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// legacy.cjs
+for (const k of ["info", "verbose"]) {
+  exports[k] = () =&gt; k;
+}
+
+// main.mjs
+import pkg from "./legacy.cjs";
+const { info, verbose } = pkg; // 이렇게 우회</code></pre>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>CJS</th><th>ESM</th></tr></thead>
+      <tbody>
+        <tr><td>strict 모드</td><td>선택 (<code>"use strict"</code>)</td><td class="t-center">항상 켜짐, 해제 불가</td></tr>
+        <tr><td>최상위 <code>this</code></td><td><code>module.exports</code></td><td><code>undefined</code></td></tr>
+        <tr><td><code>__dirname</code> / <code>__filename</code></td><td class="t-center t-ok">있음</td><td class="t-center t-no">없음 → <code>import.meta.dirname</code></td></tr>
+        <tr><td>확장자 생략</td><td class="t-center t-ok">가능</td><td class="t-center t-no">불가 (필수)</td></tr>
+        <tr><td>로딩 시점</td><td>실행 중 동기</td><td>실행 전 그래프 완성</td></tr>
+        <tr><td>순환 종속성</td><td class="t-center t-no">미완성 스냅샷</td><td class="t-center t-ok">완성된 라이브 바인딩</td></tr>
+        <tr><td>top-level await</td><td class="t-center t-no">불가</td><td class="t-center t-ok">가능</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>ESM 은 항상 strict, 최상위 <code>this</code> 는 <code>undefined</code></li>
+      <li><code>__dirname</code> / <code>__filename</code> 은 없다 → <code>import.meta.dirname</code> / <code>.filename</code> (Node 20.11+)</li>
+      <li><code>require</code> 가 필요하면 <code>createRequire(import.meta.url)</code></li>
+      <li>ESM → CJS 는 명명된 import 도 대체로 동작한다 (정적 탐지 가능할 때)</li>
+      <li>CJS → ESM 도 이제 <code>require(esm)</code> 로 가능하다 (top-level await 만 아니라면)</li>
+    </ul>
+  </div>
+</article>

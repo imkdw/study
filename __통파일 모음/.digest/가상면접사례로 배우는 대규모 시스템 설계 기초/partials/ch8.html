@@ -1,0 +1,318 @@
+<article class="item" id="item-33" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-1</div>
+    <h3>요구사항과 개략적 규모</h3>
+    <p class="item-tagline">기능은 두 줄로 끝난다. 어려움은 3,650억 개라는 숫자에서 온다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    URL 단축기는 기능이 단순한 대신 <b>읽기가 쓰기의 10배</b>이고 데이터가 계속 쌓이기만 하는 시스템이다. 이 두 성질이 설계를 결정한다.
+  </div>
+
+  <h4>기능</h4>
+  <ul>
+    <li><b>URL 단축</b> — 긴 URL을 짧게 줄여 준다.</li>
+    <li><b>URL 리디렉션</b> — 짧아진 URL을 원래 URL로 리디렉션한다.</li>
+    <li>높은 가용성, 규모 확장성, 장애 감내가 요구된다.</li>
+  </ul>
+
+  <h4>규모 추정</h4>
+  <ul>
+    <li>쓰기 — 매일 1억 개의 단축 URL 생성</li>
+    <li>초당 쓰기 연산 = 1억 ÷ 24 ÷ 3600 ≈ <b>1,160</b></li>
+    <li>읽기 연산 — 읽기:쓰기를 10:1로 가정하면 ≈ <b>11,600</b></li>
+    <li>데이터 크기 — 10년 운영 시 1억 × 365 × 10 = <b>3,650억 개</b>의 레코드</li>
+    <li>축약 전 URL의 평균 길이는 100바이트</li>
+    <li>저장 용량 = 3,650억 × 100바이트 = <b>36.5TB</b></li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">읽기 10배가 뜻하는 것 <span class="badge b-blue">보강</span></p>
+      <p>읽기가 압도적이므로 <b>리디렉션 경로를 캐시로 덮는 것</b>이 가장 큰 효과를 낸다. 1장의 주-부 다중화와 캐시 계층이 그대로 쓰이는 대목이다. 반대로 쓰기 경로(단축)는 초당 1,160회에 불과해 단일 DB로도 여유가 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>기능은 단축과 리디렉션 둘뿐.</li>
+      <li>쓰기 1,160 QPS, 읽기 11,600 QPS, 10년 저장 36.5TB.</li>
+      <li>읽기 편중이 심하므로 캐시가 핵심 최적화 지점이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-34" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-2</div>
+    <h3>API 설계와 301 vs 302</h3>
+    <p class="item-tagline">두 개의 엔드포인트, 그리고 상태 코드 하나가 만드는 사업적 차이.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    301이냐 302냐는 성능 문제가 아니라 <b>"클릭 데이터를 볼 것인가 말 것인가"</b>의 문제다.
+  </div>
+
+  <h4>단축된 URL 생성</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">POST /api/v1/data/shorten</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">// Request Body
+{ "url": "https://www.google.com" }
+
+// Response Body
+{ "shortened_url": "http://localhost:8080/abcde" }</code></pre>
+  </div>
+
+  <h4>단축된 URL 리디렉션</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">GET /abcde</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">HTTP/1.1 302 Found
+Location: https://www.google.com</code></pre>
+  </div>
+
+  <h4>HTTP 301 vs HTTP 302</h4>
+
+  <h5>HTTP 301 Permanent Redirect</h5>
+  <ul>
+    <li>HTTP 요청 처리의 책임이 <b>영구적으로</b> <code>Location</code> URL로 이전되었다는 응답이다.</li>
+    <li>브라우저가 이 응답을 캐시하므로 이후에는 단축 URL 서버로 요청을 보내지 않는다.</li>
+    <li>단순히 URL을 줄이는 것이 목적이라면 이쪽이 권장된다.</li>
+  </ul>
+
+  <h5>HTTP 302 Found</h5>
+  <ul>
+    <li>요청이 <b>일시적으로</b> <code>Location</code> URL로 처리되어야 한다는 응답이다.</li>
+    <li>단축 URL로 접근할 때마다 반드시 단축 URL 서버를 거친다는 뜻이다.</li>
+    <li>사용자 데이터 분석이 필요할 때 권장된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant B as 브라우저
+  participant T as 단축 URL 서버
+  participant O as 원본 사이트
+  Note over B,T: 301 — 첫 요청만 서버를 거친다
+  B->>T: GET /abcde
+  T-->>B: 301 + Location
+  B->>O: GET 원본 URL
+  Note over B,T: 두 번째 클릭부터는 서버에 오지 않음 (브라우저 캐시)
+  Note over B,T: 302 — 매번 서버를 거친다
+  B->>T: GET /abcde (매 클릭)
+  T-->>B: 302 + Location
+  B->>O: GET 원본 URL
+      </pre>
+    </div>
+    <div class="figure-cap"><b>301은 서버 부하를 줄이고, 302는 클릭 수를 지킨다</b> — 마케팅 링크라면 302, 단순 편의용이라면 301이다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>301</th><th>302</th></tr></thead>
+      <tbody>
+        <tr><td>브라우저 캐시</td><td class="t-center t-ok">✓ 캐시함</td><td class="t-center t-no">✗ 안 함</td></tr>
+        <tr><td>서버 부하</td><td class="t-center t-ok">낮음</td><td class="t-center">높음</td></tr>
+        <tr><td>클릭 분석</td><td class="t-center t-no">✗ 불가</td><td class="t-center t-ok">✓ 가능</td></tr>
+        <tr><td>목적지 변경</td><td class="t-center t-no">✗ 반영 안 됨</td><td class="t-center t-ok">✓ 즉시 반영</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>API는 <code>POST /shorten</code>과 <code>GET /{hash}</code> 두 개면 충분하다.</li>
+      <li>301 = 브라우저가 캐시 → 서버 부하 감소, 분석 불가.</li>
+      <li>302 = 매번 서버 경유 → 분석 가능, 부하 증가.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-35" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-3</div>
+    <h3>단축 방법 설계</h3>
+    <p class="item-tagline">해시하고 자르느냐, 진법을 바꾸느냐. 두 길의 대가가 정반대다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    두 방식의 차이는 결국 <b>충돌을 감수하고 길이를 고정할 것인가, ID 생성기를 도입하고 길이를 양보할 것인가</b>다.
+  </div>
+
+  <ul>
+    <li>중요한 것은 긴 URL을 고유한 해시값으로 대응시킬 해시 함수를 찾는 것이다.</li>
+    <li>서로 다른 긴 URL은 서로 다른 해시값을 가져야 한다.</li>
+    <li>계산된 해시값으로부터 원래의 긴 URL을 복원할 수 있어야 한다.</li>
+  </ul>
+
+  <h4>데이터 모델</h4>
+  <ul>
+    <li>해시 테이블은 초기 전략으로는 괜찮지만 실제 시스템에 쓰기에는 곤란하다.</li>
+    <li>메모리는 유한하고 비싸다.</li>
+    <li>대안은 관계형 DB에 저장하는 것이다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>original_url</th><th>shortened_url</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">1</td><td class="dg-mono">https://www.google.com</td><td class="dg-mono">http://tinyurl.com/abcde</td></tr>
+        <tr><td class="dg-mono">2</td><td class="dg-mono">https://www.facebook.com</td><td class="dg-mono">http://tinyurl.com/abcdf</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>해시 함수</h4>
+  <p>아래에서는 해시 함수가 계산해 내는 단축 URL 값을 <code>hashValue</code>라 부른다.</p>
+
+  <h5>해시값 길이</h5>
+  <ul>
+    <li><code>hashValue</code>는 <code>[0-9, a-z, A-Z]</code>로 구성되어 총 10 + 26 + 26 = <b>62개</b>의 문자를 쓴다.</li>
+    <li>길이를 정하려면 62<sup>n</sup> ≥ 3,650억을 만족하는 n을 구해야 한다.</li>
+    <li>n = 7이면 약 3.5조로 충분하므로 <code>hashValue</code>의 길이는 7로 정한다.</li>
+    <li>해시값을 만드는 방법은 <b>해시 후 충돌 해소</b>와 <b>base-62 변환</b> 두 가지가 있다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>n</th><th>62<sup>n</sup></th><th>3,650억 커버?</th></tr></thead>
+      <tbody>
+        <tr><td class="t-center">5</td><td class="dg-mono">약 9.16억</td><td class="t-center t-no">✗</td></tr>
+        <tr><td class="t-center">6</td><td class="dg-mono">약 568억</td><td class="t-center t-no">✗</td></tr>
+        <tr><td class="t-center">7</td><td class="dg-mono">약 3.52조</td><td class="t-center t-ok">✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>해시 후 충돌 해소</h5>
+  <ul>
+    <li>일반적으로 알려진 <code>CRC32</code>, <code>MD5</code> 등을 쓴다.</li>
+    <li>하지만 대부분의 방법은 지정한 <code>hashValue</code> 길이보다 큰 값을 반환한다.</li>
+    <li>앞 7자만 잘라 쓸 수는 있으나 중복 위험이 생긴다.</li>
+    <li>충돌이 있으면 다시 계산해야 하므로, 경우에 따라 DB 접근이 많아질 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["긴 URL"] --> H["hash(URL) 앞 7자"]
+  H --> Q{"DB에 이미 있나?"}
+  Q -->|"없음"| SAVE["저장 후 반환"]
+  Q -->|"있음 (충돌)"| SALT["미리 정한 문자열을 덧붙여<br>다시 해시"]
+  SALT --> H
+      </pre>
+    </div>
+    <div class="figure-cap"><b>충돌마다 DB 조회가 한 번 더 붙는다</b> — 데이터가 쌓일수록 충돌 확률이 올라가므로, 이 루프의 기대 횟수도 함께 올라간다. 블룸 필터로 존재 여부를 먼저 걸러 완화할 수 있다.</div>
+  </div>
+
+  <h5>base-62 변환</h5>
+  <ul>
+    <li>진법 변환은 URL 단축키 구성에 흔히 쓰이는 방법이다.</li>
+    <li>수의 표현 방식이 다른 두 시스템이 같은 수를 공유할 때 유용하다.</li>
+    <li>62진법을 쓰는 이유는 <code>hashValue</code>에 쓸 수 있는 문자 개수가 62개이기 때문이다.</li>
+  </ul>
+
+  <h5>base-62 변환 예시</h5>
+  <ul>
+    <li>62개 문자를 쓰므로 16진수처럼 숫자와 문자를 매핑한다 — 0 → <code>0</code>, 10 → <code>a</code>, 35 → <code>z</code>, 61 → <code>Z</code></li>
+    <li>ID 11157 를 62진법으로 바꾸면 <code>2TX</code>가 되고, 최종 URL은 <code>https://tinyurl.com/2TX</code>가 된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">base62.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function toBase62(id: number): string {
+  if (id === 0) return ALPHABET[0];
+  let out = "";
+  while (id &gt; 0) {
+    out = ALPHABET[id % 62] + out; // 나머지를 앞에 붙인다
+    id = Math.floor(id / 62);
+  }
+  return out;
+}
+
+toBase62(11157); // "2TX"</code></pre>
+  </div>
+
+  <h5>두 방식의 차이점</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>비교 항목</th><th>해시 후 충돌 해소</th><th>base-62 변환</th></tr></thead>
+      <tbody>
+        <tr><td>단축 URL 길이</td><td>고정</td><td>가변 — ID가 커지면 함께 길어진다</td></tr>
+        <tr><td>유일 ID 생성기</td><td class="t-center t-ok">불필요</td><td class="t-center t-no">필요</td></tr>
+        <tr><td>충돌</td><td>가능 — 해소 전략이 필요</td><td class="t-ok">불가능 — ID가 유일하므로</td></tr>
+        <tr><td>다음 URL 추론</td><td class="t-ok">불가능</td><td class="t-no">가능 — ID가 1씩 증가하면 예측된다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">추론 가능성은 실제 보안 문제다 <span class="badge b-blue">보강</span></p>
+      <p>base-62는 ID를 그대로 인코딩하므로 <code>2TX</code> 다음이 <code>2TY</code>임을 쉽게 안다. 공격자가 순회하며 남의 단축 URL을 전부 수집할 수 있다는 뜻이다. 실무에서는 ID를 그대로 쓰지 않고 <b>가역적인 난독화(예: Feistel 치환)를 거친 뒤</b> base-62로 인코딩하거나, 7장의 스노플레이크처럼 예측이 어려운 ID를 쓴다.</p>
+    </div>
+  </div>
+
+  <h4>단축키 상세 프로세스</h4>
+  <ol class="steps">
+    <li><div class="step-title">긴 URL을 입력받는다</div></li>
+    <li><div class="step-title">DB에 이미 있는지 확인한다</div><p>있으면 기존 단축 URL을 그대로 돌려준다.</p></li>
+    <li><div class="step-title">없으면 유일 ID를 발급받는다</div><p>7장의 ID 생성기가 여기서 쓰인다.</p></li>
+    <li><div class="step-title">ID를 base-62로 변환한다</div></li>
+    <li><div class="step-title">ID / 단축 URL / 원본 URL을 저장하고 반환한다</div></li>
+  </ol>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>shortURL</th><th>longURL</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">218310</td><td class="dg-mono">http://tinyurl.com/abcde</td><td class="dg-mono">https://www.google.com</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>URL 리디렉션 설계</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  U["사용자"] -->|"GET /abcde"| LB["로드밸런서"]
+  LB --> W["웹 서버"]
+  W --> C{"캐시에 있나?"}
+  C -->|"Hit"| RES["301 / 302 + Location"]
+  C -->|"Miss"| DB[("URL DB")]
+  DB --> FILL["캐시 적재"]
+  FILL --> RES
+  RES --> U
+      </pre>
+    </div>
+    <div class="figure-cap"><b>읽기가 10배이므로 캐시 히트율이 곧 시스템 성능</b> — 8-1에서 계산한 읽기 편중이 이 그림의 존재 이유다.</div>
+  </div>
+
+  <h4>추가 고려사항</h4>
+  <ul>
+    <li>처리율 제한 장치(4장)로 IP 기반 남용을 막는다.</li>
+    <li>데이터 분석 솔루션으로 클릭 데이터를 사업 가치로 연결한다.</li>
+    <li>가용성 / 데이터 일관성 / 안정성 — 1장의 다중화와 샤딩이 그대로 적용된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>62<sup>7</sup> ≈ 3.5조 &gt; 3,650억 이므로 해시 길이는 7자.</li>
+      <li>해시 후 충돌 해소 = 길이 고정 + 충돌 처리 비용.</li>
+      <li>base-62 = 충돌 없음 + ID 생성기 필요 + 추론 가능.</li>
+      <li>리디렉션 경로는 캐시로 덮는 것이 최우선 최적화다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,314 @@
+<article class="item" id="item-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 1</div>
+    <h3>잡 큐와 메시지 브로커</h3>
+    <p class="item-tagline">BullMQ는 Redis 위에 얹은 라이브러리고, RabbitMQ는 그 자체로 서버다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    BullMQ는 <b>작업의 생애를 저장</b>하고, RabbitMQ는 <b>메시지를 전달만</b> 한다. 이 한 문장에서 나머지 차이가 전부 파생된다.
+  </div>
+
+  <h4>BullMQ: 서버가 없는 큐</h4>
+  <p>
+    BullMQ에는 설치할 브로커가 없다. Redis에 리스트/해시/정렬셋/스트림을 깔고, 그 위에서 Lua 스크립트로
+    원자적 상태 전이를 구현한 <b>클라이언트 라이브러리</b>다. <code>new Queue()</code>도 <code>new Worker()</code>도
+    전부 내 Node.js 프로세스 안의 객체이고, 둘은 Redis라는 공유 메모리를 통해서만 만난다.
+  </p>
+  <p>
+    그래서 BullMQ의 1급 개념은 메시지가 아니라 <b>잡(job)</b>이다. 잡에는 상태(<code>waiting</code> →
+    <code>active</code> → <code>completed</code> / <code>failed</code>)가 있고, 시도 횟수가 있고, 반환값이 있고,
+    진행률이 있다. 이 모든 게 Redis에 남기 때문에 나중에 조회할 수 있다.
+  </p>
+
+  <h4>RabbitMQ: 프로토콜을 말하는 서버</h4>
+  <p>
+    RabbitMQ는 Erlang/OTP로 짜인 별도 프로세스다. 5672 포트에서 <b>AMQP 0-9-1</b>이라는 바이너리 프로토콜을 말하고,
+    어떤 언어의 클라이언트든 그 프로토콜만 지키면 붙을 수 있다. Node.js, Java, Go, Python이 같은 큐를 공유하는 게
+    기본 전제다.
+  </p>
+  <p>
+    RabbitMQ에게 메시지는 <b>바이트 덩어리 + 헤더</b>일 뿐이다. 브로커는 그 안에 무슨 일이 적혀 있는지 모르고,
+    알 필요도 없다. 컨슈머가 ack하는 순간 메시지는 큐에서 사라진다. 잡 결과도, 진행률도, 완료 이력도
+    <b>개념 자체가 없다</b>.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph B["BullMQ"]
+    direction LR
+    BP["Producer 프로세스"] -->|"queue.add()"| BR[("Redis: 잡 상태 저장소")]
+    BR -->|"Lua 원자 연산"| BW["Worker 프로세스"]
+    BW -->|"결과/진행률 기록"| BR
+  end
+  subgraph R["RabbitMQ"]
+    direction LR
+    RP["Publisher 프로세스"] -->|"AMQP publish"| RB["RabbitMQ 브로커"]
+    RB -->|"AMQP deliver"| RC["Consumer 프로세스"]
+    RC -->|"ack 하면 삭제"| RB
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>저장소인가, 전달자인가</b> — BullMQ에서 Redis는 잡의 <em>기록</em>이 남는 곳이고, RabbitMQ에서 브로커는 메시지가 <em>지나가는</em> 곳이다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>BullMQ</th><th>RabbitMQ</th></tr></thead>
+      <tbody>
+        <tr><td>정체</td><td>Node.js 라이브러리</td><td>독립 브로커 서버</td></tr>
+        <tr><td>저장소</td><td>Redis (직접 소유)</td><td>자체 저장 엔진 (Raft/세그먼트 로그)</td></tr>
+        <tr><td>프로토콜</td><td>없음 (Redis 명령)</td><td>AMQP 0-9-1, AMQP 1.0, MQTT, STOMP</td></tr>
+        <tr><td>언어</td><td>Node.js 중심 (파이썬/파로 포팅본 존재)</td><td>언어 무관</td></tr>
+        <tr><td>1급 개념</td><td>Job</td><td>Message</td></tr>
+        <tr><td>처리 후</td><td>completed 셋에 이력이 남음</td><td class="t-no">ack 즉시 소멸</td></tr>
+        <tr><td>결과 반환</td><td class="t-ok">기본 지원 (<code>job.returnvalue</code>)</td><td class="t-no">없음 (RPC 패턴을 직접 구현)</td></tr>
+        <tr><td>라우팅</td><td class="t-no">없음 (큐 이름이 곧 목적지)</td><td class="t-ok">Exchange + Binding</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">가장 흔한 착각</p>
+      <p>
+        "큐니까 BullMQ에서 쓰던 기능이 다 있겠지"는 틀렸다. 진행률(<code>job.updateProgress</code>),
+        결과 조회(<code>job.returnvalue</code>), 완료 잡 목록, 잡 ID로 상태 조회 같은 것은 RabbitMQ에
+        <b>대응물이 없다</b>. 그런 게 필요하면 애플리케이션 DB에 직접 테이블을 만들어야 한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>BullMQ = Redis 위의 <b>잡 상태 머신</b>. RabbitMQ = 독립 프로세스인 <b>메시지 라우터</b>.</li>
+      <li>BullMQ는 잡의 이력이 남고, RabbitMQ는 ack 즉시 메시지가 사라진다.</li>
+      <li>RabbitMQ는 언어 중립 프로토콜이라 서비스 간 통신에 강하고, 대신 잡 관리 기능은 하나도 없다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2</div>
+    <h3>BullMQ의 Queue와 RabbitMQ의 Queue는 다른 것이다</h3>
+    <p class="item-tagline">RabbitMQ에서 발행자는 큐 이름을 모른다. 그게 전부다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ에는 발행자와 큐 사이에 <b>Exchange</b>라는 한 겹이 더 있다. 이 한 겹이 두 시스템의 설계 차이를 통째로 만든다.
+  </div>
+
+  <h4>BullMQ: 큐 이름이 곧 목적지</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bullmq.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const queue = new Queue('email');
+
+// 'email' 큐에 넣는다. 이 잡을 누가 가져갈지는 큐 이름이 이미 결정했다.
+await queue.add('welcome', { userId: 42 });</code></pre>
+  </div>
+  <p>
+    발행자가 <code>'email'</code>이라는 이름을 알고 있어야 한다. 이 잡을 알림 서비스도 같이 받아야 한다면?
+    <code>queue.add</code>를 한 번 더 호출하거나, 별도의 pub/sub을 하나 더 놓아야 한다. <b>발행자가 소비자 목록을 안다.</b>
+  </p>
+
+  <h4>RabbitMQ: 발행자는 exchange에만 던진다</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">publisher.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// exchange 이름과 routing key만 안다. 큐 이름은 모른다.
+channel.publish('user.events', 'user.created', Buffer.from(JSON.stringify({ userId: 42 })));</code></pre>
+  </div>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 소비자 쪽이 "나는 이런 메시지를 받겠다"고 선언한다.
+await channel.assertQueue('email.welcome', { durable: true });
+await channel.bindQueue('email.welcome', 'user.events', 'user.created');</code></pre>
+  </div>
+  <p>
+    나중에 알림 서비스가 같은 이벤트를 받고 싶어지면, <b>발행자 코드를 한 줄도 건드리지 않고</b>
+    자기 큐를 만들어 바인딩만 추가하면 된다. 발행자는 구독자가 몇 개인지 영원히 모른다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] -->|"routing key: user.created"| X{{"Exchange: user.events"}}
+  X -->|"binding: user.created"| Q1["Queue: email.welcome"]
+  X -->|"binding: user.*"| Q2["Queue: analytics.all"]
+  X -->|"binding: user.created"| Q3["Queue: crm.sync"]
+  Q1 --> C1["이메일 컨슈머"]
+  Q2 --> C2["분석 컨슈머"]
+  Q3 --> C3["CRM 컨슈머"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>한 번 발행, 여러 큐</b> — 큐를 하나 더 붙이는 일이 바인딩 한 줄이다. 이게 BullMQ에는 없는 축이다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">처음에 헷갈리는 <code>sendToQueue</code> <span class="badge b-blue">보강</span></p>
+      <p>
+        amqplib의 <code>channel.sendToQueue('email', buf)</code>는 BullMQ의 <code>queue.add</code>처럼 보인다.
+        하지만 실제로는 <b>이름 없는 기본 exchange(<code>""</code>)에 routing key를 큐 이름으로 넣어 발행</b>하는
+        축약형이다. 모든 큐는 자기 이름과 같은 routing key로 기본 exchange에 자동 바인딩되어 있기 때문에
+        그렇게 동작한다. 편하지만, 이걸로만 쓰면 RabbitMQ를 비싼 BullMQ로 쓰는 셈이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>BullMQ: 발행자가 <b>큐(목적지)</b>를 지정한다. RabbitMQ: 발행자가 <b>exchange + routing key(의도)</b>를 지정한다.</li>
+      <li>큐와 바인딩은 소비자 쪽 관심사다. 구독자 추가가 발행자 배포와 무관해진다.</li>
+      <li><code>sendToQueue</code>는 기본 exchange를 쓰는 축약형이다. 편의 문법이지 다른 모델이 아니다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 3</div>
+    <h3>책임의 경계선 다시 긋기</h3>
+    <p class="item-tagline">BullMQ가 대신 해주던 일 중 상당수는 이제 내 설계다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ가 보장하는 것은 사실상 <b>"큐에 넣은 메시지를 컨슈머에게 최소 한 번 전달한다"</b> 하나다. 그 위의 모든 것은 토폴로지 설계와 애플리케이션 코드다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기능</th><th>BullMQ</th><th>RabbitMQ</th></tr></thead>
+      <tbody>
+        <tr><td>재시도 횟수 제한</td><td><code>attempts: 5</code></td><td>큐 인자 <code>x-delivery-limit</code> (quorum queue)</td></tr>
+        <tr><td>지수 백오프</td><td><code>backoff: { type: 'exponential' }</code></td><td>4.3의 <code>x-delayed-retry-*</code>(선형) 또는 TTL+DLX 직접 구성</td></tr>
+        <tr><td>동시성</td><td><code>new Worker(..., { concurrency: 10 })</code></td><td><code>channel.prefetch(10)</code> + 컨슈머 개수</td></tr>
+        <tr><td>우선순위</td><td><code>priority: 1</code> (숫자 자유)</td><td>메시지 <code>priority</code> 속성, 0~31 (quorum queue는 항상 활성)</td></tr>
+        <tr><td>지연 실행</td><td><code>delay: 60000</code></td><td class="t-no">네이티브 없음. TTL+DLX 패턴</td></tr>
+        <tr><td>반복 작업(크론)</td><td class="t-ok">내장</td><td class="t-no">없음. 외부 스케줄러가 발행</td></tr>
+        <tr><td>레이트 리밋</td><td class="t-ok">내장</td><td class="t-no">없음. 컨슈머가 직접</td></tr>
+        <tr><td>잡 결과 조회</td><td class="t-ok">내장</td><td class="t-no">없음. RPC 패턴 또는 DB</td></tr>
+        <tr><td>진행률</td><td class="t-ok">내장</td><td class="t-no">없음</td></tr>
+        <tr><td>부모-자식 의존(Flow)</td><td class="t-ok">FlowProducer</td><td class="t-no">없음. 사가/오케스트레이터 직접</td></tr>
+        <tr><td>실패 격리</td><td>failed 셋에 보관</td><td class="t-ok">Dead Letter Exchange</td></tr>
+        <tr><td>다중 소비자 팬아웃</td><td class="t-no">없음</td><td class="t-ok">Exchange + Binding</td></tr>
+        <tr><td>발행 성공 확인</td><td>Redis 응답</td><td class="t-ok">Publisher Confirms</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4.3에서 브로커 쪽으로 넘어온 것들 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        예전에는 "재시도 제한도 백오프도 전부 애플리케이션 몫"이라고 설명했지만, 지금은 그렇지 않다.
+        quorum queue는 <code>x-delivery-limit</code>(기본 20)로 재배달 횟수를 세고, 4.3부터는
+        <code>x-delayed-retry-type</code> 계열 인자로 <b>선형 백오프 재시도</b>까지 브로커가 처리한다.
+        BullMQ의 <code>attempts</code>/<code>backoff</code>에 상당히 가까워진 지점이다. 자세한 건
+        <b>ITEM 21~22</b>에서 다룬다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">사고방식의 전환</p>
+      <p>
+        BullMQ에서는 <b>옵션 객체</b>로 표현하던 것을, RabbitMQ에서는 <b>큐와 exchange를 몇 개 어떻게 놓을지</b>로
+        표현한다. "재시도 3번 후 실패 처리"가 코드 한 줄이 아니라 <code>work</code> 큐 + <code>retry</code> 큐 +
+        <code>dlq</code> 큐 세 개의 그림이 된다. 대신 그 그림은 관리 UI에서 눈으로 보이고, 언어에 상관없이 공유된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>RabbitMQ의 보장은 "라우팅 + 최소 한 번 전달"까지다.</li>
+      <li>스케줄, 레이트 리밋, 결과, 진행률, 잡 의존성은 <b>없다</b>. 필요하면 직접 만든다.</li>
+      <li>대신 팬아웃, 라우팅, DLX, 발행 확인은 브로커가 훨씬 제대로 해준다.</li>
+      <li>옵션으로 풀던 문제를 이제 <b>토폴로지</b>로 푼다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 4</div>
+    <h3>그래서 언제 무엇을 쓰나</h3>
+    <p class="item-tagline">둘은 경쟁 관계가 아니다. 실무에서는 같이 쓰는 경우가 오히려 흔하다.</p>
+  </header>
+
+  <h4>BullMQ가 계속 나은 자리</h4>
+  <ul>
+    <li>한 서비스 안에서 끝나는 <b>백그라운드 작업</b>. 썸네일 생성, PDF 렌더, 리포트 집계.</li>
+    <li>작업의 <b>결과나 진행률을 사용자에게 보여줘야</b> 하는 경우.</li>
+    <li>크론/반복 작업, 레이트 리밋이 핵심인 경우. (외부 API 초당 10회 제한 같은)</li>
+    <li>부모-자식 작업 그래프(Flow)가 필요한 경우.</li>
+    <li>이미 Redis가 있고, 인프라를 하나라도 덜 늘리고 싶은 경우.</li>
+  </ul>
+
+  <h4>RabbitMQ가 필요해지는 자리</h4>
+  <ul>
+    <li><b>서비스 경계를 넘는 통신</b>. 특히 Node 아닌 언어의 서비스가 섞여 있을 때.</li>
+    <li>한 사건을 <b>여러 소비자가 각자</b> 처리해야 할 때(이벤트 팬아웃).</li>
+    <li>메시지 종류에 따라 <b>다른 처리 경로</b>로 갈라야 할 때(라우팅).</li>
+    <li>결제/정산처럼 <b>유실이 곧 사고</b>인 도메인. 퍼블리셔 컨펌 + quorum queue + DLX 조합이 필요할 때.</li>
+    <li>느린 컨슈머를 <b>브로커 차원의 백프레셔</b>로 눌러야 할 때.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["처리해야 할 일이 생겼다"] --> B{"다른 서비스도 알아야 하나?"}
+  B -->|"아니오"| C{"결과/진행률/크론이 필요한가?"}
+  C -->|"예"| D["BullMQ"]
+  C -->|"아니오"| E["둘 다 가능. 팀 표준을 따른다"]
+  B -->|"예"| F{"소비자가 여럿이거나 언어가 다른가?"}
+  F -->|"예"| G["RabbitMQ"]
+  F -->|"아니오"| H{"유실이 치명적인가?"}
+  H -->|"예"| G
+  H -->|"아니오"| E
+      </pre>
+    </div>
+    <div class="figure-cap"><b>고민의 순서</b> — "서비스 경계를 넘는가"가 첫 질문이다. 성능이 아니라 <em>경계</em>가 기준이다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">현실의 조합 <span class="badge b-blue">보강</span></p>
+      <p>
+        흔한 구성은 이렇다. 서비스 간 이벤트는 RabbitMQ로 흘리고, 각 서비스가 그 이벤트를 받아
+        <b>자기 안에서 처리할 무거운 작업은 BullMQ 잡으로 다시 만든다</b>. 브로커는 배달만 하고,
+        재시도/진행률/결과 같은 잡 관리는 서비스 내부에서 하는 셈이다. 이직한 회사에서 RabbitMQ를 쓴다고 해서
+        BullMQ 지식이 버려지는 게 아니라, 층이 하나 위로 올라간다고 보면 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>기준은 성능이 아니라 <b>경계</b>다. 서비스/언어 경계를 넘으면 RabbitMQ.</li>
+      <li>잡 관리 기능(결과, 진행률, 크론, 레이트 리밋)이 핵심이면 BullMQ.</li>
+      <li>둘을 계층으로 나눠 같이 쓰는 구성이 실무에서 가장 흔하다.</li>
+    </ul>
+  </div>
+</article>

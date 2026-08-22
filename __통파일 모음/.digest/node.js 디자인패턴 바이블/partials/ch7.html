@@ -1,0 +1,1118 @@
+<article class="item" id="item-23" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-1</div>
+    <h3>팩토리</h3>
+    <p class="item-tagline">new 는 타입을 고정하지만, 팩토리는 무엇을 돌려줄지 나중에 정할 수 있게 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>new Foo()</code> 는 호출부를 <b>Foo 라는 구체 타입에 못 박는다.</b>
+    팩토리 함수 뒤에 숨기면, 나중에 서브클래스로 쪼개든 목 객체로 바꿔치기하든 <b>호출부는 한 줄도 바뀌지 않는다.</b>
+  </div>
+
+  <h4>팩토리</h4>
+  <ul>
+    <li>주요 장점은 <b>객체의 생성을 특정 구현으로부터 분리</b>할 수 있다는 것이다.</li>
+    <li>클로저를 활용해 캡슐화를 강제하는 데도 쓸 수 있다.</li>
+  </ul>
+
+  <h4>객체 생성과 구현의 분리</h4>
+  <ul>
+    <li><code>new</code> 연산자나 <code>Object.create()</code> 로 직접 만드는 것보다 팩토리를 호출하는 편이 더 편리하고 유연하다.</li>
+    <li>팩토리를 쓰면 객체의 생성과 구현을 분리할 수 있다.</li>
+  </ul>
+
+  <h5>팩토리로 객체 생성하기</h5>
+  <ul>
+    <li><code>new</code> 를 쓰면 코드가 특정 유형의 객체에 바인딩된다.</li>
+    <li>팩토리는 더 큰 유연성을 제공하고, <b>클래스를 비공개로 유지</b>할 수 있게 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">factory.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">/**
+ * 팩토리 패턴
+ */
+function createMyImage(image: string) {
+  return new MyImage(image);
+}
+const myImage1 = createMyImage("image1");
+
+/**
+ * new 생성자
+ */
+const myImage2 = new MyImage("image2");</code></pre>
+  </div>
+
+  <p>겉보기에는 한 겹 더 감쌌을 뿐이지만, 나중에 <code>Image</code> 를 더 작은 단위로 분리할 때
+    <b>팩토리 함수만 수정</b>하면 된다는 점에서 차이가 난다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">factory-branch.ts</span>
+      <span class="code-tag good">호출부는 그대로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function createMyImage(image: string) {
+  if (image.endsWith(".jpg")) {
+    return new ImageJpeg(image);
+  } else if (image.endsWith(".png")) {
+    return new ImagePng(image);
+  }
+}
+const myImage1 = createMyImage("image1.jpg");</code></pre>
+  </div>
+
+  <h4>캡슐화를 강제할 수 있는 메커니즘</h4>
+  <ul>
+    <li>팩토리는 <b>클로저</b> 덕분에 캡슐화 메커니즘으로도 쓸 수 있다.</li>
+    <li>캡슐화란 외부 코드가 컴포넌트 내부에 직접 접근하거나 조작하는 것을 막기 위한 접근 제어이며, 객체지향의 기본 원칙이다.</li>
+    <li>자바스크립트에서는 함수 스코프와 클로저로 캡슐화를 구현할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">createPerson.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function createPerson(name: string) {
+  const privateProperties: { [key: string]: string } = {};
+
+  const person = {
+    setName(name: string) {
+      if (!name) {
+        throw new Error("name is required");
+      }
+
+      privateProperties.name = name;
+    },
+    getName() {
+      return privateProperties.name;
+    },
+  };
+
+  person.setName(name);
+  return person;
+}
+
+const person = createPerson("John");
+console.log(person);
+// { setName: [Function: setName], getName: [Function: getName] }</code></pre>
+  </div>
+
+  <p><code>privateProperties</code> 는 반환된 객체 어디에도 나타나지 않는다.
+    <a href="#item-6">2-3</a>의 노출식 모듈 패턴과 같은 기법이 <b>객체 단위</b>로 적용된 것이다.
+    그리고 <code>setName</code> 을 통해야만 값을 넣을 수 있으므로 <b>불변식(name 은 비어 있을 수 없다)이 강제</b>된다.</p>
+
+  <h4>간단한 코드 프로파일러 만들기</h4>
+  <ul>
+    <li>프로덕션 환경에서는 과한 로깅을 피하기 위해 <b>동작만 따라 하는 빈 객체</b>를 반환한다.</li>
+    <li>자바스크립트의 <b>덕 타이핑</b> 덕분에 가능한 방법이다 — 같은 메서드만 있으면 무엇이든 된다.</li>
+    <li>객체의 구현과 생성을 완벽하게 분리할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">profiler.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Profiler {
+  private label: string;
+  private lastTime: [number, number];
+
+  constructor(label: string) {
+    this.label = label;
+    this.lastTime = [0, 0];
+  }
+
+  start() {
+    this.lastTime = process.hrtime();
+  }
+
+  end() {
+    const diff = process.hrtime(this.lastTime);
+    console.log(`Timer: ${this.label}: ${diff[0]}s ${diff[1] / 1000000}ms`);
+  }
+}
+
+const noopProfiler = {
+  start() {},
+  end() {},
+};
+
+const createProfiler = (label: string) =&gt; {
+  if (process.env.NODE_ENV === "production") {
+    return noopProfiler;          // 프로덕션에서는 아무것도 하지 않는다
+  }
+
+  return new Profiler(label);
+};</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>createProfiler</code> 는 <b>양쪽 분기 모두 <code>new Profiler(label)</code> 를 반환</b>한다.
+        그러면 <code>noobProfiler</code> 를 만들어 둔 의미가 없고, 프로덕션에서도 그대로 로깅된다.
+        바로 위 설명("프로덕션에서는 동작만 따라 한 객체를 반환")과 코드가 어긋나 있어 위처럼 고쳤다.
+        변수명 <code>noobProfiler</code> 도 no-op 의 오타로 보여 <code>noopProfiler</code> 로 정정했다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">덕 타이핑이 여기서 하는 일 <span class="badge b-blue">보강</span></p>
+      <p><code>noopProfiler</code> 는 <code>Profiler</code> 를 상속하지도, 인터페이스를 구현하지도 않는다.
+        <code>start</code> 와 <code>end</code> 를 가지고 있다는 사실만으로 대체 가능하다.
+        상속 계층 없이 교체 가능성을 얻는 것 — <a href="#item-1">1-1</a>의
+        "복잡한 클래스 계층 대신 간단한 객체"라는 철학이 그대로 구현된 사례다.</p>
+    </div>
+  </div>
+
+  <h4>실전에서</h4>
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 노트에는 이 소제목 아래에 빈 불릿 하나만 있다. 내용을 지어내지 않고 자리만 표시해 둔다.
+        (책은 이 자리에서 <code>knex</code> 같은 라이브러리가 팩토리를 진입점으로 쓰는 사례를 다룬다.)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>팩토리는 호출부를 구체 타입에서 떼어낸다 → 나중에 분기·교체가 자유로워진다</li>
+      <li>클로저와 결합하면 언어 차원에서 강제되는 캡슐화를 얻는다</li>
+      <li>덕 타이핑 덕분에 상속 없이도 대체 가능한 객체(no-op 프로파일러)를 만들 수 있다</li>
+      <li>클래스를 아예 export 하지 않으면 사용자는 팩토리 외의 생성 경로를 가질 수 없다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-24" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-2</div>
+    <h3>빌더</h3>
+    <p class="item-tagline">인자 열 개짜리 생성자를 읽을 수 있는 문장으로 바꾼다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    빌더의 가치는 <b>이름 붙이기</b>와 <b>묶기</b>다. 위치 인자에 이름을 주고,
+    함께 다니는 값들을 <code>withMotors(count, brand, model)</code> 처럼 한 메서드로 묶는다.
+  </div>
+
+  <h4>빌더</h4>
+  <ul>
+    <li><b>fluent interface</b>(메서드 체이닝)를 제공해 복잡한 객체 생성을 단순화하는 패턴이다.</li>
+    <li>복잡한 객체를 만들 때 가독성과 개발 경험이 크게 향상된다.</li>
+    <li>보통 인자가 많거나 복잡한 매개변수를 가질 때 사용한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Boat.ts</span>
+      <span class="code-tag bad">읽을 수 없는 호출</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Boat {
+  constructor(
+    private hasMotor: boolean,
+    private motorCount: number,
+    private motorBrand: string,
+    private hasEngine: boolean,
+    private engineBrand: string,
+    private motorModel: string,
+    private hasSails: boolean,
+    private sailsCount: number,
+    private sailsBrand: string,
+    private sailsColor: string
+  ) {}
+}
+
+const myBoat = new Boat(true, 2, "motor", true, "engine", "motor", true, 2, "sails", "blue");</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">타입 시스템도 못 막는다</p>
+      <p><code>hasMotor</code> 와 <code>hasEngine</code> 은 둘 다 <code>boolean</code>, <code>motorBrand</code> 와
+        <code>engineBrand</code> 는 둘 다 <code>string</code> 이다.
+        <b>순서를 바꿔 넣어도 컴파일 에러가 나지 않는다.</b>
+        인자가 많을수록 위험한 것은 가독성이 아니라 이 점이다.</p>
+    </div>
+  </div>
+
+  <h5>개선 1 — 모든 인자를 하나의 객체 리터럴로 모으기</h5>
+  <ul>
+    <li>각 매개변수가 무엇인지 명확해져 <code>new</code> 생성자보다 가독성이 좋다.</li>
+    <li>하지만 어떤 키를 넣어야 하는지 알려면 결국 문서를 보거나 코드를 열어봐야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Boat-params.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Boat {
+  private hasMotor: boolean;
+  private motorCount: number;
+  private motorBrand: string;
+  private hasEngine: boolean;
+  private engineBrand: string;
+  private motorModel: string;
+  private hasSails: boolean;
+  private sailsCount: number;
+  private sailsBrand: string;
+  private sailsColor: string;
+
+  constructor(allParameter: BoatParams) {
+    this.hasMotor = allParameter.hasMotor;
+    this.motorCount = allParameter.motorCount;
+    this.motorBrand = allParameter.motorBrand;
+    this.hasEngine = allParameter.hasEngine;
+    this.engineBrand = allParameter.engineBrand;
+    this.motorModel = allParameter.motorModel;
+    this.hasSails = allParameter.hasSails;
+    this.sailsCount = allParameter.sailsCount;
+    this.sailsBrand = allParameter.sailsBrand;
+    this.sailsColor = allParameter.sailsColor;
+  }
+}</code></pre>
+  </div>
+
+  <h5>개선 2 — 빌더 패턴으로 개선하기</h5>
+  <ul>
+    <li>주요 목적은 복잡한 생성자를 <b>더 읽기 쉽고 관리하기 쉬운 여러 단계</b>로 나누는 것이다.</li>
+    <li>서로 관련된 매개변수들을 한 번에 설정하는 빌더 함수를 만든다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">BoatBuilder.ts</span>
+      <span class="code-tag good">개선</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class BoatBuilder {
+  private motorCount: number;
+  private motorBrand: string;
+  private motorModel: string;
+  private sailsCount: number;
+  private sailsBrand: string;
+  private sailsColor: string;
+  private engineBrand: string;
+  private hasMotor: boolean;
+  private hasEngine: boolean;
+  private hasSails: boolean;
+
+  withMotors(count: number, brand: string, model: string) {
+    this.hasMotor = true;          // 플래그는 빌더가 알아서 세운다
+    this.motorCount = count;
+    this.motorBrand = brand;
+    this.motorModel = model;
+
+    return this;
+  }
+
+  withSails(count: number, brand: string, color: string) {
+    this.hasSails = true;
+    this.sailsCount = count;
+    this.sailsBrand = brand;
+    this.sailsColor = color;
+
+    return this;
+  }
+
+  withEngine(brand: string) {
+    this.hasEngine = true;
+    this.engineBrand = brand;
+
+    return this;
+  }
+
+  build() {
+    return new Boat(
+      this.hasMotor,
+      this.motorCount,
+      this.motorBrand,
+      this.hasEngine,
+      this.engineBrand,
+      this.motorModel,
+      this.hasSails,
+      this.sailsCount,
+      this.sailsBrand,
+      this.sailsColor
+    );
+  }
+}
+
+const myBoat = new BoatBuilder()
+  .withMotors(2, "motor", "motor")
+  .withEngine("engine")
+  .withSails(2, "sails", "blue")
+  .build();</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">객체 리터럴보다 나은 지점 <span class="badge b-blue">보강</span></p>
+      <p>세 가지가 다르다.
+        <b>(1)</b> <code>hasMotor</code> 같은 <b>파생 플래그를 사용자가 신경 쓰지 않는다</b> — 빌더가 세운다.
+        <b>(2)</b> 함께 다녀야 하는 값들이 한 메서드로 묶여 <b>일부만 빠뜨릴 수 없다</b>.
+        <b>(3)</b> 메서드 체인이라 IDE 자동완성이 다음에 무엇을 부를 수 있는지 알려준다.</p>
+    </div>
+  </div>
+
+  <h4>URL 객체 빌더 구현하기</h4>
+  <p>아래 <code>Url</code> 은 클라이언트가 여덟 개 구성요소의 순서와 의미를 모두 알아야 해서 쓰기 힘들다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Url.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Url {
+  constructor(
+    private protocol: string,
+    private username: string,
+    private password: string,
+    private hostname: string,
+    private port: string,
+    private pathname: string,
+    private search: string,
+    private hash: string
+  ) {
+    this.validate();
+  }
+
+  private validate() {
+    if (!this.protocol || !this.hostname) {
+      throw new Error("protocol and hostname are required");
+    }
+  }
+
+  toString() {
+    return `${this.protocol}://${this.username}:${this.password}@${this.hostname}:${this.port}${this.pathname}${this.search}${this.hash}`;
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">UrlBuilder.ts</span>
+      <span class="code-tag good">빌더 적용</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UrlBuilder {
+  private protocol: string;
+  private username: string;
+  private password: string;
+  private hostname: string;
+  private port: string;
+  private pathname: string;
+  private search: string;
+  private hash: string;
+
+  setProtocol(protocol: string) {
+    this.protocol = protocol;
+    return this;
+  }
+
+  setUsername(username: string) {
+    this.username = username;
+    return this;
+  }
+
+  setPassword(password: string) {
+    this.password = password;
+    return this;
+  }
+
+  setHostname(hostname: string) {
+    this.hostname = hostname;
+    return this;
+  }
+
+  setPort(port: string) {
+    this.port = port;
+    return this;
+  }
+
+  setPathname(pathname: string) {
+    this.pathname = pathname;
+    return this;
+  }
+
+  setSearch(search: string) {
+    this.search = search;
+    return this;
+  }
+
+  setHash(hash: string) {
+    this.hash = hash;
+    return this;
+  }
+
+  build() {
+    return new Url(
+      this.protocol,
+      this.username,
+      this.password,
+      this.hostname,
+      this.port,
+      this.pathname,
+      this.search,
+      this.hash
+    );
+  }
+}
+
+const url = new UrlBuilder()
+  .setProtocol("http")
+  .setHostname("localhost")
+  .setPort("8080")
+  .setPathname("/api/v1")
+  .setSearch("?key=value")
+  .setHash("#hash")
+  .build();
+
+console.log(url.toString());</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">빌더에도 검증은 끝에서 한 번</p>
+      <p><code>Url</code> 생성자가 <code>validate()</code> 를 호출하므로, 필수 값 누락은
+        <code>build()</code> 시점에 <b>비로소</b> 드러난다. 이는 빌더 패턴의 의도된 성질이다 —
+        중간 단계에서는 객체가 미완성 상태여도 되고, <b>완성 시점에만 불변식을 만족</b>하면 된다.
+        <code>setProtocol</code> 만 부르고 <code>build()</code> 하면 <code>"protocol and hostname are required"</code> 가 던져진다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>인자가 많으면 순서 실수를 타입 시스템이 못 잡는다 — 이것이 진짜 문제</li>
+      <li>객체 리터럴은 이름을 주지만, 어떤 키가 필요한지는 여전히 문서를 봐야 한다</li>
+      <li>빌더는 관련 인자를 묶고 파생 플래그를 감춘다. 자동완성도 따라온다</li>
+      <li>불변식 검증은 <code>build()</code> 시점에 한 번 — 중간 상태는 미완성이어도 된다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-25" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-3</div>
+    <h3>공개 생성자</h3>
+    <p class="item-tagline">생성되는 그 순간에만 내부를 열어 주고, 그 뒤로는 영원히 닫는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    생성자에 <b>executor 함수</b>를 넘기면, 그 함수가 실행되는 동안만 내부 조작 권한이 주어진다.
+    <code>new Promise((resolve, reject) =&gt; ...)</code> 가 정확히 이 패턴이다.
+  </div>
+
+  <h4>공개 생성자</h4>
+  <ul>
+    <li>유명한 GoF 디자인 패턴 책에서는 찾을 수 없는 패턴이다.</li>
+    <li>Node.js 커뮤니티에서 <b>"객체가 생성되는 순간에만 내부 기능의 일부를 노출할 수 있을까?"</b>라는 질문에서 유래했다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">shape.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class SomeClass {
+  constructor(executor: (revealedMembers: any) =&gt; void) {
+    // 내부 멤버를 만들고 executor 에게만 건넨다
+  }
+}
+
+const object = new SomeClass(function executor(revealedMembers: any) {
+  // 멤버 변수 조작
+});</code></pre>
+  </div>
+
+  <h4>변경 불가능한 버퍼 만들기</h4>
+  <ul>
+    <li><b>불변성</b>이란 객체가 생성된 뒤 데이터나 상태를 수정할 수 없는 성질을 뜻한다.</li>
+    <li>불변성을 쓰면 원본이 변하는 것을 막기 위해 복사본을 만들 필요가 없다.</li>
+    <li>아래 예시는 <b>생성 시점에만</b> 버퍼를 조작할 수 있게 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">ImmutableBuffer.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const MODIFIER_NAMES = ["swap", "write", "fill"];
+
+class ImmutableBuffer {
+  constructor(size: number, executor: any) {
+    const buffer = Buffer.alloc(size);
+    const modifiers: { [key: string]: Function } = {};
+
+    for (const prop in buffer) {
+      if (typeof buffer[prop] !== "function") {
+        continue;
+      }
+
+      if (MODIFIER_NAMES.some((m) =&gt; prop.startsWith(m))) {
+        modifiers[prop] = buffer[prop].bind(buffer);   // 변경 함수는 executor 에게만
+      } else {
+        this[prop] = buffer[prop].bind(buffer);        // 읽기 함수는 공개
+      }
+    }
+
+    executor(modifiers);
+  }
+}
+
+const hello = "Hello!";
+const immutable = new ImmutableBuffer(hello.length, ({ write }) =&gt; {
+  write(hello);
+});
+
+immutable.write("world"); // 에러 — write 는 인스턴스에 없다</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 190" width="460" role="img" aria-label="공개 생성자에서 읽기 함수와 변경 함수가 나뉘는 구조">
+        <rect x="24" y="40" width="180" height="112" rx="12" class="dg-fill-soft dg-stroke"/>
+        <text x="114" y="32" class="dg-text-sub" font-size="11" text-anchor="middle">인스턴스 (영구 공개)</text>
+        <text x="114" y="68" class="dg-text dg-mono" font-size="11" text-anchor="middle">slice()</text>
+        <text x="114" y="90" class="dg-text dg-mono" font-size="11" text-anchor="middle">toString()</text>
+        <text x="114" y="112" class="dg-text dg-mono" font-size="11" text-anchor="middle">readUInt8()</text>
+        <text x="114" y="136" class="dg-text-sub" font-size="10" text-anchor="middle">읽기 전용 연산</text>
+        <rect x="256" y="40" width="180" height="112" rx="12" class="dg-fill-bg dg-stroke"/>
+        <text x="346" y="32" class="dg-text-sub" font-size="11" text-anchor="middle">executor 인자 (생성 중에만)</text>
+        <text x="346" y="68" class="dg-text dg-mono" font-size="11" text-anchor="middle">write()</text>
+        <text x="346" y="90" class="dg-text dg-mono" font-size="11" text-anchor="middle">fill()</text>
+        <text x="346" y="112" class="dg-text dg-mono" font-size="11" text-anchor="middle">swap16()</text>
+        <text x="346" y="136" class="dg-text-sub" font-size="10" text-anchor="middle">executor 반환 후 소멸</text>
+        <text x="230" y="176" class="dg-text-sub" font-size="11" text-anchor="middle">같은 Buffer 를 두 묶음으로 갈라 노출 범위를 다르게 준다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>권한을 시간으로 제한한다</b> — 변경 함수는 인스턴스에 붙지 않고
+      <code>executor</code> 의 인자로만 전달되므로, executor 가 반환되는 순간 아무도 그 참조를 얻을 수 없다.</div>
+  </div>
+
+  <p>이 클래스는 사용자와 <code>Buffer</code> 사이에서 <b>프록시</b> 역할을 한다(<a href="#item-29">8-1</a>).
+    변경하지 않는 함수들은 공개하고, 변경을 시도하는 경우에는 애초에 접근 경로가 없다.</p>
+
+  <h4>실전에서</h4>
+  <ul>
+    <li>완벽한 캡슐화를 제공해야 할 때 사용한다.</li>
+    <li>대표적인 예시가 자바스크립트의 <code>Promise</code> 생성자다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">promise.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const promise = new Promise((resolve, reject) =&gt; {});</code></pre>
+  </div>
+
+  <p>내부 상태를 변경하는 <code>resolve</code> 와 <code>reject</code> 를 executor 에게만 주고,
+    생성 이후에는 외부에서 상태를 바꿀 수 없다.
+    <a href="#item-17">5-1</a>에서 본 "한 번 결정되면 되돌릴 수 없다"는 성질이
+    <b>이 패턴 덕분에 언어 차원에서 보장</b>되는 것이다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">밖에서 resolve 하고 싶다면 <span class="badge b-blue">보강</span></p>
+      <p>가끔 executor 밖에서 <code>resolve</code> 를 호출해야 할 때가 있다(deferred 패턴).
+        예전에는 executor 안에서 변수에 담아 밖으로 빼내는 우회를 썼지만,
+        ES2024 의 <code>Promise.withResolvers()</code> 가 <code>{ promise, resolve, reject }</code> 를 한 번에 돌려준다.
+        Node v24.17.0 에 존재함을 확인했다. 이는 <b>공개 생성자의 캡슐화를 의도적으로 포기</b>하는 선택이므로,
+        정말 필요할 때만 쓴다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>공개 생성자 = 생성자에 executor 를 받아 <b>그 순간에만</b> 내부 조작 권한을 준다</li>
+      <li>권한을 스코프가 아니라 <b>시간</b>으로 제한한다는 점이 독특하다</li>
+      <li><code>ImmutableBuffer</code>: 읽기 함수는 인스턴스에, 변경 함수는 executor 인자로만</li>
+      <li><code>new Promise(executor)</code> 가 표준 라이브러리 안의 대표 사례</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-26" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-4</div>
+    <h3>싱글톤</h3>
+    <p class="item-tagline">Node에서는 모듈 하나면 끝난다. 다만 "하나"의 범위가 생각보다 좁다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    모듈 캐시의 키는 <b>해석된 전체 경로</b>다. 같은 패키지라도 <code>node_modules</code> 위치가 다르면
+    <b>다른 모듈로 취급되어 인스턴스가 두 개 생긴다.</b>
+  </div>
+
+  <h4>싱글톤</h4>
+  <ul>
+    <li>싱글톤은 Node에서 논의할 가치가 거의 없는, 사소한 구현 패턴 중 하나다.</li>
+    <li>클래스의 인스턴스가 하나만 존재하도록 접근을 중앙 집중화하는 패턴이다.</li>
+    <li>Node는 모듈에서 인스턴스를 <code>export</code> 하는 것만으로 싱글톤과 매우 유사하게 동작한다.
+      모듈을 캐싱해 불러올 때마다 코드를 다시 읽지 않기 때문이다(<a href="#item-7">2-4</a>).</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">db.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Database {
+  constructor(name: string, detail: any) {
+    // ...
+  }
+}
+
+export const dbInstance = new Database("test", {});</code></pre>
+  </div>
+
+  <h4>내보내기가 싱글톤이 안 되는 상황</h4>
+  <ul>
+    <li>모듈은 <b>전체 경로를 기반으로</b> 캐싱되므로, 현재 패키지 내부에서는 싱글톤이 보장된다.</li>
+    <li>하지만 다른 패키지가 <b>자기만의 사본</b>으로 동일한 모듈을 로딩하면 인스턴스가 두 개 생겨 싱글톤이 깨진다.</li>
+    <li>사실상 Node에서는 <code>globalThis.dbInstance</code> 처럼 명시하지 않는 한 전역 유일성이 보장되지 않는다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  APP["내 앱"] --> P1["packageA/node_modules/mydb"]
+  APP --> P2["packageB/node_modules/mydb"]
+  P1 --> I1["Database 인스턴스 #1"]
+  P2 --> I2["Database 인스턴스 #2"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b><a href="#item-1">1-1</a>에서 종속성 지옥을 막아 준 그 구조가 여기서는 싱글톤을 깬다</b> —
+      버전이 달라 호이스팅되지 못하면 사본이 두 개 생기고, 경로가 다르므로 모듈 캐시도 별개가 된다.
+      같은 설계 결정이 상황에 따라 장점도 함정도 된다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">표기 정정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>global.dbInstanace</code> 는 오타이며, 표준적인 이름은 <code>globalThis</code> 다.
+        <code>global</code> 은 Node 고유 별칭이라 브라우저/워커에서는 동작하지 않는다.
+        다만 전역에 인스턴스를 붙이는 방식은 <b>최후의 수단</b>이다 — 이름 충돌 위험이 있고,
+        누가 언제 덮어썼는지 추적할 수 없다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">그래서 어떻게 할 것인가 <span class="badge b-blue">보강</span></p>
+      <p>정말 인스턴스가 하나여야 한다면, 전역에 숨기지 말고 <b>애플리케이션 진입점에서 한 번 만들어 명시적으로 전달</b>하는 편이 낫다.
+        그것이 바로 다음 아이템인 <a href="#item-27">7-5 모듈 와이어링</a>의 종속성 주입이다.
+        "싱글톤이 깨질 수 있다"는 사실이 DI 를 정당화하는 가장 실용적인 이유다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Node 에서 싱글톤은 인스턴스를 export 하면 끝 — 모듈 캐시가 해 준다</li>
+      <li>캐시 키는 해석된 전체 경로. 패키지 사본이 둘이면 인스턴스도 둘</li>
+      <li><code>globalThis</code> 에 붙이면 유일성은 얻지만 추적 가능성을 잃는다</li>
+      <li>진짜 해법은 진입점에서 만들어 주입하는 것 → <a href="#item-27">7-5</a></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-27" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-5</div>
+    <h3>모듈 와이어링</h3>
+    <p class="item-tagline">컴포넌트를 어떻게 이어 붙일지는 앱이 커질수록 아키텍처 그 자체가 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    싱글톤 종속성은 <b>쓰기 쉽고 바꾸기 어렵고</b>, 종속성 주입은 <b>쓰기 번거롭고 바꾸기 쉽다</b>.
+    바꿀 일이 있느냐(테스트 포함)가 선택의 기준이다.
+  </div>
+
+  <h4>모듈 와이어링</h4>
+  <ul>
+    <li>모든 앱은 여러 컴포넌트를 연결한 결과다.</li>
+    <li>컴포넌트를 연결하는 방식은 앱이 커질수록 유지보수와 성공을 좌우하는 중요한 요인이 된다.</li>
+  </ul>
+
+  <h4>싱글톤 종속성</h4>
+  <ul>
+    <li>싱글톤 방식은 확실히 간단하고 즉각적이며 가독성이 높다.</li>
+    <li>하지만 테스트 코드에서 모킹을 하려 할 때 오히려 장애물이 된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">blog-singleton.ts</span>
+      <span class="code-tag bad">db 가 하드코딩되어 있다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { promisify } from "util";
+import { db } from "./db";              // ← 여기가 고정점
+
+const dbRun = promisify(db.run.bind(db));
+const dbAll = promisify(db.all.bind(db));
+
+class Blog {
+  initialize() {
+    const initQuery = `create table if not exists posts(
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT,
+      created_at TEXT
+    )`;
+
+    return dbRun(initQuery);
+  }
+
+  getAllPosts() {
+    return dbAll("select * from posts");
+  }
+}</code></pre>
+  </div>
+
+  <p><code>Blog</code> 를 테스트하려면 반드시 실제 <code>./db</code> 가 필요하다.
+    <a href="#item-8">2-5</a>의 몽키패치나 <a href="#item-9">2-6</a>의 모듈 목킹으로 우회할 수는 있지만,
+    둘 다 전역 상태를 건드리는 방법이라 테스트 간 격리가 깨지기 쉽다.</p>
+
+  <h4>종속성 주입(Dependency Injection)</h4>
+  <ul>
+    <li>컴포넌트의 종속성을 <b>인젝터</b>라는 외부 요소가 공급하는 패턴이다.</li>
+    <li>장점은 <b>디커플링</b>이다. 싱글톤에서는 각 종속성이 모듈에 하드코딩되지만, DI 에서는 외부에서 주입된다.</li>
+    <li>인젝터의 목표는 서비스가 요구하는 종속성을 충족하는 인스턴스를 제공하는 것이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">blog-di.ts</span>
+      <span class="code-tag good">db 를 인자로 받는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Blog {
+  private db: sqlite3.Database;
+  private dbRun: (query: string) =&gt; Promise&lt;void&gt;;
+  private dbAll: (query: string) =&gt; Promise&lt;any[]&gt;;
+
+  constructor(
+    db: sqlite3.Database,
+    dbRun: (query: string) =&gt; Promise&lt;void&gt;,
+    dbAll: (query: string) =&gt; Promise&lt;any[]&gt;
+  ) {
+    this.db = db;
+    this.dbRun = dbRun;
+    this.dbAll = dbAll;
+  }
+
+  initialize() {
+    const initQuery = `create table if not exists posts(
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT,
+      created_at TEXT
+    )`;
+
+    return this.dbRun(initQuery);
+  }
+
+  getAllPosts() {
+    return this.dbAll("select * from posts");
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 DI 버전은 생성자에서 <code>this.dbRun</code> 에 저장해 놓고,
+        메서드 본문에서는 여전히 <code>dbRun(initQuery)</code> / <code>dbAll(...)</code> 처럼
+        <b>모듈 최상위의 자유 변수를 참조</b>한다. 이러면 주입한 의미가 사라진다(그리고 그 변수는 이제 정의되어 있지도 않다).
+        위 코드는 <code>this.</code> 를 붙여 고쳤다.</p>
+      <p>또한 노트에는 <code>import { db } from "./db"</code> 가 그대로 남아 있는데,
+        DI 로 바꾸는 목적이 바로 그 import 를 없애는 것이므로 제거해야 한다.</p>
+    </div>
+  </div>
+
+  <p>더 이상 <code>db</code> 모듈을 직접 불러오지 않고, 생성자가 <code>db</code> 를 인자로 받는다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">db.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export function createDb(file: string) {
+  return new sqlite3.Database(file);
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { promisify } from "util";
+
+function main() {
+  const db = createDb("./blog.db");
+  const blog = new Blog(
+    db,
+    promisify(db.run.bind(db)),
+    promisify(db.all.bind(db))
+  );
+
+  // ...
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>main()</code> 은 <code>new Blog(db)</code> 로 <b>인자를 하나만</b> 넘긴다.
+        생성자가 세 개를 요구하므로 <code>this.dbRun</code> 이 <code>undefined</code> 가 되어
+        <code>initialize()</code> 에서 <code>TypeError</code> 가 난다. 위처럼 세 개를 모두 넘겨야 한다.</p>
+      <p>다만 인자가 셋이라는 것 자체가 설계 냄새다. <code>db</code> 하나만 받고
+        <code>dbRun</code> / <code>dbAll</code> 은 생성자 안에서 만드는 편이 호출부가 훨씬 깔끔하다.
+        아니면 이 셋을 묶은 리포지토리 객체 하나를 주입하는 것도 방법이다.</p>
+    </div>
+  </div>
+
+  <h4>단점</h4>
+  <ul>
+    <li>코딩 시점에 종속성이 확정되지 않으므로, 시스템을 구성하는 여러 컴포넌트 간의 관계를 <b>파악하기 더 어려워진다</b>.</li>
+    <li>종속성이 올바른 순서로 주입되도록 <b>전체 앱의 종속성 그래프를 수동으로 작성</b>해야 한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기준</th><th>싱글톤 종속성</th><th>종속성 주입</th></tr></thead>
+      <tbody>
+        <tr><td>코드량</td><td class="t-center t-ok">적음</td><td class="t-center t-no">배선 코드 필요</td></tr>
+        <tr><td>관계 파악</td><td class="t-center t-ok"><code>import</code> 만 보면 됨</td><td class="t-center t-no">런타임 배선을 따라가야 함</td></tr>
+        <tr><td>테스트 격리</td><td class="t-center t-no">어려움 (전역 목킹)</td><td class="t-center t-ok">쉬움 (가짜 객체 주입)</td></tr>
+        <tr><td>구현 교체</td><td class="t-center t-no">모듈을 고쳐야 함</td><td class="t-center t-ok">호출부에서 결정</td></tr>
+        <tr><td>인스턴스 수 제어</td><td class="t-center t-no">모듈 캐시에 종속</td><td class="t-center t-ok">명시적</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>싱글톤 종속성: 간단하지만 종속성이 하드코딩되어 교체와 테스트가 어렵다</li>
+      <li>DI: 종속성을 밖에서 주입해 디커플링. 대신 배선 코드와 순서 관리가 생긴다</li>
+      <li>DI 로 바꿀 때는 <b>모듈 import 를 실제로 제거하고 <code>this.</code> 로 참조</b>해야 의미가 있다</li>
+      <li>주입 인자가 많아지면 묶어서 하나의 객체로 — 그것 자체가 설계 신호</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-28" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-9</div>
+    <h3>연습문제 — 색상 콘솔과 Request 빌더</h3>
+    <p class="item-tagline">팩토리와 빌더를 각각 가장 작은 형태로 짜 본다.</p>
+  </header>
+
+  <h4>1. 콘솔 색상 팩토리</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">color-console.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import chalk from "chalk";
+
+type ConsoleColor = "red" | "blue" | "green";
+
+class ColorConsole {
+  private color: ConsoleColor;
+
+  constructor(color: ConsoleColor) {
+    this.color = color;
+  }
+
+  log(message: string) {
+    console.log(chalk[this.color](message));
+  }
+}
+
+class RedConsole extends ColorConsole {
+  constructor() {
+    super("red");
+  }
+}
+class BlueConsole extends ColorConsole {
+  constructor() {
+    super("blue");
+  }
+}
+class GreenConsole extends ColorConsole {
+  constructor() {
+    super("green");
+  }
+}
+
+function createConsole(color: ConsoleColor) {
+  switch (color) {
+    case "red":
+      return new RedConsole();
+    case "blue":
+      return new BlueConsole();
+    case "green":
+      return new GreenConsole();
+  }
+}
+
+const redConsole = createConsole("red");
+redConsole.log("Hello, world!");
+
+const blueConsole = createConsole("blue");
+blueConsole.log("Hello, world!");
+
+const greenConsole = createConsole("green");
+greenConsole.log("Hello, world!");</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">서브클래스가 정말 필요한가 <span class="badge b-blue">보강</span></p>
+      <p>세 서브클래스는 <code>super(color)</code> 만 다르고 동작이 완전히 같다.
+        <a href="#item-1">1-1</a>의 "복잡한 클래스 계층 대신 간단한 함수/클로저" 원칙에 비추면
+        <code>createConsole</code> 이 <code>new ColorConsole(color)</code> 만 반환해도 충분하다.</p>
+      <p>그럼에도 이 연습이 유의미한 이유는, <b>호출부가 세 클래스의 존재를 전혀 모른다</b>는 점을 보여주기 때문이다.
+        나중에 <code>RedConsole</code> 만 다르게 동작하도록 바꿔도 <code>createConsole("red")</code> 는 그대로다.</p>
+    </div>
+  </div>
+
+  <h4>2. Request 빌더</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">request-builder.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">export class Request {
+  private url: string;
+  private method: string;
+
+  constructor(url: string, method: string) {
+    this.url = url;
+    this.method = method;
+  }
+
+  invoke(cb: (res: Response) =&gt; Promise&lt;void&gt;) {
+    fetch(this.url, {
+      method: this.method,
+    }).then(cb);
+  }
+}
+
+export class RequestBuilder {
+  private url: string;
+  private method: string;
+
+  setUrl(url: string) {
+    this.url = url;
+    return this;
+  }
+
+  setMethod(method: string) {
+    this.method = method;
+    return this;
+  }
+
+  build() {
+    return new Request(this.url, this.method);
+  }
+}
+
+const request = new RequestBuilder()
+  .setUrl("https://jsonplaceholder.typicode.com/posts")
+  .setMethod("GET")
+  .build()
+  .invoke((res) =&gt; {
+    console.log(res);
+  });</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">두 가지 다듬을 점</p>
+      <p><b>(1)</b> <code>invoke</code> 가 <code>fetch(...).then(cb)</code> 의 결과를 반환하지 않으므로
+        <b>호출자가 완료를 기다릴 수도, 실패를 잡을 수도 없다</b>.
+        <code>return fetch(...)</code> 로 바꾸면 <code>.catch()</code> 가 붙는다 —
+        <a href="#item-18">5-2</a>의 <code>return await</code> 와 같은 종류의 함정이다.</p>
+      <p><b>(2)</b> 변수명이 <code>request</code> 지만 실제로 담기는 값은 <code>invoke()</code> 의 반환값(<code>undefined</code>)이다.
+        <code>build()</code> 까지만 담고 <code>invoke</code> 는 따로 호출하는 편이 의도에 맞다.</p>
+    </div>
+  </div>
+
+  <h4>3. 변경 방지 큐</h4>
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 노트에는 제목만 있고 풀이가 없다. 내용을 지어내지 않고 자리만 표시해 둔다.</p>
+      <p>참고로 이 문제는 <a href="#item-25">7-3 공개 생성자</a>의 응용이다 —
+        큐의 <code>enqueue</code> 는 executor 에게만 주고, 소비자에게는 <code>dequeue</code> 만 노출하는 형태를 요구한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>팩토리: 호출부는 어떤 구체 클래스가 만들어지는지 알 필요가 없다</li>
+      <li>동작이 같은 서브클래스를 여러 개 만드는 것은 대개 과설계다</li>
+      <li>빌더의 <code>build()</code> 는 객체를 돌려주는 데서 끝내고, 실행은 분리한다</li>
+      <li>Promise 를 반환하지 않는 비동기 메서드는 호출자에게서 대기와 에러 처리를 빼앗는다</li>
+    </ul>
+  </div>
+</article>

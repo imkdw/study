@@ -1,0 +1,1291 @@
+<article class="item" id="item-10-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-1</div>
+    <h3>통계 정보</h3>
+    <p class="item-tagline">비용 기반 옵티마이저의 입력값. 8.0에서 <b>히스토그램</b>이 추가되면서 인덱스 없는 컬럼도 예측 대상이 되었다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    히스토그램은 <b>인덱스가 없는 컬럼</b>을 위한 것이다. 인덱스가 있는 컬럼은 <b>인덱스 다이브</b>가 더 정확하므로 히스토그램을 쓰지 않는다.
+  </div>
+
+  <h4>테이블 및 인덱스 통계 정보</h4>
+  <ul>
+    <li>비용 기반 최적화에서 <b>가장 중요한 것이 통계 정보</b>다.</li>
+    <li>MySQL은 다른 DBMS에 비해 통계 정보의 정확도가 높지 않고 <b>휘발성이 강했다.</b></li>
+    <li>그래서 실행 계획 수립 시 실제 테이블 데이터를 일부 분석해 통계를 보완한다.</li>
+  </ul>
+
+  <h5>MySQL 서버의 통계 정보</h5>
+  <ul>
+    <li>InnoDB 테이블의 통계 정보를 <b>영구적으로 관리</b>할 수 있게 개선되었다.</li>
+    <li><code>mysql.innodb_index_stats</code>, <code>mysql.innodb_table_stats</code> 테이블에 저장된다.</li>
+    <li>영구 관리가 되면서 <b>서버를 재시작해도 기존 통계가 유지</b>된다.</li>
+    <li>자동 수집을 끄면, 점검 시간이나 사용량이 적은 시간대에 <b>더 정확한 통계를 직접 수집</b>할 수도 있다.</li>
+  </ul>
+
+  <h5>STATS_PERSISTENT</h5>
+  <ul>
+    <li>테이블 단위로 영구 통계 보관 여부를 결정하는 옵션이다.</li>
+    <li><code>CREATE TABLE</code>, <code>ALTER TABLE</code> 에서 쓸 수 있다.</li>
+    <li>기본적으로 활성화되어 있으며, 비활성화하면 통계가 메모리에만 남는다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE test (
+  id INT PRIMARY KEY,
+  c1 VARCHAR(255)
+) ENGINE = INNODB
+  STATS_PERSISTENT = { DEFAULT | 0 | 1 };
+
+ALTER TABLE test STATS_PERSISTENT = { DEFAULT | 0 | 1 };</code></pre>
+  </div>
+
+  <h5>통계 정보 확인</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">인덱스 통계</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT * FROM mysql.innodb_index_stats
+WHERE DATABASE_NAME='realmysql' AND TABLE_NAME LIKE '%employees%';</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>index_name</th><th>stat_name</th><th>stat_value</th><th>sample_size</th><th>stat_description</th></tr></thead>
+      <tbody>
+        <tr><td>PRIMARY</td><td><code>n_diff_pfx01</code></td><td>297,901</td><td>20</td><td>emp_no (선행 1개 컬럼의 유니크 값 수)</td></tr>
+        <tr><td>PRIMARY</td><td><code>n_leaf_pages</code></td><td>2,577</td><td></td><td>Number of leaf pages in the index</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">테이블 통계</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT * FROM mysql.innodb_table_stats
+WHERE database_name='realmysql' AND table_name LIKE "%employees%";</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>table_name</th><th>n_rows</th><th>clustered_index_size</th><th>sum_of_other_index_sizes</th></tr></thead>
+      <tbody>
+        <tr><td>employees_comp4k</td><td>297,901</td><td>2,599</td><td>1,352</td></tr>
+        <tr><td>employees_comp8k</td><td>299,226</td><td>1,251</td><td>962</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>통계 수집 관련 변수</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>기본값</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>STATS_AUTO_RECALC</code></td><td>—</td><td>테이블 단위로 <b>자동 통계 수집 여부</b>를 제어 (테이블 생성 시 지정)</td></tr>
+        <tr><td><code>innodb_stats_transient_sample_pages</code></td><td>8</td><td><b>일시적</b> 통계 수집 시 샘플링할 페이지 수</td></tr>
+        <tr><td><code>innodb_stats_persistent_sample_pages</code></td><td>20</td><td><code>ANALYZE TABLE</code> 등 <b>영구</b> 통계 수집 시 샘플링할 페이지 수</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>히스토그램</h4>
+  <p>8.0에서 도입된, <b>컬럼의 데이터 분포도</b>를 참조할 수 있는 정보다.</p>
+
+  <h5>수집과 조회</h5>
+  <ul>
+    <li><b>컬럼 단위</b>로 관리되고, <b>자동으로 수집되지 않는다.</b> 수동으로 수집·관리해야 한다.</li>
+    <li>시스템 딕셔너리에 저장되고, 서버 시작 시 <code>information_schema.column_statistics</code> 뷰로 로드된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- gender, hire_date 컬럼의 히스토그램 수집
+ANALYZE TABLE employees UPDATE HISTOGRAM ON gender, hire_date;
+
+-- 수집된 히스토그램 조회
+SELECT * FROM information_schema.column_statistics
+WHERE schema_name='realmysql' AND table_name='employees';</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">gender 컬럼의 히스토그램 (일부)</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "buckets": [[1, 0.5998618770077537], [2, 1.0]],
+  "data-type": "enum",
+  "auto-update": false,
+  "null-values": 0.0,
+  "collation-id": 45,
+  "last-updated": "2024-09-22 07:00:59.804754",
+  "sampling-rate": 0.347187503471875,
+  "histogram-type": "singleton",
+  "number-of-buckets-specified": 100
+}</code></pre>
+  </div>
+
+  <p><code>gender</code> 는 값이 두 개뿐이라 <code>singleton</code> 타입이 선택되었고, 버킷은 <code>[값, 누적 비율]</code> 형태다. 첫 값이 전체의 약 <b>60%</b> 를 차지한다는 것을 옵티마이저가 알 수 있게 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">hire_date 컬럼의 히스토그램 (앞부분 발췌)</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "buckets": [
+    ["1985-02-01", "1985-03-01", 0.009961597622610315, 29],
+    ["1985-03-02", "1985-03-28", 0.019870875929975830, 27],
+    ["1985-03-29", "1985-04-25", 0.029842937415635103, 28],
+    "...",
+    ["1998-08-24", "2000-01-08", 1.0, 463]
+  ],
+  "data-type": "date",
+  "sampling-rate": 0.347187503471875,
+  "histogram-type": "equi-height",
+  "number-of-buckets-specified": 100
+}</code></pre>
+  </div>
+
+  <p>버킷의 네 값은 각각 <b>[구간 시작, 구간 끝, 누적 비율, 그 구간의 유니크 값 개수]</b> 다. 마지막 버킷의 구간이 유독 넓고(1998~2000) 유니크 값이 463개인 것에서, <b>데이터가 균등하지 않다</b>는 사실이 그대로 드러난다.</p>
+
+  <h5>히스토그램의 타입</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타입</th><th>방식</th><th>적합한 경우</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>singleton</code></td>
+          <td>컬럼값 <b>개별로</b> 레코드 건수를 관리</td>
+          <td>코드처럼 유니크 값이 <b>적은</b> 컬럼</td>
+        </tr>
+        <tr>
+          <td><code>equi-height</code></td>
+          <td>컬럼값의 범위를 <b>균등한 개수</b>로 나눠 관리</td>
+          <td>날짜·금액처럼 값이 많은 컬럼</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>옵션</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>sampling-rate</code></td><td>수집을 위해 스캔한 페이지의 비율. 0.35라면 약 <b>35%</b> 를 스캔한 것. 메모리 크기에 맞춰 샘플링하며 기본값은 <b>20MB</b></td></tr>
+        <tr><td><code>histogram-type</code></td><td><code>singleton</code> 또는 <code>equi-height</code></td></tr>
+        <tr><td><code>number-of-buckets-specified</code></td><td>생성 시 설정한 버킷 개수. 미지정 시 <b>100개</b>, 최대 <b>1024개</b>. 보통 100개면 충분하다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">노트의 주의 사항 <span class="badge b-blue">보강</span></p>
+      <p>노트에 적힌 대로 <b>8.0.19 미만</b>에서는 히스토그램 생성 시 <b>풀 스캔</b>으로 데이터를 읽는다. 위 예시의 <code>sampling-rate</code> 가 1이 아닌 것은 8.0.19 이상에서 샘플링 방식이 도입된 결과다. 운영 중인 대형 테이블에 히스토그램을 걸 계획이라면 <b>서버 버전을 먼저 확인</b>하는 편이 좋다.</p>
+    </div>
+  </div>
+
+  <h5>히스토그램 삭제</h5>
+  <ul>
+    <li>다른 테이블 데이터를 참조하지 않으므로 <b>즉시 삭제</b>된다.</li>
+    <li>실행 중인 다른 쿼리에 영향을 주지는 않지만, <b>이후 실행 계획이 달라질 수 있으니</b> 조심해야 한다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ANALYZE TABLE employees DROP HISTOGRAM ON gender, hire_date;</code></pre>
+  </div>
+
+  <h5>옵티마이저에서 히스토그램 비활성화</h5>
+  <p>삭제하지 않고도 실행 계획 수립에 쓰지 못하게 할 수 있다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SET { GLOBAL | SESSION } optimizer_switch='condition_fanout_filter=off';
+
+SELECT /*+ SET_VAR(optimizer_switch='condition_fanout_filter=off') */ ...
+FROM ...</code></pre>
+  </div>
+
+  <h5>히스토그램의 용도</h5>
+  <ul>
+    <li>이전에는 레코드 1,000개에 유니크 값 100개면 <b>동등 비교 시 약 10건 일치</b> 라고 단순 계산했다.</li>
+    <li>실제 데이터는 절대 균등하지 않으므로 이런 예측은 자주 틀렸다.</li>
+    <li>히스토그램은 <b>각 범위별 레코드 건수와 유니크 값 개수</b>를 갖고 있어 훨씬 정확한 예측이 가능하다.</li>
+  </ul>
+
+  <h5>히스토그램과 인덱스</h5>
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">인덱스 다이브</p>
+      <p>옵티마이저가 조건절에 일치하는 데이터 건수를 예측하기 위해 <b>B-Tree를 실제로 샘플링해 확인</b>하는 것을 인덱스 다이브라고 한다.</p>
+    </div>
+  </div>
+  <ul>
+    <li><b>인덱스된 컬럼</b>을 검색 조건으로 쓰면 히스토그램이 아니라 <b>인덱스 다이브</b>로 얻은 정보를 쓴다.
+      <ul><li>실제 검색 조건에 대해 샘플링하는 것이라 <b>히스토그램보다 정확</b>하기 때문이다.</li></ul>
+    </li>
+    <li>따라서 히스토그램은 주로 <b>인덱스되지 않은 컬럼</b>의 분포를 참조하는 용도로 쓰인다.</li>
+  </ul>
+
+  <h4>코스트 모델 (Cost Model)</h4>
+  <ul>
+    <li>전체 쿼리 비용을 계산하는 데 필요한 <b>단위 작업들의 비용</b>을 코스트 모델이라고 한다.</li>
+    <li>8.0부터는 이 비용들을 <b>직접 커스터마이징</b> 할 수 있다.</li>
+  </ul>
+
+  <h5>server_cost, engine_cost 테이블</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>테이블</th><th>관리하는 비용</th></tr></thead>
+      <tbody>
+        <tr><td><code>server_cost</code></td><td>인덱스를 찾고, 레코드를 비교하고, 임시 테이블을 처리하는 비용</td></tr>
+        <tr><td><code>engine_cost</code></td><td>레코드를 가진 <b>데이터 페이지를 가져오는</b> 비용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>공통 컬럼
+      <ul>
+        <li><code>cost_name</code> — 각 단위 작업의 이름</li>
+        <li><code>default_value</code> — 각 단위 작업의 기본 비용</li>
+        <li><code>cost_value</code> — 관리자가 설정한 값. <code>NULL</code> 이면 기본값 사용</li>
+        <li><code>last_updated</code>, <code>comment</code> — 수정 시각과 설명. 실제 동작에는 영향 없음</li>
+      </ul>
+    </li>
+    <li><code>engine_cost</code> 에만 있는 컬럼
+      <ul>
+        <li><code>engine_name</code> — 비용이 적용되는 스토리지 엔진</li>
+        <li><code>device_type</code> — 디스크 타입. 아직 <b>0만 사용 가능</b></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>계산된 비용 확인</h5>
+  <p>직접 계산해 보고 싶을 수 있지만 쉽지 않다 — <b>계산에 필요한 모든 정보가 사용자에게 노출되지 않기</b> 때문이다. 대신 결과값은 볼 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">FORMAT=TREE</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; EXPLAIN FORMAT=TREE
+    -&gt; SELECT * FROM employees e WHERE first_name = 'Matt';
+
+-&gt; Index lookup on e using ix_firstname (first_name='Matt')  (cost=81.5 rows=233)</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">FORMAT=JSON</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": { "query_cost": "81.55" },
+    "table": {
+      "table_name": "e",
+      "access_type": "ref",
+      "possible_keys": ["ix_firstname"]
+    }
+  }
+}</code></pre>
+  </div>
+
+  <h5>최적의 값?</h5>
+  <ul>
+    <li>이 값들을 커스터마이징하려면 <b>전문적인 지식이 필요</b>하다. 없다면 건드리지 않는 것이 낫다.</li>
+    <li>약 20년 동안 기본값으로도 잘 써 왔다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>InnoDB 통계는 <code>mysql.innodb_index_stats</code> / <code>innodb_table_stats</code> 에 <b>영구 보관</b>된다.</li>
+      <li>히스토그램은 <b>수동 수집</b>(<code>ANALYZE TABLE ... UPDATE HISTOGRAM</code>)이고, 인덱스 없는 컬럼용이다.</li>
+      <li><code>singleton</code>(값이 적을 때) / <code>equi-height</code>(값이 많을 때) 두 타입, 기본 버킷 100개.</li>
+      <li>인덱스가 있으면 <b>인덱스 다이브</b>가 우선한다 — 히스토그램은 인덱스의 대체재가 아니다.</li>
+      <li>코스트 모델은 손대지 않는 것이 기본이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-2</div>
+    <h3>실행 계획 확인</h3>
+    <p class="item-tagline"><code>EXPLAIN</code> 은 계획을 보여 주고, <code>EXPLAIN ANALYZE</code> 는 <b>실제로 실행해 본 결과</b>를 보여 준다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>EXPLAIN ANALYZE</code> 는 <b>쿼리를 진짜로 실행한다.</b> 그래서 계획이 나쁜 쿼리는 <code>EXPLAIN</code> 으로 먼저 손보고 나서 써야 한다.
+  </div>
+
+  <h4>실행 계획 출력 포맷</h4>
+  <p>MySQL의 실행 계획은 <code>DESC</code> 또는 <code>EXPLAIN</code> 으로 확인한다. <code>FORMAT</code> 옵션으로 세 가지 형태를 제공한다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+query...
+
+EXPLAIN FORMAT=JSON
+query...
+
+EXPLAIN FORMAT=TREE
+query...</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>포맷</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr><td>테이블 (기본)</td><td>12개 컬럼의 표. 가장 익숙하고 빠르게 훑기 좋다</td></tr>
+        <tr><td><code>JSON</code></td><td>비용 정보(<code>cost_info</code>) 등 <b>가장 많은 정보</b>를 담는다</td></tr>
+        <tr><td><code>TREE</code></td><td>연산의 <b>중첩 구조</b>가 그대로 드러난다. 조인 순서를 읽기 좋다</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>취향에 맞게 쓰면 되고, <b>실행 계획의 흐름을 보여 주는 데는 큰 차이가 없다.</b></p>
+
+  <h4>쿼리의 실행 시간 확인 — EXPLAIN ANALYZE</h4>
+  <ul>
+    <li><b>8.0.18</b> 부터 실행 계획과 <b>단계별 소요 시간</b>을 함께 볼 수 있는 <code>EXPLAIN ANALYZE</code> 가 추가되었다.</li>
+    <li>항상 TREE 형식으로 보여 주므로 다른 <code>FORMAT</code> 은 지정할 수 없다.</li>
+    <li>단순한 계획이 아니라 <b>실제로 쿼리를 실행하고</b> 그 정보를 보여 주는 것이라 느릴 수 있다.
+      <ul><li>계획이 아주 나쁜 쿼리라면 <code>EXPLAIN</code> 으로 <b>어느 정도 튜닝한 뒤에</b> 실행하는 것이 좋다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN ANALYZE
+SELECT e.emp_no, AVG(s.salary)
+FROM employees e
+  INNER JOIN salaries s ON s.emp_no = e.emp_no
+    AND s.salary &gt; 50000
+    AND s.from_date &lt;= '1990-01-01'
+    AND s.to_date &gt; '1990-01-01'
+WHERE e.first_name = 'Matt'
+GROUP BY e.hire_date, e.emp_no;</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">결과</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">-&gt; Table scan on &lt;temporary&gt;  (actual time=38.2..38.2 rows=48 loops=1)
+    -&gt; Aggregate using temporary table  (actual time=38.2..38.2 rows=48 loops=1)
+        -&gt; Nested loop inner join  (cost=536 rows=122) (actual time=1.77..37.9 rows=48 loops=1)
+            -&gt; Index lookup on e using ix_firstname (first_name='Matt')  (cost=81.5 rows=233) (actual time=1.41..1.99 rows=233 loops=1)
+            -&gt; Filter: ((s.salary &gt; 50000) and (s.from_date &lt;= DATE'1990-01-01') and (s.to_date &gt; DATE'1990-01-01'))  (cost=1.01 rows=0.522) (actual time=0.151..0.154 rows=0.206 loops=233)
+                -&gt; Index lookup on s using PRIMARY (emp_no=e.emp_no)  (cost=1.01 rows=9.41) (actual time=0.149..0.153 rows=9.53 loops=233)</code></pre>
+  </div>
+
+  <h5>읽는 법</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>항목</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>cost=</code> / <code>rows=</code></td><td>옵티마이저가 <b>예측한</b> 비용과 건수</td></tr>
+        <tr><td><code>actual time=A..B</code></td><td><b>실제</b> 소요 시간(ms). A는 첫 레코드까지, B는 마지막 레코드까지</td></tr>
+        <tr><td><code>actual ... rows=</code></td><td><b>실제</b> 반환 건수 (loops 당 평균)</td></tr>
+        <tr><td><code>loops=</code></td><td>이 단계가 <b>몇 번 반복</b>되었는가</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 출력에서 읽어야 할 것 <span class="badge b-blue">보강</span></p>
+      <p>예측 <code>rows=122</code> 대 실제 <code>rows=48</code> — <b>예측과 실제의 간격</b>이 곧 통계 정보의 정확도다. 또 안쪽 <code>Index lookup on s</code> 가 <code>loops=233</code> 인 것에서 <b>드라이빙 테이블 233건마다 드리븐을 한 번씩 탔다</b>는 네스티드 루프의 구조가 그대로 보인다. 튜닝 포인트를 찾을 때는 <b>가장 안쪽에서 loops 가 큰 단계</b>부터 본다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>EXPLAIN</code> = 예측, <code>EXPLAIN ANALYZE</code> = <b>실행 후 실측</b> (8.0.18+, TREE 고정).</li>
+      <li>포맷은 취향 — <code>JSON</code> 은 비용까지, <code>TREE</code> 는 중첩 구조까지 보여 준다.</li>
+      <li><code>ANALYZE</code> 는 쿼리를 실제로 돌린다. <b>나쁜 쿼리는 먼저 <code>EXPLAIN</code> 으로</b>.</li>
+      <li>진단은 <b>예측 rows 대 실제 rows</b> 의 간격과 <code>loops</code> 값에서 시작한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-3</div>
+    <h3>실행 계획 분석</h3>
+    <p class="item-tagline">12개 컬럼 사전. 이 챕터에서 정말 봐야 할 것은 <b><code>type</code>, <code>key</code>, <code>rows</code>, <code>Extra</code></b> 네 개다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>type</code> 은 <b>어떻게 읽었는가</b>, <code>key</code> 는 <b>무엇으로 읽었는가</b>, <code>rows</code> 는 <b>얼마나 읽을 것 같은가</b>, <code>Extra</code> 는 <b>그 밖에 무슨 일이 있었는가</b> 다.
+  </div>
+
+  <h4>실행 계획 읽는 순서</h4>
+  <ul>
+    <li>각 라인은 <b>쿼리에 사용된 테이블 개수만큼</b> 출력된다.</li>
+    <li><b>위에 있을수록</b> 쿼리의 바깥 부분이거나 먼저 접근한 테이블이다.</li>
+    <li><b>아래에 있을수록</b> 안쪽 부분이거나 나중에 접근한 테이블이다.</li>
+  </ul>
+
+  <h4>id 컬럼</h4>
+  <ul>
+    <li><b>단위 SELECT 쿼리별로</b> 부여되는 식별자다.</li>
+    <li>SELECT가 하나이고 테이블 여러 개가 조인되면 <b>id는 증가하지 않고 같은 값</b>이 부여된다.</li>
+    <li>N개의 단위 SELECT로 구성되면 서로 다른 id를 갖는다.</li>
+    <li><b>id 는 테이블 접근 순서를 의미하지 않는다.</b> 순서는 <code>EXPLAIN ANALYZE</code> 로 확인한다.</li>
+  </ul>
+
+  <h4>select_type 컬럼</h4>
+  <p>각 단위 SELECT가 <b>어떤 타입의 쿼리인지</b> 표시한다.</p>
+
+  <h5>SIMPLE</h5>
+  <ul>
+    <li><code>UNION</code> 이나 서브쿼리를 쓰지 않은 단순한 쿼리다.</li>
+    <li>일반적으로 제일 바깥 SELECT에 표시된다.</li>
+  </ul>
+
+  <h5>PRIMARY</h5>
+  <ul>
+    <li><code>UNION</code> 이나 서브쿼리를 가진 쿼리에서 <b>제일 바깥쪽</b> 단위 쿼리에 표시된다.</li>
+    <li>하나의 실행 계획에 <b>PRIMARY는 하나만</b> 존재한다.</li>
+  </ul>
+
+  <h5>UNION</h5>
+  <ul>
+    <li><code>UNION</code> 으로 결합되는 단위 SELECT 중 <b>첫 번째를 제외한</b> 두 번째 이후에 표시된다.</li>
+    <li>첫 번째 단위 SELECT는 <code>DERIVED</code> 로 표시되는데, 이는 <b>UNION 결과를 모아 담는 임시 테이블</b>을 뜻한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM (
+  (SELECT emp_no FROM employees e1 LIMIT 10) UNION ALL
+  (SELECT emp_no FROM employees e2 LIMIT 10) UNION ALL
+  (SELECT emp_no FROM employees e3 LIMIT 10)
+) tb;</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>PRIMARY</td><td><code>&lt;derived2&gt;</code></td><td>ALL</td><td></td><td>30</td><td></td></tr>
+        <tr><td>2</td><td>DERIVED</td><td>e1</td><td>index</td><td>ix_hiredate</td><td>300,030</td><td><code>Using index</code></td></tr>
+        <tr><td>3</td><td>UNION</td><td>e2</td><td>index</td><td>ix_hiredate</td><td>300,030</td><td><code>Using index</code></td></tr>
+        <tr><td>4</td><td>UNION</td><td>e3</td><td>index</td><td>ix_hiredate</td><td>300,030</td><td><code>Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>DEPENDENT UNION</h5>
+  <ul>
+    <li><code>UNION</code>, <code>UNION ALL</code> 로 집합을 결합하는 쿼리에서 표시된다.</li>
+    <li><b>DEPENDENT</b> 는 그 단위 쿼리가 <b>외부 쿼리의 영향을 받는다</b>는 뜻이다.</li>
+    <li>즉 내부 쿼리가 외부 값을 참조해서 처리될 때 붙는다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees e1 WHERE e1.emp_no IN (
+  SELECT e2.emp_no FROM employees e2 WHERE e2.first_name = 'Matt'
+  UNION
+  SELECT e3.emp_no FROM employees e3 WHERE e3.last_name = 'Matt'
+);</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>ref</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>PRIMARY</td><td>e1</td><td class="t-no">ALL</td><td></td><td>300,030</td><td><code>Using where</code></td></tr>
+        <tr><td>2</td><td>DEPENDENT SUBQUERY</td><td>e2</td><td>eq_ref</td><td>func</td><td>1</td><td><code>Using where</code></td></tr>
+        <tr><td>3</td><td>DEPENDENT UNION</td><td>e3</td><td>eq_ref</td><td>func</td><td>1</td><td><code>Using where</code></td></tr>
+        <tr><td>4</td><td>UNION RESULT</td><td><code>&lt;union2,3&gt;</code></td><td>ALL</td><td></td><td></td><td><code>Using temporary</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>내부적으로 <code>e1.emp_no = e2.emp_no</code>, <code>e1.emp_no = e3.emp_no</code> 조건이 <b>추가</b>되었다.</li>
+    <li>그래서 외부의 <code>e1</code> 에 의존하게 되고 <code>DEPENDENT</code> 가 붙는다.</li>
+  </ul>
+
+  <h5>UNION RESULT</h5>
+  <ul>
+    <li><code>UNION</code> 처리 결과를 담아 두는 테이블이다.</li>
+    <li><code>UNION</code>(= <code>UNION DISTINCT</code>)은 여전히 <b>임시 테이블에 결과를 버퍼링</b>한다.</li>
+    <li><code>&lt;union1,2&gt;</code> 의 1, 2 는 <b>id가 1인 단위 쿼리의 결과와 id가 2인 단위 쿼리의 결과를 조합</b>했다는 뜻이다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>PRIMARY</td><td>salaries</td><td>range</td><td>ix_salary</td><td>188,518</td><td><code>Using where; Using index</code></td></tr>
+        <tr><td>2</td><td>UNION</td><td>dept_emp</td><td>range</td><td>ix_fromdate</td><td>5,325</td><td><code>Using where; Using index</code></td></tr>
+        <tr><td>3</td><td>UNION RESULT</td><td><code>&lt;union1,2&gt;</code></td><td>ALL</td><td></td><td></td><td><code>Using temporary</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>SUBQUERY</h5>
+  <ul>
+    <li><code>FROM</code> 절의 서브쿼리는 <code>DERIVED</code>, <b>그 외의 서브쿼리는 모두</b> <code>SUBQUERY</code> 로 표시된다.</li>
+    <li>서브쿼리는 위치에 따라 이름이 다르다.
+      <ul>
+        <li><b>중첩 쿼리(Nested Query)</b> — <code>SELECT</code> 절에 쓰인 서브쿼리</li>
+        <li><b>서브쿼리(Subquery)</b> — <code>WHERE</code> 에 쓰인 것. 보통 그냥 서브쿼리라고 부른다</li>
+        <li><b>파생 테이블(Derived Table)</b> — <code>FROM</code> 절에 쓰인 서브쿼리</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>DEPENDENT SUBQUERY</h5>
+  <ul>
+    <li>서브쿼리가 <b>바깥쪽 SELECT에서 정의된 컬럼</b>을 쓰는 경우 표시된다.</li>
+    <li>외부 쿼리가 먼저 실행되고 나서야 내부가 실행되므로 <b>일반 서브쿼리보다 느릴 때가 많다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT e.first_name,
+  (SELECT COUNT(*)
+   FROM dept_emp de, dept_manager dm
+   WHERE dm.dept_no = de.dept_no AND de.emp_no = e.emp_no) AS cnt
+FROM employees e
+WHERE e.first_name = 'Matt';</code></pre>
+  </div>
+  <p>서브쿼리 안의 <code>de.emp_no = e.emp_no</code> 가 외부 <code>employees</code> 를 참조한다. 그래서 <code>DEPENDENT SUBQUERY</code> 다.</p>
+
+  <h5>DERIVED</h5>
+  <ul>
+    <li>SELECT 쿼리의 실행 결과로 메모리나 디스크에 <b>임시 테이블</b>을 만드는 것이다.</li>
+    <li>이때 만들어지는 임시 테이블을 <b>파생 테이블</b>이라고 한다.</li>
+    <li>가능하면 <code>DERIVED</code> 로 표시되도록 최적화하되, <b>더 좋은 것은 서브쿼리를 조인으로 바꾸는 것</b>이다.</li>
+  </ul>
+
+  <h5>DEPENDENT DERIVED</h5>
+  <ul>
+    <li>8.0부터 <b>레터럴 조인</b>이 추가되면서 <code>FROM</code> 절 서브쿼리에서도 외부 컬럼을 참조할 수 있게 되었다.</li>
+    <li><code>DEPENDENT DERIVED</code> 는 그 테이블이 <b>레터럴 조인으로 쓰였다</b>는 표시다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees e
+LEFT JOIN LATERAL (
+  SELECT * FROM salaries s
+  WHERE s.emp_no = e.emp_no
+  ORDER BY s.from_date DESC LIMIT 2
+) AS s2 ON s2.emp_no = e.emp_no;</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>PRIMARY</td><td>e</td><td>ALL</td><td></td><td>300,030</td><td><code>Rematerialize (&lt;derived2&gt;)</code></td></tr>
+        <tr><td>1</td><td>PRIMARY</td><td><code>&lt;derived2&gt;</code></td><td>ref</td><td><code>&lt;auto_key0&gt;</code></td><td>2</td><td></td></tr>
+        <tr><td>2</td><td>DEPENDENT DERIVED</td><td>s</td><td>ref</td><td>PRIMARY</td><td>9</td><td><code>Using filesort</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>UNCACHEABLE SUBQUERY</h5>
+  <ul>
+    <li>같은 서브쿼리가 재사용될 때, 보통은 다시 실행하지 않고 <b>캐싱된 결과</b>를 쓴다.
+      <ul>
+        <li>이는 쿼리 캐시나 파생 테이블과는 <b>전혀 무관</b>하다.</li>
+        <li><code>SUBQUERY</code> — 바깥의 영향을 받지 않으므로 <b>처음 한 번만</b> 실행하고 결과를 캐싱한다.</li>
+        <li><code>DEPENDENT SUBQUERY</code> — 의존하는 <b>바깥 컬럼값 단위로</b> 캐싱한다.</li>
+      </ul>
+    </li>
+    <li><code>SUBQUERY</code> 와 <code>UNCACHEABLE SUBQUERY</code> 의 차이는 <b>캐싱 가능 여부</b>다.</li>
+    <li>사용자 변수, 스토어드 루틴, 랜덤 값 등이 들어가면 캐싱할 수 없다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE e.emp_no = (
+  SELECT @status FROM dept_emp de WHERE de.dept_no='d005'
+);</code></pre>
+  </div>
+  <p>사용자 변수 <code>@status</code> 때문에 캐싱이 불가능해졌다.</p>
+
+  <h5>UNCACHEABLE UNION</h5>
+  <p>유니온 연산 결과를 캐싱할 수 없다는 뜻이다.</p>
+
+  <h5>MATERIALIZED</h5>
+  <ul>
+    <li>주로 <code>FROM</code> 절이나 <code>IN (subquery)</code> 형태의 서브쿼리 최적화에 쓰인다.</li>
+    <li>서브쿼리를 <b>임시 테이블로 구체화</b>한 뒤 조인하는 형태로 진행된다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>ref</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>SIMPLE</td><td><code>&lt;subquery2&gt;</code></td><td>ALL</td><td></td><td></td></tr>
+        <tr><td>1</td><td>SIMPLE</td><td>e</td><td>eq_ref</td><td><code>&lt;subquery2&gt;.emp_no</code></td><td></td></tr>
+        <tr><td>2</td><td>MATERIALIZED</td><td>s</td><td>range</td><td></td><td><code>Using where; Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>table 컬럼</h4>
+  <ul>
+    <li>MySQL의 실행 계획은 단위 SELECT 기준이 아니라 <b>테이블 기준</b>으로 출력된다.</li>
+    <li>테이블을 쓰지 않는 쿼리는 <code>NULL</code> 이 표시된다.</li>
+    <li><code>&lt;...&gt;</code> 는 임시 테이블을 뜻하고, 안의 숫자는 <b>단위 SELECT의 id</b> 를 가리킨다.
+      <ul><li>예) <code>&lt;derived2&gt;</code> — id가 2인 실행 계획에서 만들어진 파생 테이블</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN SELECT NOW();
+-- table: NULL, Extra: No tables used</code></pre>
+  </div>
+
+  <h4>partitions 컬럼</h4>
+  <ul>
+    <li><b>파티션 프루닝</b> 시 어떤 파티션에서 데이터를 가져올지 보여 준다.
+      <ul><li><b>파티션 프루닝</b> — 여러 파티션 중 접근이 필요한 것만 골라내고 나머지를 실행 계획에서 배제하는 작업</li></ul>
+    </li>
+    <li><code>type</code> 이 <code>ALL</code> 로 나오는 이유는, 대부분의 RDBMS에서 파티션이 <b>테이블처럼 개별 공간</b>을 가지므로 특정 파티션 안에서 풀 스캔을 하기 때문이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE employees_2 (
+    emp_no INT NOT NULL,
+    birth_date DATE NOT NULL,
+    first_name VARCHAR(14) NOT NULL,
+    last_name VARCHAR(16) NOT NULL,
+    gender ENUM('M', 'F') NOT NULL,
+    hire_date DATE NOT NULL,
+    PRIMARY KEY (emp_no, hire_date)
+) PARTITION BY RANGE COLUMNS(hire_date) (
+    PARTITION p1986_1990 VALUES LESS THAN ('1990-01-01'),
+    PARTITION p1991_1995 VALUES LESS THAN ('1996-01-01'),
+    PARTITION p1996_2000 VALUES LESS THAN ('2000-01-01'),
+    PARTITION p2001_2005 VALUES LESS THAN ('2006-01-01')
+);
+
+EXPLAIN
+SELECT * FROM employees_2
+WHERE hire_date BETWEEN '1999-11-15' AND '2000-01-15';</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>table</th><th>partitions</th><th>type</th><th>rows</th><th>filtered</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>employees_2</td><td class="t-ok"><code>p1996_2000,p2001_2005</code></td><td>ALL</td><td>22,317</td><td>11.11</td><td><code>Using where</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>4개 파티션 중 <b>2개만</b> 접근한다. 나머지 2개가 프루닝된 것이다.</p>
+
+  <h4>type 컬럼</h4>
+  <ul>
+    <li><code>type</code> 이후의 컬럼들은 <b>각 테이블의 레코드를 어떤 방식으로 읽었는지</b>를 나타낸다.</li>
+    <li><b>실행 계획에서 반드시 체크해야 하는 정보</b>다.</li>
+    <li><code>ALL</code> 을 제외한 나머지는 전부 <b>인덱스를 통한 접근</b> 방법이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["system / const"] --> B["eq_ref / ref"]
+  B --> C["fulltext / ref_or_null"]
+  C --> D["unique_subquery / index_subquery"]
+  D --> E["range"]
+  E --> F["index_merge"]
+  F --> G["index"]
+  G --> H["ALL"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>왼쪽이 빠르고 오른쪽이 느리다</b> — <code>range</code> 이상이면 대체로 괜찮고, <code>index</code> 와 <code>ALL</code> 은 스캔이다.</div>
+  </div>
+
+  <h5>system</h5>
+  <ul>
+    <li>레코드가 <b>1건만 있거나 아예 없는</b> 테이블을 참조하는 접근 방법이다.</li>
+    <li>InnoDB에는 나타나지 않고 MyISAM, MEMORY 에서만 쓰인다.</li>
+  </ul>
+
+  <h5>const</h5>
+  <ul>
+    <li>기본키나 유니크 키로 <code>WHERE</code> 조건을 걸어 <b>반드시 1건만</b> 반환하는 쿼리의 처리 방식이다.</li>
+    <li>다른 DBMS에서는 <b>유니크 인덱스 스캔</b>이라고도 부른다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>table</th><th>type</th><th>key</th><th>ref</th><th>rows</th></tr></thead>
+      <tbody>
+        <tr><td>employees</td><td class="t-ok">const</td><td>PRIMARY</td><td>const</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>const 의 내부 처리 — 상수화</h5>
+  <ul>
+    <li>최적화 단계에서 그 부분을 <b>먼저 실행하고 결과를 통째로 상수화</b>한다.</li>
+    <li>옵티마이저에 의해 상수로 치환된 뒤 다음 쿼리로 전달되므로 접근 방법이 <code>const</code> 로 보인다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT COUNT(*)
+FROM employees e1
+WHERE first_name = (SELECT first_name FROM employees e2 WHERE emp_no=10001);
+
+-- 옵티마이저가 아래처럼 바꿔 실행한다
+-- WHERE first_name = 'Georgi'</code></pre>
+  </div>
+
+  <h5>eq_ref</h5>
+  <ul>
+    <li>여러 테이블이 조인되는 실행 계획에서 표시된다.</li>
+    <li>조인에서 <b>두 번째 이후에 읽는 테이블</b>에 반드시 1건만 존재한다는 보장이 있어야 쓸 수 있다.</li>
+  </ul>
+
+  <h5>ref</h5>
+  <ul>
+    <li>인덱스의 종류와 무관하게 <b>동등(Equal) 조건</b>으로 검색할 때 쓰인다.</li>
+    <li>동등 조건으로만 검색되므로 매우 빠른 방법이다.</li>
+  </ul>
+
+  <h5>fulltext</h5>
+  <ul>
+    <li>전문 검색 문법을 쓰면 <b>무조건</b> 전문 검색 인덱스를 사용한다.</li>
+    <li>전문 검색 인덱스는 통계 정보가 관리되지 않고, 전혀 다른 문법(<code>MATCH ... AGAINST ...</code>)을 요구한다.</li>
+    <li>실제로는 <b>일반 인덱스의 레인지 스캔이 더 빠른 경우가 많았다.</b></li>
+  </ul>
+
+  <h5>ref_or_null</h5>
+  <ul>
+    <li><code>ref</code> 방식 <b>또는 NULL 비교</b> 접근 방법이다.</li>
+    <li>많이 쓰이지는 않지만, 쓰인다고 해도 나쁘지 않은 수준이다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM titles t
+WHERE to_date = '1985-03-01' OR to_date IS NULL;</code></pre>
+  </div>
+
+  <h5>unique_subquery</h5>
+  <ul>
+    <li><code>WHERE</code> 절의 <code>IN (subquery)</code> 형태를 위한 접근 방법이다.</li>
+    <li>서브쿼리가 <b>중복 없는 유니크한 값만</b> 반환할 때 쓰인다.</li>
+    <li>8.0 이후에는 <b>세미 조인 최적화</b>가 먼저 적용되어 다른 계획이 나오는 경우가 많다.</li>
+  </ul>
+
+  <h5>index_subquery</h5>
+  <ul>
+    <li>서브쿼리 결과의 <b>중복을 인덱스로 제거</b>할 수 있을 때의 방법이다.</li>
+    <li><code>unique_subquery</code> 와 달리 <b>중복이 있지만</b> 인덱스로 제거할 수 있는 경우이니 헷갈리지 말자.</li>
+  </ul>
+
+  <h5>range</h5>
+  <ul>
+    <li><b>인덱스 레인지 스캔</b>을 통한 접근이다.</li>
+    <li>주로 <code>&lt;</code>, <code>&gt;</code>, <code>IS NULL</code>, <code>BETWEEN</code>, <code>IN</code>, <code>LIKE</code> 등에서 나타난다.</li>
+    <li><b>모든 쿼리가 이 방법만 써도 최적의 성능이 보장된다</b>고 생각해도 좋다.</li>
+  </ul>
+
+  <h5>index_merge</h5>
+  <ul>
+    <li>2개 이상의 인덱스로 각각 검색하고 결과를 병합하는 방식이다.</li>
+    <li>이름만큼 효율적이지는 않다.
+      <ul>
+        <li>여러 인덱스를 읽어야 해서 <code>range</code> 보다 효율이 떨어진다.</li>
+        <li>전문 검색 인덱스에는 쓸 수 없다.</li>
+        <li>항상 2개 이상의 집합이 생기므로 <b>교집합·합집합·중복 제거</b> 같은 부가 작업이 필요하다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- BETWEEN 조건은 기본키를 통한 레인지 접근
+-- OR 의 first_name 은 ix_firstname 을 통한 접근
+-- 두 결과를 병합하고 중복을 제거한다
+EXPLAIN
+SELECT * FROM employees e
+WHERE emp_no BETWEEN 10001 AND 11000 OR first_name='smith';
+-- Extra: Using union(PRIMARY,ix_firstname); Using where</code></pre>
+  </div>
+
+  <h5>index</h5>
+  <ul>
+    <li>이름은 좋아 보이지만 <b>인덱스 풀 스캔</b>을 의미한다.</li>
+    <li>주로 아래 상황에서 선택된다.
+      <ul>
+        <li><code>range</code>, <code>const</code>, <code>ref</code> 를 쓸 수 없을 때</li>
+        <li>인덱스에 포함된 컬럼만으로 처리 가능할 때</li>
+        <li>인덱스로 정렬이나 그루핑이 가능할 때</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>d</td><td>index</td><td>ux_deptname</td><td>9</td><td><code>Backward index scan; Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>ALL</h5>
+  <ul>
+    <li><b>풀 테이블 스캔</b>이다.</li>
+    <li>어떤 방식으로도 인덱스를 쓸 수 없을 때 선택되는, 가장 비효율적인 방법이다.</li>
+    <li>다행히 InnoDB는 <b>read ahead</b> 로 한 번에 많은 페이지를 읽는 최적화를 제공한다.</li>
+  </ul>
+
+  <h4>possible_keys 컬럼</h4>
+  <ul>
+    <li>최적의 계획을 만들려고 <b>후보로 검토했던</b> 인덱스 목록이다.</li>
+    <li>말 그대로 <b>쓰일 뻔한</b> 목록이므로, 특별한 경우가 아니면 <b>그냥 무시해도 된다.</b></li>
+  </ul>
+
+  <h4>key 컬럼</h4>
+  <ul>
+    <li><b>최종적으로 선택된</b> 인덱스다.</li>
+    <li>쿼리 튜닝에서는 <b>여기에 의도한 인덱스가 있는지</b> 확인하는 것이 핵심이다.</li>
+  </ul>
+
+  <h4>key_len 컬럼</h4>
+  <ul>
+    <li>다중 컬럼 인덱스에서 <b>몇 개의 컬럼까지 사용했는지</b>를 나타낸다.</li>
+  </ul>
+
+  <h5>계산 방법</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN SELECT * FROM dept_emp WHERE dept_no='d005';
+-- key: PRIMARY, key_len: 16</code></pre>
+  </div>
+  <ul>
+    <li><code>dept_no</code> 는 <code>char(4)</code> 이다.</li>
+    <li><code>utf8mb4</code> 는 <b>한 글자당 최대 4바이트</b> 이므로 <code>4 × 4 = 16</code> 이 나온다.</li>
+  </ul>
+
+  <h5>여러 컬럼을 사용하는 경우</h5>
+  <ul>
+    <li>사용된 컬럼들의 길이가 <b>합산</b>된다.</li>
+    <li><code>INT</code> 는 4바이트다.</li>
+    <li>추가로 <b>NULL 허용 컬럼</b>은 NULL 여부를 판단하기 위해 <b>1바이트를 더</b> 쓴다.
+      <ul><li>예) <code>DATE</code> 는 3바이트인데 NULL 허용이면 <code>3 + 1 = 4</code> 바이트.</li></ul>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "<b>NOT NULL 컬럼</b>의 경우 현재 값이 NULL인지 판단하기 위해 1바이트를 추가로 사용함" 이라고 적혀 있는데, 방향이 반대다. <b><code>NOT NULL</code> 이 아닌(= NULL 을 허용하는) 컬럼</b>이 NULL 플래그 1바이트를 더 쓴다. <code>NOT NULL</code> 컬럼은 애초에 NULL일 수 없으므로 그 1바이트가 필요 없다. 이어지는 <code>DATE</code> 예시(3 + 1 = 4)도 <b>NULL 허용 DATE 컬럼</b>의 이야기다.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>table</th><th>type</th><th>key</th><th>key_len</th><th>ref</th><th>rows</th></tr></thead>
+      <tbody>
+        <tr><td>dept_emp</td><td>const</td><td>PRIMARY</td><td>20</td><td><code>const,const</code></td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>dept_no</code>(16) + <code>emp_no</code>(4) = <b>20</b>. 즉 복합 기본키 두 컬럼을 모두 사용했다는 뜻이다.</p>
+
+  <h4>ref 컬럼</h4>
+  <ul>
+    <li>참조(동등 비교 조건)에 <b>어떤 값이 제공됐는지</b> 알려 준다.</li>
+    <li><code>const</code>, <code>func</code> 같은 몇몇을 제외하면 컬럼명이 표시된다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>값</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>const</code></td><td>상수를 참조했다</td></tr>
+        <tr><td><code>func</code></td><td>값을 그대로 쓴 것이 아니라 <b>콜레이션 변환이나 연산을 거쳐</b> 참조했다</td></tr>
+        <tr><td>컬럼명</td><td>그 컬럼의 값을 참조했다 (예: <code>realmysql.de.emp_no</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">func 이 나오는 예</span>
+      <span class="code-tag bad">타입/연산 변환</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees e, dept_emp de
+WHERE e.emp_no = (de.emp_no - 1);
+-- ref: func</code></pre>
+  </div>
+  <p>가능하면 이런 변환이 필요 없도록 <b>조인 컬럼의 타입을 일치시키는</b> 것이 좋다.</p>
+
+  <h4>rows 컬럼</h4>
+  <ul>
+    <li>실행 계획의 효율성을 판단하기 위해 <b>예측한 레코드 수</b>다.</li>
+    <li>스토리지 엔진의 통계 정보로 만들어 낸 값이라 <b>정확하지 않다.</b></li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">rows 331,143 / type ALL</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM dept_emp
+WHERE from_date &gt;= '1985-01-01';
+-- 인덱스만으로 처리가 불가능하다고
+-- 판단해 풀 스캔을 선택</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">rows 292 / type range</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM dept_emp
+WHERE from_date &gt;= '2002-07-01';
+-- 범위가 좁아 적은 건수만
+-- 스캔하면 된다고 판단</code></pre>
+    </div>
+  </div>
+  <p>같은 컬럼, 같은 연산자인데 <b>상수값 하나로 접근 방법이 완전히 갈렸다.</b> 이것이 비용 기반 옵티마이저의 모습이다. 정확도를 높이고 싶다면 <a href="#item-10-1">히스토그램</a>을 쓴다.</p>
+
+  <h4>filtered 컬럼</h4>
+  <ul>
+    <li>필터링되어 <b>버려지는</b> 비율이 아니라, 필터링 후 <b>남는</b> 레코드의 비율이다.</li>
+    <li>이 값을 얼마나 정확히 예측하느냐에 따라 <b>조인 성능이 달라진다.</b></li>
+    <li>8.0부터는 히스토그램 덕분에 예측이 더 정확해졌다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>table</th><th>type</th><th>key</th><th>rows</th><th>filtered</th><th>실제 남는 건수</th></tr></thead>
+      <tbody>
+        <tr><td>e</td><td>ref</td><td>ix_firstname</td><td>233</td><td>16.65</td><td>약 39건</td></tr>
+        <tr><td>s</td><td>ref</td><td>PRIMARY</td><td>9</td><td>4.77</td><td>약 0.4건</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Extra 컬럼</h4>
+  <ul>
+    <li>내부 처리 알고리즘에 대해 <b>가장 깊이 있는 내용</b>을 보여 준다.</li>
+    <li>이름과 달리 <b>성능과 직결된 중요한 정보</b>가 자주 나오므로 반드시 확인해야 한다.</li>
+  </ul>
+
+  <h5>const row not found</h5>
+  <p><code>const</code> 방식으로 레코드를 읽었지만 <b>실제로 존재하지 않을 때</b> 표시된다.</p>
+
+  <h5>Deleting all rows</h5>
+  <ul>
+    <li><code>WHERE</code> 조건이 없는 <code>DELETE</code> 에서 자주 표시되던 것이다.</li>
+    <li>이전에는 레코드를 하나씩 지웠지만, 이 기능은 <b>한 번에 제거</b>했음을 의미한다.</li>
+    <li><b>현재는 더 이상 표시되지 않는다.</b></li>
+    <li>모든 레코드를 지울 때는 <code>DELETE</code> 대신 <code>TRUNCATE</code> 를 쓰는 것을 권장한다.</li>
+  </ul>
+
+  <h5>Distinct</h5>
+  <p>최종 결과에서 <code>DISTINCT</code> 를 처리하는 데 <b>필요한 것만 조인하고, 필요한 레코드만 읽었다</b>는 뜻이다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT DISTINCT d.dept_no
+FROM departments d, dept_emp de
+WHERE de.dept_no = d.dept_no;
+-- de 라인의 Extra: Using index; Distinct</code></pre>
+  </div>
+
+  <h5>FirstMatch</h5>
+  <p>세미 조인 최적화 중 <b>FirstMatch</b> 방식이 쓰였을 때 표시된다. 기준 테이블에 대해 상대 테이블에서 <b>첫 번째 일치 1건만</b> 찾고 그만둔다.</p>
+
+  <h5>Full scan on NULL key</h5>
+  <ul>
+    <li><code>col1 IN (SELECT col2 FROM ...)</code> 형태에서 <code>col1</code> 이 <code>NULL</code> 이면 서브쿼리 테이블의 풀 스캔이 필요해진다.</li>
+    <li>이 메시지는 <b>실행 도중 <code>col1</code> 에 NULL 이 나오면 풀 스캔을 하겠다</b>는 예고다.</li>
+    <li>NULL 규칙을 무시해도 된다면 <code>WHERE col1 IS NOT NULL</code> 을 추가하면 된다.</li>
+    <li>이 계획이 표시돼도 <b>실제로 NULL 이 없다면 풀 스캔은 일어나지 않으니</b> 안심해도 된다.</li>
+  </ul>
+
+  <h5>Impossible HAVING</h5>
+  <ul>
+    <li><code>GROUP BY ... HAVING</code> 조건을 만족하는 레코드가 없을 때 표시된다.</li>
+    <li>이 메시지가 보이면 <b>쿼리가 잘못된 경우</b>이니 다시 확인하는 것이 좋다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT e.emp_no, COUNT(*) AS cnt
+FROM employees e
+WHERE e.emp_no = 10001
+GROUP BY e.emp_no
+HAVING e.emp_no IS NULL;   -- 절대 만족할 수 없다</code></pre>
+  </div>
+
+  <h5>LooseScan</h5>
+  <p>세미 조인 최적화 중 <b>Loose Scan</b> 방식이 쓰였을 때 표시된다.</p>
+
+  <h5>No matching min/max row</h5>
+  <ul>
+    <li><code>MIN</code>, <code>MAX</code> 같은 집합 함수가 있는 쿼리의 조건에 일치하는 레코드가 <b>한 건도 없을 때</b> 나온다.</li>
+    <li>결과값으로 <code>NULL</code> 이 반환된다.</li>
+  </ul>
+
+  <h5>no matching row in const table</h5>
+  <ul>
+    <li><code>const</code> 방식으로 접근할 때 일치하는 레코드가 없는 경우 표시된다.</li>
+    <li><code>Impossible WHERE</code> 처럼 <b>실행 계획을 만들 자료 자체가 없다</b>는 의미다.</li>
+  </ul>
+
+  <h5>No matching rows after partition pruning</h5>
+  <ul>
+    <li><code>UPDATE</code>, <code>DELETE</code> 에서 나올 수 있다.</li>
+    <li>해당 파티션에 수정·삭제할 대상 레코드가 <b>없다</b>는 뜻이다.</li>
+  </ul>
+
+  <h5>No tables used</h5>
+  <p><code>FROM</code> 절이 없거나 <code>DUAL</code> 테이블을 쓰는 경우에 나온다.</p>
+
+  <h5>Not exists</h5>
+  <ul>
+    <li>A에는 있지만 B에는 없는 데이터를 찾을 때 보통 <code>NOT IN (subquery)</code> 나 <code>NOT EXISTS</code> 를 쓴다.</li>
+    <li>가능하면 <b>같은 의미의 <code>LEFT OUTER JOIN</code> + <code>IS NULL</code></b> 형태로 처리하는 것이 좋다.</li>
+    <li>이 메시지는 조인 조건에 일치하는 레코드가 여러 건이더라도 <b>딱 1건만 확인하고 끝냈다</b>는 뜻이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM dept_emp de
+LEFT JOIN departments d ON de.dept_no = d.dept_no
+WHERE d.dept_no IS NULL;
+-- d 라인의 Extra: Using where; Not exists; Using join buffer (hash join)</code></pre>
+  </div>
+
+  <h5>Plan isn't ready yet</h5>
+  <ul>
+    <li>MySQL은 <b>다른 커넥션에서 실행 중인 쿼리</b>의 실행 계획을 확인할 수 있다 — <code>EXPLAIN FOR CONNECTION &lt;connection_id&gt;</code>.</li>
+    <li>이 메시지는 그 커넥션이 <b>아직 실행 계획을 수립하지 못한 상태</b>라는 뜻이다.</li>
+  </ul>
+
+  <h5>Range checked for each record (index map: N)</h5>
+  <ul>
+    <li><b>레코드 한 건마다</b> 인덱스 레인지 스캔을 수행할지 판단한다는 뜻이다.</li>
+    <li><code>index map: N</code> 은 <b>후보 인덱스들을 비트마스크로</b> 표현한 것이다.
+      <ul><li>비트 순서는 <code>SHOW CREATE TABLE</code> 에 나오는 <b>인덱스 생성 순서</b>다.</li></ul>
+    </li>
+    <li><code>type</code> 이 <code>ALL</code> 인 이유는 <b>인덱스 사용 여부를 검토해 보고, 도움이 안 되면 풀 스캔을 하겠다</b>는 것이기 때문이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e1, employees e2
+WHERE e2.emp_no &gt; e1.emp_no;
+-- e2 라인의 Extra: Range checked for each record (index map: 0x1)</code></pre>
+  </div>
+
+  <h5>index map 읽는 법</h5>
+  <p><code>(index map: 0x19)</code> 인 경우를 예로 들면, <code>0x19</code> 를 2진수로 바꾸면 <code>11001</code> 이다. 아래 테이블 정의를 기준으로 <b>1로 켜진 자리에 해당하는 인덱스</b>가 후보다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">SHOW CREATE TABLE employees</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE TABLE `employees` (
+  `emp_no` int NOT NULL,
+  `birth_date` date NOT NULL,
+  `first_name` varchar(14) NOT NULL,
+  `last_name` varchar(16) NOT NULL,
+  `gender` enum('M','F') NOT NULL,
+  `hire_date` date NOT NULL,
+  PRIMARY KEY (`emp_no`),                                  -- 1번째
+  KEY `ix_hiredate` (`hire_date`),                         -- 2번째
+  KEY `ix_gender_birthdate` (`gender`,`birth_date`),       -- 3번째
+  KEY `ix_firstname` (`first_name`),                       -- 4번째
+  KEY `ix_gender_birthdata` (`gender`,`birth_date`),       -- 5번째
+  KEY `ix_lastname_firstname` (`last_name`,`first_name`)   -- 6번째
+) ENGINE=InnoDB</code></pre>
+  </div>
+
+  <p><code>11001</code> 을 오른쪽(1번째)부터 읽으면 1·4·5번째 자리가 켜져 있다 — 즉 <b><code>PRIMARY</code>, <code>ix_firstname</code>, <code>ix_gender_birthdata</code></b> 가 후보 인덱스다.</p>
+
+  <h5>Recursive</h5>
+  <ul>
+    <li><b>CTE(Common Table Expression)</b> 를 이용한 재귀 쿼리에 표시된다.</li>
+    <li><code>WITH</code> 와 CTE를 썼다고 나오는 것이 아니라 <b>실제로 재귀인 경우만</b> 표시된다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+WITH RECURSIVE cte (n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT n + 1 FROM cte WHERE n &lt; 5
+)
+SELECT * FROM cte;
+-- cte 라인의 Extra: Recursive; Using where</code></pre>
+  </div>
+
+  <h5>Rematerialize</h5>
+  <ul>
+    <li>레터럴 조인에서는 <b>선행 테이블의 레코드마다</b> 서브쿼리를 실행해 임시 테이블에 저장한다.</li>
+    <li>즉 <b>매번 임시 테이블이 새로 만들어지는</b> 경우에 표시된다.</li>
+  </ul>
+
+  <h5>Select tables optimized away</h5>
+  <ul>
+    <li><code>MIN</code>, <code>MAX</code> 만 SELECT에 쓰인 경우</li>
+    <li><code>GROUP BY</code> 로 <code>MIN</code>, <code>MAX</code> 를 조회하는 쿼리가 인덱스를 오름/내림차순으로 <b>1건만 읽는</b> 형태로 최적화된 경우</li>
+  </ul>
+
+  <h5>Start temporary, End temporary</h5>
+  <ul>
+    <li>세미 조인 최적화 중 <b>Duplicate Weed-out</b> 전략이 쓰였을 때 표시된다.</li>
+    <li>중복 제거를 위해 내부 임시 테이블을 쓰는데, 그 <b>구간을 식별할 수 있게</b> 표시해 준다.</li>
+  </ul>
+
+  <h5>unique row not found</h5>
+  <p>두 테이블이 각각 유니크 컬럼(기본키 포함)으로 아우터 조인을 수행하는 쿼리에서, 아우터 테이블에 일치하는 레코드가 없을 때 표시된다.</p>
+
+  <h5>Using filesort</h5>
+  <ul>
+    <li><code>ORDER BY</code> 를 인덱스로 처리할 수 없어 <b>소트 버퍼에서 CPU 연산으로</b> 처리했다는 뜻이다.</li>
+    <li>가능하면 인덱스로 처리되도록 쿼리 튜닝이나 인덱스 생성을 권장한다.</li>
+  </ul>
+
+  <h5>Using index (커버링 인덱스)</h5>
+  <ul>
+    <li><b>레코드를 전혀 읽지 않고</b> 인덱스만으로 쿼리를 처리한 경우다.</li>
+    <li>다만 특정 상황에서는 풀 스캔이 더 효율적인 경우도 있다.</li>
+    <li>InnoDB는 클러스터링 인덱스 특성 덕분에 <b>커버링 인덱스로 처리되는 경우가 많다.</b></li>
+    <li><code>type</code> 컬럼의 <code>index</code> 와는 <b>완전히 다른 것</b>이니 주의해야 한다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">헷갈리기 쉬운 두 가지</p>
+      <p><code>type = index</code> 는 <b>인덱스 풀 스캔</b>(느림). <code>Extra = Using index</code> 는 <b>커버링 인덱스</b>(빠름). 이름은 비슷한데 의미는 정반대에 가깝다.</p>
+    </div>
+  </div>
+
+  <h5>Using index condition</h5>
+  <ul>
+    <li><b>인덱스 컨디션 푸시다운</b> 최적화가 적용된 경우다.</li>
+    <li>인덱스로 읽을 범위를 먼저 좁히고, 그다음 스토리지 엔진에서 레코드를 읽는다.</li>
+  </ul>
+
+  <h5>Using index for group-by</h5>
+  <ul>
+    <li><code>GROUP BY</code> 가 인덱스를 이용해 처리될 때 표시된다 — 즉 <b>루스 인덱스 스캔</b>인 경우다.</li>
+    <li><b>타이트 인덱스 스캔</b>인 경우
+      <ul><li><code>SUM</code>, <code>AVG</code> 처럼 모든 인덱스를 다 읽어야 하는 경우로, 루스 스캔이 아니므로 <b>표시되지 않는다.</b></li></ul>
+    </li>
+    <li><b>루스 인덱스 스캔</b>인 경우
+      <ul>
+        <li>그루핑 컬럼 외에는 아무것도 조회하지 않는 쿼리에서 쓸 수 있다.</li>
+        <li><code>MIN</code>, <code>MAX</code> 처럼 인덱스의 처음이나 끝만 읽으면 되는 경우에도 가능하다.</li>
+        <li>단, <code>WHERE</code> 조건에 따라 인덱스 사용 여부가 달라질 수 있다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>Using index for skip scan</h5>
+  <ul>
+    <li>인덱스 스킵 스캔 최적화가 쓰인 경우다.</li>
+    <li>루스 인덱스 스캔을 확장한 기능이며 아직 부족한 부분이 많지만, 알아 두면 좋다.</li>
+  </ul>
+
+  <h5>Using join buffer (&lt;JOIN_ALGORITHM&gt;)</h5>
+  <p>조인 버퍼가 사용된 경우에 표시된다. 8.0.20 이후에는 대개 <code>(hash join)</code> 이 붙는다.</p>
+
+  <h5>Using MRR</h5>
+  <p>스토리지 엔진 레벨의 최적화인 <b>Multi-Range Read</b> 가 사용된 경우다.</p>
+
+  <h5>Using sort_union, Using union, Using intersect</h5>
+  <p>인덱스 머지를 쓸 때 <b>두 인덱스의 결과를 어떻게 병합했는지</b> 알려 준다. (→ <a href="#item-9-3">9-3 인덱스 머지</a>)</p>
+
+  <h5>Using temporary</h5>
+  <ul>
+    <li>임시 테이블을 사용했다는 뜻이다.</li>
+    <li>대표적으로 <code>GROUP BY</code> 에서 인덱스를 쓰지 못할 때 표시된다.</li>
+  </ul>
+
+  <h5>Using where</h5>
+  <ul>
+    <li><b>MySQL 엔진 레이어</b>에서 별도의 필터링 작업을 처리한 경우다.</li>
+    <li><b>작업 범위 결정 조건</b>은 스토리지 엔진에서 처리되지만, <b>체크 조건</b>은 MySQL 엔진에서 처리된다.</li>
+  </ul>
+
+  <h5>Zero Limit</h5>
+  <ul>
+    <li>때로는 실제 레코드가 아니라 <b>결과의 메타데이터만</b> 필요한 경우가 있다 (<code>LIMIT 0</code>).</li>
+    <li>레코드를 전혀 읽지 않고 메타데이터만 반환할 때 표시된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>실행 계획은 <b>위에서 아래로</b> 읽되, <b><code>id</code> 는 접근 순서가 아니다.</b></li>
+      <li>가장 먼저 볼 것 — <code>type</code>(접근 방법), <code>key</code>(선택된 인덱스), <code>rows</code>(예상 건수), <code>Extra</code>(그 밖의 사정).</li>
+      <li><code>type</code> 은 <code>const</code> → <code>eq_ref</code> → <code>ref</code> → <code>range</code> → <code>index</code> → <code>ALL</code> 순으로 나빠진다. <code>range</code> 이상이면 대체로 합격.</li>
+      <li><code>type=index</code>(인덱스 풀 스캔)와 <code>Extra=Using index</code>(커버링 인덱스)를 <b>혼동하지 말 것.</b></li>
+      <li><code>key_len</code> 은 <b>복합 인덱스를 어디까지 썼는지</b> 알려 주는 유일한 단서다.</li>
+      <li><code>filtered</code> 는 <b>남는</b> 비율이다. 이 예측이 정확할수록 조인 순서가 좋아진다.</li>
+    </ul>
+  </div>
+</article>

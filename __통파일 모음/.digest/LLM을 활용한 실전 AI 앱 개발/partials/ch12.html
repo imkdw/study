@@ -1,0 +1,1113 @@
+<article class="item" id="item-12-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-1</div>
+    <h3>벡터 데이터베이스란</h3>
+    <p class="item-tagline">키가 문자열이 아니라 벡터인 데이터베이스.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    벡터 DB 는 <b>벡터 사이의 거리 계산에 특화된 데이터베이스</b>다. "같은 값 찾기"가 아니라 "가까운 값 찾기"가 기본 연산이라는 점이 RDBMS 와의 결정적 차이다.
+  </div>
+
+  <h4>벡터 데이터베이스의 정의</h4>
+  <ul>
+    <li><b>벡터 임베딩을 키로 사용하는 데이터베이스</b>를 말한다.</li>
+    <li>텍스트/이미지/음성 같은 비정형 데이터는 물론, <b>서비스를 사용하는 사용자</b>도 임베딩 모델을 통해 벡터로 표현할 수 있다.</li>
+    <li>데이터를 벡터로 바꿔 저장해 두면, <b>거리 계산으로 유사하거나 관련 깊은 데이터를 검색</b>할 수 있다.</li>
+  </ul>
+
+  <h4>딥러닝과 벡터 데이터베이스</h4>
+  <p>머신러닝과 딥러닝의 차이는 <b>사람이 직접 데이터의 특징을 정의하는지</b> 여부다. 머신러닝은 특징을 사람이 설계해야 하지만, 딥러닝은 <b>그 과정조차 학습한다</b>. 데이터만 충분하면 모델이 알아서 특징을 뽑는데, 이를 <b>표현 학습</b>(representation learning)이라 한다.</p>
+
+  <p>벡터 DB 가 지금 시점에 필요해진 이유가 여기 있다 — <b>딥러닝이 좋은 표현(임베딩)을 만들어주기 시작했기 때문에</b>, 그 표현을 담고 검색할 저장소가 필요해진 것이다.</p>
+
+  <h5>벡터 DB 를 활용하는 3단계</h5>
+  <ol class="steps">
+    <li><div class="step-title">저장</div><p>저장할 데이터를 임베딩 모델에 통과시켜 벡터로 변환하고 벡터 DB 에 넣는다.</p></li>
+    <li><div class="step-title">검색</div><p>검색할 데이터도 같은 임베딩 모델로 벡터로 바꾸고 DB 에서 찾는다. 거리 계산에는 <b>유클리드 거리 / 코사인 유사도 / 점곱(내적)</b> 을 가장 많이 쓴다.</p></li>
+    <li><div class="step-title">결과 반환</div><p>검색 쿼리 임베딩과 거리가 가까운 벡터들을 찾아 반환한다.</p></li>
+  </ol>
+
+  <h5>활용처</h5>
+  <ul>
+    <li>핀터레스트처럼 <b>이미지 검색</b> 등 비정형 데이터의 유사성 기반 검색을 제공하는 서비스</li>
+    <li>사용자가 구매한 상품과 <b>유사한 상품을 추천</b>하는 추천 시스템</li>
+  </ul>
+
+  <h4>벡터 DB 지형 파악하기</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>분류</th><th>대표 제품</th><th>성격</th></tr></thead>
+      <tbody>
+        <tr><td><b>벡터 라이브러리</b></td><td>Faiss(메타), Annoy(스포티파이), ScaNN(구글), NMSLIB</td><td>인메모리 검색 라이브러리. 서버/영속성/CRUD 는 직접 구현</td></tr>
+        <tr><td><b>벡터 전용 DB</b></td><td>Pinecone, Weaviate, Milvus, Chroma, Qdrant, Vespa</td><td>벡터 검색을 위해 처음부터 설계된 데이터베이스</td></tr>
+        <tr><td><b>벡터 기능이 추가된 DB</b></td><td>Elasticsearch, PostgreSQL(pgvector), MongoDB, Neo4j</td><td>기존 DB 에 벡터 인덱스가 얹힌 형태</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 <b>NMSLIB 와 ScaNN 을 모두 구글이 만든 것</b>으로 적었는데, 이 중 구글 것은 <b>ScaNN</b>(Google Research)뿐이다. <b>NMSLIB</b>(Non-Metric Space Library)는 Bilegsaikhan Naidan / Leonid Boytsov / Yury Malkov / David Novak 등이 개발한 커뮤니티 오픈소스 프로젝트로, 특정 빅테크의 산출물이 아니다. 참고로 NMSLIB 의 공동 개발자 Yury Malkov 는 <a href="#item-12-2">12-2</a> 에서 다루는 <b>HNSW 알고리즘의 저자</b>이기도 하다. Faiss(메타)와 Annoy(스포티파이)는 노트대로 맞다. 근거: <a href="https://github.com/nmslib/nmslib">nmslib/nmslib 저장소</a></p>
+    </div>
+  </div>
+
+  <h4>어떤 기술을 고를 것인가</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  S{"기존에 쓰는 DB 가 있고<br>거기 얹고 싶은가?"} -->|"예"| A["벡터 기능이 추가된 DB<br>pgvector / Elasticsearch"]
+  S -->|"아니오"| T{"부가 기능(영속성 / 필터링<br>스케일링)이 필요한가?"}
+  T -->|"아니오"| L["벡터 라이브러리<br>Faiss / Annoy"]
+  T -->|"예"| U{"직접 운영할<br>이해도와 여력이 있는가?"}
+  U -->|"있다"| O["오픈소스 벡터 DB<br>Milvus / Qdrant / Chroma"]
+  U -->|"부족하다"| M["관리형 제품<br>Pinecone"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>선택 기준은 성능이 아니라 운영 부담이다</b> — 필요한 기능과 감당할 수 있는 운영 수준으로 갈린다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>벡터 DB = <b>벡터 임베딩을 키로 쓰는, 거리 계산에 특화된 DB</b>.</li>
+      <li>딥러닝의 <b>표현 학습</b>이 좋은 임베딩을 만들어주면서 벡터 DB 의 필요성이 생겼다.</li>
+      <li>저장 → 검색 → 반환의 3단계. 거리는 유클리드 / 코사인 / 점곱.</li>
+      <li>라이브러리 / 전용 DB / 기능 추가형 세 갈래이며, <b>부가 기능과 운영 부담</b>으로 고른다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-2</div>
+    <h3>벡터 디비 작동 원리</h3>
+    <p class="item-tagline">KNN 의 한계 → ANN → NSW → 계층 구조 → HNSW.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>정확도를 조금 포기하고 속도를 크게 얻는다</b>는 것이 ANN 의 전부다. HNSW 는 여기에 "적당히 랜덤한 연결"과 "계층 구조"라는 두 아이디어를 더한 결과물이다.
+  </div>
+
+  <h4>KNN 검색과 그 한계</h4>
+  <p>가장 기본적인 방법은 <b>KNN</b> 검색이다 — 저장된 모든 임베딩 벡터를 조회해 가장 유사한 K 개를 반환한다.</p>
+  <ul>
+    <li><b>장점</b>: 직관적이고, 모든 데이터를 조사하므로 정확하다.</li>
+    <li><b>단점</b>: 데이터가 많아질수록 연산량이 <b>데이터 수에 비례해</b> 늘어나 속도가 느려지고 확장성이 떨어진다.</li>
+  </ul>
+
+  <h5>벡터 검색의 두 단계와 네 가지 지표</h5>
+  <p>인덱스(RDBMS 의 테이블에 해당)에 벡터를 저장하는 과정을 <b>색인한다</b>고 표현한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>단계</th><th>중요한 지표</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="2"><b>색인</b></td><td>메모리 사용량</td><td>인덱스가 차지하는 메모리</td></tr>
+        <tr><td>색인 시간</td><td>벡터를 넣는 데 걸리는 시간</td></tr>
+        <tr><td rowspan="2"><b>검색</b></td><td>검색 시간</td><td>쿼리 한 건당 걸리는 시간</td></tr>
+        <tr><td><b>재현율</b>(recall)</td><td>실제로 가장 가까운 K 개의 정답 중 <b>몇 개가 검색 결과에 반환됐는지</b>의 비율</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>이 네 지표가 서로 맞물려 움직인다는 것이 <a href="#item-12-3">12-3</a> 의 파라미터 실험이 보여주는 내용이다.</p>
+
+  <h5>데이터 준비 — SIFT1M</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">wget ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz
+tar -xf sift.tar.gz
+mkdir data/sift1M -p
+mv sift/* data/sift1M</code></pre>
+  </div>
+
+  <h5>KNN 은 선형으로 느려진다</h5>
+  <p>SIFT1M 은 <b>128차원</b> 벡터 100만 개의 데이터셋이다. 참고로 BERT 는 768차원, <code>text-embedding-ada-002</code> 는 1536차원을 쓴다. <b>차원이 커질수록 검색 속도는 더 느려진다</b>.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">knn_scaling.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import time
+import faiss
+from faiss.contrib.datasets import DatasetSIFT1M
+import psutil
+
+# 현재 프로세스의 메모리 사용량을 MB 단위로 반환
+def get_memory_usage_mb():
+    process = psutil.Process()
+    return process.memory_info().rss / (1024 * 1024)
+
+ds = DatasetSIFT1M()
+
+xq = ds.get_queries()      # 검색에 사용할 쿼리 벡터
+xb = ds.get_database()     # 저장할 벡터 데이터
+gt = ds.get_groundtruth()  # 실제 정답 (재현율 계산용)
+
+k = 1
+d = xq.shape[1]
+nq = 1000                  # 검색 수행 횟수를 1,000회로 제한
+xq = xq[:nq]
+
+for i in range(1, 10, 2):
+    start_memory = get_memory_usage_mb()
+    start_indexing = time.time()
+
+    # 임베딩 벡터 색인 — IndexFlatL2 는 전수 비교(KNN)
+    index = faiss.IndexFlatL2(d)
+    index.add(xb[:(i + 1) * 100000])
+
+    end_indexing = time.time()
+    end_memory = get_memory_usage_mb()
+
+    t0 = time.time()
+    D, I = index.search(xq, k)   # 검색 수행
+    t1 = time.time()
+
+    print(f"데이터 {(i + 1) * 100000}개:")
+    print(f"색인: {(end_indexing - start_indexing) * 1000:.3f} ms "
+          f"({end_memory - start_memory:.3f} MB) "
+          f"검색: {(t1 - t0) * 1000 / nq:.3f} ms")</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>데이터 수</th><th>색인 시간</th><th>메모리 증가</th><th>쿼리당 검색 시간</th></tr></thead>
+      <tbody>
+        <tr><td>200,000</td><td>21.820 ms</td><td>98.609 MB</td><td class="t-center">0.151 ms</td></tr>
+        <tr><td>400,000</td><td>30.994 ms</td><td>195.328 MB</td><td class="t-center">0.294 ms</td></tr>
+        <tr><td>600,000</td><td>43.433 ms</td><td>97.656 MB</td><td class="t-center">0.439 ms</td></tr>
+        <tr><td>800,000</td><td>75.189 ms</td><td>97.656 MB</td><td class="t-center">0.583 ms</td></tr>
+        <tr><td>1,000,000</td><td>100.101 ms</td><td>97.406 MB</td><td class="t-center t-no">0.726 ms</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>검색 시간이 데이터 수에 <b>거의 정확히 선형</b>으로 증가한다(0.151 → 0.726, 데이터는 5배, 시간은 4.8배). 100만 건에서 0.7ms 는 괜찮아 보이지만, 1억 건이면 70ms 다 — 서비스에서는 감당하기 어려운 수치다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">메모리 수치가 들쭉날쭉한 이유 <span class="badge b-blue">보강</span></p>
+      <p>표의 메모리 증가량이 데이터 수와 비례하지 않는다(600,000 건이 400,000 건보다 작다). <code>psutil</code> 의 <b>RSS</b> 는 OS 가 이 프로세스에 실제로 매핑한 물리 메모리 총량이라, 앞 반복에서 해제된 인덱스의 메모리가 재사용되면 증가량이 작게 잡힌다. <b>증가분 측정 방식 자체의 노이즈</b>이므로, 절대적인 값보다 경향으로 읽어야 한다. 이 점은 12-3 의 실험 결과를 해석할 때 다시 중요해진다.</p>
+    </div>
+  </div>
+
+  <h4>ANN 검색이란</h4>
+  <ul>
+    <li>대용량 데이터셋에서 주어진 쿼리와 가장 유사한 항목을 <b>효율적으로</b> 찾는 기술이다.</li>
+    <li><b>약간의 정확도를 희생하는 대신 훨씬 빠른 검색 속도</b>를 제공한다.</li>
+    <li>실제 응용에서는 데이터셋이 크고 고차원인 경우가 많아 ANN 을 이해하고 응용할 줄 알아야 한다.</li>
+    <li>대표적으로 <b>IVF</b> 와 <b>HNSW</b> 가 쓰인다.</li>
+  </ul>
+
+  <h5>IVF (Inverted File Index)</h5>
+  <ul>
+    <li>검색 공간을 제한하기 위해 데이터셋 벡터들을 <b>클러스터로 그룹화</b>하는 근사 최근접 이웃 알고리즘이다.</li>
+    <li><b>인덱싱 시점</b>: 데이터를 가져와 중심점(클러스터)을 형성한다.</li>
+    <li><b>쿼리 시점</b>: 가장 가까운 클러스터를 먼저 찾고, 그 클러스터 안에서 가장 가까운 포인트를 찾는다.</li>
+    <li>전체 대신 <b>몇 개의 클러스터만</b> 검색하는 것이 IVF 의 전략이다. 일부 이웃을 놓칠 수 있다는 비용을 감수하고 검색 시간을 크게 줄인다.</li>
+  </ul>
+
+  <h5>HNSW (Hierarchical Navigable Small World)</h5>
+  <ul>
+    <li>효율적인 ANN 검색을 위한 <b>그래프 기반</b> 인덱싱 구조다.</li>
+    <li><b>상위에는 연결이 적고 하위에는 연결이 밀집된</b> 다층 그래프를 구축한다.</li>
+    <li>상위 계층은 연결이 적어 <b>한 번에 먼 거리를 이동</b>할 수 있으므로 빠르게 탐색한다.</li>
+    <li>검색은 <b>최상위 → 하위</b> 순으로 내려가며, 하위로 갈수록 연결이 많아 더 꼼꼼히 탐색한다.</li>
+    <li>속도가 빠르면서 검색 성능도 뛰어나 <b>가장 많이 활용되는 알고리즘</b>이다.</li>
+  </ul>
+
+  <h4>탐색 가능한 작은 세계(NSW)</h4>
+  <p>HNSW 는 그래프 기반이고, 그래프는 <b>노드</b>와 <b>간선</b> 두 요소로 이뤄진다. 서로 연결된 노드끼리만 탐색이 가능하므로 <b>노드 사이에 간선이 얼마나 있는지</b>에 따라 성능이 달라진다.</p>
+
+  <p><b>NSW</b> 란 규칙적으로 연결된 그래프와 랜덤 그래프 사이의, <b>적당히 랜덤하게 연결된 그래프</b>를 뜻한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>그래프 유형</th><th>탐색 정확도</th><th>탐색 속도</th><th>문제</th></tr></thead>
+      <tbody>
+        <tr><td><b>규칙적으로 연결된 그래프</b></td><td class="t-center t-ok">정확</td><td class="t-center t-no">느림</td><td>촘촘히 연결돼 있어 많은 단계를 거쳐야 한다</td></tr>
+        <tr><td><b>랜덤 그래프</b></td><td class="t-center t-no">불안정</td><td class="t-center">경우에 따라 빠름</td><td>연결되지 않은 노드가 있으면 탐색 자체가 불가능하고, 되려 더 오래 걸리기도 한다</td></tr>
+        <tr><td><b>적당히 랜덤한 그래프 (NSW)</b></td><td class="t-center t-ok">정확</td><td class="t-center t-ok">빠름</td><td>규칙적 연결로 정확성을, 랜덤 연결로 속도를 얻는다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>NSW 는 <b>규칙적인 연결에서 일부만 랜덤하게 바꾼 형태</b>다. 규칙적 연결 덕분에 정확한 탐색이 가능하면서, 랜덤한 성질 덕분에 먼 거리를 건너뛰는 지름길이 생긴다.</p>
+
+  <h5>작은 세계에서 랜덤 연결 만들기</h5>
+  <p>구현상으로는 <b>벡터의 순서를 랜덤으로 섞어서 저장하는</b> 방식을 쓴다. 다만 여기에 문제가 하나 있다.</p>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">지역 최솟값 문제</p>
+      <p>랜덤하게 저장하다 보니, 진입점에서 출발했을 때 <b>찾으려는 벡터와 가장 가까운 점이 아닌 엉뚱한 노드에서 탐색을 멈추는</b> 경우가 생긴다. 이웃 중에 자기보다 가까운 노드가 없으면 거기서 멈춰버리는데, 전역적으로는 더 가까운 노드가 다른 곳에 있는 상황이다. 이를 <b>지역 최솟값</b>(local minimum) 문제라 한다. 이 문제를 해결하려고 추가된 것이 <b>계층 구조</b>다.</p>
+    </div>
+  </div>
+
+  <h4>계층 구조</h4>
+  <ul>
+    <li>계층 구조는 자료구조 <b>연결 리스트</b> 방식으로 구성된다.</li>
+    <li>데이터가 <b>크기순으로 정렬되어 있어야</b> 연결 리스트의 탐색 속도를 높일 수 있다.</li>
+    <li><b>레벨 0 에는 모든 데이터</b>를 두고, 레벨 1 / 2 로 갈수록 데이터를 <b>듬성듬성</b> 배치한다.</li>
+    <li>HNSW 는 이 계층 구조를 NSW 에 접목해, 여러 계층에 그래프를 배치하는 방식으로 벡터를 저장한다.</li>
+    <li>확률을 이용해 높은 층으로 갈수록 데이터가 적어지는 구조를 만든다. 높은 층의 벡터는 <b>NSW 의 랜덤 연결이 탐색 단계를 줄인 것과 같은 방식으로</b> 탐색 단계를 줄여준다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 220" width="460" role="img" aria-label="HNSW 계층 구조 — 상위 레벨은 노드가 적어 멀리 이동하고 하위로 갈수록 노드가 많아져 정밀 탐색한다">
+        <text x="14" y="36" class="dg-text-sub dg-mono" font-size="11">L2</text>
+        <line x1="60" y1="32" x2="420" y2="32" class="dg-stroke" stroke-dasharray="2 4"/>
+        <circle cx="80" cy="32" r="6" class="dg-accent"/>
+        <circle cx="290" cy="32" r="6" class="dg-fill-soft dg-stroke"/>
+        <line x1="80" y1="32" x2="290" y2="32" class="dg-stroke"/>
+        <text x="440" y="36" class="dg-text-sub" font-size="10" text-anchor="end">듬성듬성</text>
+
+        <text x="14" y="106" class="dg-text-sub dg-mono" font-size="11">L1</text>
+        <line x1="60" y1="102" x2="420" y2="102" class="dg-stroke" stroke-dasharray="2 4"/>
+        <circle cx="80" cy="102" r="5" class="dg-fill-soft dg-stroke"/>
+        <circle cx="170" cy="102" r="5" class="dg-fill-soft dg-stroke"/>
+        <circle cx="290" cy="102" r="5" class="dg-accent"/>
+        <circle cx="360" cy="102" r="5" class="dg-fill-soft dg-stroke"/>
+        <line x1="80" y1="102" x2="170" y2="102" class="dg-stroke"/>
+        <line x1="170" y1="102" x2="290" y2="102" class="dg-stroke"/>
+        <line x1="290" y1="102" x2="360" y2="102" class="dg-stroke"/>
+
+        <text x="14" y="180" class="dg-text-sub dg-mono" font-size="11">L0</text>
+        <line x1="60" y1="176" x2="420" y2="176" class="dg-stroke" stroke-dasharray="2 4"/>
+        <circle cx="80" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="125" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="170" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="215" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="250" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="290" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="325" cy="176" r="4" class="dg-accent"/>
+        <circle cx="360" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <circle cx="400" cy="176" r="4" class="dg-fill-soft dg-stroke"/>
+        <line x1="80" y1="176" x2="400" y2="176" class="dg-stroke"/>
+        <text x="440" y="180" class="dg-text-sub" font-size="10" text-anchor="end">모든 데이터</text>
+
+        <line x1="290" y1="40" x2="290" y2="94" class="dg-stroke" stroke-dasharray="3 3"/>
+        <line x1="290" y1="110" x2="320" y2="168" class="dg-stroke" stroke-dasharray="3 3"/>
+        <text x="150" y="24" class="dg-text-sub" font-size="10">① 진입점에서 멀리 점프</text>
+        <text x="196" y="126" class="dg-text-sub" font-size="10">② 좁혀 들어간다</text>
+        <text x="330" y="205" class="dg-text-sub" font-size="10">③ 정밀 탐색 → 최근접</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>위층은 지도, 아래층은 골목이다</b> — 상위 계층에서 대략적인 위치를 잡고 내려오므로 지역 최솟값에 갇힐 확률이 크게 줄어든다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>KNN</b>: 전수 비교라 정확하지만 검색 시간이 데이터 수에 <b>선형 비례</b>한다.</li>
+      <li><b>ANN</b>: 정확도를 조금 포기하고 속도를 얻는 기술의 총칭. IVF(클러스터링) / HNSW(그래프).</li>
+      <li><b>NSW</b>: 규칙적 그래프(정확/느림)와 랜덤 그래프(불안정) 사이의 절충.</li>
+      <li>NSW 만으로는 <b>지역 최솟값</b> 문제가 남는다 → <b>계층 구조</b>로 해결.</li>
+      <li>HNSW = NSW + 계층. 상위 계층은 듬성듬성해 멀리 점프하고, 레벨 0 에는 모든 데이터가 있다.</li>
+      <li>색인은 <b>메모리/시간</b>, 검색은 <b>시간/재현율</b> — 이 네 지표가 서로 맞물린다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-3</div>
+    <h3>HNSW 인덱스의 핵심 파라미터 이해하기</h3>
+    <p class="item-tagline">m / ef_construction / ef_search — 셋이 네 지표를 흔든다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b><code>m</code> 은 메모리를, <code>ef_construction</code> 은 색인 시간을, <code>ef_search</code> 는 검색 시간을 대가로 재현율을 산다.</b> 어느 자원을 내줄 수 있는지가 튜닝의 출발점이다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>파라미터</th><th>의미</th><th>주로 영향받는 지표</th></tr></thead>
+      <tbody>
+        <tr><td><code>m</code></td><td>하나의 벡터에 연결하는 간선의 수</td><td>메모리 / 색인 시간 / 재현율</td></tr>
+        <tr><td><code>ef_construction</code></td><td><b>색인</b> 과정에서 가장 가까운 M 개를 고르기 위해 저장하는 후보 수</td><td>색인 시간 / 그래프 품질</td></tr>
+        <tr><td><code>ef_search</code></td><td><b>검색</b> 과정에서 가장 가까운 K 개를 고를 때 저장하는 후보 수</td><td>검색 시간 / 재현율</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>파라미터 m 이해하기</h4>
+  <ul>
+    <li>HNSW 에서 추가하는 임베딩 벡터에 연결하는 <b>간선의 수</b>다.</li>
+    <li>연결이 많을수록 그래프가 촘촘해져 <b>검색 품질(재현율)이 좋아진다</b>.</li>
+    <li>대신 더 많은 연결을 만들고 저장해야 하므로 <b>메모리 사용량이 커지고 색인 시간이 길어진다</b>.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 <code>m</code> 을 <b>"하나의 벡터에 연결하는 <u>최소</u> 연결 수"</b> 라고 적었지만, HNSW 원논문(Malkov &amp; Yashunin)에서 <code>M</code> 은 <b>노드를 삽입할 때 만드는 연결의 수이자 각 계층에서 유지하는 연결 수의 상한</b>이다. 최소가 아니라 <b>목표치이자 상한</b>에 가깝다. 또 한 가지 — 상위 계층은 <code>M</code> 개까지 유지하지만 <b>레벨 0 은 <code>2M</code> 까지</b> 유지한다(<code>Mmax0 = 2M</code>). 아래 표에서 M 을 두 배로 늘릴 때 메모리가 정확히 두 배로 늘지 않는 것도 이 비대칭 때문이다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">param_m.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import numpy as np
+import time
+import faiss
+from faiss.contrib.datasets import DatasetSIFT1M
+import psutil
+
+def get_memory_usage_mb():
+    return psutil.Process().memory_info().rss / (1024 * 1024)
+
+ds = DatasetSIFT1M()
+xq = ds.get_queries()
+xb = ds.get_database()
+gt = ds.get_groundtruth()
+
+k = 1
+d = xq.shape[1]
+nq = 1000
+xq = xq[:nq]
+
+for m in [8, 16, 32, 64]:
+    # 간선의 수를 늘려가며 색인
+    index = faiss.IndexHNSWFlat(d, m)
+    time.sleep(3)
+    start_memory = get_memory_usage_mb()
+    start_index = time.time()
+    index.add(xb)
+    end_memory = get_memory_usage_mb()
+    end_index = time.time()
+    print(f"M: {m} - 색인 시간: {end_index - start_index} s, "
+          f"메모리 사용량: {end_memory - start_memory} MB")
+
+    t0 = time.time()
+    D, I = index.search(xq, k)
+    t1 = time.time()
+
+    # 재현율 계산 — 정답과 일치한 비율
+    recall_at_1 = np.equal(I, gt[:nq, :1]).sum() / float(nq)
+    print(f"{(t1 - t0) * 1000.0 / nq:.3f} ms per query, R@1 {recall_at_1:.3f}")</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>M</code></th><th>색인 시간</th><th>메모리</th><th>쿼리당 검색</th><th>R@1</th></tr></thead>
+      <tbody>
+        <tr><td>8</td><td>13.02 s</td><td>734.70 MB</td><td>0.006 ms</td><td class="t-center t-no">0.678</td></tr>
+        <tr><td>16</td><td>14.66 s</td><td>440.72 MB</td><td>0.009 ms</td><td class="t-center">0.777</td></tr>
+        <tr><td>32</td><td>26.44 s</td><td>689.97 MB</td><td>0.011 ms</td><td class="t-center">0.904</td></tr>
+        <tr><td>64</td><td>33.05 s</td><td>984.58 MB</td><td>0.015 ms</td><td class="t-center t-ok">0.937</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>간선이 늘어날수록 <b>색인 시간과 검색 시간이 증가</b>하지만 <b>재현율도 함께 올라간다</b>(0.678 → 0.937). 보통 <b>5~48</b> 범위를 쓰며, <b>메모리가 허용하는 선에서 값을 키워 검색 품질을 높이는 것이 유리하다</b>.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">메모리 열은 그대로 믿으면 안 된다</p>
+      <p>노트는 "간선 수가 늘어날수록 메모리 사용량이 증가한다"고 정리했지만, 표에서는 <b><code>M=8</code>(734MB)이 <code>M=16</code>(440MB)보다 크다</b>. 실제로 M 이 커지면 메모리는 늘어나는 게 맞다. 어긋난 이유는 12-2 에서 짚은 <b>RSS 증가분 측정의 노이즈</b> 때문이다 — 앞 반복의 인덱스가 해제되고 남은 메모리를 다음 반복이 재사용하면 증가분이 작게 잡힌다. <b>M=8 → 64 로 갈 때 전체 경향이 우상향</b>이라는 점만 취하면 된다.</p>
+    </div>
+  </div>
+
+  <h4>파라미터 ef_construction 이해하기</h4>
+  <ul>
+    <li>인덱스에 새 벡터를 추가할 때도 <b>검색과 마찬가지로</b> 그 벡터와 가장 가까운 벡터들을 탐색한다.</li>
+    <li><code>ef_construction</code> 은 이때 <b>저장하는 후보의 수</b>를 결정한다.</li>
+    <li>값이 클수록 더 많은 후보를 탐색하므로 <b>실제로 가장 가까운 벡터를 고를 가능성이 높아진다</b> = 그래프 품질이 좋아진다.</li>
+    <li>단, <b>색인 시간은 증가</b>하지만 메모리 사용량과 검색 시간은 크게 영향받지 않는다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">param_ef_construction.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">for ef_construction in [40, 80, 160, 320]:
+    # 간선 수(m)는 32 로 고정
+    index = faiss.IndexHNSWFlat(d, 32)
+    index.hnsw.efConstruction = ef_construction
+
+    time.sleep(3)
+    start_memory = get_memory_usage_mb()
+    start_index = time.time()
+    index.add(xb)
+    end_memory = get_memory_usage_mb()
+    end_index = time.time()
+    print(f"efConstruction: {ef_construction} - 색인 시간: {end_index - start_index} s, "
+          f"메모리 사용량: {end_memory - start_memory} MB")
+
+    t0 = time.time()
+    D, I = index.search(xq, k)
+    t1 = time.time()
+
+    recall_at_1 = np.equal(I, gt[:nq, :1]).sum() / float(nq)
+    print(f"{(t1 - t0) * 1000.0 / nq:.3f} ms per query, R@1 {recall_at_1:.3f}")</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>efConstruction</code></th><th>색인 시간</th><th>메모리</th><th>쿼리당 검색</th><th>R@1</th></tr></thead>
+      <tbody>
+        <tr><td>40</td><td class="t-center">27.92 s</td><td>894.72 MB</td><td>0.012 ms</td><td class="t-center">0.898</td></tr>
+        <tr><td>80</td><td class="t-center">34.29 s</td><td>750.91 MB</td><td>0.009 ms</td><td class="t-center">0.874</td></tr>
+        <tr><td>160</td><td class="t-center">62.41 s</td><td>701.89 MB</td><td>0.013 ms</td><td class="t-center">0.894</td></tr>
+        <tr><td>320</td><td class="t-center t-no">117.34 s</td><td>734.88 MB</td><td>0.012 ms</td><td class="t-center">0.908</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>색인 시간은 거의 배수로 증가</b>(27.9 → 117.3, 4.2배)하는 반면 <b>메모리 사용량이나 재현율은 큰 차이가 없다</b>. 재현율이 오히려 낮아지는 구간(80)도 있는데, <b>그래프 생성에 랜덤성이 들어가기 때문에 결과가 언제나 의도한 대로 나오지는 않는다</b>.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 실험에서 얻을 실무 결론 <span class="badge b-blue">보강</span></p>
+      <p><code>efConstruction</code> 은 <b>수익 체감이 매우 빠른 파라미터</b>다. 이 데이터셋에서는 40 에서 320 으로 8배 올려 색인 시간을 4배 쓰고 재현율은 0.01 얻었다. <b>재현율을 올리고 싶다면 <code>efConstruction</code> 보다 <code>m</code> 이나 <code>ef_search</code> 를 먼저 건드리는 편이 낫다</b>(m: 0.678→0.937, ef_search: 0.902→0.995). 다만 색인은 한 번, 검색은 수백만 번이므로 <b>색인 시간은 상대적으로 지불하기 쉬운 비용</b>이라는 점도 함께 고려한다.</p>
+    </div>
+  </div>
+
+  <h4>파라미터 ef_search 이해하기</h4>
+  <ul>
+    <li><code>ef_construction</code> 이 <b>색인 단계</b>의 후보군 크기라면, <code>ef_search</code> 는 <b>검색 단계</b>의 후보군 크기다.</li>
+    <li>후보군이 커지면 더 많은 벡터를 탐색하므로 <b>재현율이 높아진다</b>.</li>
+    <li>대신 <b>검색 시간이 길어진다</b>.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">param_ef_search.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">for ef_search in [16, 32, 64, 128]:
+    index = faiss.IndexHNSWFlat(d, 32)
+    index.hnsw.efSearch = ef_search
+
+    start_memory = get_memory_usage_mb()
+    start_index = time.time()
+    index.add(xb)
+    end_memory = get_memory_usage_mb()
+    end_index = time.time()
+
+    t0 = time.time()
+    D, I = index.search(xq, k)
+    t1 = time.time()
+
+    recall_at_1 = np.equal(I, gt[:nq, :1]).sum() / float(nq)
+    print(f"efSearch: {ef_search} - {(t1 - t0) * 1000.0 / nq:.3f} ms per query, "
+          f"R@1 {recall_at_1:.3f}")</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>efSearch</code></th><th>쿼리당 검색 시간</th><th>R@1</th></tr></thead>
+      <tbody>
+        <tr><td>16</td><td class="t-center t-ok">0.012 ms</td><td class="t-center">0.902</td></tr>
+        <tr><td>32</td><td class="t-center">0.016 ms</td><td class="t-center">0.958</td></tr>
+        <tr><td>64</td><td class="t-center">0.030 ms</td><td class="t-center">0.980</td></tr>
+        <tr><td>128</td><td class="t-center t-no">0.054 ms</td><td class="t-center t-ok">0.995</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>후보군이 커질수록 <b>검색 시간이 증가</b>한다(0.012 → 0.054, 4.5배). 대신 재현율이 <b>0.902 → 0.995</b> 로 올라간다. 노트의 원본 코드에는 <code>ef_search</code> 값을 출력하는 부분이 빠져 있어 어느 줄이 어느 설정인지 알 수 없었는데, 위 코드에서는 값을 함께 찍도록 했다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">세 파라미터 중 가장 다루기 쉬운 것</p>
+      <p><code>ef_search</code> 는 <b>색인을 다시 하지 않고 런타임에 바꿀 수 있는 유일한 파라미터</b>다. <code>m</code> 과 <code>ef_construction</code> 은 그래프 구조 자체에 박히므로 바꾸려면 <b>전체 재색인</b>이 필요하다. 그래서 실무 튜닝 순서는 보통 이렇다 — 먼저 메모리 예산 안에서 <code>m</code> 을 정해 색인하고, 그 다음 <b>재현율 목표와 지연 예산에 맞춰 <code>ef_search</code> 를 조절</b>한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b><code>m</code></b>: 간선 수. ↑ 하면 재현율 ↑, 메모리/색인 시간 ↑. 통상 5~48. 레벨 0 은 <code>2M</code>.</li>
+      <li><b><code>ef_construction</code></b>: 색인 시 후보 수. ↑ 하면 색인 시간이 크게 ↑ 하는데 재현율 개선은 미미했다.</li>
+      <li><b><code>ef_search</code></b>: 검색 시 후보 수. 0.902 → 0.995 로 재현율을 가장 크게 끌어올린 파라미터.</li>
+      <li><code>ef_search</code> 만 <b>재색인 없이 런타임에 조정 가능</b>하다.</li>
+      <li>그래프 생성에 랜덤성이 있어 결과가 늘 단조롭게 나오지는 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-4</div>
+    <h3>파인콘으로 벡터 검색 구현하기</h3>
+    <p class="item-tagline">인덱스 만들고, 임베딩 넣고, 검색한다 — 관리형 벡터 DB 의 3단계.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    파인콘에서 <b>인덱스 생성 시 차원 수를 고정</b>한다. 이 값은 사용할 임베딩 모델의 출력 차원과 반드시 일치해야 하며, 나중에 바꿀 수 없다.
+  </div>
+
+  <h4>파인콘 연동과 인덱스 생성</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">create_index.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from pinecone import Pinecone, ServerlessSpec
+
+pinecone_api_key = ''
+pc = Pinecone(api_key=pinecone_api_key)
+
+# 인덱스(테이블) 이름: llm-book
+# 스펙: 서버리스 / AWS / us-east-1 / 768차원
+index_name = "llm-book"
+
+if not pc.has_index(index_name):
+    pc.create_index(
+        name=index_name,
+        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+        dimension=768,
+    )
+
+index = pc.Index(index_name)</code></pre>
+  </div>
+
+  <p><code>dimension=768</code> 은 임의의 값이 아니다. 아래에서 쓸 <code>snunlp/KR-SBERT-V40K-klueNLI-augSTS</code> 가 <b><code>klue/roberta-base</code> 기반이라 출력이 768차원</b>이기 때문이다(<a href="#item-3-3">3-3 의 config.json</a> 에서 <code>hidden_size: 768</code> 로 확인할 수 있다). 모델을 바꾸면 인덱스를 다시 만들어야 한다.</p>
+
+  <h4>임베딩 생성</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">embed.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from sentence_transformers import SentenceTransformer
+from datasets import load_dataset
+
+sentence_model = SentenceTransformer('snunlp/KR-SBERT-V40K-klueNLI-augSTS')
+klue_dp_train = load_dataset('klue', 'dp', split='train[:100]')
+
+embeddings = sentence_model.encode(klue_dp_train['sentence'])</code></pre>
+  </div>
+
+  <h4>데이터 형식 변환 및 인덱스에 저장</h4>
+  <p>파인콘은 <code>{id, values, metadata}</code> 형식을 요구한다. <code>values</code> 는 <b>파이썬 리스트</b>여야 하므로 넘파이 배열을 <code>tolist()</code> 로 변환한다. <code>metadata</code> 에 원본 텍스트를 넣어두면 검색 결과에서 바로 꺼내 쓸 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">upsert.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python"># 넘파이 배열 → 파이썬 리스트
+embeddings = embeddings.tolist()
+
+# 파인콘에 추가할 데이터 형식으로 변환
+insert_data = []
+for idx, (embedding, text) in enumerate(zip(embeddings, klue_dp_train['sentence'])):
+    insert_data.append({
+        "id": str(idx),                 # 문자열이어야 한다
+        "values": embedding,            # 임베딩 벡터
+        "metadata": {'text': text},     # 함께 저장할 부가 정보
+    })
+
+# 인덱스에 저장 (namespace 로 논리적 구획을 나눈다)
+upsert_response = index.upsert(vectors=insert_data, namespace='llm-book-sub')</code></pre>
+  </div>
+
+  <h4>인덱스 검색 수행</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">query.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">query_response = index.query(
+    namespace='llm-book-sub',   # 검색할 네임스페이스
+    top_k=10,                   # 반환할 결과 수
+    include_values=True,        # 벡터 임베딩까지 반환할지
+    include_metadata=True,      # 메타데이터를 반환할지
+    vector=embeddings[0],       # 검색할 벡터 임베딩
+)
+
+'''
+{
+    'matches': [
+        {
+            'id': '0',
+            'score': 0.999613702,          ← 자기 자신이라 거의 1
+            'metadata': {
+                'text': '해당 그림을 보면 디즈니 공주들이 브리트니 스피어스의 앨범이나 뮤직비디오, '
+                        '화보 속 모습을 똑같이 재연했다.'
+            },
+            'values': [-1.10073376, 0.220478311, 0.742353678, ... 0.350117356]
+        }
+    ],
+    'namespace': 'llm-book-sub',
+    'usage': {'read_units': 1}
+}
+'''
+print(query_response)</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">include_values 는 대개 False 가 낫다 <span class="badge b-blue">보강</span></p>
+      <p><code>include_values=True</code> 면 결과마다 768개의 실수가 통째로 따라온다. <code>top_k=10</code> 이면 7,680개 — 네트워크와 파싱 비용이 만만치 않은데 <b>대부분의 애플리케이션은 이 값을 쓰지 않는다</b>. 필요한 것은 <code>metadata</code> 의 원문과 <code>score</code> 뿐이므로, 실제 서비스에서는 <code>include_values=False</code> 로 두는 편이 좋다.</p>
+    </div>
+  </div>
+
+  <h4>수정 및 삭제</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">update_delete.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">new_text = '변경할 새로운 텍스트'
+new_embedding = sentence_model.encode(new_text).tolist()
+
+# 수정 — 벡터와 메타데이터를 함께 갱신해야 일관성이 유지된다
+update_response = index.update(
+    id='기존_문서_id',
+    values=new_embedding,
+    set_metadata={'text': new_text},
+    namespace='llm-book-sub',
+)
+
+# 삭제
+delete_response = index.delete(ids=['기존_문서_id'], namespace='llm-book-sub')</code></pre>
+  </div>
+
+  <p>수정할 때 <b>벡터만 바꾸고 메타데이터를 그대로 두거나 그 반대로 하면 데이터가 어긋난다</b>. 검색은 벡터로 하고 결과는 메타데이터로 보여주기 때문에, 둘이 다른 내용을 가리키면 엉뚱한 결과가 나온다.</p>
+
+  <h4>라마인덱스에서 벡터 DB 바꾸기</h4>
+  <p>라마인덱스는 기본 벡터 DB(인메모리)를 쓰지만, <b>다양한 벡터 DB 와 쉽게 통합</b>할 수 있는 기능을 제공한다. <code>StorageContext</code> 만 갈아끼우면 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">llamaindex_pinecone.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import os
+from pinecone import Pinecone, ServerlessSpec
+from llama_index.vector_stores.pinecone import PineconeVectorStore
+from llama_index.core import StorageContext, Document, VectorStoreIndex
+from datasets import load_dataset
+
+pinecone_api_key = ''
+pc = Pinecone(api_key=pinecone_api_key)
+index_name = "llm-book"
+
+if not pc.has_index(index_name):
+    pc.create_index(
+        name=index_name,
+        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+        dimension=768,
+    )
+
+pinecone_index = pc.Index(index_name)
+
+# documents 생성
+os.environ["OPENAI_API_KEY"] = ""
+dataset = load_dataset('klue', 'mrc', split='train')
+text_list = dataset[:100]['context']
+documents = [Document(text=t) for t in text_list]
+
+# 벡터 DB 를 파인콘으로 교체
+vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">차원 불일치에 주의</p>
+      <p>위 코드의 인덱스는 <b>768차원</b>으로 만들어져 있는데, 라마인덱스가 <code>OPENAI_API_KEY</code> 만 보고 기본 임베딩 모델(<code>text-embedding-ada-002</code>, <b>1536차원</b>)을 쓰면 <b>차원이 맞지 않아 업서트가 실패한다</b>. 파인콘 인덱스를 1536 으로 만들거나, <code>Settings.embed_model</code> 에 768차원 모델을 명시해야 한다(<a href="#item-10-3">10-3</a> 참고).</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>인덱스 생성 시 <b>차원 수</b>를 정하며, 임베딩 모델의 출력 차원과 반드시 일치해야 한다.</li>
+      <li>저장 형식은 <code>{id, values, metadata}</code>. <code>id</code> 는 문자열, <code>values</code> 는 리스트.</li>
+      <li><code>namespace</code> 로 하나의 인덱스를 논리적으로 구획한다.</li>
+      <li>수정 시 <b>벡터와 메타데이터를 함께</b> 갱신해야 어긋나지 않는다.</li>
+      <li>라마인덱스는 <code>StorageContext</code> 교체만으로 벡터 DB 를 바꿀 수 있다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-5</div>
+    <h3>파인콘을 활용한 멀티 모달 검색 구현하기</h3>
+    <p class="item-tagline">텍스트로 색인한 DB 를 이미지로 검색한다 — CLIP 이 있어서 가능한 일.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>CLIP 의 텍스트 인코더로 색인하고 이미지 인코더로 검색한다.</b> 두 인코더의 출력이 같은 벡터 공간에 있기 때문에, 인코더가 달라도 거리 비교가 성립한다.
+  </div>
+
+  <h4>데이터셋 — DiffusionDB</h4>
+  <ul>
+    <li>스테이블 디퓨전으로 만든 <b>이미지-프롬프트 쌍</b>으로 구성된 데이터셋이다.</li>
+    <li>200만 개 이미지의 <b>DiffusionDB 2M</b> 과 1,400만 개의 <b>DiffusionDB Large</b> 가 있다.</li>
+    <li>실습에서는 <code>2m_first_1k</code> 서브셋으로 <b>1,000개만</b> 사용한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">load_dataset.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from datasets import load_dataset
+
+dataset = load_dataset('poloclub/diffusiondb', "2m_first_1k", split='train')
+example_index = 867
+original_image  = dataset[example_index]['image']
+original_prompt = dataset[example_index]['prompt']
+
+# &lt;PIL.PngImagePlugin.PngImageFile image mode=RGB size=512x512 at 0x134481430&gt;
+print(original_image)</code></pre>
+  </div>
+
+  <h4>실습 흐름</h4>
+  <p><b>원본 이미지</b> 하나와, 서로 다른 세 가지 프롬프트로 생성한 <b>합성 이미지 세 개</b>를 비교한다. 이미지 생성에는 DALL-E 3 을 쓴다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">GPT-4o 가 만든 설명</div><p>원본 이미지를 멀티 모달 LLM 인 GPT-4o 에 입력해 설명을 받아 프롬프트로 쓴다.</p></li>
+    <li><div class="step-title">원본 프롬프트</div><p>원본 이미지에 실제로 대응되는 프롬프트를 그대로 쓴다.</p></li>
+    <li><div class="step-title">검색으로 찾은 유사 프롬프트</div><p>전체 프롬프트 텍스트를 임베딩해 벡터 DB 에 저장해 두고, <b>원본 이미지를 이미지 임베딩으로 변환해 검색</b>한 결과의 프롬프트를 쓴다.</p></li>
+  </ol>
+
+  <h4>GPT-4o 로 이미지 설명 생성하기</h4>
+  <p>OpenAI 의 Vision API 에 이미지를 넘기려면 <b>base64 로 인코딩해 data URL 형태</b>로 만들어야 한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">describe_image.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import requests, base64, os
+from io import BytesIO
+from datasets import load_dataset
+
+os.environ["OPENAI_API_KEY"] = ""
+
+def make_base64(image):
+    buffered = BytesIO()
+    image.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+def generate_description_from_image_gpt4(prompt, image64):
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+    }
+    payload = {
+        "model": "gpt-4o",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url",
+                 "image_url": {"url": f"data:image/jpeg;base64,{image64}"}},
+            ],
+        }],
+        "max_tokens": 300,
+    }
+    response_oai = requests.post(
+        "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+    )
+    return response_oai.json()["choices"][0]["message"]["content"]
+
+dataset = load_dataset("poloclub/diffusiondb", "2m_first_1k", split="train")
+example_index = 867
+original_image  = dataset[example_index]["image"]
+original_prompt = dataset[example_index]["prompt"]
+
+image_base64 = make_base64(original_image)
+described_result = generate_description_from_image_gpt4("Describe provided image", image_base64)
+
+'''
+The image depicts a lion with an elaborate and colorful mane that resembles peacock feathers.
+The mane features vibrant hues of blue, green, and purple, with eye-like patterns similar to
+those found on peacock feathers. The lion sits against a natural background with patches of
+grass and flowers, creating a whimsical and fantastical scene.
+The overall tone of the image is vibrant and imaginative.
+'''
+print(described_result)</code></pre>
+  </div>
+
+  <h4>프롬프트 저장하기</h4>
+
+  <h5>인덱스 생성</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">create_mm_index.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from pinecone import Pinecone, ServerlessSpec
+
+pc = Pinecone(api_key=pinecon_api_key)
+
+index_name = "llm-multimodal"
+try:
+    pc.create_index(
+        name=index_name,
+        dimension=512,        # CLIP ViT-B/32 의 임베딩 차원
+        metric="cosine",      # 코사인 유사도를 평가 지표로 사용
+        spec=ServerlessSpec("aws", "us-east-1"),
+    )
+    print(pc.list_indexes())
+except:
+    print("인덱스가 이미 있음")
+
+index = pc.Index(index_name)</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 이 줄에 <code># 무료 차원인 512차원 사용</code> 이라는 주석이 달려 있는데, <b>파인콘 무료 플랜에 512차원이라는 제한은 없다</b>. 512 를 쓴 진짜 이유는 이 실습이 쓰는 <b><code>openai/clip-vit-base-patch32</code> 의 프로젝션 출력 차원이 512</b> 이기 때문이다. 12-4 에서 768 을 쓴 것과 같은 원리다 — <b>인덱스 차원은 늘 임베딩 모델이 결정한다</b>. 다른 CLIP 변형을 쓰면(예: ViT-L/14 는 768) 이 값도 따라 바뀐다.</p>
+    </div>
+  </div>
+
+  <h5>프롬프트 텍스트 → 임베딩 → 파인콘 저장</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">index_prompts.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import torch
+from tqdm.auto import trange
+from transformers import AutoTokenizer, CLIPTextModelWithProjection
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# CLIP 의 텍스트 쪽 인코더
+text_model = CLIPTextModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+tokenizer  = AutoTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+
+tokens = tokenizer(dataset['prompt'], padding=True, return_tensors="pt", truncation=True)
+batch_size = 16
+text_embs = []
+
+for start_idx in trange(0, len(dataset), batch_size):
+    with torch.no_grad():
+        outputs = text_model(
+            input_ids=tokens['input_ids'][start_idx:start_idx + batch_size],
+            attention_mask=tokens['attention_mask'][start_idx:start_idx + batch_size],
+        )
+        text_embs.append(outputs.text_embeds)
+
+text_embs = torch.cat(text_embs, dim=0)
+
+'''
+tensor([[-0.1001, -0.0165,  0.1752,  ..., -0.1827, -0.1109, -0.7854],
+        [ 0.4135,  0.1837, -0.0263,  ..., -0.0776, -0.2004, -0.3663],
+        ...,
+        [ 0.1094, -0.1349, -0.5255,  ..., -0.1460,  0.4290,  0.1840]])
+'''
+print(text_embs)
+
+# 파인콘에 저장
+input_data = []
+for id_int, emb, prompt in zip(range(0, len(dataset)), text_embs.tolist(), dataset['prompt']):
+    input_data.append({
+        "id": str(id_int),
+        "values": emb,
+        "metadata": {"prompt": prompt},
+    })
+
+index.upsert(vectors=input_data)   # {'upserted_count': 1000}</code></pre>
+  </div>
+
+  <p><code>torch.no_grad()</code> 로 그레이디언트 계산을 끄고, 배치 단위로 나눠 처리한다. 추론만 할 때 필수적인 두 가지 습관이다.</p>
+
+  <h5>이미지 임베딩으로 유사 프롬프트 검색</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">search_by_image.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from transformers import AutoProcessor, CLIPVisionModelWithProjection
+
+# CLIP 의 이미지 쪽 인코더
+vision_model = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+processor    = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+inputs  = processor(images=original_image, return_tensors="pt")
+outputs = vision_model(**inputs)
+image_embeds = outputs.image_embeds
+
+# 텍스트로 색인된 인덱스를 이미지 벡터로 검색한다
+search_results = index.query(
+    vector=image_embeds[0].tolist(),
+    top_k=3,
+    include_values=False,
+    include_metadata=True,
+)
+searched_idx = int(search_results['matches'][0]['id'])
+
+print(searched_idx)   # 918</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>순위</th><th>id</th><th>score</th><th>프롬프트의 차이</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>918</td><td class="t-center">0.3748</td><td>cute fluffy <b>bunny</b> cat lion hybrid …</td></tr>
+        <tr><td>2</td><td class="t-ok">867</td><td class="t-center">0.3724</td><td>cute fluffy <b>baby cat rabbit</b> lion hybrid … <i>(원본)</i></td></tr>
+        <tr><td>3</td><td>817</td><td class="t-center">0.3708</td><td>cute fluffy <b>baby cat</b> lion hybrid …</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>정답인 <b>867 번은 2위</b>다. 1위인 918 번 프롬프트는 원본과 거의 같고 <code>rabbit</code> 이 <code>bunny</code> 로 바뀌고 <code>baby</code> 가 빠진 정도의 차이다. 세 점수가 <b>0.3748 / 0.3724 / 0.3708</b> 로 소수점 셋째 자리에서 갈릴 만큼 촘촘하다는 점이 중요하다 — <a href="#item-10-2">10-2</a> 에서 짚은 CLIP 점수의 스케일 특성이 그대로 나타난 것이며, 사실상 세 프롬프트가 같은 그림을 가리킨다는 뜻이다.</p>
+
+  <h4>DALL-E 3 으로 이미지 생성하고 비교하기</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">generate_compare.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import requests
+from PIL import Image
+import matplotlib.pyplot as plt
+from openai import OpenAI
+
+client = OpenAI()
+
+def generate_image_dalle3(prompt):
+    response_oai = client.images.generate(
+        model="dall-e-3",
+        prompt=str(prompt),
+        size="1024x1024",
+        quality="standard",
+        n=1,
+    )
+    return response_oai.data[0].url
+
+# 생성된 이미지 URL 을 로컬에 저장
+def get_generated_image(image_url, sequence):
+    generated_image = requests.get(image_url).content
+    image_filename = f"gen_img_{sequence}.png"
+    with open(image_filename, "wb") as image_file:
+        image_file.write(generated_image)
+    return Image.open(image_filename)
+
+# (b) GPT-4o 가 만든 설명으로 생성
+gpt_described_image_url = generate_image_dalle3(described_result)
+gpt4o_prompt_image = get_generated_image(gpt_described_image_url, sequence="1")
+
+# (c) 원본 프롬프트로 생성
+original_prompt_image_url = generate_image_dalle3(original_prompt)
+original_prompt_image = get_generated_image(original_prompt_image_url, sequence="2")
+
+# (d) 이미지 임베딩으로 검색한 유사 프롬프트로 생성
+searched_prompt_image_url = generate_image_dalle3(dataset[searched_idx]['prompt'])
+searched_prompt_image = get_generated_image(searched_prompt_image_url, sequence="3")
+
+images = [original_image, gpt4o_prompt_image, original_prompt_image, searched_prompt_image]
+titles = ['(a)', '(b)', '(c)', '(d)']
+
+fig, axes = plt.subplots(1, len(images), figsize=(15, 5))
+for ax, img, title in zip(axes, images, titles):
+    ax.imshow(img)
+    ax.axis('off')
+    ax.set_title(title)
+
+plt.tight_layout()
+plt.show()</code></pre>
+  </div>
+
+  <h5>결과 비교</h5>
+  <p>노트에는 네 이미지를 가로로 배치한 <code>matplotlib</code> 출력이 스크린샷으로 남아 있다. 이미지 자체는 재현할 수 없으므로, <b>각 패널이 무엇을 보여주는지</b>를 표로 옮긴다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>패널</th><th>프롬프트 출처</th><th>실제로 생성된 그림</th><th>원본과의 거리</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-center"><b>(a)</b></td>
+          <td>원본 이미지 (DiffusionDB #867)</td>
+          <td>정면을 응시하는 사자. 갈기에 <b>공작 깃털</b>이 섞여 파랑/초록 눈알 무늬가 펼쳐져 있고, 배경은 하늘과 들꽃</td>
+          <td class="t-center">기준</td>
+        </tr>
+        <tr>
+          <td class="t-center"><b>(b)</b></td>
+          <td>GPT-4o 가 이미지를 보고 쓴 설명</td>
+          <td>풀밭에 <b>엎드린</b> 사자. 갈기가 통째로 공작 깃털로 바뀌어 청록색이 지배적이고, 얼굴에도 푸른 무늬가 번져 있다</td>
+          <td class="t-center">사자 + 공작 갈기는 맞지만 <b>색/자세가 크게 다름</b></td>
+        </tr>
+        <tr>
+          <td class="t-center"><b>(c)</b></td>
+          <td>원본 프롬프트 그대로</td>
+          <td><b>고양이/토끼 하이브리드</b>. 긴 귀와 꽃 장식 머리띠, 뒤로 뻗은 공작 깃털 꼬리, 몸통은 고양이</td>
+          <td class="t-center t-ok">프롬프트의 요소를 <b>가장 충실히</b> 반영</td>
+        </tr>
+        <tr>
+          <td class="t-center"><b>(d)</b></td>
+          <td>이미지 검색으로 찾은 유사 프롬프트 (#918)</td>
+          <td>(c)와 거의 같은 계열의 <b>솜털 고양이형 생명체</b>. 꼬리가 더 크게 말려 있고 전체 색조가 갈색/세피아로 차분하다</td>
+          <td class="t-center t-ok">(c)와 <b>같은 부류</b> — 검색이 유효했음</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">이 비교에서 읽어야 할 것</p>
+      <p><b>(c)와 (d)가 서로 닮았다</b>는 사실이 이 실습의 결론이다. (d)의 프롬프트는 원본을 본 적이 없고, <b>오직 이미지 임베딩으로 벡터 DB 를 검색해 찾아낸 남의 프롬프트</b>다. 그런데도 원본 프롬프트로 만든 (c)와 같은 부류의 그림이 나왔다 — <b>CLIP 이 이미지와 텍스트를 같은 공간에 놓았기 때문에 가능한 결과</b>다.</p>
+      <p>반면 <b>(b)는 사자로 돌아갔다</b>. GPT-4o 는 (a)를 보고 "공작 갈기를 가진 사자"라고 정확히 묘사했지만, 원본 프롬프트에 있던 <code>cat rabbit hybrid</code> 라는 <b>생성 의도</b>는 알 수 없었다. <b>이미지를 설명하는 것과 그 이미지를 만든 프롬프트를 복원하는 것은 다른 일이다</b>.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>CLIP 의 <b>텍스트 인코더로 색인하고 이미지 인코더로 검색</b>하는 것이 멀티 모달 검색의 핵심 구조다.</li>
+      <li>인덱스 차원(512)은 무료 플랜 제한이 아니라 <b>CLIP ViT-B/32 의 출력 차원</b>이다.</li>
+      <li>CLIP 유사도는 절대값이 작고 상위권이 촘촘하다 — <b>순위로 읽어야 한다</b>.</li>
+      <li>검색으로 찾은 남의 프롬프트가 원본 프롬프트와 <b>비슷한 그림</b>을 만들어냈다.</li>
+      <li>이미지 <b>설명</b>과 이미지 생성 <b>프롬프트 복원</b>은 다른 문제다.</li>
+    </ul>
+  </div>
+</article>

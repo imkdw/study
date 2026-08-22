@@ -1,0 +1,79 @@
+<article class="item" id="item-13-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-1</div>
+    <h3>MLOps</h3>
+    <p class="item-tagline">데브옵스에 데이터와 모델이라는 두 축이 더 붙는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    MLOps 에서 가장 중요한 것은 <b>재현성</b> — 같은 워크플로를 다시 돌렸을 때 같은 모델이 나오는가. 이를 위해 <b>데이터/모델/코드를 모두 버저닝</b>한다.
+  </div>
+
+  <h4>MLOps 란</h4>
+  <ul>
+    <li>데브옵스의 개념을 <b>머신러닝과 데이터 과학 분야로 확장</b>한 방법론이다.</li>
+    <li>기존 데브옵스가 SW 개발/운영/협업/자동화에 초점을 맞췄다면, MLOps 는 여기에 <b>데이터</b>와 <b>머신러닝 모델</b>이라는 두 가지 핵심 요소를 더한다.</li>
+    <li>목표는 <b>머신러닝 프로젝트의 전 과정을 자동화하고 효율화하는 것</b>이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph DO["DevOps 가 다루던 축"]
+    C["코드"]
+  end
+  subgraph ML["MLOps 가 더한 축"]
+    D["데이터"]
+    M["모델"]
+  end
+  C --> R["재현성<br>같은 입력 → 같은 모델"]
+  D --> R
+  M --> R
+  R --> V["세 축 모두 버저닝<br>+ 입력값 / 파라미터 추적"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>코드만 고정해서는 같은 모델이 나오지 않는다</b> — 데이터와 모델까지 버전을 매겨야 비로소 재현이 가능해진다.</div>
+  </div>
+
+  <h4>재현성</h4>
+  <p>MLOps 에서는 <b>재현성</b>을 보장하는 것이 매우 중요하다. 이전에 수행된 ML 워크플로를 그대로 반복했을 때 <b>동일한 모델을 얻을 수 있는지</b> 여부를 뜻한다.</p>
+
+  <ul>
+    <li><b>데이터/모델/코드의 버저닝</b>이 이뤄져야 한다.</li>
+    <li><b>모든 단계의 입력값과 파라미터를 추적하고 기록</b>해야 한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이미 앞에서 만들어 본 것들 <span class="badge b-blue">보강</span></p>
+      <p>이 장의 원칙은 앞 장들의 실습과 직접 이어진다. <a href="#item-9-4">9-4</a> 에서 <code>Trace</code> 에 <code>temperature</code> / <code>model_name</code> / <code>token_usage</code> 를 남긴 것이 <b>파라미터 추적</b>이고, <a href="#item-3-4">3-4</a> 와 <a href="#item-11-2">11-2</a> 에서 <code>seed=42</code> 를 고정한 것이 <b>데이터 분할의 재현성</b>을 확보하는 장치였다. MLOps 는 이런 개별 습관을 시스템 수준으로 끌어올린 것이다.</p>
+    </div>
+  </div>
+
+  <h4>데이터 관리</h4>
+  <ul>
+    <li>머신러닝에서는 <b>데이터의 범위를 어떻게 선택하느냐</b>에 따라 데이터의 크기와 의미가 달라지고, 모델의 성능이나 일반화 능력에 영향을 미친다.</li>
+    <li>데이터에 오류가 있으면 수정하거나 제거하는 <b>전처리</b>, 카테고리 정보를 어떻게 변환할지 등 다뤄야 할 것이 다양하다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">노트 상태 안내</p>
+      <p>원문 노트의 13장은 <b>「데이터 관리」 항목 이후 "스탑"으로 중단</b>되어 있다. 이후 이어질 내용(모델 실험 관리, 배포/서빙, 모니터링, LLMOps 로의 확장)은 노트에 없어 이 정리본에도 담지 않았다. 추측으로 채우지 않는 것이 이 정리본의 원칙이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>MLOps = 데브옵스 + <b>데이터</b> + <b>모델</b>.</li>
+      <li>핵심 가치는 <b>재현성</b> — 같은 워크플로를 반복하면 같은 모델이 나와야 한다.</li>
+      <li>그러려면 데이터/모델/코드를 <b>모두 버저닝</b>하고 입력값과 파라미터를 기록해야 한다.</li>
+      <li>데이터 범위 선택과 전처리는 모델 성능/일반화에 직접 영향을 준다.</li>
+    </ul>
+  </div>
+</article>

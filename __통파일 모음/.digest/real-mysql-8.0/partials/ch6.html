@@ -1,0 +1,215 @@
+<article class="item" id="item-6-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-1</div>
+    <h3>페이지 압축</h3>
+    <p class="item-tagline">Transparent Page Compression — 파일시스템의 <b>펀치 홀</b>에 기대는 압축이라, 실제로는 잘 쓰지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    페이지 압축의 결과물은 <b>스파스 파일</b>이다. DB 안에서는 완벽하게 동작하지만, <code>cp</code> 한 번에 원래 크기로 부풀어 오른다.
+  </div>
+
+  <h4>어떻게 동작하는가</h4>
+  <ul>
+    <li>서버가 디스크에 <b>저장하는 시점</b>에 데이터 페이지가 압축된다.</li>
+    <li>디스크에서 <b>읽어오는 시점</b>에 압축이 해제된다.</li>
+    <li>버퍼 풀에 한 번 적재되면 InnoDB는 <b>압축이 해제된 상태로만</b> 관리한다.</li>
+    <li>사용자 입장에서는 완전히 투명(transparent)하게 동작한다.</li>
+  </ul>
+
+  <p>문제는 <b>16KB 페이지를 압축한 결과가 몇 KB가 될지 예측할 수 없다</b>는 것이다. 적어도 하나의 테이블은 동일한 크기의 페이지로 통일되어야 하므로, <b>펀치 홀(punch hole)</b> 기능을 쓴다.</p>
+
+  <h4>펀치 홀 기능</h4>
+
+  <ol class="steps">
+    <li><div class="step-title">16KB 페이지를 압축한다</div><p>결과가 7KB가 되었다고 하자.</p></li>
+    <li><div class="step-title">디스크에 압축 결과 7KB를 저장하고, 남는 9KB를 기록해 둔다</div><p>페이지 슬롯 자체는 여전히 16KB 자리를 차지한다.</p></li>
+    <li><div class="step-title">남은 9KB 영역에 펀치 홀을 뚫는다</div><p>파일시스템에게 "이 구간은 비어 있다"고 알리는 것이다.</p></li>
+    <li><div class="step-title">파일시스템이 9KB를 OS에 반납한다</div><p>결과적으로 실제 디스크 사용량은 7KB가 된다.</p></li>
+  </ol>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 520 150" width="520" role="img" aria-label="16KB 페이지가 7KB 압축분과 9KB 펀치 홀로 나뉘는 그림">
+        <rect x="30" y="30" width="200" height="44" rx="6" class="dg-fill-soft"/>
+        <rect x="30" y="30" width="200" height="44" rx="6" class="dg-stroke" fill="none"/>
+        <text x="130" y="58" class="dg-text dg-mono" font-size="13" text-anchor="middle">원본 16KB</text>
+        <text x="130" y="96" class="dg-text-sub" font-size="11" text-anchor="middle">버퍼 풀에서의 모습</text>
+        <text x="256" y="58" class="dg-text" font-size="16" text-anchor="middle">→</text>
+        <rect x="290" y="30" width="88" height="44" rx="6" class="dg-fill-soft"/>
+        <rect x="290" y="30" width="88" height="44" rx="6" class="dg-stroke" fill="none"/>
+        <text x="334" y="58" class="dg-text dg-mono" font-size="12" text-anchor="middle">7KB</text>
+        <rect x="378" y="30" width="112" height="44" rx="6" class="dg-fill-bg"/>
+        <rect x="378" y="30" width="112" height="44" rx="6" class="dg-stroke" fill="none" stroke-dasharray="4 4"/>
+        <text x="434" y="53" class="dg-text-sub" font-size="12" text-anchor="middle">펀치 홀</text>
+        <text x="434" y="68" class="dg-text-sub" font-size="11" text-anchor="middle">9KB 반납</text>
+        <text x="390" y="96" class="dg-text-sub" font-size="11" text-anchor="middle">디스크에서의 모습 (스파스 파일)</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>파일의 논리적 크기는 그대로 16KB다</b> — 실제 점유량만 7KB로 줄어든다. 이 간극이 뒤에서 문제를 만든다.</div>
+  </div>
+
+  <h4>문제점</h4>
+  <ul>
+    <li>펀치 홀은 <b>운영체제와 하드웨어가 모두 지원</b>해야 쓸 수 있다.</li>
+    <li>DB 파일은 DB 안에만 있는 것이 아니다. 백업 등으로 <b>외부에서 파일을 다루는 순간</b> 문제가 된다.</li>
+    <li>실제 페이지 크기가 1GB인 파일도 <code>cp</code> 명령이나 복구 툴을 거치면 <b>펀치 홀이 0으로 채워져 10GB가 될 수 있다.</b></li>
+    <li>이런 이유로 <b>페이지 압축은 실무에서 잘 쓰이지 않는다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">page-compression.sql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE TABLE page_compression (
+  id INT PRIMARY KEY AUTO_INCREMENT
+) COMPRESSION="zlib";</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>압축·해제 시점은 <b>디스크 I/O 지점</b>. 버퍼 풀에는 항상 해제된 상태로 올라간다.</li>
+      <li>가변적인 압축 결과를 고정 페이지 크기에 맞추기 위해 <b>펀치 홀</b>을 쓴다.</li>
+      <li>OS/하드웨어 의존성과 <b>백업 시 원래 크기로 부풀어 오르는 문제</b> 때문에 실무 채택률이 낮다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-2</div>
+    <h3>테이블 압축</h3>
+    <p class="item-tagline">제약이 없어 활용도가 높지만, <b>버퍼 풀을 두 벌 쓴다</b>는 값을 치른다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    테이블 압축의 진짜 비용은 디스크가 아니라 <b>버퍼 풀</b>이다. 압축본과 해제본이 동시에 메모리에 올라간다.
+  </div>
+
+  <h4>페이지 압축과의 차이</h4>
+  <ul>
+    <li>페이지 압축과 달리 <b>OS·하드웨어 제약이 없어</b> 일반적으로 활용도가 더 높다.</li>
+    <li>디스크에 저장되는 데이터 파일 크기를 줄일 수 있지만 단점도 분명하다.
+      <ul>
+        <li>버퍼 풀 공간 활용률이 낮아진다.</li>
+        <li>쿼리 처리 성능이 낮아진다.</li>
+        <li>빈번한 데이터 변경 시 압축률이 떨어진다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>압축 테이블 생성</h4>
+  <ul>
+    <li>전제조건 — 압축할 테이블이 <b>별도의 테이블스페이스</b>를 사용해야 한다. 즉 <code>innodb_file_per_table</code> 이 켜져 있어야 한다.</li>
+    <li><code>ROW_FORMAT=COMPRESSED</code> 옵션이 있어야 압축이 적용된다. 생략해도 <code>KEY_BLOCK_SIZE</code> 가 있으면 자동으로 들어간다.</li>
+    <li><code>KEY_BLOCK_SIZE</code> 로 <b>압축 후 목표 페이지 크기</b>를 명시한다.
+      <ul>
+        <li>2의 승수만 사용 가능하다.</li>
+        <li>페이지 크기(<code>innodb_page_size</code>)가 16KB면 <b>4KB 또는 8KB</b> 만 설정할 수 있다.</li>
+        <li>페이지 크기가 32KB나 64KB인 경우에는 <b>테이블 압축을 쓸 수 없다.</b></li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">table-compression.sql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SET GLOBAL innodb_file_per_table = ON;
+
+CREATE TABLE compressed_table (
+  id INT AUTO_INCREMENT PRIMARY KEY
+)
+ROW_FORMAT=COMPRESSED
+KEY_BLOCK_SIZE=8;</code></pre>
+  </div>
+
+  <h4>압축 과정</h4>
+  <p>이 과정에서 <b>InnoDB 스토리지 엔진이 하는 일은 없다</b> — 압축 라이브러리(zlib)에 맡긴다. 페이지 크기 16KB, 블록 크기 8KB인 경우를 보자.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["16KB 데이터 페이지 압축"] --> B{"결과가 8KB 이하?"}
+  B -->|"예"| C["그대로 디스크에 저장 - 압축 완료"]
+  B -->|"아니오"| D["원본 페이지를 둘로 쪼갬"]
+  D --> E["각각 8KB 슬롯에 저장 시도"]
+  E --> A
+      </pre>
+    </div>
+    <div class="figure-cap"><b>목표 크기에 들어갈 때까지 페이지를 쪼갠다</b> — 압축률이 나쁜 데이터일수록 페이지 분할이 늘어난다.</div>
+  </div>
+
+  <h4>KEY_BLOCK_SIZE 설정</h4>
+  <ul>
+    <li>테이블 압축에서 <b>가장 중요한 결정</b>이 이 크기다.</li>
+    <li>4KB 또는 8KB로 만들어 보고 <b>샘플 데이터를 넣어 본 뒤</b> 적절한지 판단한다.</li>
+    <li><code>information_schema.INNODB_CMP_PER_INDEX</code> 테이블로 압축 성공·실패 횟수를 확인할 수 있다.</li>
+  </ul>
+
+  <h4>압축된 페이지의 버퍼 풀 적재 및 사용</h4>
+  <ul>
+    <li>압축 테이블의 페이지를 버퍼 풀에 적재하면 <b>압축 전과 압축 후 두 개의 버전</b>이 관리된다.
+      <ul>
+        <li><b>LRU 리스트</b> — 디스크에서 읽은 그대로의(압축된) 데이터 페이지 목록</li>
+        <li><b>Unzip_LRU 리스트</b> — 압축 해제 버전</li>
+      </ul>
+    </li>
+    <li>두 버전을 동시에 관리하느라 <b>버퍼 풀 공간을 이중으로</b> 쓰게 된다.</li>
+    <li>또한 압축된 페이지에서 데이터를 읽거나 변경할 때마다 해제가 필요하므로 <b>CPU를 많이 쓴다.</b></li>
+  </ul>
+
+  <h5>어댑티브 알고리즘</h5>
+  <p>이 단점을 보완하기 위해 InnoDB는 Unzip_LRU를 별도로 두고, <b>유입되는 요청 패턴에 맞춰</b> 적절히 조절한다.</p>
+  <ul>
+    <li>버퍼 풀 공간이 필요하면 LRU 리스트는 유지하고 <b>Unzip_LRU 를 먼저 제거</b>해 공간을 확보한다.</li>
+    <li>압축된 페이지가 자주 사용되면 Unzip_LRU에 <b>계속 유지</b>해 CPU 사용률을 최소화한다.</li>
+    <li>페이지가 미사용으로 LRU 리스트에서 제거되면 Unzip_LRU에서도 함께 제거된다.</li>
+    <li><b>CPU 사용률이 높은 상태</b>면 압축/해제를 피하려고 Unzip_LRU의 비율을 <b>높인다.</b></li>
+    <li><b>Disk I/O 가 높은 서버</b>면 Unzip_LRU의 비율을 <b>낮춰</b> 버퍼 풀 공간을 더 확보한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">읽는 요령 <span class="badge b-blue">보강</span></p>
+      <p>두 규칙이 반대 방향처럼 보이지만 논리는 하나다 — <b>지금 병목인 자원을 아끼는 쪽으로 움직인다.</b> CPU가 병목이면 해제본을 남겨 CPU를 아끼고, 디스크가 병목이면 압축본만 남겨 더 많은 페이지를 캐시한다.</p>
+    </div>
+  </div>
+
+  <h4>테이블 압축 관련 설정</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>innodb_cmp_per_index_enabled</code></td>
+          <td>압축 테이블의 <b>인덱스별</b> 압축 성공·실행 횟수를 수집. <code>information_schema.INNODB_CMP_PER_INDEX</code>, <code>INNODB_CMP</code> 에서 확인</td>
+        </tr>
+        <tr>
+          <td><code>innodb_compression_level</code></td>
+          <td>압축률 설정. <b>0~9</b> 중 선택하며 기본값은 <b>6</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>이 밖에도 <code>innodb_compression_failure_threshold_pct</code>, <code>innodb_compression_pad_pct_max</code> 등 다양한 옵션이 있다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테이블 압축은 <code>innodb_file_per_table = ON</code> 이 전제이고, <code>KEY_BLOCK_SIZE</code> 로 목표 크기를 정한다.</li>
+      <li>16KB 페이지에서는 <b>4KB / 8KB만</b> 선택 가능. 32KB·64KB 페이지에서는 아예 못 쓴다.</li>
+      <li>비용은 <b>버퍼 풀 이중 점유 + CPU</b>. 어댑티브 알고리즘이 그때그때 균형을 잡는다.</li>
+      <li><code>KEY_BLOCK_SIZE</code> 는 <b>실측으로 정한다</b> — <code>INNODB_CMP_PER_INDEX</code> 의 실패 횟수를 본다.</li>
+    </ul>
+  </div>
+</article>

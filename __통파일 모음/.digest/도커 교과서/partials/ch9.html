@@ -1,0 +1,810 @@
+<article class="item" id="item-9-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9-1</div>
+    <h3>컨테이너화된 앱에서 사용되는 모니터링 기술 스택</h3>
+    <p class="item-tagline">감시 대상이 계속 떴다 사라지는 환경에서는, 서버를 지켜보는 방식이 통하지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    프로메테우스는 <b>앱의 언어와 무관하게 <code>/metrics</code> 라는 하나의 규약</b>으로 측정값을 모은다.
+    그 덕에 자바든 고든 닷넷이든 같은 방식으로 감시할 수 있다.
+  </div>
+
+  <h4>일반 환경에서의 모니터링</h4>
+  <ul>
+    <li>단일 서버에서 앱이 동작하는 경우, 모니터링이라고 하면 디스크 공간 / RAM / CPU 같은 것들이다.</li>
+    <li>보통 대시보드가 있고 임계치를 넘어가면 알람이 발생하는 구조다.</li>
+  </ul>
+
+  <h4>컨테이너 환경에서의 모니터링</h4>
+  <ul>
+    <li>정적인 컨테이너나 고정된 IP 없이도 실행 중인 앱을 확인할 수 있는 모니터링 방식이 필요하다.</li>
+  </ul>
+
+  <h4>프로메테우스(Prometheus)</h4>
+  <ul>
+    <li>CNCF 에서 개발을 담당하고 있으며 널리 쓰인다.</li>
+    <li>마찬가지로 컨테이너에서 동작하기 때문에 분산 앱에 어렵지 않게 모니터링을 붙일 수 있다.</li>
+    <li>앱의 프로그래밍 언어와 무관하게 모든 앱을 표준적인 형태로 모니터링할 수 있어 일관성을 보장한다.</li>
+    <li>도커 엔진의 측정값도 뽑아낼 수 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">프로메테우스의 위상 <span class="badge b-blue">보강</span></p>
+      <p>
+        프로메테우스는 2016년 5월 CNCF 에 <b>쿠버네티스 다음 두 번째</b>로 합류했고,
+        2018년 8월 9일 <b>Graduated</b>(졸업) 등급이 됐다. 사실상 컨테이너 환경 메트릭의 표준이다.
+        수집 모델은 <b>풀(pull)</b> 이며, 짧게 살다 죽는 배치 작업만 예외적으로
+        Pushgateway 라는 중계 서버를 통해 푸시한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Prometheus"] -->|"주기적으로 GET /metrics"| D["Docker Engine (:9323/metrics)"]
+  P -->|"GET /metrics"| S1["앱 컨테이너 1"]
+  P -->|"GET /metrics"| S2["앱 컨테이너 2"]
+  D -.->|"인프라 관점 측정값"| P
+  S1 -.->|"런타임 + 커스텀 측정값"| P
+      </pre>
+    </div>
+    <div class="figure-cap">
+      <b>프로메테우스가 찾아가서 긁어 온다</b> — 앱이 프로메테우스를 알 필요가 없다.
+      각자 <code>/metrics</code> 를 열어 두기만 하면 되고, 대상 목록은 프로메테우스 설정이 관리한다.
+    </div>
+  </div>
+
+  <h4>도커 엔진 메트릭 수집 설정</h4>
+  <p>orbstack 기준으로 <code>~/.orbstack/config/docker.json</code> 을 수정하고 <code>orb restart docker</code> 를 실행한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">~/.orbstack/config/docker.json</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "metrics-addr": "0.0.0.0:9323"
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>0.0.0.0</code> 은 실습용이다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>0.0.0.0:9323</code> 은 <b>모든 네트워크 인터페이스에 메트릭 엔드포인트를 여는 것</b>이다.
+        컨테이너 안에서 호스트를 찔러야 하는 실습에서는 편하지만, 이 포트는 인증이 없다.
+        실제 서버에서는 내부 인터페이스에만 바인딩하거나 방화벽으로 막아야 한다.
+        도커 데몬의 메트릭 자체가 호스트 구성 정보를 상당히 드러낸다.
+      </p>
+    </div>
+  </div>
+
+  <p>설정 후 <code>localhost:9323/metrics</code> 에 접속하면 프로메테우스 텍스트 형식의 측정값이 그대로 보인다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">localhost:9323/metrics</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># HELP builder_builds_failed_total Number of failed image builds
+# TYPE builder_builds_failed_total counter
+builder_builds_failed_total{reason="build_canceled"} 0
+builder_builds_failed_total{reason="build_target_not_reachable_error"} 0
+builder_builds_failed_total{reason="command_not_supported_error"} 0
+builder_builds_failed_total{reason="dockerfile_empty_error"} 0
+builder_builds_failed_total{reason="dockerfile_syntax_error"} 0
+builder_builds_failed_total{reason="error_processing_commands_error"} 0
+builder_builds_failed_total{reason="missing_onbuild_arguments_error"} 0
+builder_builds_failed_total{reason="unknown_instruction_error"} 0
+# HELP builder_builds_triggered_total Number of triggered image builds
+# TYPE builder_builds_triggered_total counter
+builder_builds_triggered_total 0
+# HELP engine_daemon_container_actions_seconds The number of seconds it takes to process each container action
+# TYPE engine_daemon_container_actions_seconds histogram
+engine_daemon_container_actions_seconds_bucket{action="changes",le="0.005"} 1
+engine_daemon_container_actions_seconds_bucket{action="changes",le="0.01"} 1
+engine_daemon_container_actions_seconds_bucket{action="changes",le="0.025"} 1
+engine_daemon_container_actions_seconds_bucket{action="changes",le="0.05"} 1</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 텍스트 형식이 전부다 <span class="badge b-blue">보강</span></p>
+      <p>
+        프로메테우스 노출 형식은 <b>사람이 읽을 수 있는 평문</b>이다. 한 줄이
+        <code>메트릭이름{라벨="값"} 숫자</code> 구조이고, <code># HELP</code> 는 설명,
+        <code># TYPE</code> 은 종류다. 종류는 네 가지 — 계속 증가만 하는
+        <code>counter</code>, 오르내리는 <code>gauge</code>, 분포를 버킷으로 담는
+        <code>histogram</code>, 분위수를 담는 <code>summary</code>.
+        위 출력에서 <code>_bucket{...,le="0.005"}</code> 이 히스토그램의 "0.005초 이하" 버킷이다.
+      </p>
+    </div>
+  </div>
+
+  <h4>프로메테우스에서 로컬 PC 정보 수집하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 현재 PC의 IP 정보 설정 (macOS)
+$ hostIP=$(ifconfig en0 | grep -e 'inet\s' | awk '{print $2}')
+
+$ echo $hostIP
+172.30.1.6
+
+# prometheus 실행
+$ docker run -e DOCKER_HOST=$hostIP -d -p 9090:9090 diamol/prometheus
+84b8bb606d242604aaa828ff9043a899bb1aa45200b6ef86ce825862db96c2f3</code></pre>
+  </div>
+
+  <p>
+    <code>localhost:9090</code> 의 프로메테우스 UI 에서 쿼리를 실행하면 수집된 시계열이 보인다.
+    아래는 <code>engine_daemon_container_actions_seconds_sum</code> 을 조회한 결과다.
+  </p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Prometheus &mdash; Console 탭</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">Element
+engine_daemon_container_actions_seconds_sum{action="changes",instance="DOCKER_HOST:9323",job="docker"}
+engine_daemon_container_actions_seconds_sum{action="commit", instance="DOCKER_HOST:9323",job="docker"}
+engine_daemon_container_actions_seconds_sum{action="create", instance="DOCKER_HOST:9323",job="docker"}
+engine_daemon_container_actions_seconds_sum{action="delete", instance="DOCKER_HOST:9323",job="docker"}
+engine_daemon_container_actions_seconds_sum{action="start",  instance="DOCKER_HOST:9323",job="docker"}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>job</code> 과 <code>instance</code> 라벨은 프로메테우스가 붙인 것이다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>action="changes"</code> 는 도커 엔진이 원래 붙인 라벨이지만,
+        <code>job="docker"</code> 와 <code>instance="DOCKER_HOST:9323"</code> 은
+        <b>프로메테우스가 수집하면서 자동으로 덧붙인 라벨</b>이다.
+        <code>job</code> 은 설정 파일의 <code>job_name</code> 에서, <code>instance</code> 는 수집 대상 주소에서 온다.
+        스케일 아웃한 서비스의 인스턴스를 구분할 수 있는 것도 이 라벨 덕분이다
+        (<a href="#item-9-3">9-3</a>).
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컨테이너 환경에서는 대상이 계속 바뀌므로, 대상 목록을 스스로 관리하는 수집기가 필요하다.</li>
+      <li>프로메테우스는 CNCF 졸업 프로젝트이며 <code>/metrics</code> 를 주기적으로 긁어 오는 풀 방식이다.</li>
+      <li>도커 엔진도 <code>metrics-addr</code> 을 열면 같은 형식으로 측정값을 낸다.</li>
+      <li>수집 시 <code>job</code> / <code>instance</code> 라벨이 자동으로 붙어 인스턴스를 구분할 수 있다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9-2</div>
+    <h3>앱의 측정값 출력하기</h3>
+    <p class="item-tagline">엔진 메트릭은 켜기만 하면 되지만, 앱 메트릭은 앱이 직접 내보내야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    클라이언트 라이브러리를 붙이면 <b>런타임 수준의 측정값은 공짜로</b> 따라온다.
+    진짜 가치는 그 위에 얹는 <b>연산 중심 / 비즈니스 중심 지표</b>에 있다.
+  </div>
+
+  <h4>앱의 측정값</h4>
+  <ul>
+    <li>앱의 유용한 정보를 측정값으로 구성하려면 API 엔드포인트로 출력해야 해서, 도커 엔진 측정값보다는 좀 더 복잡하다.</li>
+    <li>각 프로그래밍 언어별로 공식 또는 비공식 라이브러리가 존재한다.</li>
+    <li>보통 수집되는 정보는 런타임 수준의 측정값이다. 예를 들면
+      <ul>
+        <li>Go — 활성 상태인 고루틴의 개수</li>
+        <li>Java — JVM 의 메모리 사용량</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>수집하는 정보들</h4>
+  <p>docker-compose 로 실행하면 <code>localhost:8010/metrics</code> 에서 확인할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">localhost:8010/metrics</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0
+go_gc_duration_seconds{quantile="0.25"} 0
+go_gc_duration_seconds{quantile="0.5"} 0
+go_gc_duration_seconds{quantile="0.75"} 0
+go_gc_duration_seconds{quantile="1"} 0
+go_gc_duration_seconds_sum 0
+go_gc_duration_seconds_count 0
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 9
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.13.15"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 1.646448e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 1.646448e+06
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.443231e+06</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 목록은 개발자가 하나도 쓰지 않았다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>go_goroutines</code>, <code>go_gc_duration_seconds</code>, <code>go_memstats_*</code> 는
+        전부 <b>클라이언트 라이브러리가 자동으로 등록하는 기본 컬렉터</b>다.
+        라이브러리를 붙이고 <code>/metrics</code> 핸들러 한 줄을 매핑하면 여기까지는 그냥 나온다.
+        <code>go_info{version="go1.13.15"} 1</code> 처럼 <b>값이 아니라 라벨에 정보를 담는</b>
+        메트릭도 흔한 관용구다.
+      </p>
+    </div>
+  </div>
+
+  <h4>도움이 될 만한 지표들</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>분류</th><th>예시</th><th>답해 주는 질문</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>런타임 중심</b></td>
+          <td>고루틴 수, JVM 메모리, GC 시간</td>
+          <td>프로세스가 건강한가</td>
+        </tr>
+        <tr>
+          <td><b>연산 중심</b></td>
+          <td>컴포넌트가 처리 중인 이벤트 수, API 평균 응답 시간</td>
+          <td>시스템이 제 성능을 내고 있는가</td>
+        </tr>
+        <tr>
+          <td><b>비즈니스 중심</b></td>
+          <td>활성 사용자 수, 신규 서비스 사용자 수</td>
+          <td>이 시스템이 실제로 쓸모가 있는가</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>어떤 정보를 수집할지는 앱마다 다르다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">아래로 갈수록 만들기 어렵고, 그만큼 가치 있다</p>
+      <p>
+        런타임 지표는 라이브러리가 주고, 연산 지표는 코드 몇 줄로 얻고, 비즈니스 지표는 도메인을 알아야 정의할 수 있다.
+        장애 대응에는 위쪽이 쓰이지만, <b>"장애인지 아닌지"를 판단하는 것은 아래쪽</b>이다.
+        메모리가 정상이어도 주문 수가 0 이면 그건 장애다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>앱 메트릭은 클라이언트 라이브러리를 붙이고 <code>/metrics</code> 엔드포인트를 여는 것으로 시작한다.</li>
+      <li>런타임 지표는 자동으로 따라온다. 연산 / 비즈니스 지표는 직접 정의해야 한다.</li>
+      <li>메트릭 종류는 counter / gauge / histogram / summary 네 가지다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9-3</div>
+    <h3>측정값 수집을 맡을 프로메테우스 컨테이너 실행하기</h3>
+    <p class="item-tagline">고정된 컨테이너는 <code>static_configs</code>, 늘었다 줄었다 하는 것은 <code>dns_sd_configs</code>.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    스케일 아웃하는 서비스를 감시하려면 <b>주소를 적어 두는 대신 DNS 로 찾게</b> 해야 한다.
+    <code>dns_sd_configs</code> 가 <a href="#item-7-3">7-3</a> 의 DNS 디스커버리를 그대로 활용한다.
+  </div>
+
+  <h4>프로메테우스의 데이터 수집</h4>
+  <ul>
+    <li>프로메테우스는 대상 시스템에서 데이터를 받아 오는 <b>폴링 방식</b>으로 동작한다.</li>
+    <li>이 과정을 <b>스크래핑(scraping)</b> 이라고 부른다.</li>
+  </ul>
+
+  <h4>프로메테우스 설정</h4>
+  <ul>
+    <li><code>scrape_interval</code> — 스크래핑 주기를 기본값인 10초로 지정</li>
+    <li><code>static_configs</code> — 정적 설정으로 단일 컨테이너를 지정</li>
+    <li><code>dns_sd_configs</code> — 도커의 DNS 디스커버리 기능으로 여러 개의 컨테이너를 지정</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">prometheus.yml</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-yaml">global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: "image-gallery"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["image-gallery"]
+
+  - job_name: "iotd-api"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["iotd"]
+
+  - job_name: "access-log"
+    metrics_path: /metrics
+    scrape_interval: 3s
+    dns_sd_configs:
+      - names:
+          - accesslog
+        type: A
+        port: 80
+
+  - job_name: "docker"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["DOCKER_HOST:9323"]</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 230" width="620" role="img" aria-label="프로메테우스가 image-gallery 와 iotd 는 static_configs 로, accesslog 3개는 dns_sd_configs 로 스크래핑한다">
+        <text x="30" y="120" class="dg-text" font-size="15" font-weight="700">Prometheus</text>
+
+        <path d="M126 110 C 176 60, 216 46, 262 42" fill="none" class="dg-stroke" marker-end="url(#sc-arr)"/>
+        <path d="M126 118 C 190 118, 216 116, 262 114" fill="none" class="dg-stroke" marker-end="url(#sc-arr)"/>
+        <path d="M126 128 C 176 178, 216 190, 262 194" fill="none" class="dg-stroke" marker-end="url(#sc-arr)"/>
+        <defs>
+          <marker id="sc-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+
+        <text x="272" y="47" class="dg-text dg-mono" font-size="13">image-gallery</text>
+        <text x="272" y="119" class="dg-text dg-mono" font-size="13">iotd</text>
+        <text x="272" y="199" class="dg-text dg-mono" font-size="13">accesslog × 3</text>
+
+        <path d="M420 30 L 432 30 L 432 130 L 420 130" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+        <text x="444" y="76" class="dg-accent dg-mono" font-size="12" font-weight="700">static_configs</text>
+        <text x="444" y="94" class="dg-text-sub" font-size="10">주소를 직접 적는다</text>
+
+        <line x1="406" y1="194" x2="432" y2="194" stroke="var(--accent)" stroke-width="1.6"/>
+        <text x="444" y="192" class="dg-accent dg-mono" font-size="12" font-weight="700">dns_sd_configs</text>
+        <text x="444" y="210" class="dg-text-sub" font-size="10">DNS 로 찾아낸다</text>
+
+        <text x="88" y="152" class="dg-text-sub" font-size="12">scraping</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>대상 수가 고정이면 정적 설정, 변하면 DNS 디스커버리</b> —
+      <code>accesslog</code> 만 <code>dns_sd_configs</code> 인 이유는 이것만 <code>--scale</code> 로 늘리기 때문이다.
+    </div>
+  </div>
+
+  <h4>수집이 잘 되는지 보기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose-scale.yml</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-yaml">services:
+  accesslog:
+    image: diamol/ch09-access-log
+    ports:
+      - "80"
+    networks:
+      - app-net
+
+  iotd:
+    image: diamol/ch09-image-of-the-day
+    ports:
+      - "8011:80"
+    networks:
+      - app-net
+
+  image-gallery:
+    image: diamol/ch09-image-gallery
+    ports:
+      - "8010:80"
+    depends_on:
+      - accesslog
+      - iotd
+    networks:
+      - app-net
+
+  prometheus:
+    image: diamol/ch09-prometheus
+    ports:
+      - "9090:9090"
+    environment:
+      - DOCKER_HOST=${HOST_IP}
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    external:
+      name: nat</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker-compose -f docker-compose-scale.yml up -d --scale accesslog=3
+
+[+] Running 6/6
+ ✔ Container exercises-iotd-1           Started                                 0.3s
+ ✔ Container exercises-accesslog-1      Started                                 0.6s
+ ✔ Container exercises-prometheus-1     Started                                 0.3s
+ ✔ Container exercises-accesslog-2      Started                                 0.3s
+ ✔ Container exercises-accesslog-3      Started                                 0.4s
+ ✔ Container exercises-image-gallery-1  Started                                 0.6s
+
+# API 호출하기
+$ for i in {1..10}; do curl http://localhost:8010 &gt; /dev/null; done</code></pre>
+  </div>
+
+  <p>인스턴스별로 로드밸런싱이 골고루 된 모습이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Prometheus &mdash; access_log_total</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">Element                                                                                   Value
+access_log_total{hostname="7a189b9d198d",instance="192.168.97.5:80",job="access-log"}     4
+access_log_total{hostname="9c21cee23e23",instance="192.168.97.6:80",job="access-log"}     3
+access_log_total{hostname="f0073fa990fa",instance="192.168.97.3:80",job="access-log"}     4
+
+Total time series: 3</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">4 / 3 / 4 라는 숫자가 말해 주는 것 <span class="badge b-blue">보강</span></p>
+      <p>
+        11번의 요청이 세 인스턴스에 4/3/4 로 나뉘었다. 정확히 균등하지는 않은데,
+        이것이 바로 <a href="#item-7-3">7-3</a> 에서 짚은 DNS 기반 로드밸런싱의 성격이다.
+        <b>인스턴스별 라벨이 분리돼 있기 때문에 이런 편차를 눈으로 확인할 수 있다</b>는 것이
+        모니터링의 값어치다. 라벨이 없었다면 합계 11만 보였을 것이다.
+      </p>
+    </div>
+  </div>
+
+  <h4>그래프 추가하기</h4>
+  <ul>
+    <li>아래에 쓰인 <code>sum()</code> 함수는 프로메테우스에서 쓰는 <b>PromQL</b> 이라는 언어다.</li>
+    <li>사실 이런 UI 를 대시보드라고 하긴 어렵다. 메트릭 데이터를 기반으로 UI 를 만드는 <b>Grafana</b> 가 따로 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 240" width="620" role="img" aria-label="sum(access_log_total) without(hostname, instance) 쿼리 결과가 0 에서 4, 7, 10, 11 로 계단식으로 증가하는 그래프">
+        <rect x="8" y="8" width="604" height="224" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="24" y="20" width="500" height="24" rx="4" class="dg-fill-soft dg-stroke"/>
+        <text x="36" y="37" class="dg-accent dg-mono" font-size="11">sum(access_log_total) without(hostname, instance)</text>
+        <text x="600" y="37" class="dg-text-sub" font-size="9.5" text-anchor="end">Total time series: 1</text>
+
+        <line x1="70" y1="70" x2="70" y2="196" class="dg-stroke"/>
+        <line x1="70" y1="196" x2="592" y2="196" class="dg-stroke"/>
+
+        <text x="62" y="74" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">12</text>
+        <text x="62" y="95" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">10</text>
+        <text x="62" y="137" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">6</text>
+        <text x="62" y="179" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">2</text>
+        <text x="62" y="200" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">0</text>
+
+        <line x1="200" y1="70" x2="200" y2="196" class="dg-stroke" stroke-dasharray="3 4" opacity="0.4"/>
+        <line x1="330" y1="70" x2="330" y2="196" class="dg-stroke" stroke-dasharray="3 4" opacity="0.4"/>
+        <line x1="460" y1="70" x2="460" y2="196" class="dg-stroke" stroke-dasharray="3 4" opacity="0.4"/>
+        <text x="200" y="210" class="dg-text-sub dg-mono" font-size="9" text-anchor="middle">51</text>
+        <text x="330" y="210" class="dg-text-sub dg-mono" font-size="9" text-anchor="middle">52</text>
+        <text x="460" y="210" class="dg-text-sub dg-mono" font-size="9" text-anchor="middle">53</text>
+
+        <polyline points="200,196 236,196 236,154 248,154 248,122 262,122 262,101 458,101 458,90 588,90"
+                  fill="none" stroke="var(--red)" stroke-width="2"/>
+
+        <rect x="76" y="212" width="106" height="18" rx="3" class="dg-fill-soft dg-stroke"/>
+        <rect x="84" y="217" width="8" height="8" fill="var(--red)"/>
+        <text x="98" y="225" class="dg-text-sub dg-mono" font-size="9">{job="access-log"}</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b><code>without(hostname, instance)</code> 로 세 시계열을 하나로 합쳤다</b> —
+      counter 라서 계단식으로 증가만 하고, 요청이 몰린 구간에서 가파르게 올라간다.
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">counter 는 보통 그대로 보지 않는다 <span class="badge b-blue">보강</span></p>
+      <p>
+        counter 는 계속 누적되므로 그래프가 늘 우상향한다. 실무에서 알고 싶은 것은
+        보통 <b>"지금 초당 몇 건인가"</b> 이고, 그럴 때는 <code>rate()</code> 를 씌운다.
+        <code>sum(rate(access_log_total[1m])) without(hostname, instance)</code> 처럼 쓰면
+        분당 증가율을 초당 건수로 환산해 준다. counter 는 컨테이너가 재시작하면 0 으로 돌아가는데,
+        <code>rate()</code> 는 그 리셋을 자동으로 보정해 준다는 이점도 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>프로메테우스는 <code>scrape_interval</code> 마다 대상의 <code>/metrics</code> 를 긁는다(스크래핑).</li>
+      <li>고정 대상은 <code>static_configs</code>, 개수가 변하는 대상은 <code>dns_sd_configs</code>.</li>
+      <li>인스턴스별 라벨이 분리되어 있어 부하 편차까지 보인다.</li>
+      <li>PromQL 의 <code>sum() ... without()</code> 으로 라벨을 접어 합칠 수 있다. counter 에는 <code>rate()</code> 를 씌운다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9-4</div>
+    <h3>측정값 시각화를 위한 그라파나 컨테이너 실행하기</h3>
+    <p class="item-tagline">프로메테우스가 데이터를 갖고, 그라파나가 그것을 화면으로 만든다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    대시보드에서 어려운 것은 PromQL 이 아니라 <b>무엇을 보여 줄지 고르는 일</b>이다.
+    쿼리는 복잡할 필요가 없고, 화면에 올릴 지표를 잘 고르는 것이 전부다.
+  </div>
+
+  <h4>그라파나가 포함된 컨테이너 실행</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># IP 설정 (macOS)
+$ export HOST_IP=$(ipconfig getifaddr en0)
+
+$ echo $HOST_IP
+172.30.1.6
+
+# grafana 가 포함된 컨테이너 실행
+$ docker-compose -f docker-compose-with-grafana.yml up -d --scale accesslog=3
+
+# 부하 발생시키기
+$ for i in {1..20}; do curl http://localhost:8010 &gt; /dev/null; done</code></pre>
+  </div>
+
+  <h4>Grafana 접속</h4>
+  <ul>
+    <li>docker-compose 에 기재된 주소인 <code>http://localhost:3000</code> 으로 접속한다.</li>
+    <li>이후 <code>data source</code> 설정과 대시보드 JSON import 를 진행한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 300" width="640" role="img" aria-label="그라파나 Image Gallery 대시보드에 HTTP 200 Responses, In-Flight Requests, Memory In Use, Active Goroutines 등 여러 패널이 행 단위로 묶여 배치된 모습">
+        <rect x="8" y="8" width="624" height="284" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="8" y="8" width="624" height="26" rx="8" class="dg-fill-soft"/>
+        <line x1="8" y1="34" x2="632" y2="34" class="dg-stroke"/>
+        <text x="24" y="26" class="dg-text-sub dg-mono" font-size="10">localhost:3000 / Dashboards / Image Gallery</text>
+        <rect x="530" y="12" width="92" height="18" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="576" y="25" class="dg-text-sub" font-size="9" text-anchor="middle">Last 15 minutes</text>
+
+        <text x="24" y="54" class="dg-accent" font-size="11.5" font-weight="700">▾ Image Gallery</text>
+        <g>
+          <rect x="24" y="62" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="34" y="78" class="dg-text" font-size="9.5" font-weight="700">HTTP 200 Responses</text>
+          <polyline points="36,124 92,124 92,90 158,90" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+          <rect x="174" y="62" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="184" y="78" class="dg-text" font-size="9.5" font-weight="700">In-Flight Requests</text>
+          <polyline points="186,126 308,126" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+          <rect x="324" y="62" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="334" y="78" class="dg-text" font-size="9.5" font-weight="700">Memory In Use</text>
+          <polyline points="336,116 356,108 372,118 392,100 410,110 430,92 450,98" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+          <rect x="474" y="62" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="484" y="78" class="dg-text" font-size="9.5" font-weight="700">Active Goroutines</text>
+          <polyline points="486,94 502,116 518,100 534,120 550,104 566,122 582,110 598,116" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+        </g>
+
+        <text x="24" y="156" class="dg-accent" font-size="11.5" font-weight="700">▾ Image of the Day API</text>
+        <g>
+          <rect x="24" y="164" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="34" y="180" class="dg-text" font-size="9.5" font-weight="700">Get Image Requests</text>
+          <polyline points="36,226 92,226 92,192 158,192" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+          <rect x="174" y="164" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="184" y="180" class="dg-text" font-size="9.5" font-weight="700">Image Loads (gauge)</text>
+          <path d="M212 218 A 34 34 0 0 1 278 218" fill="none" stroke="var(--green)" stroke-width="7" stroke-linecap="round"/>
+          <text x="245" y="216" class="dg-text" font-size="15" font-weight="800" text-anchor="middle">103</text>
+          <rect x="324" y="164" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="334" y="180" class="dg-text" font-size="9.5" font-weight="700">JVM Memory Use</text>
+          <polyline points="336,220 356,196 376,192 396,224 416,212 436,204 452,200" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+          <rect x="474" y="164" width="142" height="72" rx="5" class="dg-fill-soft dg-stroke"/>
+          <text x="484" y="180" class="dg-text" font-size="9.5" font-weight="700">Active Threads</text>
+          <polyline points="486,220 520,220 520,204 598,204" fill="none" stroke="var(--green)" stroke-width="1.8"/>
+        </g>
+
+        <text x="24" y="258" class="dg-accent" font-size="11.5" font-weight="700">▾ Access Log</text>
+        <g>
+          <rect x="24" y="266" width="142" height="20" rx="4" class="dg-fill-soft dg-stroke"/>
+          <text x="34" y="280" class="dg-text-sub" font-size="9">Logs by Container</text>
+          <rect x="174" y="266" width="142" height="20" rx="4" class="dg-fill-soft dg-stroke"/>
+          <text x="184" y="280" class="dg-text-sub" font-size="9">Current Client IPs</text>
+          <rect x="324" y="266" width="142" height="20" rx="4" class="dg-fill-soft dg-stroke"/>
+          <text x="334" y="280" class="dg-text-sub" font-size="9">Memory Use by Container</text>
+          <rect x="474" y="266" width="142" height="20" rx="4" class="dg-fill-soft dg-stroke"/>
+          <text x="484" y="280" class="dg-text-sub" font-size="9">Active Sockets</text>
+        </g>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>서비스별로 행을 나눠 묶은 것이 이 대시보드의 핵심 구조다</b> —
+      Image Gallery / IOTD API / Access Log 세 행이 각각 그 서비스의 상태를 한 줄로 보여 준다.
+      장애가 나면 어느 행이 붉어지는지로 원인 구간을 좁힐 수 있다.
+    </div>
+  </div>
+
+  <h4>대시보드 팁</h4>
+  <ul>
+    <li>정보는 모두 PromQL 로 만들어지는데, 이때 복잡한 쿼리가 중요한 게 아니다.</li>
+    <li>어떤 측정값을 보여 줄지 잘 골라서 시각화하는 것이 중요하다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">대시보드를 코드로 관리하기 <span class="badge b-blue">보강</span></p>
+      <p>
+        UI 에서 손으로 만든 대시보드는 컨테이너를 지우면 사라진다.
+        위 실습이 <b>JSON import</b> 로 대시보드를 넣는 이유가 이것이다.
+        그라파나는 데이터 소스와 대시보드를 파일로 미리 넣어 두는
+        <b>프로비저닝</b> 기능을 지원하므로, 이미지에 함께 구워 두면
+        <code>docker run</code> 한 번으로 대시보드까지 완성된 상태로 뜬다.
+        <a href="#item-9-5">투명성</a>도 코드로 관리되어야 재현 가능해진다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>프로메테우스가 저장소, 그라파나가 화면. 데이터 소스로 연결한다.</li>
+      <li>서비스 단위로 행을 나눠 배치하면 장애 구간을 빠르게 좁힐 수 있다.</li>
+      <li>대시보드는 JSON 으로 관리해 이미지에 함께 넣으면 재현 가능해진다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 9-5</div>
+    <h3>투명성의 수준</h3>
+    <p class="item-tagline">개념 검증과 실제 제품을 가르는 것 중 하나가 "지금 무슨 일이 일어나는지 볼 수 있는가"다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    수십 개의 패널보다 중요한 것은 <b>앱 전체를 한 화면에 조망하는 대시보드 하나</b>다.
+    가장 중요한 지표만 모아 한 화면에 담을 수 있어야 한다.
+  </div>
+
+  <h4>투명성(Observability)</h4>
+  <ul>
+    <li>간단한 개념 검증 수준의 앱에서 실제 제품으로 나아가려면 투명성이 필요하다.</li>
+    <li>실제 운영 환경에서는 대시보드가 꼭 필요한데, 그중에서도 앱의 전체 상황을 조망하는 대시보드가 중요하다.</li>
+    <li>측정값 중 앱에 가장 중요한 데이터를 모아 하나의 화면으로 구성할 수 있어야 한다.</li>
+  </ul>
+
+  <h4>투명성 아키텍처 한눈에 보기</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 300" width="640" role="img" aria-label="그라파나가 프로메테우스를 조회하고, 프로메테우스는 도커 엔진과 여러 서버의 metrics 엔드포인트를 수집하는 계층 구조">
+        <rect x="240" y="16" width="160" height="42" rx="8" class="dg-fill-soft dg-stroke"/>
+        <text x="320" y="43" class="dg-text" font-size="14" font-weight="700" text-anchor="middle">Grafana</text>
+        <text x="416" y="34" class="dg-accent" font-size="11">PromQL 을 통한 시각화</text>
+
+        <path d="M320 60 L 320 96" fill="none" class="dg-stroke" marker-end="url(#ob-arr)"/>
+
+        <rect x="240" y="100" width="160" height="42" rx="8" class="dg-fill-soft dg-stroke"/>
+        <text x="320" y="127" class="dg-text" font-size="14" font-weight="700" text-anchor="middle">Prometheus</text>
+        <text x="416" y="118" class="dg-accent" font-size="11">Metric 데이터 수집</text>
+
+        <path d="M282 144 C 220 168, 160 190, 120 208" fill="none" class="dg-stroke" marker-end="url(#ob-arr)"/>
+        <path d="M312 144 L 300 206" fill="none" class="dg-stroke" marker-end="url(#ob-arr)"/>
+        <path d="M348 144 C 380 172, 400 192, 412 206" fill="none" class="dg-stroke" marker-end="url(#ob-arr)"/>
+        <path d="M380 144 C 460 172, 500 192, 528 206" fill="none" class="dg-stroke" marker-end="url(#ob-arr)"/>
+        <defs>
+          <marker id="ob-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+
+        <rect x="30" y="212" width="180" height="40" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="120" y="237" class="dg-text dg-mono" font-size="12" text-anchor="middle">Docker Engine</text>
+        <text x="120" y="266" class="dg-text-sub dg-mono" font-size="10.5" text-anchor="middle">/metrics</text>
+        <text x="120" y="288" class="dg-accent" font-size="10.5" text-anchor="middle">컨테이너 수 / 호스트 PC 등 인프라 정보</text>
+
+        <rect x="248" y="212" width="104" height="40" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="300" y="237" class="dg-text dg-mono" font-size="12" text-anchor="middle">Server</text>
+        <text x="300" y="266" class="dg-text-sub dg-mono" font-size="10.5" text-anchor="middle">/metrics</text>
+
+        <rect x="368" y="212" width="104" height="40" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="420" y="237" class="dg-text dg-mono" font-size="12" text-anchor="middle">Server</text>
+        <text x="420" y="266" class="dg-text-sub dg-mono" font-size="10.5" text-anchor="middle">/metrics</text>
+
+        <text x="528" y="238" class="dg-text-sub" font-size="14">···</text>
+
+        <path d="M280 276 L 280 284 L 440 284 L 440 276" fill="none" stroke="var(--accent)" stroke-width="1.4"/>
+        <text x="360" y="298" class="dg-accent" font-size="10.5" text-anchor="middle">런타임 + 커스텀 데이터</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>세 층이 각자 한 가지 일만 한다</b> — 앱과 엔진은 <code>/metrics</code> 로 내보내고,
+      프로메테우스는 모아서 저장하고, 그라파나는 보여 준다.
+      각 층이 독립적이라 어느 하나를 바꿔도 나머지는 그대로 둘 수 있다.
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">메트릭만으로는 부족하다 <span class="badge b-blue">보강</span></p>
+      <p>
+        여기서 다룬 것은 관측 가능성의 세 기둥 중 <b>메트릭</b> 하나다.
+        메트릭은 "무언가 이상하다"를 빠르게 알려 주지만 "왜"를 말해 주지 못한다.
+        나머지 두 기둥은 <b>로그</b>(무슨 일이 있었는지)와 <b>트레이스</b>(요청이 어느 구간에서 느려졌는지)다.
+        메트릭으로 이상을 감지하고, 트레이스로 구간을 좁히고, 로그로 원인을 확인하는 흐름이 표준이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>투명성은 제품 수준으로 가기 위한 필수 조건이다.</li>
+      <li>앱 전체를 조망하는 대시보드 하나가 패널 수십 개보다 중요하다.</li>
+      <li>내보내기 / 수집 / 시각화 세 층이 독립적이라 각각 교체할 수 있다.</li>
+      <li>메트릭은 이상 감지용이다. 원인 규명에는 로그와 트레이스가 함께 필요하다.</li>
+    </ul>
+  </div>
+</article>

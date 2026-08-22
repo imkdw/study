@@ -1,0 +1,525 @@
+<article class="item" id="item-5-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-1</div>
+    <h3>트랜잭션</h3>
+    <p class="item-tagline">트랜잭션은 <b>부분 성공을 없애는 장치</b>다. 그래서 애플리케이션의 클렌징 코드를 없애 준다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    트랜잭션의 이득은 코드에서 온다 — 실패 시 <b>되돌리는 코드를 내가 쓰지 않아도 된다</b>는 것. 대신 <b>범위를 최소로</b> 유지해야 그 값을 치를 수 있다.
+  </div>
+
+  <h4>MyISAM 과 InnoDB 의 차이</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>1, 2 성공 · 3 실패일 때</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>MyISAM</td><td>1, 2 는 그대로 저장됨</td><td class="t-no">부분 업데이트 — 정합성이 깨진다</td></tr>
+        <tr><td>InnoDB</td><td>1, 2 도 저장되지 않음</td><td class="t-ok">전부 롤백 — 원자성 보장</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>MyISAM에서 벌어지는 이 현상을 <b>부분 업데이트(Partial Update)</b> 라고 부르며, 정합성 측면에서 매우 골치 아프다.</li>
+    <li>InnoDB는 실패 시 전부 롤백하므로, <b>애플리케이션에 클렌징 코드를 따로 넣지 않아도</b> DB가 정리해 준다.</li>
+  </ul>
+
+  <h4>주의사항 — 트랜잭션의 범위</h4>
+  <ul>
+    <li>커넥션과 마찬가지로 <b>꼭 필요한 최소 구간</b>에만 걸어야 한다.</li>
+    <li>이는 곧 <b>프로그램 코드에서 트랜잭션의 범위를 최소화하라</b>는 뜻이다.</li>
+    <li>FTP 전송, 외부 API 호출 같은 <b>무겁거나 오래 걸리는 작업</b>을 트랜잭션 사이에 넣으면 곧바로 성능 저하로 이어진다.</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">문제</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">START TRANSACTION;
+  UPDATE stock ...;
+  -- 외부 결제 API 호출 (수 초)
+  -- 파일 업로드
+  INSERT INTO orders ...;
+COMMIT;</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">개선</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- 외부 결제 API 호출 (트랜잭션 밖)
+-- 파일 업로드 (트랜잭션 밖)
+
+START TRANSACTION;
+  UPDATE stock ...;
+  INSERT INTO orders ...;
+COMMIT;</code></pre>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 그렇게까지 <span class="badge b-blue">보강</span></p>
+      <p>트랜잭션이 열려 있는 동안 그 트랜잭션이 잡은 <b>레코드 잠금이 유지</b>되고, 동시에 <b>언두 로그가 삭제되지 못한다.</b> 외부 호출 하나가 수 초 걸리면 그 수 초 동안 다른 커넥션들이 같은 레코드에서 줄을 선다. 트랜잭션 범위 최소화는 스타일 문제가 아니라 <a href="#item-4-2">언두 로그와 잠금</a>의 문제다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>MyISAM은 부분 업데이트를 남기고, InnoDB는 전부 롤백한다.</li>
+      <li>트랜잭션의 진짜 이득은 <b>애플리케이션에서 복구 코드를 제거</b>하는 것이다.</li>
+      <li>네트워크·파일 작업은 트랜잭션 <b>바깥</b>으로. 열려 있는 동안 잠금과 언두가 함께 묶인다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-2</div>
+    <h3>MySQL 엔진의 잠금</h3>
+    <p class="item-tagline">글로벌 · 테이블 · 네임드 · 메타데이터 — 스토리지 엔진 위쪽에도 네 종류의 잠금이 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    MySQL 엔진 레벨의 잠금은 <b>스토리지 엔진과 무관하게</b> 모든 테이블에 걸린다. 그래서 범위가 크고, 그래서 위험하다.
+  </div>
+
+  <p>락은 크게 <b>스토리지 엔진 레벨</b>과 <b>MySQL 엔진 레벨</b>로 나뉜다. 이 절은 후자 — 글로벌 락, 테이블 락, 네임드 락, 메타데이터 락이다.</p>
+
+  <h4>글로벌 락</h4>
+  <ul>
+    <li>MySQL이 제공하는 잠금 중 <b>가장 범위가 크다.</b> 범위는 MySQL 서버 전체다.</li>
+    <li><code>SELECT</code> 를 제외한 DDL, DML 쿼리는 글로벌 락이 걸린 동안 전부 대기 상태가 된다.</li>
+    <li>락을 걸기 전에 <b>실행 중인 모든 쿼리가 완료되어야</b> 한다 — 그래서 긴 쿼리 하나가 있으면 락 획득 자체가 오래 걸린다.</li>
+    <li>모든 테이블에 영향을 주므로 <b>웹 서비스용 DB에서는 쓰지 않는 것이 좋다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag bad">운영 중 실행 금지</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; FLUSH TABLES WITH READ LOCK;
+Query OK, 0 rows affected (0.02 sec)</code></pre>
+  </div>
+
+  <h4>백업 락</h4>
+  <ul>
+    <li>백업 실패를 막기 위해, DDL 명령이 실행되면 <b>복제를 일시 중지</b>시키는 역할을 한다.</li>
+    <li>특정 세션이 백업 락을 획득하면 테이블 스키마나 사용자 인증 정보를 변경할 수 없다.</li>
+    <li>글로벌 락과 달리 <b>일반적인 DML은 계속 처리된다</b> — 이것이 백업 락의 존재 이유다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag good">백업 시 권장</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; LOCK INSTANCE FOR BACKUP;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; UNLOCK INSTANCE;
+Query OK, 0 rows affected (0.00 sec)</code></pre>
+  </div>
+
+  <h4>테이블 락</h4>
+  <ul>
+    <li>개별 테이블 단위로 설정되는 잠금이다. <b>명시적</b>으로도, <b>묵시적</b>으로도 걸릴 수 있다.</li>
+    <li>명시적 락은 특별한 상황이 아니면 애플리케이션에서 쓸 일이 거의 없다.</li>
+    <li>묵시적 락은 쿼리가 실행되는 동안 자동으로 획득했다가 자동으로 해제된다.
+      <ul>
+        <li>InnoDB는 레코드 기반 잠금을 제공하므로 <b>단순 데이터 변경으로는 테이블 락이 걸리지 않는다.</b></li>
+        <li>대부분의 DML에서는 무시되고, <b>스키마를 변경하는 DDL</b> 에만 영향을 미친다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; LOCK TABLES test_table READ;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql&gt; UNLOCK TABLES;
+Query OK, 0 rows affected (0.00 sec)</code></pre>
+  </div>
+
+  <h4>네임드 락</h4>
+  <ul>
+    <li><code>GET_LOCK()</code> 함수로 <b>임의의 문자열</b>에 잠금을 설정한다.</li>
+    <li>테이블이나 레코드와 아무 관계가 없다. 단순히 사용자가 지정한 문자열을 대상으로 한다.</li>
+    <li>자주 쓰이진 않고, 많은 레코드에 대해 복잡한 요건을 처리하는 <b>특정 배치 상황</b>에서 쓰인다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT GET_LOCK('mylock1', 10);   -- 최대 10초 대기
++-------------------------+
+| GET_LOCK('mylock1', 10) |
++-------------------------+
+|                       1 |
++-------------------------+
+
+mysql&gt; SELECT GET_LOCK('mylock2', 10);
++-------------------------+
+| GET_LOCK('mylock2', 10) |
++-------------------------+
+|                       1 |
++-------------------------+
+
+mysql&gt; SELECT RELEASE_LOCK('mylock1');
++-------------------------+
+| RELEASE_LOCK('mylock1') |
++-------------------------+
+|                       1 |
++-------------------------+
+
+mysql&gt; SELECT RELEASE_ALL_LOCKS();
++---------------------+
+| RELEASE_ALL_LOCKS() |
++---------------------+
+|                   1 |
++---------------------+</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">쓸모 있는 자리 <span class="badge b-blue">보강</span></p>
+      <p>네임드 락은 <b>분산 환경의 배치 중복 실행 방지</b>에 유용하다. 여러 대의 애플리케이션 서버가 같은 배치를 돌릴 때 <code>GET_LOCK('daily_batch', 0)</code> 이 1을 반환한 인스턴스만 실행하면 된다. 다만 커넥션이 끊기면 잠금도 자동 해제되므로, 커넥션 풀 환경에서는 <b>같은 커넥션을 잡고 있어야</b> 한다는 점에 주의한다.</p>
+    </div>
+  </div>
+
+  <h4>메타데이터 락</h4>
+  <ul>
+    <li>DB 객체의 <b>이름이나 구조를 변경</b>할 때 획득하는 잠금이다.</li>
+    <li><b>명시적으로 획득할 수 없다.</b> 테이블 이름을 바꾸는 등의 상황에서 자동으로 걸린다.</li>
+    <li>예를 들어 배치 프로그램에서 실시간으로 테이블을 교체해야 하는 요건이 대표적인 경우다.</li>
+  </ul>
+
+  <h5>시간이 오래 걸리는 테이블 구조 변경 쿼리 개선하기</h5>
+  <p>DDL은 단일 스레드로 작동하기 때문에 데이터가 많으면 오래 걸린다. 노트가 정리한 우회 전략은 다음과 같다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">KEY_BLOCK_SIZE 로 테이블을 압축한다</div><p>대상 테이블의 물리적 크기를 먼저 줄여 둔다.</p></li>
+    <li><div class="step-title">N개의 스레드로 데이터를 나눠 삽입한다</div><p>단일 스레드 DDL이 아니라 병렬 INSERT로 대부분을 옮긴다.</p></li>
+    <li><div class="step-title">남은 데이터를 MAX(id) 기준으로 마저 삽입한다</div><p>병렬 작업 중 새로 들어온 레코드를 따라잡는다.</p></li>
+    <li><div class="step-title">최종 전환</div><p>이때 <b>최대한 많은 데이터를 사전에 옮겨 두어야</b> 마지막 락 구간이 짧아진다.</p></li>
+  </ol>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>글로벌 락(<code>FLUSH TABLES WITH READ LOCK</code>)은 서버 전체를 멈춘다. 운영 DB에서는 금물.</li>
+      <li>백업에는 글로벌 락 대신 <b>백업 락</b>(<code>LOCK INSTANCE FOR BACKUP</code>)을 쓴다.</li>
+      <li>InnoDB에서 테이블 락은 사실상 <b>DDL 전용</b>이다.</li>
+      <li>네임드 락은 테이블과 무관한 <b>애플리케이션 수준의 상호배제</b> 도구다.</li>
+      <li>메타데이터 락은 명시적으로 못 잡는다. <b>DDL이 곧 메타데이터 락</b>이라고 보면 된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-3</div>
+    <h3>InnoDB 스토리지 엔진 잠금</h3>
+    <p class="item-tagline">InnoDB는 <b>레코드가 아니라 인덱스를 잠근다.</b> 인덱스 설계가 곧 잠금 설계다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    변경할 레코드를 찾기 위해 <b>스캔한 인덱스 레코드는 전부 잠긴다.</b> 인덱스가 없으면 테이블의 모든 레코드가 잠긴다.
+  </div>
+
+  <h4>InnoDB 잠금의 특징</h4>
+  <ul>
+    <li>스토리지 엔진 내부에서 레코드 기반 잠금 방식을 갖는다.
+      <ul>
+        <li>MyISAM보다 뛰어난 동시성 제어를 제공한다.</li>
+        <li>잠금 정보가 <b>상당히 작은 공간</b>으로 관리된다.</li>
+      </ul>
+    </li>
+    <li>예전에는 InnoDB 락 정보에 접근하기 어려웠으나, 지금은 <code>performance_schema</code> 를 통한 모니터링이 가능하다.</li>
+  </ul>
+
+  <h4>네 가지 잠금</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 160" width="560" role="img" aria-label="인덱스 레코드 사이의 갭과 레코드 락, 넥스트 키 락의 범위">
+        <line x1="40" y1="100" x2="520" y2="100" class="dg-stroke" stroke-width="1.5"/>
+        <circle cx="120" cy="100" r="7" class="dg-accent"/>
+        <circle cx="280" cy="100" r="7" class="dg-accent"/>
+        <circle cx="440" cy="100" r="7" class="dg-accent"/>
+        <text x="120" y="126" class="dg-text dg-mono" font-size="12" text-anchor="middle">10</text>
+        <text x="280" y="126" class="dg-text dg-mono" font-size="12" text-anchor="middle">20</text>
+        <text x="440" y="126" class="dg-text dg-mono" font-size="12" text-anchor="middle">30</text>
+        <rect x="266" y="86" width="28" height="28" rx="6" class="dg-fill-soft"/>
+        <text x="280" y="70" class="dg-text" font-size="12" text-anchor="middle">레코드 락</text>
+        <rect x="134" y="88" width="132" height="24" rx="6" class="dg-fill-bg"/>
+        <text x="200" y="70" class="dg-text" font-size="12" text-anchor="middle">갭 락</text>
+        <line x1="134" y1="42" x2="294" y2="42" class="dg-stroke" stroke-width="2.5"/>
+        <text x="214" y="34" class="dg-text-sub" font-size="11" text-anchor="middle">넥스트 키 락 = 갭 락 + 레코드 락</text>
+        <text x="480" y="126" class="dg-text-sub" font-size="11" text-anchor="middle">인덱스 순서</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>갭 락은 "값"이 아니라 "빈 자리"를 잠근다</b> — 그 구간에 새 레코드가 INSERT 되는 것을 막는다.</div>
+  </div>
+
+  <h5>레코드 락</h5>
+  <ul>
+    <li>레코드 자체만을 잠근다.</li>
+    <li>단, InnoDB는 <b>레코드 자체가 아니라 인덱스의 레코드</b>를 잠근다.</li>
+  </ul>
+
+  <h5>갭 락</h5>
+  <ul>
+    <li>레코드가 아니라 <b>레코드와 인접한 레코드 사이의 간격</b>만 잠근다.</li>
+    <li>그 사이에 새로운 레코드가 <code>INSERT</code> 되는 것을 제어한다.</li>
+  </ul>
+
+  <h5>넥스트 키 락</h5>
+  <ul>
+    <li>레코드 락과 갭 락을 <b>합쳐 놓은</b> 형태다.</li>
+    <li>주 목적은 <b>복제 일관성</b>이다 — 바이너리 로그에 기록된 쿼리가 레플리카에서 실행될 때 소스 서버와 동일한 결과를 만들도록 보장한다.</li>
+  </ul>
+
+  <h5>자동 증가 락</h5>
+  <ul>
+    <li><code>AUTO_INCREMENT</code> 컬럼에서 쓰이며, <b>테이블 수준의 잠금</b>을 사용한다.</li>
+    <li>새 레코드를 저장하는 쿼리에서만 필요하고 다른 쿼리에는 걸리지 않는다.</li>
+    <li>명시적으로 획득·해제하는 방법은 없고, 대부분의 경우 성능 문제가 되지 않는다.</li>
+    <li><code>innodb_autoinc_lock_mode</code> 로 동작 방식을 바꿀 수 있다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>값</th><th>모드</th><th>동작</th><th>값의 연속성</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-center"><code>0</code></td><td>전통(traditional)</td>
+          <td>모든 INSERT가 자동 증가 락을 사용</td>
+          <td class="t-center t-ok">완전 연속</td>
+        </tr>
+        <tr>
+          <td class="t-center"><code>1</code></td><td>연속(consecutive)</td>
+          <td>건수를 예측할 수 있으면 락 대신 <b>래치(뮤텍스)</b>. 예측 불가하면 여러 값을 <b>한 번에 미리 할당</b></td>
+          <td class="t-center">한 INSERT 문 내부는 연속. 남은 값은 <b>누락 가능</b></td>
+        </tr>
+        <tr>
+          <td class="t-center"><code>2</code></td><td>인터리브(interleaved)</td>
+          <td>절대 락을 쓰지 않고 래치만 사용. 여러 커넥션이 <b>동시에 INSERT 가능</b></td>
+          <td class="t-center t-no">연속 보장 없음. <b>유일성만</b> 보장</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">바이너리 로그 포맷과의 관계</p>
+      <p>바이너리 로그 포맷이 <code>ROW</code> 가 아니라 <b><code>STATEMENT</code></b> 라면 <code>innodb_autoinc_lock_mode</code> 를 <b>1로 낮추는 것을 권장</b>한다. 2(인터리브)에서는 값이 생성되는 순서가 확정적이지 않아 소스와 레플리카의 데이터가 달라질 수 있다.</p>
+    </div>
+  </div>
+
+  <h4>인덱스와 잠금</h4>
+  <ul>
+    <li>InnoDB의 잠금은 <b>레코드가 아니라 인덱스를 잠그는</b> 방식으로 처리된다.</li>
+    <li>변경할 레코드를 찾기 위해 <b>검색한 인덱스의 레코드를 전부</b> 잠근다.</li>
+    <li>성능 저하를 막으려면 인덱스 설계를 잘해야 한다 — 잠금 범위는 인덱스가 결정한다.</li>
+  </ul>
+
+  <h5>인덱스 잠금 예시</h5>
+  <p><code>first_name</code> 컬럼에만 인덱스가 있는 상황이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT COUNT(*) FROM employees WHERE first_name='Georgi';
++----------+
+| count(*) |
++----------+
+|      253 |
++----------+
+
+mysql&gt; SELECT COUNT(*) FROM employees
+    -&gt; WHERE first_name='Georgi' AND last_name='Klassen';
++----------+
+| count(*) |
++----------+
+|        1 |
++----------+
+
+mysql&gt; UPDATE employees SET hire_date=NOW()
+    -&gt; WHERE first_name='Georgi' AND last_name='Klassen';
+Query OK, 1 row affected, 1 warning (0.01 sec)
+Rows matched: 1  Changed: 1  Warnings: 1</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">1건을 바꿨는데 253건이 잠긴다</p>
+      <p><code>Rows matched: 1</code> 이지만, <code>last_name</code> 에는 인덱스가 없으므로 InnoDB는 <code>first_name='Georgi'</code> 로 찾은 <b>인덱스 레코드 253건 전부</b>를 잠근 뒤 그중 1건을 변경한다. 만약 인덱스가 하나도 없다면 <b>테이블의 모든 레코드</b>가 잠긴다.</p>
+    </div>
+  </div>
+
+  <h4>레코드 수준의 잠금 확인 및 해제</h4>
+  <ul>
+    <li>레코드 수준 잠금은 테이블 수준 잠금보다 확인이 복잡하다.</li>
+    <li><code>KILL</code> 로 해당 프로세스를 죽이면 강제로 잠금을 해제할 수 있다.</li>
+  </ul>
+
+  <h5>잠금 시나리오</h5>
+  <ul>
+    <li>3개의 커넥션이 동시에 같은 레코드를 업데이트한다고 가정한다.</li>
+    <li>커넥션별로 순차 처리를 위해 각 프로세스가 그 레코드에 락을 건다.</li>
+    <li><code>SHOW PROCESSLIST</code> 와 <code>performance_schema</code> 테이블(<code>data_locks</code>, <code>data_lock_waits</code>) 조회로 <b>잠금 대기 순서</b>를 확인할 수 있다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>InnoDB의 잠금 단위는 <b>인덱스 레코드</b>다. 스캔한 만큼 잠긴다.</li>
+      <li>레코드 락 + 갭 락 = <b>넥스트 키 락</b>, 그 목적은 복제 일관성이다.</li>
+      <li><code>innodb_autoinc_lock_mode</code> 2는 동시성이 좋지만 값의 연속성을 포기한다. <code>STATEMENT</code> 포맷이면 1로.</li>
+      <li>인덱스 설계가 곧 잠금 설계 — WHERE 절 전체를 커버하는 인덱스가 잠금 범위를 줄인다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-4</div>
+    <h3>MySQL의 격리 수준</h3>
+    <p class="item-tagline">네 단계의 격리 수준은 결국 <b>"어느 시점의 데이터를 볼 것인가"</b> 에 대한 네 가지 답이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    InnoDB의 <code>REPEATABLE READ</code> 는 <b>갭 락과 넥스트 키 락 덕분에 팬텀 리드까지 막는다.</b> 이론상 표와 실제 동작이 다른 지점이다.
+  </div>
+
+  <p>여러 트랜잭션이 동시에 처리될 때, 특정 트랜잭션이 <b>다른 트랜잭션이 변경 중이거나 조회 중인 데이터를 볼 수 있게 할지</b> 결정하는 것이 격리 수준이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>레벨</th><th>DIRTY READ</th><th>NON-REPEATABLE READ</th><th>PHANTOM READ</th></tr></thead>
+      <tbody>
+        <tr><td>READ UNCOMMITTED</td><td class="t-center t-no">O</td><td class="t-center t-no">O</td><td class="t-center t-no">O</td></tr>
+        <tr><td>READ COMMITTED</td><td class="t-center t-ok">X</td><td class="t-center t-no">O</td><td class="t-center t-no">O</td></tr>
+        <tr><td>REPEATABLE READ</td><td class="t-center t-ok">X</td><td class="t-center t-ok">X</td><td class="t-center">O <span class="dg-text-sub">(InnoDB는 없음)</span></td></tr>
+        <tr><td>SERIALIZABLE</td><td class="t-center t-ok">X</td><td class="t-center t-ok">X</td><td class="t-center t-ok">X</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>뒤로 갈수록 격리 수준이 높아지고 <b>동시성은 떨어진다.</b></li>
+    <li><code>SERIALIZABLE</code> 수준만 아니라면 격리 수준 자체로 인한 성능 차이는 크지 않다.</li>
+    <li>일반적인 온라인 서비스는 <code>READ COMMITTED</code> 또는 <code>REPEATABLE READ</code> 를 쓴다.</li>
+    <li><b>MySQL(InnoDB)의 기본값은 <code>REPEATABLE READ</code></b> 다.</li>
+  </ul>
+
+  <h4>READ UNCOMMITTED</h4>
+  <ul>
+    <li>커밋이나 롤백을 하지 않아도 다른 트랜잭션에서 그 변경을 볼 수 있는 수준이다.</li>
+    <li>완료되지 않은 작업을 읽어 버리는 현상을 <b>DIRTY READ</b> 라고 한다.</li>
+    <li>격리 수준이라고 인정하지 않을 정도로 정합성 문제가 많다.</li>
+    <li>MySQL에서는 최소한 <code>READ COMMITTED</code> 이상을 쓰는 것이 좋다.</li>
+  </ul>
+
+  <h4>READ COMMITTED</h4>
+  <ul>
+    <li>ORACLE의 기본 격리 수준이며, 온라인 서비스에서 가장 많이 선택된다.</li>
+    <li>DIRTY READ는 발생하지 않는다. <b>커밋이 완료된 데이터만</b> 다른 트랜잭션에서 보인다.</li>
+    <li>하지만 <b>하나의 트랜잭션 안에서 같은 SELECT를 두 번 실행했을 때 결과가 달라질 수 있다</b>(NON-REPEATABLE READ).
+      <ul>
+        <li>트랜잭션 B가 열려 있는 동안 A가 중간에 커밋하면, B의 두 번째 SELECT 결과가 달라진다.</li>
+        <li>일반적인 온라인 서비스에서는 문제가 없지만 <b>금융 같은 분야에서는 문제가 된다.</b></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>REPEATABLE READ</h4>
+  <ul>
+    <li>InnoDB의 기본 격리 수준이다.</li>
+    <li><code>READ COMMITTED</code> 에서 발생하던 NON-REPEATABLE READ 부정합이 발생하지 않는다.</li>
+    <li>MVCC를 위해 <b>언두 영역에 백업된 이전 데이터</b>를 이용해서, 동일 트랜잭션 내에서는 같은 결과를 보장한다.</li>
+  </ul>
+
+  <h5>언두 영역이 어떻길래 보장이 되는가</h5>
+  <ul>
+    <li>언두 영역에 백업된 모든 레코드는 <b>변경을 발생시킨 트랜잭션의 ID</b>를 갖는다. 각 트랜잭션도 고유한 ID를 갖는다.</li>
+    <li>현재 실행 중인 트랜잭션 번호보다 <b>더 큰 번호의 언두 데이터는 삭제할 수 없다.</b></li>
+    <li>더 정확히는, 살아 있는 트랜잭션 번호 구간 안에서 백업된 언두 데이터는 <b>보존되어야</b> 한다.</li>
+  </ul>
+
+  <h5>처리 과정</h5>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+    participant T6 as TRX 6
+    participant T10 as TRX 10
+    participant T12 as TRX 12
+    participant U as 언두 로그
+    T6->>T6: INSERT emp_no=500, name=Lara
+    T10->>T10: SELECT emp_no=500 → Lara
+    T12->>U: UPDATE name=Toto (이전 값 Lara 백업)
+    T12->>T12: COMMIT
+    T10->>U: SELECT emp_no=500 다시 실행
+    U-->>T10: TRX 10 보다 작은 번호의 백업 → Lara
+      </pre>
+    </div>
+    <div class="figure-cap"><b>TRX 10 은 끝까지 Lara 를 본다</b> — 자기보다 나중에 커밋된 변경은 언두 로그를 거쳐 필터링된다.</div>
+  </div>
+
+  <h5>그래도 부정합이 발생한다 — 팬텀 리드</h5>
+  <ul>
+    <li>위 과정에서 TRX 12가 <b>새로운 레코드를 추가</b>한다고 가정하자.</li>
+    <li>테이블과 레코드에는 락을 걸 수 있지만 <b>언두 로그에는 락을 걸 수 없다.</b></li>
+    <li>TRX 10이 <code>WHERE emp_no &gt;= 500 FOR UPDATE</code> 를 수행하면 <b>2건이 반환된다.</b>
+      <ul>
+        <li><code>FOR UPDATE</code>, <code>LOCK IN SHARE MODE</code> 쿼리는 <b>언두 영역을 읽지 않고 최신 레코드에 잠금을 건다.</b></li>
+        <li>이렇게 트랜잭션의 변경 작업 때문에 데이터가 보였다 안 보였다 하는 것을 <b>PHANTOM READ</b> 라고 한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>SERIALIZABLE</h4>
+  <ul>
+    <li>가장 단순하면서 가장 엄격한 격리 수준이다.</li>
+    <li>하나의 트랜잭션이 읽고 쓰는 레코드에는 다른 트랜잭션이 <b>전혀 접근할 수 없다.</b></li>
+    <li>다만 InnoDB는 갭 락과 넥스트 키 락 덕분에 <code>REPEATABLE READ</code> 에서도 <b>팬텀 리드가 발생하지 않으므로</b>, 굳이 쓸 이유가 크지 않다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>격리 수준은 곧 <b>"MVCC에서 어느 버전을 볼 것인가"</b> 의 정책이다.</li>
+      <li><code>REPEATABLE READ</code> 의 보증은 <b>언두 로그</b>가 만든다. 트랜잭션 ID 비교로 필터링한다.</li>
+      <li>단, <code>FOR UPDATE</code> / <code>LOCK IN SHARE MODE</code> 는 언두를 거치지 않아 <b>팬텀 리드가 노출될 수 있다.</b></li>
+      <li>InnoDB는 갭 락·넥스트 키 락으로 일반 조회의 팬텀 리드를 막으므로 <code>SERIALIZABLE</code> 은 거의 불필요하다.</li>
+    </ul>
+  </div>
+</article>

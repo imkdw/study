@@ -1,0 +1,537 @@
+<article class="item" id="item-18" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-1</div>
+    <h3>처리율 제한 장치란</h3>
+    <p class="item-tagline">임계치를 넘은 요청을 잘라내는 장치. 방어이자 비용 통제 수단이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    처리율 제한은 보안 장치처럼 보이지만, 실제로는 <b>비용과 안정성을 동시에 지키는 운영 장치</b>다.
+  </div>
+
+  <ul>
+    <li>네트워크 시스템에서 클라이언트가 보내는 트래픽의 처리율을 제어하기 위한 장치다.</li>
+    <li>정의된 임계치를 넘어가는 순간, 추가로 도달한 모든 요청은 처리가 중단된다.</li>
+  </ul>
+
+  <h4>예시</h4>
+  <ul>
+    <li>사용자는 초당 2회 이상 새 글을 올릴 수 없다.</li>
+    <li>같은 IP 주소는 하루에 10개 이상의 계정을 생성할 수 없다.</li>
+    <li>같은 기기에서는 주당 5회 이상 리워드 요청이 불가능하다.</li>
+  </ul>
+
+  <h4>처리율 제한 장치의 장점</h4>
+  <ul>
+    <li>DoS(Denial of Service) 공격에 의한 자원 고갈을 방지할 수 있다.</li>
+    <li>제3자 서비스 호출 비용을 줄이고, 모든 요청을 처리하기 위해 스케일 아웃된 서버 대수를 줄여 비용을 절감한다.</li>
+    <li>봇에서 오는 트래픽이나 잘못된 이용 패턴이 유발한 트래픽을 막을 수 있다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>임계치를 넘은 요청을 버리는 것이 처리율 제한이다.</li>
+      <li>DoS 방어 / 비용 절감 / 봇 차단의 세 가지 효용이 있다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-19" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-2</div>
+    <h3>문제 이해 및 설계 범위 확정</h3>
+    <p class="item-tagline">"정확히 제한하되, 가볍고, 분산 환경에서 동작하고, 자기가 죽어도 남을 죽이지 않을 것."</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    마지막 요구사항 — <b>제한 장치의 장애가 다른 서비스에 영향을 끼치면 안 된다</b> — 이 조건이 뒤의 모든 설계 결정을 좌우한다.
+  </div>
+
+  <ul>
+    <li>API를 위한 처리율 제한 장치를 설계한다.</li>
+    <li>설정된 처리율을 초과하는 요청은 정확하게 제한해야 한다.</li>
+    <li>가능한 한 적은 메모리를 사용해야 하고, 여러 서버나 프로세스에서 동일하게 동작해야 한다.</li>
+    <li>요청이 블록되면 사용자에게 그 사실을 정확하게 전달해야 한다.</li>
+    <li>제한 장치 자체의 장애가 다른 서비스에 영향을 끼쳐서는 안 된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>정확성 / 저메모리 / 분산 지원 / 명확한 사용자 통지 / 장애 격리.</li>
+      <li>다섯 요구사항 중 정확성과 저메모리는 서로 충돌하며, 알고리즘 선택이 그 저울이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-20" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-3</div>
+    <h3>처리율 제한 장치를 어디에 둘 것인가</h3>
+    <p class="item-tagline">클라이언트는 못 믿는다. 그래서 서버 쪽 미들웨어 아니면 API 게이트웨이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    클라이언트 측 제한은 <b>UX 개선용</b>일 수는 있어도 <b>방어용</b>일 수는 없다. 클라이언트 코드는 언제든 변조된다.
+  </div>
+
+  <h4>클라이언트에 두기</h4>
+  <ul>
+    <li>일반적으로 처리율 제한을 안정적으로 걸 수 있는 장소가 못 된다.</li>
+    <li>클라이언트 요청은 너무 쉽게 변조된다.</li>
+  </ul>
+
+  <h4>서버에 두기</h4>
+  <ul>
+    <li>클라이언트와 서버 중간에 처리율 제한 장치를 구성한다.</li>
+    <li>미들웨어처럼 동작하며, 보통 <b>API 게이트웨이</b>라 부르는 곳에 구현된다.</li>
+    <li>처리율에 걸리면 <code>HTTP 429 Too Many Requests</code>를 반환한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  C["클라이언트"] -->|"요청"| M["처리율 제한 미들웨어<br>(API Gateway)"]
+  M -->|"허용"| S["API 서버"]
+  M -->|"초과 → 429"| C
+      </pre>
+    </div>
+    <div class="figure-cap"><b>제한 장치는 API 서버 앞에 선다</b> — 버려질 요청이 애플리케이션 코드에 도달하지 않는다는 것이 이 배치의 핵심이다.</div>
+  </div>
+
+  <h4>고려 사항</h4>
+  <ul>
+    <li>현재 사용 중인 프로그래밍 언어가 서버 측 구현을 지원하기에 충분한지 확인한다.</li>
+    <li>사업에 필요한 올바른 알고리즘을 고른다.</li>
+    <li>이미 MSA 구조에서 API 게이트웨이를 쓰고 있다면 거기에 포함시켜야 할 수도 있다.</li>
+    <li>직접 만들면 오래 걸린다. 인력이 부족하다면 상용 서비스를 쓰는 편이 낫다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>클라이언트 측 제한은 방어 수단이 아니다.</li>
+      <li>서버 측 미들웨어 또는 API 게이트웨이가 표준 위치다.</li>
+      <li>초과 시 응답은 <code>429 Too Many Requests</code>.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-21" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-4</div>
+    <h3>처리율 제한 알고리즘</h3>
+    <p class="item-tagline">다섯 가지 알고리즘, 그리고 메모리와 정확도 사이의 저울.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    다섯 알고리즘의 차이는 결국 <b>"버스트를 허용하는가"</b>와 <b>"경계 부근에서 정확한가"</b> 두 축으로 정리된다.
+  </div>
+
+  <h4>토큰 버킷</h4>
+  <ul>
+    <li>처리율 제한에 폭넓게 이용된다.</li>
+    <li>아마존과 스트라이프가 API 요청 통제에 사용 중인 방법이다.</li>
+  </ul>
+
+  <h5>동작 원리</h5>
+  <ol class="steps">
+    <li><div class="step-title">버킷은 지정된 용량을 갖는 컨테이너다</div><p>지정된 주기마다 새 토큰이 추가되고, 용량을 넘는 토큰은 버려진다.</p></li>
+    <li><div class="step-title">요청 하나가 토큰 하나를 쓴다</div><p>토큰이 충분하면 처리하고, 없으면 요청을 버린다.</p></li>
+  </ol>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  R["토큰 공급기<br>주기마다 n개"] -->|"보충"| B["버킷 (용량 4)"]
+  B -->|"넘치면 버림"| X["폐기"]
+  Q["요청"] --> C{"토큰 있나?"}
+  B --> C
+  C -->|"있음 → 토큰 1 소모"| OK["처리"]
+  C -->|"없음"| DROP["요청 폐기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>버킷에 토큰이 쌓여 있으면 순간 폭주도 받아낸다</b> — 이 "미리 쌓아 두는" 성질이 버스트 허용의 정체다.</div>
+  </div>
+
+  <h5>세부 사항</h5>
+  <ul>
+    <li>인자는 <b>버킷 크기</b>(담을 수 있는 최대 토큰 수)와 <b>토큰 공급률</b>(주기마다 추가되는 토큰 수) 두 개다.</li>
+    <li>버킷을 몇 개 둘지 —
+      <ul>
+        <li>API마다 버킷을 두는 방식. 사용자 기준으로 제한 기능이 3개면 사용자당 버킷 3개가 필요하다.</li>
+        <li>IP 기반이면 IP 주소마다 버킷이 필요하다.</li>
+        <li>시스템 전체 처리율이 10,000개라면 크기 10,000짜리 버킷 하나를 전체가 공유한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>장점 / 단점</h5>
+  <ul>
+    <li><b>장점</b> — 구현이 쉽고 메모리 효율적이다. 짧은 시간에 집중되는 트래픽도 처리할 수 있다.</li>
+    <li><b>단점</b> — 버킷 크기와 공급률 두 인자를 적절히 튜닝하기가 까다롭다.</li>
+  </ul>
+
+  <h4>누출 버킷 알고리즘</h4>
+  <ul>
+    <li>토큰 버킷과 비슷하지만 <b>요청 처리율이 고정</b>이라는 점이 다르다.</li>
+    <li>보통 FIFO 큐로 구현한다.</li>
+  </ul>
+
+  <h5>동작 원리</h5>
+  <ul>
+    <li>요청이 도착하면 큐가 가득 찼는지 확인하고, 빈자리가 있으면 큐에 넣는다.</li>
+    <li>큐가 가득 차 있으면 요청을 버린다.</li>
+    <li>지정된 시간마다 큐에서 요청을 꺼내 처리한다.</li>
+    <li>Shopify가 이 알고리즘을 사용하고 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q1["요청 유입"] --> C{"큐가 찼나?"}
+  C -->|"여유 있음"| FIFO[["FIFO 큐 (고정 크기)"]]
+  C -->|"가득 참"| DROP["요청 폐기"]
+  FIFO -->|"고정 처리율로 유출"| S["서버"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>출력이 항상 일정하다</b> — 뒷단 서버가 감당할 수 있는 속도를 보장하는 대신, 큐에 오래 앉아 있던 요청이 최신 요청보다 먼저 나간다.</div>
+  </div>
+
+  <h5>세부 사항</h5>
+  <ul>
+    <li><b>버킷 크기</b> — 큐에 담을 수 있는 총 작업 수.</li>
+    <li><b>처리율</b> — 지정된 시간당 몇 개의 항목을 처리할지.</li>
+  </ul>
+
+  <h5>장점 / 단점</h5>
+  <ul>
+    <li><b>장점</b> — 큐 크기가 제한되어 메모리 사용량이 효율적이다. 고정된 처리율이라 안정적인 출력이 필요한 경우 적합하다.</li>
+    <li><b>단점</b> — 단시간에 트래픽이 몰리면 큐에 오래된 요청이 쌓이고 최신 요청은 버려진다. 두 인자 튜닝도 까다롭다.</li>
+  </ul>
+
+  <h4>고정 윈도 카운터 알고리즘</h4>
+  <ul>
+    <li>타임라인을 고정된 윈도로 나누고, 윈도마다 카운터를 붙인다.</li>
+    <li>요청이 접수되면 카운터가 1씩 증가한다.</li>
+    <li>카운터가 임계치에 도달하면 새 윈도가 열릴 때까지 모든 요청이 버려진다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 200" width="620" role="img" aria-label="고정 윈도 카운터의 경계 문제를 보여주는 타임라인">
+        <text x="8" y="18" class="dg-text-sub" font-size="11">임계치: 초당 3개 / 윈도 크기 1초</text>
+
+        <line x1="30" y1="70" x2="580" y2="70" class="dg-stroke"/>
+        <line x1="30" y1="55" x2="30" y2="85" class="dg-stroke"/>
+        <line x1="305" y1="55" x2="305" y2="85" class="dg-stroke"/>
+        <line x1="580" y1="55" x2="580" y2="85" class="dg-stroke"/>
+        <text x="30" y="102" class="dg-text dg-mono" font-size="11" text-anchor="middle">1:00:00</text>
+        <text x="305" y="102" class="dg-text dg-mono" font-size="11" text-anchor="middle">1:00:01</text>
+        <text x="580" y="102" class="dg-text dg-mono" font-size="11" text-anchor="middle">1:00:02</text>
+
+        <text x="167" y="42" class="dg-text-sub" font-size="11" text-anchor="middle">윈도 1 (카운터 3/3)</text>
+        <text x="442" y="42" class="dg-text-sub" font-size="11" text-anchor="middle">윈도 2 (카운터 3/3)</text>
+
+        <circle cx="230" cy="70" r="7" fill="var(--accent)"/>
+        <circle cx="255" cy="70" r="7" fill="var(--accent)"/>
+        <circle cx="280" cy="70" r="7" fill="var(--accent)"/>
+        <circle cx="330" cy="70" r="7" fill="var(--accent)"/>
+        <circle cx="355" cy="70" r="7" fill="var(--accent)"/>
+        <circle cx="380" cy="70" r="7" fill="var(--accent)"/>
+
+        <path d="M225 130 L385 130" stroke="var(--red)" stroke-width="2" fill="none"/>
+        <line x1="225" y1="124" x2="225" y2="136" stroke="var(--red)" stroke-width="2"/>
+        <line x1="385" y1="124" x2="385" y2="136" stroke="var(--red)" stroke-width="2"/>
+        <text x="305" y="155" class="dg-text dg-mono" font-size="12" text-anchor="middle" fill="var(--red)">경계 1초 구간에 6개 통과</text>
+        <text x="305" y="176" class="dg-text-sub" font-size="11" text-anchor="middle">각 윈도는 규칙을 지켰지만, 임계치의 2배가 흘러갔다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>고정 윈도의 구조적 결함</b> — 윈도 경계를 걸치는 1초를 잘라 보면 허용치의 두 배가 통과한다. 카운터는 잘못이 없고, 윈도를 자르는 방식이 문제다.</div>
+  </div>
+
+  <h5>장점 / 단점</h5>
+  <ul>
+    <li><b>장점</b> — 메모리 효율이 좋고 이해하기 쉽다. 윈도가 닫히는 시점에 카운터를 초기화하는 방식은 특정 트래픽 패턴 처리에 적합하다.</li>
+    <li><b>단점</b> — 윈도 경계 부근에 트래픽이 몰리면 기대했던 것보다 더 많은 요청이 처리된다.</li>
+  </ul>
+
+  <h4>이동 윈도 로깅 알고리즘</h4>
+  <ul>
+    <li>요청의 타임스탬프를 추적해 Redis의 sorted set 같은 곳에 보관한다.</li>
+    <li>새 요청이 오면 만료된 타임스탬프를 제거한다.</li>
+    <li>로그 크기가 허용치보다 작거나 같으면 요청을 전달하고, 아니면 거부한다.</li>
+  </ul>
+
+  <h5>예시 (허용치: 1분에 2개)</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>시각</th><th>로그 상태</th><th>크기</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td class="t-center">1:00:01</td><td>비어 있음 → [1:00:01]</td><td class="t-center">1</td><td class="t-center t-ok">✓ 허용</td></tr>
+        <tr><td class="t-center">1:00:30</td><td>[1:00:01, 1:00:30]</td><td class="t-center">2</td><td class="t-center t-ok">✓ 허용</td></tr>
+        <tr><td class="t-center">1:00:50</td><td>[1:00:01, 1:00:30, 1:00:50]</td><td class="t-center">3</td><td class="t-center t-no">✗ 거부 (타임스탬프는 남김)</td></tr>
+        <tr><td class="t-center">1:01:40</td><td>만료분 제거 후 [1:00:50, 1:01:40]</td><td class="t-center">2</td><td class="t-center t-ok">✓ 허용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">거부된 요청도 로그에 남는다 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 마지막 줄은 1:01:40 시점에 "1:00:01, 1:00:30을 지우고 나면 2개"라고 적고 있는데, 이때 남는 것은 <b>1:00:50과 1:01:40</b>이다. 1:00:50 요청은 거부됐지만 <b>타임스탬프는 로그에 그대로 남기 때문</b>이다. 이 성질이 곧 아래 단점의 원인이다.</p>
+    </div>
+  </div>
+
+  <h5>장점 / 단점</h5>
+  <ul>
+    <li><b>장점</b> — 메커니즘이 아주 정교하다. 어느 순간의 윈도를 보더라도 허용 요청 수가 한도를 넘지 않는다.</li>
+    <li><b>단점</b> — 거부된 요청의 타임스탬프까지 저장하므로 많은 메모리를 쓴다.</li>
+  </ul>
+
+  <h4>이동 윈도 카운터 알고리즘</h4>
+  <ul>
+    <li>고정 윈도 카운터와 이동 윈도 로깅을 결합한 형태다.</li>
+    <li>직전 윈도의 카운터를 겹치는 비율만큼 가중해서 더한다. 로그를 전부 저장하지 않으면서도 경계 문제를 완화한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">다섯 알고리즘 한눈에 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>알고리즘</th><th>버스트 허용</th><th>메모리</th><th>경계 정확도</th></tr></thead>
+          <tbody>
+            <tr><td>토큰 버킷</td><td class="t-center t-ok">✓</td><td class="t-center">적음</td><td class="t-center">양호</td></tr>
+            <tr><td>누출 버킷</td><td class="t-center t-no">✗</td><td class="t-center">적음</td><td class="t-center">양호</td></tr>
+            <tr><td>고정 윈도 카운터</td><td class="t-center t-ok">✓ (의도치 않게)</td><td class="t-center">가장 적음</td><td class="t-center t-no">나쁨</td></tr>
+            <tr><td>이동 윈도 로깅</td><td class="t-center t-no">✗</td><td class="t-center t-no">많음</td><td class="t-center t-ok">완벽</td></tr>
+            <tr><td>이동 윈도 카운터</td><td class="t-center">제한적</td><td class="t-center">적음</td><td class="t-center">좋음</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>토큰 버킷 — 버스트를 허용하며 가장 널리 쓰인다.</li>
+      <li>누출 버킷 — 출력이 고정. 뒷단 보호가 목적일 때.</li>
+      <li>고정 윈도 — 가장 싸지만 경계에서 2배가 새어 나간다.</li>
+      <li>이동 윈도 로깅 — 완벽하지만 메모리를 많이 먹는다.</li>
+      <li>이동 윈도 카운터 — 둘의 절충안.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-22" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-5</div>
+    <h3>개략적인 아키텍처</h3>
+    <p class="item-tagline">카운터를 어디에 둘 것인가. 답은 디스크가 아니라 메모리다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    Redis를 고르는 이유는 단순히 빨라서가 아니라, <b><code>INCR</code>와 <code>EXPIRE</code>가 처리율 제한이 필요한 연산 그 자체</b>이기 때문이다.
+  </div>
+
+  <ul>
+    <li>기본 아이디어는 아주 단순하다. IP 기반이든 API 주소별이든, 카운터 값이 한도를 넘으면 추가 요청을 거부한다.</li>
+  </ul>
+
+  <h4>카운터를 어디에 저장할까</h4>
+  <ul>
+    <li>DB는 디스크 기반이라 느리므로 쓰지 않는다.</li>
+    <li>일반적으로 Redis에 저장한다. 빠른 속도와 데이터 만료 시간을 지원하기 때문이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  C["클라이언트"] --> M["처리율 제한 미들웨어"]
+  M -->|"INCR key"| R[("Redis 카운터")]
+  R -->|"현재 값"| M
+  M -->|"한도 이하 → 통과"| S["API 서버"]
+  M -->|"한도 초과 → 429"| C
+      </pre>
+    </div>
+    <div class="figure-cap"><b>카운터 조회와 증가가 한 번의 왕복으로 끝난다</b> — <code>INCR</code>는 값을 올리면서 결과를 돌려주므로 읽기와 쓰기를 나눌 필요가 없다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">Redis 명령 두 개면 충분하다 <span class="badge b-blue">보강</span></p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">INCR   rate:user123:1700000000   # 카운터 +1, 증가된 값을 그대로 반환
+EXPIRE rate:user123:1700000000 1 # 윈도 끝나면 자동 소멸 → 청소 코드 불필요</code></pre>
+      </div>
+      <p>키에 윈도 시각을 붙여 두면 윈도가 바뀔 때 새 키가 생기고, 옛 키는 TTL로 알아서 사라진다. 별도의 정리 작업이 필요 없다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>카운터는 디스크 기반 DB가 아니라 인메모리 저장소에 둔다.</li>
+      <li>Redis의 <code>INCR</code> + <code>EXPIRE</code> 조합이 사실상의 표준 구현이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-23" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-6</div>
+    <h3>상세 설계</h3>
+    <p class="item-tagline">규칙 파일, 응답 헤더, 그리고 분산 환경의 두 가지 함정.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    미들웨어를 여러 대로 늘리는 순간 <b>경쟁 조건</b>과 <b>동기화</b>라는 새 문제가 생긴다. 이 둘을 어떻게 푸는지가 이 절의 알맹이다.
+  </div>
+
+  <h4>처리율 제한 규칙</h4>
+  <ul>
+    <li>설정 파일은 보통 디스크에 저장된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">ratelimit.yaml</span><span class="code-spacer"></span></div>
+<pre><code class="language-yaml">domain: messaging
+descriptors:
+  - key: message_type
+    value: marketing
+    rate_limit:
+      unit: day
+      requests_per_unit: 1000</code></pre>
+  </div>
+
+  <h4>처리율 한도 트래픽의 처리</h4>
+  <ul>
+    <li>요청이 한도에 걸리면 <code>HTTP 429</code>를 반환한다.</li>
+    <li>경우에 따라서는 제한에 걸린 요청을 나중에 처리하도록 큐에 보관하기도 한다.</li>
+  </ul>
+
+  <h5>처리율 제한 장치가 사용하는 HTTP 헤더</h5>
+  <ul>
+    <li>클라이언트는 HTTP 헤더로 현재 요청이 제한에 걸렸는지 확인할 수 있다.</li>
+    <li><code>X-RateLimit-Remaining</code> — 윈도 안에 남은 처리 가능 요청 수</li>
+    <li><code>X-RateLimit-Limit</code> — 윈도당 전송할 수 있는 요청 수</li>
+    <li><code>Retry-After</code> — 다음 요청까지 기다려야 하는 시간(초)</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에 적힌 <code>X-Ratelimit-Renaming</code>은 <code>X-RateLimit-<b>Remaining</b></code>의 오기다. 또한 <code>X-Ratelimit-Retry-After</code>라는 헤더는 존재하지 않으며, 재시도 대기 시간을 알리는 표준 헤더는 접두사 없는 <code><b>Retry-After</b></code>(RFC 9110)다. <code>X-RateLimit-*</code>계열은 표준이 아니라 널리 퍼진 관행이다. (근거: <a href="https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/">IETF draft-ietf-httpapi-ratelimit-headers</a>)</p>
+    </div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">표준화가 진행 중이다 <span class="badge b-purple">최신 반영</span></p>
+      <p>IETF httpapi 워킹그룹이 <code>RateLimit</code>과 <code>RateLimit-Policy</code> 두 필드로 정리한 Internet-Draft를 진행 중이다(아직 RFC는 아니다). 초기 드래프트에 있던 <code>RateLimit-Limit</code> / <code>-Remaining</code> / <code>-Reset</code> 세 이름이 사실상의 관행으로 굳어져 널리 쓰이고 있으니, 지금 새로 설계한다면 이 세 이름을 쓰되 향후 병합될 수 있음을 염두에 두면 된다.</p>
+    </div>
+  </div>
+
+  <h4>상세 설계</h4>
+  <ol class="steps">
+    <li><div class="step-title">규칙을 캐싱한다</div><p>처리율 제한 규칙은 디스크에 보관하고, 작업 프로세스가 수시로 파일을 읽어 캐시에 올린다.</p></li>
+    <li><div class="step-title">요청이 미들웨어에 도달한다</div><p>클라이언트 요청은 API 서버보다 먼저 미들웨어에 닿는다.</p></li>
+    <li><div class="step-title">두 곳에서 데이터를 읽는다</div><p>미들웨어는 제한 규칙을 로컬 캐시에서 가져오고, 카운터 등 나머지 정보는 Redis에서 가져온다.</p></li>
+  </ol>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  D[("규칙 파일 (디스크)")] -->|"주기적 로드"| WK["작업 프로세스"]
+  WK --> RC["규칙 캐시 (로컬)"]
+  C["클라이언트"] --> M["처리율 제한 미들웨어"]
+  RC --> M
+  M <-->|"카운터 조회 / 증가"| R[("Redis")]
+  M -->|"통과"| API["API 서버"]
+  M -->|"초과"| Q[["(선택) 지연 처리 큐"]]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>규칙은 로컬 캐시, 카운터는 Redis</b> — 규칙은 거의 안 바뀌므로 로컬에 두고, 카운터는 매 요청 바뀌므로 공유 저장소에 둔다.</div>
+  </div>
+
+  <h4>분산 환경에서의 미들웨어</h4>
+  <ul>
+    <li>여러 서버와 병렬 스레드를 지원하도록 확장하면 또 다른 문제가 생긴다.</li>
+    <li>경쟁 조건과 동기화 문제를 풀어야 한다.</li>
+  </ul>
+
+  <h5>경쟁 조건 (Race Condition)</h5>
+  <ul>
+    <li>여러 곳에서 동시에 Redis 카운터를 올리는 상황을 생각해 보자.</li>
+    <li>값이 3일 때 두 요청이 각각 1을 더하면 5가 되어야 하는데 4가 될 수 있다.</li>
+    <li>가장 널리 알려진 해결책은 락을 쓰는 것이며, 실무에서는 Lua 스크립트나 sorted set을 토대로 구현한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant A as 미들웨어 A
+  participant R as Redis
+  participant B as 미들웨어 B
+  A->>R: GET counter
+  R-->>A: 3
+  B->>R: GET counter
+  R-->>B: 3
+  A->>R: SET counter 4
+  B->>R: SET counter 4
+  Note over R: 두 번 증가했지만 값은 4 — 하나가 사라졌다
+      </pre>
+    </div>
+    <div class="figure-cap"><b>읽고-더하고-쓰기를 나누면 갱신이 유실된다</b> — Redis의 <code>INCR</code>는 이 세 단계를 원자적으로 처리하므로 이 문제 자체가 생기지 않는다. 여러 키를 함께 다뤄야 할 때 Lua 스크립트가 필요해진다.</div>
+  </div>
+
+  <h5>동기화 이슈</h5>
+  <ul>
+    <li>수백만 사용자를 다루는 서비스는 미들웨어 한 대로 부족할 수 있다.</li>
+    <li>여러 대를 배치했을 때 스티키 세션을 쓰면 같은 미들웨어로 가는 것은 보장되지만, 확장성 면에서 권장되지 않는다.</li>
+    <li>미들웨어끼리도 공유 저장소(Redis 등)를 통해 상태를 나누는 편이 낫다.</li>
+  </ul>
+
+  <h5>성능 최적화</h5>
+  <ul>
+    <li>미들웨어도 사용자에게 가장 가까운 엣지에 배치하면 지연이 줄어든다.</li>
+  </ul>
+
+  <h5>모니터링</h5>
+  <ul>
+    <li>설치 후 의도대로 동작하고 있는지 모니터링이 필요하다.</li>
+    <li>알고리즘이 효율적인지, 규칙이 잘 적용되고 있는지 확인해야 한다.</li>
+    <li>제한 규칙이 너무 빡빡하면 정상 요청까지 대량으로 버려진다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>규칙은 디스크 → 로컬 캐시, 카운터는 Redis.</li>
+      <li>응답 헤더는 <code>X-RateLimit-Limit</code> / <code>X-RateLimit-Remaining</code> / <code>Retry-After</code>.</li>
+      <li>분산 환경의 두 함정은 경쟁 조건(원자 연산 / Lua로 해결)과 동기화(공유 저장소로 해결).</li>
+      <li>규칙이 과하면 정상 트래픽이 잘려 나가므로 모니터링이 필수다.</li>
+    </ul>
+  </div>
+</article>

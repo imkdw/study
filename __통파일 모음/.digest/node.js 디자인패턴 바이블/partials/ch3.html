@@ -1,0 +1,1037 @@
+<article class="item" id="item-11" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-1</div>
+    <h3>콜백 패턴</h3>
+    <p class="item-tagline">콜백의 규칙은 취향이 아니다. 하나라도 어기면 앱이 조용히 망가진다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>하나의 API 는 항상 동기이거나 항상 비동기여야 한다.</b>
+    조건에 따라 갈리는 순간, 리스너를 등록할 틈이 있느냐 없느냐가 입력에 따라 달라지고
+    로그조차 남지 않는 버그가 태어난다.
+  </div>
+
+  <h4>콜백 패턴</h4>
+  <ul>
+    <li>자바스크립트는 콜백에 이상적인 언어다.</li>
+    <li><b>함수가 일급 객체</b>다 — 변수에 할당하고, 인자로 전달하고, 반환할 수 있다.</li>
+    <li><b>클로저</b>가 있다 — 생성된 함수의 환경을 참조할 수 있어, 호출 시점과 무관하게
+      비동기 작업이 요청된 컨텍스트를 유지한다.</li>
+  </ul>
+
+  <h4>연속 전달 방식(CPS)</h4>
+  <p>자바스크립트에서 콜백은 다른 함수에 인자로 전달되는 함수이며, 이 방식을
+    <b>연속 전달 방식(Continuation Passing Style)</b>이라 부른다.
+    항상 비동기 작업과 연관되는 것은 아니고, 단순히 결과를 호출자에게 <b>반환하는 대신 다른 함수로 전달</b>하는 것을 뜻한다.</p>
+
+  <h5>동기식 연속 전달 방식</h5>
+  <p>결과를 <code>return</code> 으로 돌려주는 일반적인 방식은 <b>직접(direct) 스타일</b>이라고 부른다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">sync-cps.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function add(a: number, b: number) {
+  return a + b;                      // 직접 스타일
+}
+
+function addCps(a: number, b: number, c: (num: number) =&gt; void) {
+  c(a + b);                          // 연속 전달 방식 (동기)
+}
+
+console.log("before");
+addCps(1, 2, (result) =&gt; console.log(`Result: ${result}`));
+console.log("after");
+
+/**
+ * output
+ *
+ * before
+ * Result: 3
+ * after
+ */</code></pre>
+  </div>
+
+  <h5>비동기 연속 전달 방식</h5>
+  <ul>
+    <li><code>setTimeout</code> 은 비동기 작업을 실행시키기 위해 콜백의 실행이 끝날 때까지 기다리지 않는다.</li>
+    <li>즉시 반환되고 제어권은 호출자에게 넘어간다.</li>
+    <li>핸들러의 실행은 이벤트 루프에서 시작되기 때문에 <b>새로운 스택</b>을 가진다.</li>
+    <li>다른 시점, 다른 위치에서 호출되더라도 클로저 덕분에 호출자의 컨텍스트가 유지된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">async-cps.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function additionAsync(a: number, b: number, cb: (num: number) =&gt; void) {
+  setTimeout(() =&gt; cb(a + b), 100);
+}
+
+console.log("before");
+additionAsync(1, 2, (result) =&gt; {
+  console.log(`result: ${result}`);
+});
+console.log("after");
+
+/**
+ * output
+ *
+ * before
+ * after           ← 순서가 뒤집혔다
+ * result: 3
+ */</code></pre>
+  </div>
+
+  <h5>비연속 전달 콜백</h5>
+  <p>콜백 파라미터가 있다고 해서 비동기이거나 CPS 인 것은 아니다. 구현 방식에 따라 다르다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">non-cps.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const result = [1, 2, 3].map((item) =&gt; item * item);
+console.log(result); // [1, 4, 9]  ← 콜백이지만 동기이고 CPS 도 아니다</code></pre>
+  </div>
+
+  <h4>동기? 비동기?</h4>
+  <p>일반적으로 모순과 혼돈을 만드는 방법은 무조건 피해야 한다.</p>
+
+  <h5>예측할 수 없는 함수</h5>
+  <ul>
+    <li>캐시에 파일이 저장되어 있다면 <b>동기식</b>으로 반환한다.</li>
+    <li>처음 보는 파일이라면 <b>비동기식</b>으로 반환한다.</li>
+    <li>조건에 따라 동기/비동기로 갈리는 함수는 매우 위험하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">inconsistentRead.ts</span>
+      <span class="code-tag bad">Zalgo</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { readFile } from "fs";
+
+const cache = new Map();
+
+function inconsistentRead(filename: string, cb: (data: unknown) =&gt; unknown) {
+  if (cache.has(filename)) {
+    // 동기 호출
+    cb(cache.get(filename));
+  } else {
+    // 비동기 호출
+    readFile(filename, "utf8", (err, data) =&gt; {
+      cache.set(filename, data);
+      cb(data);
+    });
+  }
+}</code></pre>
+  </div>
+
+  <h5>Zalgo를 풀어놓다</h5>
+  <p>예측 불가능한 함수를 쓰면 앱이 쉽게 손상된다. Node.js 커뮤니티에서는 이런 행동을
+    <b>"Zalgo를 풀어놓았다"</b>고 부른다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">createFileReader.ts</span>
+      <span class="code-tag bad">두 번째 로그가 찍히지 않는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function createFileReader(filename: string) {
+  const listeners: Array&lt;(v: unknown) =&gt; void&gt; = [];
+  inconsistentRead(filename, (value) =&gt; {
+    listeners.forEach((listener) =&gt; listener(value));
+  });
+
+  return {
+    onDataReady: (listener: (v: unknown) =&gt; void) =&gt; listeners.push(listener),
+  };
+}
+
+const reader1 = createFileReader("data.txt");
+reader1.onDataReady((data) =&gt; {
+  console.log(`First call data: ${data}`);
+
+  // 잠시 후 같은 파일을 다시 읽으려고 시도
+  const reader2 = createFileReader("data.txt");
+  reader2.onDataReady((data) =&gt; {
+    console.log(`Second call data: ${data}`);
+  });
+});
+
+/**
+ * output
+ *
+ * First call data: Hello, world!
+ *                              ← Second call 은 영원히 찍히지 않는다
+ */</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant U as 호출자
+  participant R1 as reader1 (캐시 미스)
+  participant R2 as reader2 (캐시 히트)
+  U->>R1: createFileReader()
+  R1-->>U: 즉시 반환 (읽기는 진행 중)
+  U->>R1: onDataReady(listener) 등록
+  Note over R1: 이벤트 루프 다음 사이클에 콜백 → 리스너 있음 ✓
+  R1->>U: First call data 출력
+  U->>R2: createFileReader()
+  Note over R2: 캐시 히트 → 생성자 안에서 콜백 즉시 실행
+  Note over R2: 이 시점에 listeners 는 아직 비어 있음 ✗
+  R2-->>U: 반환
+  U->>R2: onDataReady(listener) 등록 — 이미 늦었다
+      </pre>
+    </div>
+    <div class="figure-cap"><b>리스너를 등록할 "틈"이 있느냐가 캐시 상태에 따라 달라진다</b> —
+      비동기 경로에서는 반환 후 등록할 시간이 있지만, 동기 경로에서는 생성자가 반환되기도 전에 콜백이 끝나 버린다.</div>
+  </div>
+
+  <p>이런 버그는 실제 앱에서 <b>로그도 남지 않고 예외도 던지지 않아</b> 탐지가 극도로 어렵다. 매우 위험한 결함이다.</p>
+
+  <h5>해결책 1 — 동기 API 사용</h5>
+  <ul>
+    <li>함수를 완전히 동기 방식으로 바꾸면 모순이 사라진다.</li>
+    <li>동기식이 되면 더 이상 CPS 를 가질 이유도 없어진다.</li>
+    <li>다만 대부분의 경우 동기 I/O 는 권장되지 않고, <b>큰 파일을 동기식으로 다루는 것은 절대 금물</b>이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">sync-fix.ts</span>
+      <span class="code-tag good">모순 없음</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function consistentReadSync(filename: string) {
+  if (cache.has(filename)) {
+    return cache.get(filename);
+  } else {
+    const data = readFileSync(filename, "utf8");
+    cache.set(filename, data);
+    return data;
+  }
+}</code></pre>
+  </div>
+
+  <h5>해결책 2 — 지연 실행으로 비동시성 보장</h5>
+  <ul>
+    <li>비동기 방식을 유지하면서도 고칠 수 있다.</li>
+    <li>중요한 트릭은 동기 콜백 호출을 <b>즉시 실행하는 대신 가까운 미래로 예약</b>하는 것이다.</li>
+    <li>Node의 <code>process.nextTick()</code> 이 그 역할을 한다 — 현재 진행 중인 작업의 완료 시점 뒤로 함수 실행을 지연시킨다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">nextTick-fix.ts</span>
+      <span class="code-tag good">항상 비동기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function consistentRead(filename: string, cb: (data: unknown) =&gt; unknown) {
+  if (cache.has(filename)) {
+    process.nextTick(() =&gt; cb(cache.get(filename)));
+  } else {
+    readFile(filename, "utf-8", (err, data) =&gt; {
+      cache.set(filename, data);
+      cb(data);
+    });
+  }
+}</code></pre>
+  </div>
+
+  <h5>process.nextTick vs setImmediate</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th><code>process.nextTick()</code></th><th><code>setImmediate()</code></th></tr></thead>
+      <tbody>
+        <tr><td>실행 시점</td><td>현재 작업이 끝난 직후, 이벤트 루프가 계속되기 <b>전</b></td><td>이미 큐에 있는 I/O 이벤트들 <b>뒤</b></td></tr>
+        <tr><td>I/O 대비 순서</td><td class="t-center">예정된 I/O 보다 먼저</td><td class="t-center">예정된 I/O 보다 나중</td></tr>
+        <tr><td>위험</td><td class="t-center t-no">재귀 호출 시 I/O 기아 유발</td><td class="t-center t-ok">기아를 유발하지 않음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">용어 다듬기 <span class="badge b-red">원문 교정</span></p>
+      <p>노트는 <code>process.nextTick()</code> 으로 지연된 콜백을 "마이크로 태스크"라고 부르지만,
+        Node 문서는 <b>nextTick 큐와 마이크로태스크(Promise) 큐를 별개로</b> 구분한다.
+        두 큐 모두 현재 작업 직후에 비워지지만 <b>nextTick 큐가 항상 먼저</b>다.
+        "이벤트 루프의 다음 페이즈로 넘어가기 전에 처리되는 별도의 큐"라고 이해하는 편이 정확하다.</p>
+      <p>또한 <code>setImmediate()</code> 를 "<code>setTimeout(fn, 0)</code> 과 비슷하다"고 한 서술은 결과적으로는 비슷해 보이지만
+        메커니즘이 다르다. <code>setImmediate</code> 는 이벤트 루프의 <b>check 페이즈</b>에서, <code>setTimeout</code> 은
+        <b>timers 페이즈</b>에서 실행된다. 그래서 메인 모듈에서 둘을 나란히 호출하면 <b>실행 순서가 비결정적</b>이지만,
+        I/O 콜백 안에서 호출하면 <code>setImmediate</code> 가 항상 먼저다.
+        (근거: <a href="https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick">Node.js Docs — Event Loop, Timers, and process.nextTick()</a>)</p>
+    </div>
+  </div>
+
+  <h4>노드의 콜백 규칙</h4>
+  <p>CPS 콜백은 일련의 특정한 규칙을 따른다. 콜백 API 를 정의한다면 이를 이해하고 반드시 준수해야 한다.</p>
+
+  <h5>콜백 함수는 맨 마지막에</h5>
+  <ul>
+    <li>함수가 입력으로 콜백을 받는다면, 콜백은 <b>마지막 인자</b>여야 한다.</li>
+    <li>위치가 마지막이면 함수 호출의 가독성이 좋아진다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">last-arg.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">readFile("data.txt", (err, buffer) =&gt; {});</code></pre>
+  </div>
+
+  <h5>오류는 맨 처음에</h5>
+  <ul>
+    <li>첫 번째 인자로 오류를, 실제 결과나 기타 값은 두 번째 인자부터 전달한다.</li>
+    <li>콜백에서는 항상 오류를 먼저 체크하는 것이 좋고, <code>err</code> 의 타입은 항상 <code>Error</code> 여야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">error-first.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { readFile } from "fs";
+
+readFile("foo.txt", "utf-8", (err, data) =&gt; {
+  if (err) {
+    // ...
+  } else {
+    process(data);
+  }
+});</code></pre>
+  </div>
+
+  <h5>오류 전파</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>스타일</th><th>전파 방식</th></tr></thead>
+      <tbody>
+        <tr><td>동기식</td><td><code>throw</code> 로 던지면 <code>catch</code> 될 때까지 호출 스택을 거슬러 올라간다</td></tr>
+        <tr><td>비동기식</td><td>에러를 호출 체인의 <b>다음 콜백으로 전달</b>해서 수행한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">readJSON.ts</span>
+      <span class="code-tag good">try/catch 로 감싸 콜백으로 전달</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { readFile } from "fs";
+
+function readJSON(
+  filename: string,
+  cb: (err: Error | unknown | null, arg?: string) =&gt; void
+) {
+  readFile(filename, "utf8", (err, data) =&gt; {
+    let parsed: any;
+
+    if (err) {
+      return cb(err);
+    }
+
+    try {
+      parsed = JSON.parse(data);
+    } catch (err) {
+      return cb(err);
+    }
+
+    cb(null, parsed);
+  });
+}</code></pre>
+  </div>
+
+  <h5>catch 되지 않는 예외</h5>
+  <ul>
+    <li>에러는 비동기 실행을 발생시킨 함수 쪽이 아니라, <b>예외가 발생한 별도의 콜스택</b>을 타고 이벤트 루프까지 전파된다.</li>
+    <li>예외가 이벤트 루프에 도달하는 순간 앱은 중단된다.</li>
+    <li>Node는 프로세스를 종료하기 전에 <code>uncaughtException</code> 이라는 특수 이벤트를 발행한다.</li>
+    <li>이런 문제가 생기면 앱을 <b>즉시 종료하고 프로세스 관리자가 재시작</b>하게 하는 편이 좋다.
+      이를 <b>fail-fast</b> 접근법이라고 부른다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">readJSON-broken.ts</span>
+      <span class="code-tag bad">JSON.parse 가 던지면 프로세스가 죽는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { readFile } from "fs";
+
+function readJSON(
+  filename: string,
+  cb: (err: Error | unknown | null, arg?: string) =&gt; void
+) {
+  readFile(filename, "utf8", (err, data) =&gt; {
+    if (err) {
+      return cb(err);
+    }
+
+    cb(null, JSON.parse(data)); // 에러가 발생한다면?
+  });
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 바깥 try/catch 로 못 잡는가 <span class="badge b-blue">보강</span></p>
+      <p><code>readJSON()</code> 을 <code>try/catch</code> 로 감싸도 소용없다.
+        <code>readFile</code> 의 콜백은 <code>readJSON</code> 이 이미 반환된 뒤, <b>완전히 새로운 스택</b>에서
+        이벤트 루프가 호출하기 때문이다. <a href="#item-2">1-2</a>에서 본 리액터 패턴의 구조가
+        그대로 에러 전파 경로를 결정한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>CPS = 결과를 반환하는 대신 다음 함수로 전달. 비동기와 동의어가 아니다</li>
+      <li>동기/비동기가 조건에 따라 갈리면 Zalgo — 리스너 등록 타이밍이 입력에 따라 달라진다</li>
+      <li>해법은 두 개: 완전히 동기로 만들거나, <code>process.nextTick()</code> 으로 항상 비동기로 만들거나</li>
+      <li>규칙: 콜백은 마지막 인자, 에러는 첫 번째 인자, 에러는 던지지 말고 콜백으로 전달</li>
+      <li>콜백 안의 예외는 새 스택에서 터진다 → 바깥 try/catch 로 못 잡는다 → fail-fast</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-2</div>
+    <h3>관찰자 패턴</h3>
+    <p class="item-tagline">콜백은 한 번, 이벤트는 여러 번. 그리고 EventEmitter 는 구독 해제를 잊으면 새는 그릇이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>딱 한 번 결과가 나오면 콜백, 같은 종류의 일이 여러 번 일어나면 이벤트.</b>
+    이 기준 하나면 대부분의 API 설계 선택이 끝난다.
+  </div>
+
+  <h4>EventEmitter 클래스</h4>
+  <ul>
+    <li>Node에서는 내장 <code>EventEmitter</code> 클래스로 관찰자 패턴을 구현한다.</li>
+    <li>특정 유형의 이벤트가 발생하면 호출되는 하나 이상의 함수를 <b>리스너</b>로 등록할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">emitter.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { EventEmitter } from "events";
+
+const emitter = new EventEmitter();</code></pre>
+  </div>
+
+  <h5>필수 메서드</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>메서드</th><th>동작</th></tr></thead>
+      <tbody>
+        <tr><td><code>on(event, listener)</code></td><td>주어진 이벤트에 대한 리스너 등록</td></tr>
+        <tr><td><code>once(event, listener)</code></td><td>이벤트가 한 번 전달되고 나서 자동 제거되는 리스너 등록</td></tr>
+        <tr><td><code>off(event, listener)</code></td><td>지정된 이벤트에 대한 리스너 제거</td></tr>
+        <tr><td><code>emit(event, ...args)</code></td><td>이벤트를 동기적으로 발생시켜 등록 순서대로 리스너 호출</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 리스너 제거 메서드가 <code>remove(event, listener)</code> 로 적혀 있는데,
+        실제 API 이름은 <code>removeListener(event, listener)</code> 이고 그 별칭이 <code>off()</code> 다.
+        <code>remove()</code> 라는 메서드는 존재하지 않는다.</p>
+      <p>또한 노트 뒷부분의 <code>removeEventListener</code> 역시 <b>DOM 의 API 이름</b>이며 <code>EventEmitter</code> 에는 없다.
+        Node v24.17.0 에서 확인하면 <code>typeof emitter.off</code> 와 <code>typeof emitter.removeListener</code> 는
+        <code>"function"</code>, <code>typeof emitter.removeEventListener</code> 는 <code>undefined</code> 다.
+        (근거: <a href="https://nodejs.org/api/events.html#emitterremovelistenereventname-listener">Node.js Docs — emitter.removeListener()</a>)</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">findRegex.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { EventEmitter } from "events";
+import { readFile } from "fs";
+import path from "path";
+
+function findRegex(files: string[], regex: RegExp) {
+  const emitter = new EventEmitter();
+  for (const file of files) {
+    readFile(file, "utf8", (err, content) =&gt; {
+      if (err) {
+        return emitter.emit("error", err);
+      }
+
+      emitter.emit("fileread", file);
+      const match = content.match(regex);
+      if (match) {
+        match.forEach((line) =&gt; emitter.emit("found", file, line));
+      }
+    });
+  }
+
+  return emitter;
+}
+
+const files = [
+  path.join(__dirname, "..", "static", "fileA.txt"),
+  path.join(__dirname, "..", "static", "fileB.txt"),
+];
+
+findRegex(files, /hello \w+/g)
+  .on("fileread", (file) =&gt; console.log(`${file} was found`))
+  .on("found", (file, match) =&gt; console.log(`Matched ${match} in file ${file}`))
+  .on("error", (err) =&gt; console.error(`Error emitted ${err.message}`));
+
+/**
+ * output
+ *
+ * Error emitted ENOENT: no such file or directory, open '.../static/fileB.txt'
+ * .../static/fileA.txt was found
+ */</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 예제가 동작하는 이유 <span class="badge b-blue">보강</span></p>
+      <p><code>findRegex()</code> 는 emitter 를 <b>즉시 반환</b>하고, <code>readFile</code> 콜백은 이벤트 루프의 다음 사이클에 실행된다.
+        그래서 <code>.on(...)</code> 체인을 붙일 시간이 생긴다.
+        이 순서가 뒤집히면 어떻게 되는지가 바로 아래 "동기 및 비동기 이벤트"의 주제다.</p>
+    </div>
+  </div>
+
+  <h4>오류 전파</h4>
+  <ul>
+    <li><code>EventEmitter</code> 는 콜백처럼 에러를 단순히 <code>throw</code> 할 수 없다.</li>
+    <li>대신 <code>"error"</code> 라는 특수 이벤트를 발생시키고 <code>Error</code> 객체를 인자로 전달하는 규약을 따른다.</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title"><code>error</code> 리스너가 없으면 프로세스가 죽는다</p>
+      <p><code>"error"</code> 이벤트는 특별 취급된다. 리스너가 하나도 등록되어 있지 않은 상태에서 emit 되면
+        Node 는 그 <code>Error</code> 를 <b>그대로 던져</b> 프로세스를 종료시킨다.
+        <code>EventEmitter</code> 를 반환하는 API 를 쓸 때 <code>.on("error", ...)</code> 는 선택이 아니다.</p>
+    </div>
+  </div>
+
+  <h4>관찰 가능한 객체 만들기</h4>
+  <p><code>EventEmitter</code> 를 그대로 쓰는 경우는 드물고, 보통 다른 클래스가 이를 <b>확장</b>한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">FindRegex.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { EventEmitter } from "events";
+import { readFile } from "fs";
+import path from "path";
+
+class FindRegex extends EventEmitter {
+  private regex: RegExp;
+  private files: string[] = [];
+
+  constructor(regex: RegExp) {
+    super();
+    this.regex = regex;
+  }
+
+  addFile(file: string) {
+    this.files.push(file);
+    return this;                 // 체이닝을 위해 this 반환
+  }
+
+  find() {
+    for (const file of this.files) {
+      readFile(file, "utf8", (err, content) =&gt; {
+        if (err) {
+          return this.emit("error", err);
+        }
+
+        this.emit("fileread", file);
+        const match = content.match(this.regex);
+        if (match) {
+          match.forEach((line) =&gt; this.emit("found", file, line));
+        }
+      });
+    }
+
+    return this;
+  }
+}
+
+const fileA = path.join(__dirname, "..", "static", "fileA.txt");
+const fileB = path.join(__dirname, "..", "static", "fileB.txt");
+
+new FindRegex(/hello \w+/g)
+  .addFile(fileA)
+  .addFile(fileB)
+  .find()
+  .on("fileread", (file) =&gt; console.log(`${file} was found`))
+  .on("found", (file, match) =&gt; console.log(`Matched ${match} in file ${file}`))
+  .on("error", (err) =&gt; console.error(`Error emitted ${err.message}`));</code></pre>
+  </div>
+
+  <h4>EventEmitter와 메모리 누수</h4>
+  <ul>
+    <li>이벤트를 구독하고 나서 더 이상 필요하지 않다면 <b>구독을 해지하는 것이 필수</b>다.</li>
+    <li>그러지 않으면 메모리 사용량이 무한히 증가하므로 명백한 소프트웨어 결함이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">leak.ts</span>
+      <span class="code-tag bad">누수</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import EventEmitter from "events";
+
+const thisTakesMemory = "A big string";
+const listener = () =&gt; {
+  console.log(thisTakesMemory);
+};
+
+const emitter = new EventEmitter();
+emitter.on("event", listener);</code></pre>
+  </div>
+
+  <p>리스너가 해제되기 전까지 <code>thisTakesMemory</code> 는 클로저에 붙들려 GC 대상이 되지 않는다.
+    수명이 긴 <code>EventEmitter</code> 에 리스너를 계속 등록하면 그대로 메모리 누수다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">경고와 예방 <span class="badge b-red">원문 교정</span></p>
+      <p>동일 이벤트에 리스너가 <b>10개를 초과</b>하면(즉 11번째부터) Node 가
+        <code>MaxListenersExceededWarning</code> 을 출력한다. 노트의 "10개 이상부터"는 경계가 한 칸 어긋난 표현이다.
+        기본값은 <code>events.defaultMaxListeners</code> 이며 Node v24.17.0 에서 <code>10</code> 임을 확인했다.</p>
+      <p>예방 수단은 <code>off()</code> / <code>removeListener()</code> 로 해제하거나,
+        인스턴스별로는 <code>emitter.setMaxListeners(n)</code>, 전역으로는 <code>events.defaultMaxListeners</code> 를 조정하는 것이다.
+        다만 <b>경고를 끄는 것이 누수를 고치는 것은 아니다</b> — 상한을 올리기 전에 왜 리스너가 쌓이는지부터 봐야 한다.</p>
+    </div>
+  </div>
+
+  <h4>동기 및 비동기 이벤트</h4>
+  <ul>
+    <li>이벤트도 콜백과 마찬가지로 <b>이벤트를 생성하는 작업이 언제 호출되느냐</b>에 따라 동기/비동기로 갈린다.</li>
+    <li>그리고 이 둘을 <b>절대 섞어 쓰면 안 된다</b>.</li>
+    <li>비동기라면 이벤트가 이벤트 루프의 다음 사이클까지 실행되지 않는 것이 보장되므로,
+      현재 스택이 이벤트 루프로 넘어가기 전까지 <b>새 리스너를 등록할 시간</b>이 있다.</li>
+  </ul>
+
+  <h5>이벤트를 동기적으로 발생시킨다면?</h5>
+  <p>동기라면 모든 리스너를 <b>작업 실행 전에</b> 등록해야 한다. 그러지 않으면 이벤트를 전부 유실한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">FindRegex.ts (동기 버전)</span>
+      <span class="code-tag bad">리스너 등록 틈이 없다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">  find() {
+    for (const file of this.files) {
+      let content: string;
+
+      try {
+        content = readFileSync(file, "utf8");
+        this.emit("fileread", file);
+        const match = content.match(this.regex);
+        if (match) {
+          match.forEach((elem) =&gt; this.emit("found", file, elem));
+        }
+      } catch (err) {
+        this.emit("error", err);
+      }
+    }
+
+    return this;
+  }</code></pre>
+  </div>
+
+  <p><code>readFile</code> 을 <code>readFileSync</code> 로 바꾸면 <code>find()</code> 가 반환되기 전에 모든 이벤트가 이미 끝나 있다.
+    아래처럼 <code>.on("error", ...)</code> 를 <code>find()</code> <b>뒤에</b> 붙이면 리스너가 등록될 틈이 없다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">main.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const findRegexInstance = new FindRegex(/hello \w+/g);
+findRegexInstance
+  .addFile(fileA)
+  .addFile(fileB)
+  .find()                        // ← 여기서 이벤트가 전부 끝난다
+  .on("fileread", (file) =&gt; console.log(`${file} was found`))
+  .on("found", (file, match) =&gt; console.log(`Matched ${match} in file ${file}`))
+  .on("error", (err) =&gt; console.error(`Error emitted ${err.message}`));</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">런타임 에러 — 프로세스가 그대로 종료된다</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">Error: ENOENT: no such file or directory, open '.../static/fileB.txt'
+    at readFileSync (node:fs:448:20)
+    at FindRegex.find (.../dist/app.js:23:49)
+    at Object.&lt;anonymous&gt; (.../dist/app.js:43:6)
+    at Module._compile (node:internal/modules/cjs/loader:1469:14)
+    ...
+Emitted 'error' event on FindRegex instance at:</code></pre>
+      </div>
+      <p><code>error</code> 이벤트 핸들러가 아직 등록되지 않은 상태에서 emit 되었기 때문에
+        Node 가 에러를 그대로 던지고 앱이 종료됐다.</p>
+    </div>
+  </div>
+
+  <h4>EventEmitter vs Callback</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상황</th><th>선택</th></tr></thead>
+      <tbody>
+        <tr><td>딱 한 번 호출되고, 결과가 비동기적으로 반환됨</td><td class="t-center t-ok">콜백</td></tr>
+        <tr><td>반복적이고, 발생한 사건에 연결되어야 함</td><td class="t-center t-ok">이벤트</td></tr>
+        <tr><td>여러 종류의 결과를 구분해서 알려야 함</td><td class="t-center t-ok">이벤트</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>거의 동일한 기능을 나타내더라도 <b>가독성, 의미, 구현 또는 코드의 양</b>에서 갈린다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">compare.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { EventEmitter } from "events";
+
+function helloEvents() {
+  const eventEmitter = new EventEmitter();
+  setTimeout(() =&gt; eventEmitter.emit("complete", "event hello world"), 100);
+  return eventEmitter;
+}
+
+function helloCallback(
+  cb: (err: Error | null | unknown, data: string) =&gt; void
+) {
+  setTimeout(() =&gt; cb(null, "callback hello world"), 100);
+}
+
+helloEvents().on("complete", (message) =&gt; console.log(message));
+helloCallback((err, message) =&gt; console.log(message));</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">둘을 섞는 것도 정답일 때가 있다 <span class="badge b-blue">보강</span></p>
+      <p><code>fs.createReadStream</code> 처럼 "결과는 여러 번, 완료는 한 번"인 API 는
+        이벤트로 진행 상황을 알리고 콜백/Promise 로 최종 완료를 알린다.
+        <a href="#item-20">6-2 스트림</a>이 정확히 이 구조이며, <code>EventEmitter</code> 를 상속받은 대표적인 사례다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>on</code> / <code>once</code> / <code>off</code>(= <code>removeListener</code>) / <code>emit</code> 이 기본 4종</li>
+      <li>에러는 throw 하지 않고 <code>"error"</code> 이벤트로. 리스너가 없으면 프로세스가 죽는다</li>
+      <li>리스너 해제를 잊으면 클로저가 붙든 메모리가 그대로 누수된다. 11개째부터 경고</li>
+      <li>이벤트를 동기적으로 발생시키면 리스너 등록 틈이 사라진다 → Zalgo 와 같은 함정</li>
+      <li>한 번 = 콜백, 여러 번 = 이벤트. 진행 + 완료가 섞이면 둘 다 쓴다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-13" data-spy>
+  <header class="item-head">
+    <div class="item-num">3-9</div>
+    <h3>연습문제 — FindRegex와 Ticker</h3>
+    <p class="item-tagline">직접 짜 보면 "리스너 등록 타이밍"이라는 개념이 손에 남는다.</p>
+  </header>
+
+  <h4>1. 단순 이벤트</h4>
+  <p>입력 파일 리스트를 인자로 넘기고, find 프로세스를 시작할 때 이벤트를 방출하도록
+    비동기 <code>FindRegex</code> 클래스를 수정한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">exercise-1.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { EventEmitter } from "events";
+import { readFile } from "fs";
+import path from "path";
+
+class FindRegex extends EventEmitter {
+  private regex: RegExp;
+
+  constructor(regex: RegExp) {
+    super();
+    this.regex = regex;
+  }
+
+  find(files: string[]) {
+    for (const file of files) {
+      readFile(file, "utf8", (err, content) =&gt; {
+        this.emit("find_start", files);
+
+        if (err) {
+          return this.emit("error", err);
+        }
+
+        this.emit("fileread", file);
+        const match = content.match(this.regex);
+        if (match) {
+          match.forEach((line) =&gt; this.emit("found", file, line));
+        }
+      });
+    }
+
+    return this;
+  }
+}
+
+const fileA = path.join(__dirname, "..", "static", "fileA.txt");
+
+const findRegexInstance = new FindRegex(/hello \w+/g);
+findRegexInstance
+  .find([fileA])
+  .on("find_start", (files) =&gt;
+    console.log(`Searching in ${files.length} files`)
+  )
+  .on("fileread", (file) =&gt; console.log(`${file} was found`))
+  .on("found", (file, match) =&gt; console.log(`Matched ${match} in file ${file}`))
+  .on("error", (err) =&gt; console.error(`Error emitted ${err.message}`));</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이 구현의 문제 <span class="badge b-blue">보강</span></p>
+      <p><code>find_start</code> 를 <code>readFile</code> <b>콜백 안에서</b> emit 하기 때문에,
+        파일 개수만큼 중복 발행된다. "find 프로세스를 시작할 때"라는 요구사항대로라면
+        루프 <b>바깥</b>에서 한 번만 emit 해야 한다.
+        다만 그러면 이번에는 <code>find()</code> 반환 전에 emit 되어 리스너가 못 받는다 —
+        <a href="#item-11">3-1</a>에서 본 대로 <code>process.nextTick()</code> 으로 한 틱 미뤄야 한다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">exercise-1-fixed.ts</span>
+      <span class="code-tag good">한 번만, 그러나 한 틱 뒤에</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">  find(files: string[]) {
+    process.nextTick(() =&gt; this.emit("find_start", files));
+
+    for (const file of files) {
+      readFile(file, "utf8", (err, content) =&gt; {
+        // ... 나머지는 동일
+      });
+    }
+
+    return this;
+  }</code></pre>
+  </div>
+
+  <h4>2. Ticker</h4>
+  <ul>
+    <li><code>number</code> 와 콜백을 인자로 받는 함수를 작성한다.</li>
+    <li>호출 후 <code>number</code> 밀리초가 지나기 전까지 <b>매 50밀리초마다</b> <code>tick</code> 이벤트를 내보내는 <code>EventEmitter</code> 를 반환한다.</li>
+    <li><code>number</code> 밀리초가 지났을 때 <code>tick</code> 이 일어난 횟수를 받는 콜백을 호출한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">exercise-2.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import EventEmitter from "events";
+
+let count = 0;
+
+const tick = (emitter: EventEmitter) =&gt; {
+  count++;
+  emitter.emit("tick");
+};
+
+const ticker = (ms: number, cb: (count: number) =&gt; void) =&gt; {
+  const eventEmitter = new EventEmitter();
+  const interval = setInterval(() =&gt; tick(eventEmitter), 50);
+
+  setTimeout(() =&gt; {
+    clearInterval(interval);
+    cb(count);
+  }, ms);
+
+  return eventEmitter;
+};
+
+const emitter = ticker(500, (count) =&gt; {
+  console.log(count);
+}).on("tick", () =&gt; {});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>count</code> 를 모듈 전역에 둔 부작용 <span class="badge b-blue">보강</span></p>
+      <p><code>ticker()</code> 를 두 번 호출하면 두 인스턴스가 같은 <code>count</code> 를 공유해 값이 섞인다.
+        <code>ticker</code> 함수 안에 <code>let count = 0</code> 을 두면 클로저마다 독립된 카운터가 된다 —
+        <a href="#item-23">7-1 팩토리</a>에서 다루는 "클로저로 상태 캡슐화"의 가장 작은 사례다.</p>
+    </div>
+  </div>
+
+  <h4>3. 간단한 수정</h4>
+  <p>함수 호출 즉시 <code>tick</code> 이벤트를 생성하도록 바꾼다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">exercise-3.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const ticker = (ms: number, cb: (count: number) =&gt; void) =&gt; {
+  const eventEmitter = new EventEmitter();
+  tick(eventEmitter);                          // ← 즉시 한 번
+  const interval = setInterval(() =&gt; tick(eventEmitter), 50);
+
+  setTimeout(() =&gt; {
+    clearInterval(interval);
+    cb(count);
+  }, ms);
+
+  return eventEmitter;
+};</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">첫 tick 은 아무도 듣지 못한다</p>
+      <p><code>tick(eventEmitter)</code> 를 반환 전에 동기적으로 호출하므로,
+        호출자가 <code>.on("tick", ...)</code> 을 붙이기 전에 이미 emit 이 끝난다.
+        <a href="#item-12">3-2</a>의 "동기 이벤트" 함정이 그대로 재현된 것이다.
+        <code>process.nextTick(() =&gt; tick(eventEmitter))</code> 로 한 틱 미루면 해결된다.</p>
+    </div>
+  </div>
+
+  <h4>4. 에러 다루기</h4>
+  <p><code>tick</code> 발생 시 timestamp 가 5로 나누어떨어지면 에러를 생성하도록 수정하고,
+    콜백과 <code>EventEmitter</code> 를 활용해 에러를 전파한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">exercise-4.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import EventEmitter from "events";
+
+let count = 0;
+
+const tick = (emitter: EventEmitter, ms: number) =&gt; {
+  if (ms % 5 === 0) {
+    throw new Error("ms must be a multiple of 5");
+  }
+
+  count++;
+  emitter.emit("tick");
+};
+
+const ticker = (ms: number, cb: (count: number) =&gt; void) =&gt; {
+  const eventEmitter = new EventEmitter();
+
+  try {
+    tick(eventEmitter, ms);
+    const interval = setInterval(() =&gt; tick(eventEmitter, ms), 50);
+    setTimeout(() =&gt; {
+      clearInterval(interval);
+      cb(count);
+    }, ms);
+  } catch (err) {
+    eventEmitter.emit("error", err);
+  }
+
+  return eventEmitter;
+};
+
+const emitter = ticker(500, (count) =&gt; {
+  console.log(count);
+})
+  .on("tick", () =&gt; {})
+  .on("error", (err) =&gt; {
+    console.error(err);
+  });</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">이 코드는 두 군데에서 터진다</p>
+      <p><b>(1)</b> 첫 <code>tick</code> 이 던진 에러를 <code>catch</code> 해서 즉시 <code>emit("error")</code> 하는데,
+        아직 <code>.on("error")</code> 리스너가 없다 → Node 가 그대로 다시 던진다.</p>
+      <p><b>(2)</b> <code>setInterval</code> <b>안에서</b> 던진 에러는 이 <code>try</code> 블록이 잡지 못한다.
+        타이머 콜백은 <a href="#item-11">3-1</a>에서 본 대로 완전히 새로운 스택에서 실행되기 때문이다 →
+        <code>uncaughtException</code> 으로 직행한다.</p>
+      <p>둘 다 <code>process.nextTick(() =&gt; emitter.emit("error", err))</code> 로 emit 을 미루고,
+        인터벌 콜백 내부에도 자체 <code>try/catch</code> 를 두어야 해결된다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>이벤트를 emit 하기 <b>전에</b> 호출자가 리스너를 붙일 틈이 있는지 항상 확인한다</li>
+      <li>생성 함수 안에서 동기적으로 emit 하면 그 이벤트는 아무도 듣지 못한다 → <code>process.nextTick</code></li>
+      <li>타이머/IO 콜백 안의 <code>throw</code> 는 바깥 <code>try/catch</code> 가 잡지 못한다</li>
+      <li>모듈 전역 상태는 인스턴스가 둘 이상일 때 반드시 샌다 → 클로저 안으로 넣는다</li>
+    </ul>
+  </div>
+</article>

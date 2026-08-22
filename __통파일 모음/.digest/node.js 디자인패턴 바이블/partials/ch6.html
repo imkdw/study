@@ -1,0 +1,1796 @@
+<article class="item" id="item-19" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-1</div>
+    <h3>스트림의 중요성 발견</h3>
+    <p class="item-tagline">메모리와 시간은 부차적이다. 스트림의 진짜 가치는 조립할 수 있다는 것이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    버퍼링은 <b>다 모은 다음 한 번에</b>, 스트리밍은 <b>오는 대로 바로</b>.
+    이 차이가 메모리 상수화, 지연 시간 단축, 그리고 <code>pipe()</code> 로 부품을 갈아 끼우는 조립성을 동시에 만든다.
+  </div>
+
+  <h4>버퍼링 vs 스트리밍</h4>
+  <p>지금까지 다룬 대부분의 비동기 API 는 버퍼 방식을 사용한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>버퍼링</th><th>스트리밍</th></tr></thead>
+      <tbody>
+        <tr><td>동작</td><td>완료될 때까지 들어오는 데이터를 버퍼에 저장</td><td>새 데이터 청크가 수신되는 대로 소비자에게 전달</td></tr>
+        <tr><td>전달 시점</td><td>수집 완료 후 Blob 형태로 한 번에</td><td>즉시, 청크 단위로</td></tr>
+        <tr><td>메모리</td><td class="t-center t-no">입력 크기에 비례</td><td class="t-center t-ok">일정 (버퍼 크기)</td></tr>
+        <tr><td>첫 바이트까지의 시간</td><td class="t-center t-no">전체 수집 완료 후</td><td class="t-center t-ok">거의 즉시</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>단순히 효율성 관점에서만 봐도 공간(메모리)과 시간(계산) 양쪽에서 스트림이 유리할 수 있다.
+    하지만 Node의 스트림에는 그보다 더 중요한 <b>조립성</b>이 있다.</p>
+
+  <h4>공간(메모리) 효율성</h4>
+  <ul>
+    <li>매우 큰 파일을 읽어 큰 버퍼를 반환하는 것은 좋은 방법이 아니다.</li>
+    <li>동시에 여러 개의 큰 파일을 읽으면 쉽게 메모리가 부족해진다.</li>
+  </ul>
+
+  <h5>버퍼링 API를 사용한 Gzipping</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">gzip-buffered.ts</span>
+      <span class="code-tag bad">파일 크기만큼 메모리를 쓴다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { promises as fs } from "fs";
+import { gzip } from "zlib";
+import { promisify } from "util";
+
+const gzipPromise = promisify(gzip);
+
+const filename = process.argv[2];
+
+async function main() {
+  const data = await fs.readFile(filename);
+  const gzippedData = await gzipPromise(data);
+  await fs.writeFile(`${filename}.gz`, gzippedData);
+  console.log("Compressed Successfully");
+}
+
+main();
+
+// command: npx ts-node src/app.ts static/filename</code></pre>
+  </div>
+
+  <p>작은 용량이라면 괜찮지만, 큰 파일은 버퍼의 최대 용량을 초과해 에러가 발생한다.</p>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">버퍼 상한이 바뀌었다 <span class="badge b-purple">최신 반영</span></p>
+      <p>노트의 "Node v20 기준 최대 버퍼 크기 4GB"는 <b>당시 기준으로 정확</b>했다.
+        하지만 <b>Node v22.0.0 부터 <code>buffer.constants.MAX_LENGTH</code> 가 4GiB → 8PiB(<code>2^53-1</code>)로 늘어났다.</b>
+        V8 을 12.4.254.14 로 올리면서 생긴 변화다. Node v24.17.0 에서 값이 <code>9007199254740991</code> 임을 확인했다.
+        (근거: <a href="https://github.com/nodejs/node/pull/54207">nodejs/node#54207</a>)</p>
+      <p>그렇다고 버퍼링이 안전해진 것은 아니다. <b>실질적인 벽은 두 개 더 있다.</b>
+        하나는 문자열 상한(<code>MAX_STRING_LENGTH</code>, 64비트에서 약 512MB — 위 런타임에서 <code>536870888</code> 확인)이고,
+        다른 하나는 프로세스가 실제로 쓸 수 있는 <b>물리 메모리</b>다.
+        1GB 파일 열 개를 동시에 버퍼링하면 상수가 8PiB 여도 프로세스는 죽는다.</p>
+    </div>
+  </div>
+
+  <h5>스트림을 사용한 Gzipping</h5>
+  <ul>
+    <li>모두 읽은 뒤 수행하는 것이 아니라 <b>청크 단위로 읽는 대로 바로</b> 수행한다.</li>
+    <li>모든 크기의 파일에 대해 <b>일정한 메모리</b>를 사용한다.</li>
+    <li>청크의 순서도 Node 가 알아서 유지시켜 준다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">gzip-stream.ts</span>
+      <span class="code-tag good">메모리 상수</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createReadStream, createWriteStream } from "fs";
+import { createGzip } from "zlib";
+
+const filename = process.argv[2];
+
+createReadStream(filename)
+  .pipe(createGzip())
+  .pipe(createWriteStream(`${filename}.gz`))
+  .on("finish", () =&gt; console.log("Compressed Successfully"));</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph B["버퍼링"]
+    B1["파일 전체 읽기"] --> B2["전체를 메모리에 보관"]
+    B2 --> B3["전체 압축"]
+    B3 --> B4["전체 쓰기"]
+  end
+  subgraph S["스트리밍"]
+    S1["청크 읽기"] --> S2["청크 압축"]
+    S2 --> S3["청크 쓰기"]
+    S3 --> S1
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>버퍼링은 단계마다 전체를 들고 있어야 한다</b> — 스트리밍은 한 번에 청크 하나만 들고 있으면 되므로,
+      메모리 사용량이 <b>파일 크기와 무관</b>해진다. 파이프라인이 길어져도 마찬가지다.</div>
+  </div>
+
+  <h4>시간 효율성</h4>
+  <ul>
+    <li>서버에서는 데이터를 실시간으로 청크 단위로 받으면서 바로 저장한다.</li>
+    <li>모든 데이터 다운로드가 끝나기를 기다리지 않아도 되므로 효율적이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">server.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createWriteStream } from "fs";
+import { createServer } from "http";
+import { basename, join } from "path";
+import { createGunzip } from "zlib";
+
+const server = createServer((req, res) =&gt; {
+  const filename = basename(req.headers["x-filename"] as string);
+  const destFilename = join("received_files", filename);
+  console.log("File request receive");
+  req
+    .pipe(createGunzip())
+    .pipe(createWriteStream(destFilename))
+    .on("finish", () =&gt; {
+      res.writeHead(201, { "Content-Type": "text/plain" });
+      res.end("That's it\n");
+      console.log(`File saved: ${destFilename}`);
+    });
+});
+
+server.listen(3000, () =&gt;
+  console.log("Server running on http://localhost:3000")
+);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">client.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createReadStream } from "fs";
+import { request } from "http";
+import { createGzip } from "zlib";
+
+const filename = process.argv[2];
+const serverHost = process.argv[3];
+
+const httpRequestOptions = {
+  hostname: serverHost,
+  port: 3000,
+  path: "/",
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/octet-stream",
+    "Content-Encoding": "gzip",
+    "X-Filename": filename,
+  },
+};
+
+const req = request(httpRequestOptions, (res) =&gt; {
+  console.log(`Server response: ${res.statusCode}`);
+});
+
+createReadStream(filename)
+  .pipe(createGzip())
+  .pipe(req)
+  .on("finish", () =&gt; {
+    console.log("File send complete");
+  });</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  R["파일 읽기"] --> G["gzip 압축"]
+  G --> N["네트워크 전송"]
+  N --> U["gunzip 해제"]
+  U --> W["디스크 쓰기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>다섯 단계가 동시에 돌아간다</b> — 버퍼링이라면 읽기가 100% 끝나야 압축이 시작되지만,
+      스트리밍에서는 첫 청크가 쓰이는 동안 마지막 청크는 아직 읽히고 있다. 이것이 "시간 효율성"의 실체다.</div>
+  </div>
+
+  <h4>조립성</h4>
+  <ul>
+    <li><code>pipe()</code> 함수는 스트림을 구성하는 방법에 대한 명확한 개요를 제공한다.</li>
+    <li>여러 개의 <b>단일 책임</b> 프로세스를 연결할 수 있다.</li>
+    <li>전제조건은 이전 스트림이 반환한 <b>데이터 유형이 다음 스트림이 받는 유형과 맞아야</b> 한다는 것이다.
+      데이터 유형에는 바이너리, 텍스트, 객체 등이 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">조립성이 왜 가장 중요한가 <span class="badge b-blue">보강</span></p>
+      <p>위 파이프라인에 암호화를 추가하고 싶다면 <code>.pipe(createCipheriv(...))</code> 한 줄이면 된다.
+        나머지 코드는 하나도 바뀌지 않는다. 메모리와 시간 이득은 <b>측정해야 보이지만</b>,
+        조립성은 <b>코드를 고칠 때마다 체감</b>된다. <a href="#item-22">6-4 파이핑 패턴</a>이 이 성질을 끝까지 밀어붙인다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>버퍼링 = 전부 모은 뒤 한 번에 / 스트리밍 = 오는 대로 청크 단위로</li>
+      <li>공간: 파일 크기와 무관하게 메모리 상수. 버퍼링은 상한(과 실제 RAM)에 부딪힌다</li>
+      <li>시간: 파이프라인의 모든 단계가 동시에 진행되어 첫 결과가 훨씬 빨리 나온다</li>
+      <li>조립성: 단일 책임 스트림을 <code>pipe()</code> 로 갈아 끼운다 — 실무에서 가장 크게 체감되는 이득</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-20" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-2</div>
+    <h3>스트림 시작하기</h3>
+    <p class="item-tagline">네 개의 추상 클래스와 배압(backpressure) 하나. 스트림의 전부가 여기 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>write()</code> 가 <code>false</code> 를 반환하면 <b>멈추고 <code>drain</code> 을 기다려라.</b>
+    이 한 줄의 규약을 지키지 않으면 스트림을 써도 메모리가 터진다.
+  </div>
+
+  <h4>스트림 해부</h4>
+  <ul>
+    <li>Node의 스트림은 코어 모듈의 <b>네 가지 추상 클래스</b> 중 하나의 구현이다 —
+      <code>Readable</code>, <code>Writable</code>, <code>Duplex</code>, <code>Transform</code>.</li>
+    <li>스트림은 <code>EventEmitter</code> 의 인스턴스다.
+      <ul>
+        <li><code>end</code> — 읽기 가능한 스트림이 읽기를 마쳤을 때</li>
+        <li><code>finish</code> — 쓰기 스트림이 완료됐을 때</li>
+        <li><code>error</code> — 무언가 잘못됐을 때</li>
+      </ul>
+    </li>
+    <li>스트림이 매우 유연한 이유 중 하나는 바이너리뿐 아니라 거의 모든 자바스크립트 값을 처리할 수 있다는 것이다.
+      <ul>
+        <li><b>Binary 모드</b> — 버퍼 또는 문자열 청크 형태로 스트리밍</li>
+        <li><b>객체 모드</b> — 데이터를 일련의 개별 객체로 스트리밍</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  S["Stream (EventEmitter)"] --> R["Readable — _read()"]
+  S --> W["Writable — _write()"]
+  R --> D["Duplex — _read() + _write()"]
+  W --> D
+  D --> T["Transform — _transform() + _flush()"]
+  T --> P["PassThrough — 변환 없이 통과"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>Duplex 는 Readable 과 Writable 을 겹친 것, Transform 은 둘을 연결한 Duplex 다</b> —
+      Duplex 는 읽기와 쓰기가 <b>무관</b>하지만(소켓), Transform 은 쓴 것이 변환되어 읽힌다(gzip).</div>
+  </div>
+
+  <h4>Readable 스트림</h4>
+  <p>데이터를 받는 방법이 두 가지 있다.</p>
+
+  <h5>non-flowing 모드</h5>
+  <ul>
+    <li>Readable 스트림에서 읽기의 <b>기본 패턴</b>이다.</li>
+    <li><code>readable</code> 이벤트에 리스너를 연결하고, 그 안에서 <code>read()</code> 로 직접 꺼낸다.</li>
+    <li>네트워크 프로토콜을 구현하거나 특정 데이터 형식을 구문 분석할 때 유용하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">non-flowing.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">process.stdin
+  .on("readable", () =&gt; {
+    let chunk: Buffer;
+
+    console.log("New data is available");
+
+    /**
+     * read 는 스트림 내부 버퍼에서 데이터 청크를 가져오는 동기 작업
+     * 데이터 형식은 기본적으로 Buffer 타입
+     * 더 이상 읽을 값이 없다면 null 을 반환함
+     */
+    while ((chunk = process.stdin.read()) !== null) {
+      console.log(`Chunk read: (${chunk.length}), (${chunk.toString()})`);
+    }
+  })
+  .on("end", () =&gt; {
+    console.log("End of stream");
+  });
+
+/**
+ * New data is available
+ * Chunk read: (12), (hello asdasd)
+ * New data is available
+ * End of stream
+ */</code></pre>
+  </div>
+
+  <h5>flowing 모드</h5>
+  <ul>
+    <li><code>data</code> 이벤트에 리스너를 연결하면 스트림이 flowing 모드로 전환된다.</li>
+    <li><code>read()</code> 로 꺼내는 것이 아니라 <b>도착하는 대로 리스너로 바로 전달</b>된다.</li>
+    <li>non-flowing 모드보다 데이터 흐름 제어의 유연성이 떨어진다.</li>
+    <li>일시 중단하려면 <code>pause()</code> 를 사용해 버퍼에 캐싱할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">flowing.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">process.stdin
+  .on("data", (chunk) =&gt; {
+    console.log("New data is available");
+    console.log(`Chunk read: (${chunk.length}), (${chunk.toString()})`);
+  })
+  .on("end", () =&gt; {
+    console.log("End of stream");
+  });
+
+/**
+ * New data is available
+ * Chunk read: (12), (hello asdasd)
+ * End of stream
+ */</code></pre>
+  </div>
+
+  <h5>비동기 iterator</h5>
+  <ul>
+    <li>Readable 스트림은 <b>비동기 이터러블</b>이기도 하다.</li>
+    <li>전체 Readable 스트림을 소비하고 Promise 를 반환하는 함수가 필요할 때 매우 유용하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">async-iterator.ts</span>
+      <span class="code-tag good">가장 읽기 쉬운 방법</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">async function main() {
+  for await (const chunk of process.stdin) {
+    console.log(
+      `New data is available: (${chunk.length}), (${chunk.toString()})`
+    );
+  }
+
+  console.log("End of stream");
+}
+
+main();
+
+/**
+ * New data is available: (12), (hello asdasd)
+ * End of stream
+ */</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 방식이 배압도 공짜로 준다</p>
+      <p><code>for await</code> 는 루프 본문이 끝나야 다음 청크를 요청하므로,
+        소비 속도가 느리면 자연스럽게 생산도 느려진다.
+        아래에서 손으로 다뤄야 하는 <b>배압이 언어 문법으로 흡수</b>된 셈이다.
+        새 코드에서 Readable 을 소비할 때 첫 번째 선택지로 두면 좋다.</p>
+    </div>
+  </div>
+
+  <h5>Readable 스트림 구현</h5>
+  <ul>
+    <li><code>Readable</code> 클래스는 내부적으로 <code>_read</code> 를 호출하고, 이 함수는 <code>push</code> 로 내부 버퍼를 채운다.</li>
+    <li><code>read</code> 는 <b>사용자가 호출</b>하는 메서드이고 <code>_read</code> 는 <b>Node 가 호출</b>하는 것이니 혼동하면 안 된다.</li>
+    <li><code>push(null)</code> 이 스트림의 끝을 알린다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">RandomStream.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import Chance from "chance";
+import { Readable } from "stream";
+
+const chance = new Chance();
+
+class RandomStream extends Readable {
+  private emittedBytes: number;
+
+  constructor(options: any) {
+    super(options);
+    this.emittedBytes = 0;
+  }
+
+  _read(size: number) {
+    const chunk = chance.string({ length: size });
+    this.push(chunk, "utf-8");
+    this.emittedBytes += chunk.length;
+    if (chance.bool({ likelihood: 5 })) {
+      this.push(null);            // 5% 확률로 종료
+    }
+  }
+}
+
+const randomStream = new RandomStream({});
+randomStream
+  .on("data", (chunk) =&gt; {
+    console.log(chunk.toString());
+  })
+  .on("end", () =&gt; {
+    console.log("End of stream");
+  });</code></pre>
+  </div>
+
+  <h5>단순화된 생성자</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">simplified-readable.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import Chance from "chance";
+import { Readable } from "stream";
+
+const chance = new Chance();
+
+let emittedBytes = 0;
+
+const randomStream = new Readable({
+  read(size) {
+    const chunk = chance.string({ length: size });
+    this.push(chunk, "utf-8");
+    emittedBytes += chunk.length;
+    if (chance.bool({ likelihood: 5 })) {
+      this.push(null);
+    }
+  },
+});
+
+console.log(randomStream.read(10));</code></pre>
+  </div>
+
+  <h5>iterator에서 Readable 스트림 얻기</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">readable-from.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Readable } from "stream";
+
+const mountains = [
+  { name: "Everest", height: 8848 },
+  { name: "K2", height: 8611 },
+  { name: "Kangchenjunga", height: 8586 },
+  { name: "Lhotse", height: 8516 },
+  { name: "Makalu", height: 8485 },
+];
+
+const mountainsStream = Readable.from(mountains);
+mountainsStream.on("data", (chunk) =&gt; {
+  console.log(`${chunk.name.padStart(14)} ${chunk.height}m`);
+});</code></pre>
+  </div>
+
+  <p><code>Readable.from()</code> 은 기본이 <b>객체 모드</b>다. 배열·제너레이터·비동기 이터러블 무엇이든
+    스트림 파이프라인의 시작점으로 만들 수 있다.</p>
+
+  <h4>Writable 스트림</h4>
+  <p>데이터가 흘러 들어갈 <b>목적지</b>를 나타내는 스트림이다.</p>
+
+  <h5>스트림에 쓰기</h5>
+  <ul>
+    <li><code>write()</code> 로 데이터를 쓴다.</li>
+    <li><code>end()</code> 로 더 이상 기록할 데이터가 없음을 알린다. 최종 데이터 청크를 함께 넘길 수도 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">write.ts</span>
+      <span class="code-tag bad">배압을 무시한다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Chance } from "chance";
+import { createServer } from "http";
+
+const chance = new Chance();
+
+const server = createServer((req, res) =&gt; {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+
+  // 1% 확률로 종료되는 루프
+  while (chance.bool({ likelihood: 99 })) {
+    res.write(`${chance.string()}\n`);
+  }
+  res.end("\n\n");
+  res.on("finish", () =&gt; {
+    console.log("All data was sent");
+  });
+});
+
+server.listen(8080, () =&gt; {
+  console.log("Server is running on http://localhost:8080");
+});</code></pre>
+  </div>
+
+  <h5>Backpressure(배압)</h5>
+  <ul>
+    <li>Node의 스트림은 <b>소비할 수 있는 것보다 더 빨리 데이터가 기록되는</b> 병목을 겪을 수 있다.
+      <ul>
+        <li>들어오는 데이터를 버퍼링해 대처할 수 있다.</li>
+        <li>하지만 스트림이 생산자에게 피드백을 주지 않으면 버퍼가 계속 쌓여 메모리 문제가 발생한다.</li>
+      </ul>
+    </li>
+    <li>배압 메커니즘은 내부 버퍼 크기를 제한하고, 버퍼가 비워지면 다시 쓰기를 시작해도 안전함을 알려 준다.</li>
+    <li>이는 강제가 아니라 <b>권고 메커니즘</b>이다. <code>write()</code> 가 <code>false</code> 를 반환해도 계속 쓸 수는 있다 — 그저 메모리가 쌓일 뿐이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">backpressure.ts</span>
+      <span class="code-tag good">drain 을 기다린다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Chance } from "chance";
+import { createServer } from "http";
+
+const chance = new Chance();
+
+const server = createServer((req, res) =&gt; {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+
+  function generateMore() {
+    while (chance.bool({ likelihood: 95 })) {
+      const randomChunk = chance.string({
+        length: 16 * 1024 - 1,
+      });
+      const shouldContinue = res.write(randomChunk);
+      if (!shouldContinue) {
+        console.log("Backpressure");
+        return res.once("drain", generateMore);   // 비워지면 재개
+      }
+    }
+  }
+
+  generateMore();
+  res.on("finish", () =&gt; {
+    console.log("All data was sent");
+  });
+});
+
+server.listen(8080, () =&gt; {
+  console.log("Server is running on http://localhost:8080");
+});</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant P as 생산자
+  participant B as 내부 버퍼 (highWaterMark)
+  participant C as 소비자
+  P->>B: write(chunk) → true
+  P->>B: write(chunk) → true
+  P->>B: write(chunk) → false
+  Note over P: 쓰기를 멈추고 drain 을 기다린다
+  B->>C: 소비
+  B-->>P: 'drain' 이벤트
+  P->>B: write 재개
+      </pre>
+    </div>
+    <div class="figure-cap"><b><code>write()</code> 의 반환값은 "더 써도 되냐"는 신호다</b> —
+      <code>false</code> 는 실패가 아니라 "버퍼가 임계치를 넘었으니 <code>drain</code> 까지 쉬어라"는 뜻이다.
+      이 신호를 무시하면 스트림을 쓰면서도 버퍼링과 같은 메모리 문제를 겪는다.</div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">기본 highWaterMark 가 바뀌었다 <span class="badge b-purple">최신 반영</span></p>
+      <p>위 예제가 청크 크기를 <code>16 * 1024 - 1</code> 로 잡은 것은 <b>기본 highWaterMark 가 16KiB</b> 였기 때문이다.
+        <b>Node 22 부터 기본값이 64KiB(65536)로 올라갔다.</b>
+        Node v24.17.0 에서 <code>new Readable({read(){}}).readableHighWaterMark</code> 와
+        <code>fs.createReadStream(...).readableHighWaterMark</code> 모두 <code>65536</code> 임을 확인했다.</p>
+      <p>따라서 위 코드를 최신 Node 에서 그대로 돌리면 배압이 예전만큼 자주 걸리지 않는다.
+        메모리에 민감한 환경이라면 <code>stream.setDefaultHighWaterMark()</code> 로 전역 기본값을 낮추거나,
+        스트림 생성 시 <code>{ highWaterMark: n }</code> 을 직접 지정한다.</p>
+    </div>
+  </div>
+
+  <h5>Writable 스트림 구현</h5>
+  <ul>
+    <li><code>Writable</code> 을 상속하고 <code>_write()</code> 를 구현하면 된다.</li>
+    <li>아래 예제는 객체를 받아 <code>path</code> 위치에 <code>content</code> 를 파일로 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">ToFileStream.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Writable } from "stream";
+import * as mkdirp from "mkdirp";
+import { promises as fs } from "fs";
+import { dirname } from "path";
+
+class ToFileStream extends Writable {
+  constructor(options: any) {
+    super({ ...options, objectMode: true });
+  }
+
+  _write(
+    chunk: any,
+    encoding: BufferEncoding,
+    callback: (error?: Error | null) =&gt; void
+  ): void {
+    mkdirp
+      .mkdirp(dirname(chunk.path))
+      .then(() =&gt; fs.writeFile(chunk.path, chunk.content))
+      .then(() =&gt; callback())
+      .catch(callback);
+  }
+}
+
+const tfs = new ToFileStream({});
+
+tfs.write({
+  path: "static/fileA.txt",
+  content: "Hello World",
+});
+
+tfs.write({
+  path: "static/fileB.txt",
+  content: "Hello World 2",
+});
+
+tfs.end(() =&gt; {
+  console.log("done");
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">mkdirp 는 더 이상 필요 없다 <span class="badge b-blue">보강</span></p>
+      <p>Node 10.12 부터 <code>fs.mkdir(path, { recursive: true })</code> 가 코어에 들어왔다.
+        <code>fs/promises</code> 를 쓰면 이렇게 줄어든다.<br>
+        <code>await fs.mkdir(dirname(chunk.path), { recursive: true });</code></p>
+    </div>
+  </div>
+
+  <h5>단순화된 생성자</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">simplified-writable.ts</span>
+      <span class="code-tag bad">성공 경로에서 callback 을 부르지 않는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Writable } from "stream";
+import * as mkdirp from "mkdirp";
+import { dirname } from "path";
+import { promises as fs } from "fs";
+
+const tfs = new Writable({
+  objectMode: true,
+  write(chunk, encoding, callback) {
+    console.log(chunk);
+
+    mkdirp
+      .mkdirp(dirname(chunk.name))
+      .then(() =&gt; {
+        fs.writeFile(chunk.name, chunk.content);
+      })
+      .catch(callback);
+  },
+});
+
+tfs.write({ name: "static/filev.txt", content: "Hello World" }, "utf8", () =&gt; {
+  console.log("done");
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>이 코드는 성공 경로에서 <code>callback()</code> 을 호출하지 않는다.
+        <code>_write</code> 의 <code>callback</code> 은 <b>"이 청크 처리를 끝냈다"는 신호</b>라서,
+        부르지 않으면 스트림이 다음 청크를 처리하지 않고 <code>end()</code> 콜백도 실행되지 않는다.
+        즉 위 예제에서 <code>"done"</code> 은 <b>영원히 출력되지 않는다</b>.</p>
+      <p>또 <code>fs.writeFile</code> 앞에 <code>return</code> 이 없어 Promise 체인이 끊겨 있어,
+        쓰기 실패도 <code>.catch(callback)</code> 에 걸리지 않는다. 바로 위 클래스 버전이 올바른 형태다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">고친 형태</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">write(chunk, encoding, callback) {
+  fs.mkdir(dirname(chunk.name), { recursive: true })
+    .then(() =&gt; fs.writeFile(chunk.name, chunk.content))
+    .then(() =&gt; callback())
+    .catch(callback);
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4>Duplex 스트림</h4>
+  <ul>
+    <li>읽기와 쓰기가 <b>동시에</b> 가능한 스트림이다.</li>
+    <li>네트워크 소켓처럼 데이터 소스이자 목적지인 엔티티를 설명할 때 유용하다.</li>
+    <li><code>_read()</code> 와 <code>_write()</code> 를 모두 구현해야 한다.</li>
+    <li>읽는 데이터와 쓰는 데이터 사이에 <b>아무 관계가 없다</b>는 것이 Transform 과의 차이다.</li>
+  </ul>
+
+  <h4>Transform 스트림</h4>
+  <ul>
+    <li>데이터 <b>변환</b>을 처리하도록 설계된 특수한 Duplex 스트림이다.</li>
+    <li><code>_read()</code> / <code>_write()</code> 대신 <code>_transform()</code> 과 <code>_flush()</code> 를 구현한다.</li>
+    <li><code>_flush()</code> 는 스트림이 종료되기 직전에 호출되어 <b>남은 데이터를 내보낼 마지막 기회</b>를 준다.</li>
+  </ul>
+
+  <h5>Transform 스트림 구현</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">ReplaceStream.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Transform, TransformCallback } from "stream";
+
+class ReplaceStream extends Transform {
+  private searchString: string;
+  private replaceString: string;
+  private tail: string;
+
+  constructor(searchString: string, replaceString: string, options: any) {
+    super(options);
+    this.searchString = searchString;
+    this.replaceString = replaceString;
+    this.tail = "";
+  }
+
+  _transform(
+    chunk: any,
+    encoding: BufferEncoding,
+    callback: TransformCallback
+  ): void {
+    const pieces = (this.tail + chunk).split(this.searchString);
+    const lastPiece = pieces[pieces.length - 1];
+    const tailLen = this.searchString.length - 1;
+    this.tail = lastPiece.slice(-tailLen);
+    pieces[pieces.length - 1] = lastPiece.slice(0, -tailLen);
+
+    // 내부 읽기 버퍼로 데이터 저장
+    this.push(pieces.join(this.replaceString));
+    callback();
+  }
+
+  /**
+   * 스트림이 종료되기 전에 호출되고 남은 데이터를 저장함
+   */
+  _flush(callback: TransformCallback): void {
+    this.push(this.tail);
+    callback();
+  }
+}
+
+const replaceStream = new ReplaceStream("world", "node.js", {});
+
+replaceStream.on("data", (chunk) =&gt; {
+  console.log(chunk.toString());
+});
+
+replaceStream.write("hello world");
+replaceStream.write("world");
+replaceStream.end();</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 <code>tail</code> 이 필요한가</p>
+      <p>청크 경계는 <b>단어 경계와 무관</b>하다. <code>"...wor"</code> 로 청크가 끝나고 다음 청크가 <code>"ld..."</code> 로 시작하면,
+        각 청크만 보고는 <code>"world"</code> 를 찾을 수 없다.
+        그래서 검색 문자열 길이 <code>-1</code> 만큼을 잘라 다음 청크 앞에 붙이는 것이다.
+        스트림에서 <b>상태를 갖는 파서</b>를 만들 때 반복해서 만나게 되는 패턴이다.</p>
+    </div>
+  </div>
+
+  <h5>단순화된 생성자</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">simplified-transform.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Transform } from "stream";
+
+const searchStr = "World";
+const replaceStr = "Node.js";
+let tail = "";
+
+const replaceStream = new Transform({
+  defaultEncoding: "utf-8",
+  transform(chunk, encoding, callback) {
+    let pieces = (tail + chunk).split(searchStr);
+    const lastPiece = pieces[pieces.length - 1];
+    const tailLen = searchStr.length - 1;
+    tail = lastPiece.slice(-tailLen);
+    pieces[pieces.length - 1] = lastPiece.slice(0, -tailLen);
+    this.push(pieces.join(replaceStr));
+    callback();
+  },
+  flush(callback) {
+    this.push(tail);
+    callback();
+  },
+});</code></pre>
+  </div>
+
+  <h5>Transform 스트림을 사용한 데이터 필터링 및 집계</h5>
+  <ul>
+    <li>Transform 스트림은 데이터 변환 파이프라인을 구현하기 위한 완벽한 블록이다.</li>
+    <li>아래 예시는 여러 해의 매출을 담은 큰 CSV 파일을 분석한다 — <b>필터</b>와 <b>집계</b>를 각각 하나의 스트림으로.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">filter-aggregate.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Parser } from "csv-parse";
+import { createReadStream } from "fs";
+import { Transform, TransformCallback } from "stream";
+
+/**
+ * country 필드를 기준으로 데이터를 필터링하는 Transform 스트림
+ */
+class FilterByCountry extends Transform {
+  private country: string;
+
+  constructor(country: string, options: any) {
+    super(options);
+    this.country = country;
+  }
+
+  _transform(
+    chunk: any,
+    encoding: BufferEncoding,
+    callback: TransformCallback
+  ): void {
+    if (chunk.country === this.country) {
+      this.push(chunk);       // 조건에 맞을 때만 흘려보낸다
+    }
+    callback();
+  }
+}
+
+/**
+ * 금액의 합계를 처리하는 Transform 스트림
+ */
+class SumProfit extends Transform {
+  private total: number;
+
+  constructor(options: any) {
+    super(options);
+    this.total = 0;
+  }
+
+  _transform(
+    chunk: any,
+    encoding: BufferEncoding,
+    callback: TransformCallback
+  ): void {
+    this.total += Number.parseFloat(chunk.profit);
+    callback();               // 중간에는 아무것도 push 하지 않는다
+  }
+
+  _flush(callback: TransformCallback): void {
+    this.push(this.total.toString());   // 끝날 때 한 번만
+    callback();
+  }
+}
+
+const csvParser = new Parser({ columns: true });
+
+createReadStream("static/transform.csv")
+  .pipe(csvParser)
+  .pipe(new FilterByCountry("italy", { objectMode: true }))
+  .pipe(new SumProfit({ objectMode: true }))
+  .pipe(process.stdout);</code></pre>
+  </div>
+
+  <p>필터는 <b>N개를 받아 M개를 내보내고</b>(M ≤ N), 집계는 <b>N개를 받아 1개를 내보낸다</b>.
+    Transform 이 1:1 변환에만 쓰이는 것이 아니라는 점이 여기서 드러난다.</p>
+
+  <h4>PassThrough 스트림</h4>
+  <ul>
+    <li>변환을 적용하지 않고 모든 청크를 그대로 출력하는 특수한 Transform 이다.</li>
+    <li><b>관찰</b>이 가능하고, <b>느린 파이프 연결</b>과 <b>지연 스트림</b>을 구현하는 데 유용하다.</li>
+  </ul>
+
+  <h5>관찰 가능성(Observability)</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">monitor.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { PassThrough } from "stream";
+
+let bytesWritten = 0;
+
+const monitor = new PassThrough();
+monitor.on("data", (chunk) =&gt; {
+  bytesWritten += chunk.length;
+});
+
+monitor.on("finish", () =&gt; {
+  console.log(`${bytesWritten} bytes written`);
+});
+
+monitor.write("hello");
+monitor.write("world");
+monitor.end(); // 10 bytes written
+
+createReadStream("static/transform.csv")
+  .pipe(createGzip())
+  .pipe(monitor)                                     // 계측 지점을 끼워 넣는다
+  .pipe(createWriteStream("static/transform.csv.gz")); // 139 bytes written</code></pre>
+  </div>
+
+  <p>파이프라인 <b>중간에 계측 지점을 꽂는다</b>는 발상이다.
+    앞뒤 스트림은 자기가 관찰당하는지 모른다 — <a href="#item-29">8-1 프록시</a>와 같은 아이디어다.</p>
+
+  <h5>느린 파이프 연결(Late piping)</h5>
+  <ul>
+    <li>스트림을 파라미터로 받아 처리해야 하는 API 가 종종 있다.</li>
+    <li>그런데 그 API 를 호출하는 시점에는 아직 데이터가 준비되지 않았을 수 있다.</li>
+    <li><code>PassThrough</code> 를 <b>빈 자리 표시자</b>로 먼저 넘겨 두고, 나중에 파이프를 연결한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">late-piping.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createReadStream } from "fs";
+import { basename } from "path";
+import { PassThrough } from "stream";
+import { createBrotliCompress } from "zlib";
+
+export async function upload(filename: string, contentStream: any) {
+  console.log(`Uploading ${filename}...`);
+
+  return {
+    data: "",
+  };
+}
+
+const filepath = process.argv[2];
+const filename = basename(filepath);
+const contentStream = new PassThrough();
+
+upload(`${filename}.br`, contentStream)      // 먼저 넘기고
+  .then((response) =&gt; console.log(response))
+  .catch((err) =&gt; console.log(err));
+
+createReadStream(filepath)                   // 나중에 채운다
+  .pipe(createBrotliCompress())
+  .pipe(contentStream);</code></pre>
+  </div>
+
+  <h4>지연(Lazy) 스트림</h4>
+  <ul>
+    <li>동시에 다수의 스트림을 생성해야 하는 경우가 있다.</li>
+    <li>하지만 순간적으로 많은 스트림을 만들면 <code>EMFILE</code>(열린 파일이 너무 많음) 오류가 날 수 있다.
+      <code>fs.createReadStream</code> 같은 함수는 <b>읽기를 시작하기 전에 이미 파일 디스크립터를 열기</b> 때문이다.</li>
+    <li><code>lazystream</code> 같은 라이브러리를 쓰면 실제로 데이터를 소비할 때까지 비싼 초기화를 미룰 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">lazystream.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createReadStream } from "fs";
+import lazystream from "lazystream";
+
+const lazyURandom = new lazystream.Readable((options) =&gt; {
+  return createReadStream("/dev/urandom");
+});</code></pre>
+  </div>
+
+  <h4>파이프를 사용해서 스트림 연결하기</h4>
+  <ul>
+    <li>한 프로그램의 출력이 다음 프로그램의 입력으로 연결된다 — 유닉스 파이프와 같은 발상이다.</li>
+    <li><code>pipe()</code> 는 Readable 이 방출한 데이터를 제공된 Writable 로 전달한다.</li>
+    <li>두 스트림을 파이프로 연결하면 <b>흡입이 생성</b>되어 <code>read</code>, <code>write</code> 를 수동으로 호출할 필요가 없어진다.
+      배압도 자동으로 처리된다.</li>
+  </ul>
+
+  <h5>파이프 및 오류 처리</h5>
+  <ul>
+    <li><code>pipe()</code> 를 쓸 때 <code>error</code> 이벤트는 <b>파이프라인을 통해 자동 전파되지 않는다</b>.</li>
+    <li>매 스트림마다 따로 에러 핸들링을 해줘야 한다.</li>
+    <li>또 실패한 스트림을 정리(destroy)하지 않으면 메모리 누수로 이어질 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">pipe-error.ts</span>
+      <span class="code-tag bad">끔찍한 모양</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">stream1
+  .pipe(stream2)
+  .on("error", (err) =&gt; {
+    console.log(err);
+  })
+  .pipe(stream3)
+  .on("error", (err) =&gt; {
+    console.log(err);
+  });</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">게다가 이 코드는 stream1 의 에러를 놓친다</p>
+      <p><code>.pipe()</code> 는 <b>대상 스트림</b>을 반환하므로, 첫 <code>.on("error")</code> 는
+        <code>stream2</code> 에 붙는다. <code>stream1</code> 에는 아무 핸들러도 없다.
+        <a href="#item-12">3-2</a>에서 봤듯 <code>error</code> 리스너가 없는 emitter 의 에러는 프로세스를 죽인다.</p>
+    </div>
+  </div>
+
+  <h5>pipeline()을 사용한 개선된 오류 처리</h5>
+  <ul>
+    <li>수동 에러 처리는 번거롭고 실수하기 쉽다. 반드시 피해야 한다.</li>
+    <li>코어 <code>stream</code> 패키지가 <code>pipeline()</code> 을 제공한다 —
+      <b>에러를 한 곳에서 받고, 실패 시 모든 스트림을 정리</b>해 준다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">pipeline.ts</span>
+      <span class="code-tag good">권장</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { pipeline, Transform } from "stream";
+import { createGunzip, createGzip } from "zlib";
+
+const uppercasify = new Transform({
+  transform(chunk, encoding, callback) {
+    this.push(chunk.toString().toUpperCase());
+    callback();
+  },
+});
+
+pipeline(
+  process.stdin,
+  createGunzip(),
+  uppercasify,
+  createGzip(),
+  process.stdout,
+  (err) =&gt; {
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+  }
+);</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">Promise 버전이 있다 <span class="badge b-blue">보강</span></p>
+      <p><code>stream/promises</code> 에서 <code>pipeline</code> 과 <code>finished</code> 를 가져오면
+        콜백 대신 <code>await</code> 로 쓸 수 있다.
+        Node v24.17.0 에서 <code>Object.keys(require("stream/promises"))</code> 가
+        <code>[ 'finished', 'pipeline' ]</code> 임을 확인했다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">import { pipeline } from "stream/promises";
+
+await pipeline(
+  process.stdin,
+  createGunzip(),
+  uppercasify,
+  createGzip(),
+  process.stdout
+);   // 실패하면 그냥 throw 된다</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>추상 클래스 4종: Readable / Writable / Duplex(무관한 읽기+쓰기) / Transform(쓴 것이 변환되어 읽힘)</li>
+      <li>Readable 소비법 3종: non-flowing(<code>readable</code>+<code>read</code>) / flowing(<code>data</code>) / <code>for await</code></li>
+      <li>구현은 <code>_read</code> / <code>_write</code> / <code>_transform</code> + <code>_flush</code>. <code>callback()</code> 을 빠뜨리면 스트림이 멈춘다</li>
+      <li>배압: <code>write()</code> 가 <code>false</code> 면 <code>drain</code> 까지 쉰다. 기본 highWaterMark 는 Node 22부터 64KiB</li>
+      <li><code>pipe()</code> 는 에러를 전파하지 않는다 → 항상 <code>pipeline()</code>(또는 <code>stream/promises</code> 버전)을 쓴다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-21" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-3</div>
+    <h3>스트림을 사용한 비동기 제어 흐름 패턴</h3>
+    <p class="item-tagline">4장의 순차 · 병렬 · 제한된 병렬이 스트림 위에서 다시 나타난다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>_transform</code> 의 <code>done()</code> 을 <b>언제 부르느냐</b>가 전부다.
+    작업이 끝난 뒤 부르면 순차, 시작하자마자 부르면 병렬이 된다.
+  </div>
+
+  <h4>순차적 실행</h4>
+  <ul>
+    <li>기본적으로 스트림은 데이터를 <b>순서대로</b> 처리한다.</li>
+    <li>Transform 의 <code>_transform()</code> 은 콜백으로 완료를 알릴 때까지 다음 청크를 받지 않는다.</li>
+    <li>청크를 올바른 순서로 처리하는 데 결정적으로 중요한 성질이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">concatFiles.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createReadStream, createWriteStream } from "fs";
+import { Readable, Transform } from "stream";
+
+function concatFiles(dest: string, files: string[]) {
+  return new Promise((resolve, reject) =&gt; {
+    const destStream = createWriteStream(dest);
+    Readable.from(files)
+      .pipe(
+        new Transform({
+          objectMode: true,
+          transform(filename, encoding, done) {
+            const src = createReadStream(filename);
+            src.pipe(destStream, { end: false }); // 완료돼도 대상을 닫지 않음
+            src.on("error", done);
+            src.on("end", done);                  // 이 파일이 끝나야 다음 파일
+          },
+        })
+      )
+      .on("error", reject)
+      .on("finish", () =&gt; {
+        destStream.end();
+        resolve(true);
+      });
+  });
+}
+
+const main = async () =&gt; {
+  try {
+    await concatFiles("destination.txt", [
+      "static/file1.txt",
+      "static/file2.txt",
+    ]);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+main();</code></pre>
+  </div>
+
+  <p>두 가지 장치가 순서를 만든다.
+    <b>(1)</b> <code>{ end: false }</code> 로 대상 스트림이 중간에 닫히지 않게 하고,
+    <b>(2)</b> <code>src</code> 의 <code>end</code> 에서야 <code>done()</code> 을 불러 다음 파일로 넘어간다.</p>
+
+  <h4>순서가 없는 병렬 실행</h4>
+  <ul>
+    <li>모든 청크에 대해 느린 비동기 작업이 필요하다면, 병렬화해 전체 속도를 높이는 것이 좋다.</li>
+    <li>각 청크 사이에 <b>관계가 없을 때만</b> 가능하며, 바이너리보다 주로 객체 스트림에서 쓰인다.</li>
+  </ul>
+
+  <h5>순서가 없는 병렬 스트림 구현</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">ParallelStream.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { Transform, TransformCallback, TransformOptions } from "stream";
+
+class ParallelStream extends Transform {
+  private userTransform: any;
+  private running: number;
+  private terminateCb: any;
+
+  constructor(userTransform: Transform, options: TransformOptions) {
+    super({ ...options, objectMode: true });
+    this.userTransform = userTransform;
+    this.running = 0;
+    this.terminateCb = null;
+  }
+
+  _transform(
+    chunk: any,
+    encoding: BufferEncoding,
+    done: (error?: Error | null | undefined) =&gt; void
+  ) {
+    this.running++;
+    // 해당 지점에서 완료되기를 기다리지 않음
+    this.userTransform(
+      chunk,
+      encoding,
+      this.push.bind(this),
+      this._onComplete.bind(this)
+    );
+    done();      // ← 즉시 호출해야 다음 청크가 들어온다
+  }
+
+  _flush(callback: TransformCallback): void {
+    if (this.running &gt; 0) {
+      this.terminateCb = callback;   // 아직 진행 중이면 종료를 미룬다
+    } else {
+      callback();
+    }
+  }
+
+  _onComplete(err: unknown) {
+    this.running--;
+    if (err) {
+      this.emit("error", err);
+    }
+    if (this.running === 0) {
+      this.terminateCb &amp;&amp; this.terminateCb();
+    }
+  }
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>_transform</code> 에는 <code>done()</code> 호출이 빠져 있다.
+        그러면 스트림이 <b>첫 번째 청크에서 그대로 멈춘다</b> — 두 번째 청크가 아예 들어오지 않으므로
+        "병렬"이라는 목적 자체가 성립하지 않는다.</p>
+      <p>이 패턴의 핵심이 정확히 그 한 줄이다. 사용자 변환이 <b>끝나기를 기다리지 않고</b> <code>done()</code> 을 즉시 불러
+        다음 청크를 받아들이고, 실제 완료는 별도의 <code>_onComplete</code> 로 세는 것이다.
+        위 코드에는 <code>done()</code> 을 추가해 두었다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph SEQ["순차 — 작업 후 done()"]
+    A1["chunk 1 처리"] --> A2["done()"] --> A3["chunk 2 처리"] --> A4["done()"]
+  end
+  subgraph PAR["병렬 — 즉시 done()"]
+    B1["chunk 1 시작"] --> B2["done() 즉시"]
+    B2 --> B3["chunk 2 시작"]
+    B3 --> B4["done() 즉시"]
+    B1 -.->|"나중에"| C1["_onComplete"]
+    B3 -.->|"나중에"| C1
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b><code>done()</code> 을 부르는 시점 하나가 순차와 병렬을 가른다</b> —
+      병렬 버전은 <code>running</code> 카운터로 실제 완료를 따로 세고,
+      <code>_flush</code> 에서 그 카운터가 0이 될 때까지 종료를 미룬다.
+      <a href="#item-15">4-2</a>의 병렬 실행 카운터가 그대로 재등장한 것이다.</div>
+  </div>
+
+  <h5>URL 상태 모니터링 앱 구축</h5>
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 노트에는 이 소제목만 있고 내용이 없다. 책에서는 위 <code>ParallelStream</code> 을 이용해
+        URL 목록을 받아 각각의 생존 여부를 동시에 확인하는 예제를 다룬다.
+        내용을 지어내지 않고 자리만 표시해 둔다.</p>
+    </div>
+  </div>
+
+  <h4>순서가 없는 제한된 병렬 실행</h4>
+  <ul>
+    <li>한 번에 수천, 수백만 개의 작업을 처리하면 가용성이 손상될 수 있다.</li>
+    <li>부하와 리소스 사용량을 제어하는 해법은 병렬 작업의 <b>동시성을 제한</b>하는 것이다.</li>
+  </ul>
+
+  <p>구현은 <code>ParallelStream</code> 에 <code>concurrency</code> 를 추가하고,
+    <code>running</code> 이 상한에 도달하면 <code>done()</code> 을 <b>즉시 부르지 않고 보관</b>했다가
+    슬롯이 비었을 때 부르는 방식이다. <a href="#item-15">4-2</a>의 제한된 병렬 실행과 정확히 같은 구조다.</p>
+
+  <h4>순서가 있는 병렬 실행</h4>
+  <ul>
+    <li>때로는 각 청크를 <b>수신한 순서대로</b> 내보내야 한다.</li>
+    <li>실행 중인 각 작업의 결과를 버퍼에 담아 두었다가 순서에 맞게 재정렬해 내보낸다.</li>
+    <li>보통 직접 구현하지 않고 <code>parallel-transform</code> 같은 라이브러리를 쓴다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>패턴</th><th><code>done()</code> 시점</th><th>순서 보장</th><th>동시성</th></tr></thead>
+      <tbody>
+        <tr><td>순차</td><td>작업 완료 후</td><td class="t-center t-ok">보장</td><td>1</td></tr>
+        <tr><td>순서 없는 병렬</td><td>작업 시작 직후</td><td class="t-center t-no">없음</td><td>무제한</td></tr>
+        <tr><td>순서 없는 제한된 병렬</td><td>슬롯이 빌 때</td><td class="t-center t-no">없음</td><td>N</td></tr>
+        <tr><td>순서 있는 병렬</td><td>작업 시작 직후 + 출력 버퍼링</td><td class="t-center t-ok">보장</td><td>N</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>스트림은 기본이 순차다. <code>_transform</code> 의 <code>done()</code> 이 다음 청크의 신호이기 때문</li>
+      <li>병렬로 만들려면 <code>done()</code> 을 즉시 부르고, 실제 완료는 별도 카운터로 센다</li>
+      <li><code>_flush</code> 에서 카운터가 0이 될 때까지 종료를 미뤄야 데이터를 잃지 않는다</li>
+      <li>동시성 제한은 <code>done()</code> 을 보관했다 슬롯이 빌 때 부르는 것으로 구현</li>
+      <li>순서까지 지키려면 출력 버퍼 재정렬이 필요하다 → <code>parallel-transform</code></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-22" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-4</div>
+    <h3>파이핑 패턴</h3>
+    <p class="item-tagline">결합 · 분기 · 병합 · 다중화. 스트림을 배관처럼 다루는 네 가지 방법.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    파이프라인 전체를 <b>하나의 Duplex 로 감싸면</b> 내부 구현을 숨기고 에러 처리도 한 곳으로 모을 수 있다.
+    스트림에서의 캡슐화가 곧 결합(combine)이다.
+  </div>
+
+  <h4>파이핑 패턴</h4>
+  <p>Node의 스트림은 서로 다른 패턴을 조합해 파이프로 연결할 수 있다.</p>
+
+  <h4>스트림 결합</h4>
+  <ul>
+    <li>결합된 스트림은 일반적으로 <b>Duplex</b> 스트림이다.
+      첫 번째 스트림을 Writable 쪽으로, 마지막 스트림을 Readable 쪽으로 노출한다.</li>
+    <li>또 다른 중요한 특징은 파이프라인 내부에서 발생하는 <b>모든 에러를 인지하고 전파</b>한다는 것이다.</li>
+    <li>장점
+      <ul>
+        <li>내부 로직을 숨겨 <b>블랙박스로 재배포</b>할 수 있다.</li>
+        <li>스트림마다 <code>error</code> 를 붙일 필요 없이, 결합된 스트림 하나에만 붙이면 된다.</li>
+      </ul>
+    </li>
+    <li>매우 일반적인 작업이므로 특별한 이유가 없다면 <code>pumpify</code> 같은 라이브러리를 쓰는 것이 좋다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">pipeline-return.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import assert from "assert";
+import { createReadStream, createWriteStream } from "fs";
+import { pipeline, Transform } from "stream";
+
+const streamA = createReadStream("package.json");
+const streamB = new Transform({
+  transform(chunk, encoding, callback) {
+    this.push(chunk.toString().toUpperCase());
+    callback();                     // 빠뜨리면 파이프라인이 멈춘다
+  },
+});
+const streamC = createWriteStream("package-uppercase.json");
+
+const pipelineReturn = pipeline(streamA, streamB, streamC, (err) =&gt; {
+  if (err) {
+    console.error(err);
+  } else {
+    console.log("Pipeline succeeded.");
+  }
+});
+
+assert.strictEqual(streamC, pipelineReturn); // true
+const pipeReturn = streamA.pipe(streamB).pipe(streamC);
+assert.strictEqual(pipeReturn, streamC);     // true</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p><b>(1)</b> 노트의 <code>streamB</code> 는 <code>transform</code> 안에서 <code>callback()</code> 을 호출하지 않는다.
+        그러면 첫 청크 이후 파이프라인이 멈춰 <code>"Pipeline succeeded."</code> 가 출력되지 않는다. 위 코드에 추가해 두었다.</p>
+      <p><b>(2)</b> 노트는 <code>pipeline()</code> 의 한계를 "마지막 스트림만 반환함 → Readable 만 반환함"이라고 적었는데,
+        정확히는 <b>마지막(목적지) 스트림을 반환</b>하는 것이며 그것이 Readable 인지 Writable 인지는 상황에 따라 다르다.
+        위 예제에서 반환값은 Writable 인 <code>streamC</code> 다(assert 가 이를 증명한다).</p>
+      <p>진짜 한계는 <b>"쓸 곳과 읽을 곳을 동시에 주지 못한다"</b>는 것이다.
+        결합된 스트림으로 재배포하려면 <code>streamA</code> 에 쓰고 <code>streamC</code> 에서 읽는
+        <b>하나의 Duplex</b> 가 필요한데, <code>pipeline()</code> 은 그 중 한쪽만 돌려준다. 그래서 <code>pumpify</code> 가 필요하다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 150" width="460" role="img" aria-label="결합된 스트림이 내부 파이프라인을 하나의 Duplex로 감싸는 구조">
+        <rect x="30" y="35" width="400" height="70" rx="14" class="dg-fill-soft dg-stroke"/>
+        <text x="230" y="26" class="dg-text-sub" font-size="11" text-anchor="middle">결합된 스트림 (Duplex) — 바깥에서는 이것 하나만 보인다</text>
+        <rect x="48" y="55" width="96" height="30" rx="8" class="dg-fill-bg dg-stroke"/>
+        <text x="96" y="74" class="dg-text dg-mono" font-size="11" text-anchor="middle">gunzip</text>
+        <rect x="182" y="55" width="96" height="30" rx="8" class="dg-fill-bg dg-stroke"/>
+        <text x="230" y="74" class="dg-text dg-mono" font-size="11" text-anchor="middle">decrypt</text>
+        <rect x="316" y="55" width="96" height="30" rx="8" class="dg-fill-bg dg-stroke"/>
+        <text x="364" y="74" class="dg-text dg-mono" font-size="11" text-anchor="middle">parse</text>
+        <path d="M146 70 L178 70" class="dg-stroke" fill="none" marker-end="url(#ar2)"/>
+        <path d="M280 70 L312 70" class="dg-stroke" fill="none" marker-end="url(#ar2)"/>
+        <path d="M4 70 L44 70" class="dg-stroke" fill="none" marker-end="url(#ar2)"/>
+        <path d="M414 70 L456 70" class="dg-stroke" fill="none" marker-end="url(#ar2)"/>
+        <defs><marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" class="dg-accent"/></marker></defs>
+        <text x="22" y="126" class="dg-text-sub" font-size="10" text-anchor="middle">write</text>
+        <text x="436" y="126" class="dg-text-sub" font-size="10" text-anchor="middle">read</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>Writable 쪽 입구와 Readable 쪽 출구만 노출한다</b> —
+      사용자는 세 단계가 있다는 것도, 중간에 무엇이 있는지도 알 필요가 없다.
+      에러 리스너도 이 껍데기 하나에만 붙이면 된다.</div>
+  </div>
+
+  <h5>결합된 스트림의 구현</h5>
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 노트에 소제목만 있고 내용이 없다.
+        요지는 위 도해대로 <b>첫 스트림의 Writable 면과 마지막 스트림의 Readable 면을 하나의 Duplex 로 노출</b>하는 것이며,
+        실무에서는 <code>pumpify</code> 또는 <code>stream.compose()</code>(Node 16.9+, 실험적)로 해결한다.</p>
+    </div>
+  </div>
+
+  <h4>스트림 분기</h4>
+  <ul>
+    <li>단일 Readable 스트림을 여러 Writable 스트림으로 파이핑해 분기할 수 있다.</li>
+    <li>동일한 데이터를 서로 다른 목적지로 보낼 때 유용하다.</li>
+    <li>유닉스의 <code>tee</code> 명령어와 같은 발상이다.</li>
+  </ul>
+
+  <h5>다중 체크섬 생성기 구현</h5>
+  <ul>
+    <li>한쪽은 <code>sha1Stream</code>, 다른 쪽은 <code>md5Stream</code> 으로 파이프한다.</li>
+    <li><code>{ end: false }</code> 를 지정하지 않는 한, 두 스트림은 <code>inputStream</code> 이 끝날 때 자동으로 종료된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">fork.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createHash } from "crypto";
+import { createReadStream, createWriteStream } from "fs";
+
+const filename = process.argv[2];
+const sha1Stream = createHash("sha1").setEncoding("hex");
+const md5Stream = createHash("md5").setEncoding("hex");
+const inputStream = createReadStream(filename);
+
+inputStream.pipe(sha1Stream).pipe(createWriteStream(`${filename}.sha1`));
+inputStream.pipe(md5Stream).pipe(createWriteStream(`${filename}.md5`));</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">분기에서 배압은 가장 느린 쪽을 따른다 <span class="badge b-blue">보강</span></p>
+      <p>같은 Readable 을 두 곳으로 흘리면, 한쪽이 느릴 때 소스 전체가 그 속도에 맞춰진다.
+        두 갈래의 처리 속도가 크게 다르다면 느린 쪽 앞에 버퍼를 두거나 아예 분리해야 한다.</p>
+    </div>
+  </div>
+
+  <h4>스트림 병합</h4>
+  <ul>
+    <li>분기와 반대로 여러 스트림을 하나로 병합하는 작업이며 일반적으로 간단하다.</li>
+    <li>다만 <code>{ end: false }</code> 를 <b>주지 않으면</b> 소스 하나가 끝나자마자 목적지가 닫혀 버리므로 조심해야 한다.</li>
+  </ul>
+
+  <h5>텍스트 파일 병합</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">merge.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createReadStream, createWriteStream } from "fs";
+import split from "split";
+
+const dest = process.argv[2];
+const sources = process.argv.slice(3);
+
+const destStream = createWriteStream(dest);
+
+let endCount = 0;
+for (const source of sources) {
+  const sourceStream = createReadStream(source, { highWaterMark: 16 });
+  sourceStream.on("end", () =&gt; {
+    if (++endCount === sources.length) {   // 전부 끝나야 닫는다
+      destStream.end();
+      console.log(`${dest} 파일 병합 완료`);
+    }
+  });
+  sourceStream
+    .pipe(split((line: any) =&gt; line + "\n"))
+    .pipe(destStream, { end: false });
+}</code></pre>
+  </div>
+
+  <p>또 <a href="#item-15">4-2</a>의 완료 카운터다. 병합에서 "언제 닫을지"를 아는 방법은
+    결국 <b>끝난 소스의 개수를 세는 것</b>뿐이다. <code>multistream</code> 패키지를 쓰는 것도 좋은 방법이다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">병합 결과의 순서는 섞인다</p>
+      <p>위 코드는 모든 소스를 <b>동시에</b> 읽어 하나의 목적지에 흘리므로,
+        출력 파일에서 각 소스의 줄이 뒤섞인다. 순서대로 이어붙이려면
+        <a href="#item-21">6-3</a>의 <code>concatFiles</code> 처럼 순차 처리해야 한다.
+        <code>highWaterMark: 16</code> 을 준 것도 섞이는 모습을 잘 보이게 하려는 의도다.</p>
+    </div>
+  </div>
+
+  <h4>멀티플렉싱 &amp; 디멀티플렉싱</h4>
+  <ul>
+    <li>병합의 특별한 변형으로, 스트림들을 <b>합치는 것이 아니라</b> 공유 채널로 <b>실어 나른</b> 뒤 원래대로 되돌린다.</li>
+    <li><b>멀티플렉싱</b> — 여러 스트림을 하나의 채널로 결합하는 작업</li>
+    <li><b>디멀티플렉싱</b> — 수신된 데이터를 원래의 스트림들로 재구성하는 작업</li>
+    <li>이 작업을 수행하는 장치를 <b>멀티플렉서 / 디멀티플렉서</b>라고 부른다.</li>
+  </ul>
+
+  <h5>원격 로거 만들기</h5>
+  <ul>
+    <li>자식 프로세스를 시작하고 표준 출력과 표준 에러를 원격 서버로 리다이렉션하는 프로그램이다.</li>
+    <li>원격 서버는 두 스트림을 두 개의 개별 파일에 저장한다.</li>
+    <li>공유 매체는 TCP 연결이고, 다중화할 두 채널은 자식 프로세스의 <code>stdout</code>, <code>stderr</code> 이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 150" width="460" role="img" aria-label="채널 ID, 길이, 데이터로 구성된 패킷 구조">
+        <rect x="30" y="45" width="70" height="38" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="65" y="62" class="dg-text dg-mono" font-size="11" text-anchor="middle">채널 ID</text>
+        <text x="65" y="76" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">1 byte</text>
+        <rect x="104" y="45" width="86" height="38" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="147" y="62" class="dg-text dg-mono" font-size="11" text-anchor="middle">데이터 길이</text>
+        <text x="147" y="76" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">4 bytes (BE)</text>
+        <rect x="194" y="45" width="236" height="38" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="312" y="62" class="dg-text dg-mono" font-size="11" text-anchor="middle">실제 데이터</text>
+        <text x="312" y="76" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">가변 길이</text>
+        <text x="230" y="112" class="dg-text-sub" font-size="11" text-anchor="middle">수신 측은 1 → 4 → N 바이트 순서로 정확히 잘라 읽으면 원래 채널을 복원할 수 있다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>길이를 먼저 보내는 것이 핵심이다</b> —
+      TCP 는 바이트 스트림일 뿐 메시지 경계를 보존하지 않으므로, 직접 경계를 만들어 넣어야 한다.
+      그래서 수신 측이 non-flowing 모드로 <code>read(1)</code>, <code>read(4)</code>, <code>read(N)</code> 을 정확히 호출할 수 있다.</div>
+  </div>
+
+  <h5>클라이언트 — 멀티플렉싱</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">client.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { fork } from "child_process";
+import { connect } from "net";
+import { Readable, Writable } from "stream";
+
+/**
+ * 채널 다중화 처리
+ * 1. readable 이벤트에 리스너를 등록, non-flowing 모드 사용
+ * 2. 청크를 읽어 채널ID, 패킷의 크기, 실제 데이터 순서로 패킷을 만듦
+ * 3. 패킷이 준비되면 목적지 스트림에 기록
+ * 4. 모든 소스가 종료되면 목적지를 닫도록 end 리스너 등록
+ */
+const multiplexChannels = (sources: Readable[], destination: Writable) =&gt; {
+  let openChannels = sources.length;
+
+  for (let i = 0; i &lt; sources.length; i++) {
+    sources[i]
+      .on("readable", function () {
+        let chunk: Buffer;
+
+        while ((chunk = sources[i].read()) !== null) {
+          const outBuff = Buffer.alloc(1 + 4 + chunk.length);
+          outBuff.writeUint8(i, 0);
+          outBuff.writeUInt32BE(chunk.length, 1);
+          chunk.copy(outBuff, 5);
+          console.log(`Send packet ${i} with ${chunk.length} bytes`);
+          destination.write(outBuff);
+        }
+      })
+      .on("end", () =&gt; {
+        if (--openChannels === 0) {
+          destination.end();
+        }
+      });
+  }
+};
+
+/**
+ * 1. localhost:3000 서버에 TCP 연결 생성
+ * 2. 인자로 받은 자식 프로세스를 실행, silent: true 로 부모 스트림 상속 방지
+ * 3. 자식의 stdout, stderr 을 소켓으로 멀티플렉싱
+ */
+const socket = connect(3000, "localhost", () =&gt; {
+  const child = fork(process.argv[2], process.argv.slice(3), { silent: true });
+  multiplexChannels([child.stdout!, child.stderr!], socket);
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">주석 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트 주석에 "<code>silent: false</code>를 통해서 부모 프로세스 상속 방지"라고 적혀 있으나
+        코드는 <code>{ silent: true }</code> 이고, 상속을 막는 것도 <code>true</code> 쪽이다.
+        <code>silent: true</code> 면 자식의 stdio 가 부모에게 상속되지 않고 파이프로 연결되어
+        <code>child.stdout</code> / <code>child.stderr</code> 을 코드에서 잡을 수 있다. 주석이 값과 어긋난 오기다.</p>
+    </div>
+  </div>
+
+  <h5>서버 — 디멀티플렉싱</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">server.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createWriteStream } from "fs";
+import { createServer } from "net";
+import { Readable, Writable } from "stream";
+
+const demultiplexChannel = (source: Readable, destinations: Writable[]) =&gt; {
+  let currentChannel: any = null;
+  let currentLength: any = null;
+
+  source
+    .on("readable", () =&gt; {
+      let chunk: Buffer;
+
+      if (currentChannel === null) {
+        chunk = source.read(1);                    // 채널 ID 1바이트
+        currentChannel = chunk &amp;&amp; chunk.readUint8(0);
+      }
+
+      if (currentLength === null) {
+        chunk = source.read(4);                    // 길이 4바이트
+        currentLength = chunk &amp;&amp; chunk.readUInt32BE(0);
+        if (currentLength === null) {
+          return null;                             // 아직 안 왔으면 다음 readable 을 기다린다
+        }
+      }
+
+      chunk = source.read(currentLength);          // 데이터 N바이트
+      if (chunk === null) {
+        return null;
+      }
+
+      console.log(
+        `Received packet from child ${currentChannel}: ${chunk.toString()}`
+      );
+      destinations[currentChannel].write(chunk);
+
+      currentChannel = null;
+      currentLength = null;
+    })
+    .on("end", () =&gt; {
+      destinations.forEach((destination) =&gt; destination.end());
+      console.log("end");
+    });
+};
+
+const server = createServer((socket) =&gt; {
+  const stdoutStream = createWriteStream("stdout.log");
+  const stderrStream = createWriteStream("stderr.log");
+  demultiplexChannel(socket, [stdoutStream, stderrStream]);
+});
+
+server.listen(3000, () =&gt; {
+  console.log("Server is running on port 3000");
+});</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">npx ts-node src/client.ts src/data.ts</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 서버 코드는 <code>createServer</code> 를 <code>http</code> 에서 import 하고 있지만,
+        클라이언트는 <code>net.connect(3000)</code> 로 <b>순수 TCP</b> 연결을 만든다.
+        HTTP 서버의 <code>createServer</code> 콜백은 <code>(req, res)</code> 를 받으므로 <code>socket</code> 을 쓸 수 없다.
+        이 예제에서 필요한 것은 <code>net.createServer</code> 이며, 그래야 콜백 인자가 소켓이 된다.
+        위 코드는 <code>import { createServer } from "net"</code> 으로 고쳐 두었다.</p>
+      <p>또한 <code>demultiplexChannel</code> 은 <code>readable</code> 콜백이 한 번 호출될 때
+        <b>패킷을 하나만</b> 처리한다. 여러 패킷이 한꺼번에 도착하면 나머지는 다음 <code>readable</code> 이벤트를 기다려야 하므로,
+        <a href="#item-20">6-2</a>의 non-flowing 예제처럼 <code>while</code> 로 감싸는 편이 안전하다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  O["child.stdout"] --> M["멀티플렉서 (채널 0)"]
+  E["child.stderr"] --> M2["멀티플렉서 (채널 1)"]
+  M --> S["TCP 소켓 (공유 채널)"]
+  M2 --> S
+  S --> D["디멀티플렉서 (ID 로 분배)"]
+  D --> F1["stdout.log"]
+  D --> F2["stderr.log"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>연결 하나로 두 개의 논리 채널을 실어 나른다</b> —
+      <a href="#item-2">1-2</a>에서 이벤트 디멀티플렉서가 여러 리소스를 하나의 이벤트 흐름으로 모았던 것과 같은 발상이,
+      이번에는 애플리케이션 레벨에서 반복된다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>결합: 파이프라인을 하나의 Duplex 로 감싸 내부를 숨기고 에러를 한 곳으로 모은다 → <code>pumpify</code></li>
+      <li>분기: 하나의 Readable 을 여러 Writable 로. 배압은 가장 느린 쪽을 따른다</li>
+      <li>병합: 여러 소스를 하나로. <code>{ end: false }</code> + 완료 카운터가 필수, 순서는 섞인다</li>
+      <li>다중화: [채널ID][길이][데이터] 패킷으로 감싸 하나의 채널로 보내고, 수신 측에서 정확히 잘라 복원</li>
+      <li><code>pipeline()</code> 은 마지막 스트림만 반환하므로 결합된 스트림을 만들지는 못한다</li>
+    </ul>
+  </div>
+</article>

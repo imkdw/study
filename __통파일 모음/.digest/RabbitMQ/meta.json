@@ -1,0 +1,305 @@
+{
+  "title": "RabbitMQ",
+  "subtitle": "BullMQ 쓰던 사람을 위한 정리",
+  "mark": "MQ",
+  "eyebrow": "STUDY DIGEST",
+  "description": "BullMQ 경험자가 RabbitMQ로 넘어갈 때 필요한 개념/운영/Node.js 실전 정리. RabbitMQ 4.3 기준.",
+  "lead": "BullMQ는 <b>Redis 위에 얹은 잡 큐 라이브러리</b>이고, RabbitMQ는 <b>독립 프로세스로 도는 메시지 브로커</b>다. 이름이 둘 다 큐라서 같아 보이지만, 무엇이 내 코드의 책임이고 무엇이 브로커의 책임인지가 통째로 다르다. 이 문서는 그 경계선을 다시 그리는 것에서 시작해 AMQP 모델, 전달 보장, 큐 타입, 재시도 설계, amqplib 실전 코드, 운영 지표까지 한 번에 훑는다.",
+  "coverNote": "<div class=\"callout tip\"><div class=\"ic\">i</div><div><p class=\"callout-title\">이 문서의 기준 <span class=\"badge b-blue\">2026-08</span></p><p>기준 버전은 <b>RabbitMQ 4.3.x</b>(4.3.5, 2026-08-17 릴리스)이고 프로토콜은 <b>AMQP 0-9-1</b>, 클라이언트는 Node.js <code>amqplib</code> 2.x다. 4.x에서 클래식 큐 미러링/Mnesia/지연 메시지 플러그인이 <b>사라졌기 때문에</b>, 인터넷에 돌아다니는 3.x 시절 자료를 그대로 따라 하면 안 되는 지점이 여러 곳 있다. 그런 부분은 본문에 표시해 두었다.</p></div></div>",
+  "footer": "출처: RabbitMQ 공식 문서(rabbitmq.com/docs), RabbitMQ 4.3 릴리스 노트, amqplib 2.0.1 문서/CHANGELOG, BullMQ 공식 문서. 기준일 2026-08-22.",
+  "stats": [
+    {
+      "val": "34",
+      "unit": "개",
+      "label": "아이템"
+    },
+    {
+      "val": "8",
+      "unit": "개",
+      "label": "챕터"
+    },
+    {
+      "val": "4.3",
+      "unit": "",
+      "label": "기준 버전"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "ch1",
+      "short": "CH 1",
+      "navTitle": "두 물건의 정체",
+      "title": "잡 큐와 메시지 브로커는 다른 물건이다",
+      "lead": "BullMQ에서 RabbitMQ로 넘어갈 때 가장 먼저 갈아끼워야 하는 건 API가 아니라 <b>머릿속 모델</b>이다. 무엇이 라이브러리의 기능이었고 무엇이 브로커의 기능인지부터 분리한다.",
+      "items": [
+        {
+          "id": "item-1",
+          "idx": "1",
+          "title": "잡 큐와 메시지 브로커",
+          "keywords": "job queue message broker bullmq rabbitmq redis amqp 차이"
+        },
+        {
+          "id": "item-2",
+          "idx": "2",
+          "title": "BullMQ의 Queue와 RabbitMQ의 Queue는 다른 것이다",
+          "keywords": "exchange binding routing key queue 라우팅 계층"
+        },
+        {
+          "id": "item-3",
+          "idx": "3",
+          "title": "책임의 경계선 다시 긋기",
+          "keywords": "worker consumer scheduler 책임 라이브러리 브로커 서버사이드"
+        },
+        {
+          "id": "item-4",
+          "idx": "4",
+          "title": "그래서 언제 무엇을 쓰나",
+          "keywords": "선택 기준 use case fanout event driven 백그라운드 작업"
+        }
+      ]
+    },
+    {
+      "id": "ch2",
+      "short": "CH 2",
+      "navTitle": "AMQP 0-9-1 모델",
+      "title": "AMQP 0-9-1 코어 모델",
+      "lead": "RabbitMQ를 안다는 건 사실상 AMQP 0-9-1의 다섯 개 명사 <b>Connection / Channel / Exchange / Queue / Binding</b>을 안다는 뜻이다. 여기만 정확히 잡으면 나머지는 전부 이 위의 옵션이다.",
+      "items": [
+        {
+          "id": "item-5",
+          "idx": "5",
+          "title": "Connection과 Channel",
+          "keywords": "connection channel multiplexing tcp heartbeat 채널 멀티플렉싱"
+        },
+        {
+          "id": "item-6",
+          "idx": "6",
+          "title": "Exchange 네 종류",
+          "keywords": "direct fanout topic headers default exchange nameless"
+        },
+        {
+          "id": "item-7",
+          "idx": "7",
+          "title": "Binding과 라우팅 키",
+          "keywords": "binding routing key topic wildcard star hash 패턴"
+        },
+        {
+          "id": "item-8",
+          "idx": "8",
+          "title": "Queue의 속성과 arguments",
+          "keywords": "durable exclusive auto-delete x-arguments assertQueue 선언 멱등"
+        },
+        {
+          "id": "item-9",
+          "idx": "9",
+          "title": "메시지의 구조",
+          "keywords": "properties headers payload persistent delivery_mode content-type correlation-id"
+        }
+      ]
+    },
+    {
+      "id": "ch3",
+      "short": "CH 3",
+      "navTitle": "전달 보장",
+      "title": "전달 보장: ack와 confirm",
+      "lead": "메시지를 잃지 않는 일은 브로커 혼자 못 한다. <b>발행 쪽 확인(publisher confirms)</b>과 <b>소비 쪽 확인(consumer acknowledgements)</b>이 양쪽에서 맞물려야 한다. BullMQ가 Lua 스크립트 뒤에 숨겨 두었던 것이 여기서는 전부 내 코드로 나온다.",
+      "items": [
+        {
+          "id": "item-10",
+          "idx": "10",
+          "title": "컨슈머 ack: 자동과 수동",
+          "keywords": "basic.ack noAck delivery tag multiple 수동 확인"
+        },
+        {
+          "id": "item-11",
+          "idx": "11",
+          "title": "nack, reject, 그리고 requeue의 함정",
+          "keywords": "basic.nack basic.reject requeue 무한루프 poison message"
+        },
+        {
+          "id": "item-12",
+          "idx": "12",
+          "title": "prefetch: 동시성의 진짜 손잡이",
+          "keywords": "basic.qos prefetch concurrency 100 300 라운드로빈"
+        },
+        {
+          "id": "item-13",
+          "idx": "13",
+          "title": "퍼블리셔 컨펌",
+          "keywords": "confirm.select publisher confirms waitForConfirms createConfirmChannel 비동기"
+        },
+        {
+          "id": "item-14",
+          "idx": "14",
+          "title": "라우팅 실패는 에러가 아니다",
+          "keywords": "mandatory basic.return unroutable alternate exchange 유실"
+        },
+        {
+          "id": "item-15",
+          "idx": "15",
+          "title": "at-least-once와 멱등성",
+          "keywords": "idempotency 중복 처리 exactly once dedup messageId"
+        }
+      ]
+    },
+    {
+      "id": "ch4",
+      "short": "CH 4",
+      "navTitle": "큐 타입 고르기",
+      "title": "큐 타입 고르기",
+      "lead": "RabbitMQ 4.x에서 큐 타입 선택은 <b>선택이 아니라 기본기</b>다. 3.x 시절의 상식(클래식 큐 + 미러링)이 통째로 사라졌기 때문이다.",
+      "items": [
+        {
+          "id": "item-16",
+          "idx": "16",
+          "title": "Classic, Quorum, Stream",
+          "keywords": "x-queue-type classic quorum stream 큐 타입 비교"
+        },
+        {
+          "id": "item-17",
+          "idx": "17",
+          "title": "Quorum queue를 기본으로 두기",
+          "keywords": "raft replication x-quorum-initial-group-size leader locator 제약"
+        },
+        {
+          "id": "item-18",
+          "idx": "18",
+          "title": "Stream: 지우지 않는 큐",
+          "keywords": "append-only log offset x-stream-offset retention kafka 유사"
+        },
+        {
+          "id": "item-19",
+          "idx": "19",
+          "title": "4.x에서 사라진 것들",
+          "keywords": "mirroring ha-mode mnesia khepri transient classic queue 마이그레이션"
+        }
+      ]
+    },
+    {
+      "id": "ch5",
+      "short": "CH 5",
+      "navTitle": "실패와 재시도",
+      "title": "실패, 재시도, 지연",
+      "lead": "BullMQ의 <code>attempts</code>와 <code>backoff</code>가 한 줄이었다면, RabbitMQ에서는 그 한 줄이 <b>토폴로지 설계</b>가 된다. 대신 어떤 메시지가 왜 몇 번 실패했는지가 전부 눈에 보인다.",
+      "items": [
+        {
+          "id": "item-20",
+          "idx": "20",
+          "title": "DLX: 실패한 메시지의 종착지",
+          "keywords": "dead letter exchange x-dead-letter-exchange x-death reason rejected expired maxlen"
+        },
+        {
+          "id": "item-21",
+          "idx": "21",
+          "title": "delivery-limit와 poison message",
+          "keywords": "x-delivery-limit x-delivery-count 20 무한 재시도 방지"
+        },
+        {
+          "id": "item-22",
+          "idx": "22",
+          "title": "지연 재시도: 4.3의 백오프",
+          "keywords": "x-delayed-retry-type x-delayed-retry-min max linear backoff returned failed"
+        },
+        {
+          "id": "item-23",
+          "idx": "23",
+          "title": "지연 메시지: TTL+DLX와 플러그인의 종말",
+          "keywords": "x-message-ttl delayed message exchange plugin archived x-delay 스케줄링"
+        },
+        {
+          "id": "item-24",
+          "idx": "24",
+          "title": "재시도 아키텍처를 직접 설계하기",
+          "keywords": "retry queue 계단식 parking lot 재처리 운영"
+        }
+      ]
+    },
+    {
+      "id": "ch6",
+      "short": "CH 6",
+      "navTitle": "Node.js 실전",
+      "title": "Node.js 실전: amqplib",
+      "lead": "amqplib은 프로토콜을 거의 그대로 노출한다. 친절하지 않은 대신 숨기는 것도 없다. 실무에서 반드시 직접 짜야 하는 네 가지 뼈대를 정리한다.",
+      "items": [
+        {
+          "id": "item-25",
+          "idx": "25",
+          "title": "연결과 채널의 수명주기",
+          "keywords": "amqplib connect createChannel 재연결 reconnect connection churn heartbeat"
+        },
+        {
+          "id": "item-26",
+          "idx": "26",
+          "title": "컨슈머 템플릿",
+          "keywords": "consume prefetch ack nack try catch 컨슈머 구현"
+        },
+        {
+          "id": "item-27",
+          "idx": "27",
+          "title": "퍼블리셔 템플릿",
+          "keywords": "createConfirmChannel publish persistent mandatory outbox"
+        },
+        {
+          "id": "item-28",
+          "idx": "28",
+          "title": "Graceful shutdown",
+          "keywords": "SIGTERM cancel consumerTag drain 종료 처리 k8s"
+        },
+        {
+          "id": "item-29",
+          "idx": "29",
+          "title": "토폴로지는 누가 선언하나",
+          "keywords": "assertQueue definitions.json policy 배포 마이그레이션 PRECONDITION_FAILED"
+        }
+      ]
+    },
+    {
+      "id": "ch7",
+      "short": "CH 7",
+      "navTitle": "운영",
+      "title": "운영: 무엇을 보고 무엇을 막나",
+      "lead": "브로커가 별도 프로세스라는 말은 <b>별도로 죽을 수 있다</b>는 뜻이다. Redis 하나 보던 시절과 달리 봐야 할 지표가 늘어난다.",
+      "items": [
+        {
+          "id": "item-30",
+          "idx": "30",
+          "title": "관리 UI와 봐야 할 지표",
+          "keywords": "management plugin 15672 ready unacked publish rate consumer utilisation"
+        },
+        {
+          "id": "item-31",
+          "idx": "31",
+          "title": "알람과 flow control",
+          "keywords": "vm_memory_high_watermark disk_free_limit 0.6 blocked connection.blocked 백프레셔"
+        },
+        {
+          "id": "item-32",
+          "idx": "32",
+          "title": "로컬 환경과 자주 밟는 지뢰",
+          "keywords": "docker compose management 5672 15672 vhost 권한 함정 체크리스트"
+        }
+      ]
+    },
+    {
+      "id": "ch8",
+      "short": "CH 8",
+      "navTitle": "치트시트",
+      "title": "BullMQ → RabbitMQ 치트시트",
+      "lead": "머리에 남는 건 결국 대응표다. 개념 대응과 기능별 구현법을 한 장으로 압축한다.",
+      "items": [
+        {
+          "id": "item-33",
+          "idx": "33",
+          "title": "개념 대응표",
+          "keywords": "cheatsheet 대응 mapping worker consumer job message"
+        },
+        {
+          "id": "item-34",
+          "idx": "34",
+          "title": "BullMQ 기능별 RabbitMQ 구현법",
+          "keywords": "delay priority rate limit flow repeatable progress result 구현"
+        }
+      ]
+    }
+  ]
+}

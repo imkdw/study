@@ -1,0 +1,518 @@
+<article class="item" id="item-10" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 10</div>
+    <h3>컨슈머 ack: 자동과 수동</h3>
+    <p class="item-tagline">ack는 "받았다"가 아니라 "다 처리했다"는 뜻이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>noAck: true</code>는 <b>전송한 순간 처리 완료로 간주</b>한다. 컨슈머가 그 직후 죽으면 메시지는 그냥 사라진다.
+  </div>
+
+  <h4>두 가지 모드</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>자동 ack (<code>noAck: true</code>)</th><th>수동 ack (기본)</th></tr></thead>
+      <tbody>
+        <tr><td>확정 시점</td><td>브로커가 소켓에 쓴 직후</td><td>내가 <code>ch.ack()</code>를 부를 때</td></tr>
+        <tr><td>유실</td><td class="t-no">컨슈머 크래시 시 유실</td><td class="t-ok">미확인 메시지는 requeue</td></tr>
+        <tr><td>흐름 제어</td><td class="t-no">prefetch가 안 먹는다</td><td class="t-ok">prefetch로 제어</td></tr>
+        <tr><td>쓸 자리</td><td>유실해도 되는 메트릭/로그 스트림</td><td>그 외 전부</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    공식 문서는 자동 ack를 두고 <b>"안전하지 않으며 모든 워크로드에 적합하지 않다"</b>고 못박는다.
+    실무 기본값은 수동 ack다.
+  </p>
+
+  <h4>delivery tag</h4>
+  <p>
+    브로커는 배달마다 <b>채널 범위의 단조 증가 정수</b>를 붙인다. ack는 반드시 <b>배달받은 그 채널에서</b> 해야 하고,
+    다른 채널에서 하면 프로토콜 예외로 연결이 끊긴다. amqplib에서는 메시지 객체를 그대로 넘기므로
+    (<code>ch.ack(msg)</code>) 태그를 직접 만질 일은 드물다.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.consume('order.payment', async (msg) => {
+  if (!msg) return;                 // 컨슈머가 취소되면 null이 온다
+  try {
+    await handle(JSON.parse(msg.content.toString()));
+    ch.ack(msg);                    // 여기까지 와야 큐에서 지워진다
+  } catch (err) {
+    ch.nack(msg, false, false);     // 재큐 없이 DLX로
+  }
+}, { noAck: false });</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">배치 ack</p>
+      <p>
+        <code>ch.ack(msg, true)</code>는 <b>이 태그까지의 모든 미확인 배달</b>을 한 번에 확정한다
+        (<code>multiple</code> 플래그). 처리량이 아주 높은 컨슈머에서 네트워크 왕복을 줄이는 데 쓴다.
+        단, 중간에 실패한 게 하나라도 있으면 그것까지 같이 ack되므로 <b>순서대로 성공하는 파이프라인</b>에만 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">ack를 안 하고 오래 버티면 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        미확인 배달에는 <b>기본 30분</b>의 타임아웃(<code>consumer_timeout</code>)이 있다. 3.x 시절에는 이걸 넘기면
+        채널이 <code>PRECONDITION_FAILED</code>로 강제로 닫히면서 그 채널의 모든 배달이 requeue됐다. 4.3부터는
+        이 보호가 <b>quorum queue에 대해 큐 레벨에서 처리</b>되고, 채널을 끊는 대신 프로토콜에 맞는 방식으로
+        메시지만 회수한다. 그래도 30분 넘게 걸리는 작업이라면 메시지를 즉시 ack하고 진행 상태는
+        애플리케이션 DB에서 관리하는 쪽이 맞다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>수동 ack가 기본. <code>noAck: true</code>는 유실해도 되는 데이터에만.</li>
+      <li>ack는 배달받은 채널에서만 유효하다.</li>
+      <li>커넥션/채널이 끊기면 미확인 배달은 자동으로 requeue된다.</li>
+      <li>기본 미확인 타임아웃 30분. 그보다 긴 작업은 설계를 바꾼다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 11</div>
+    <h3>nack, reject, 그리고 requeue의 함정</h3>
+    <p class="item-tagline"><code>requeue: true</code>는 대부분의 경우 무한 루프의 다른 이름이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    실패했을 때 <code>nack(msg, false, <b>true</b>)</code>로 되돌리면, 같은 메시지가 즉시 다시 배달되어 <b>같은 이유로 또 실패</b>한다. 백오프가 없기 때문이다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>메서드</th><th>여러 건 처리</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td><code>ch.reject(msg, requeue)</code></td><td class="t-center t-no">✗</td><td>AMQP 표준</td></tr>
+        <tr><td><code>ch.nack(msg, allUpTo, requeue)</code></td><td class="t-center t-ok">✓</td><td>RabbitMQ 확장. 실무에서는 이것만 써도 된다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>requeue 플래그가 결정하는 것</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  F["처리 실패"] --> D{"requeue 값?"}
+  D -->|"true"| Q["큐로 즉시 복귀"]
+  Q --> R["같은 컨슈머가 곧바로 재수신"]
+  R --> F
+  D -->|"false"| X{"DLX가 설정돼 있나?"}
+  X -->|"예"| DLQ["Dead Letter Exchange 로"]
+  X -->|"아니오"| DROP["메시지 폐기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>requeue: true의 위험</b> — 결정론적으로 실패하는 메시지(스키마 오류, 없는 참조)는 CPU를 태우는 무한 루프가 된다.</div>
+  </div>
+
+  <h4>실패의 두 종류를 구분한다</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">error-policy.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">try {
+  await handle(payload);
+  ch.ack(msg);
+} catch (err) {
+  if (err instanceof TransientError) {
+    // 일시적 장애(DB 커넥션, 외부 API 5xx): 재시도할 가치가 있다.
+    // 단, 즉시 requeue 대신 재시도 큐로 보낸다 (ITEM 22, 24)
+    ch.nack(msg, false, false);
+  } else {
+    // 영구 실패(스키마 위반, 존재하지 않는 리소스): 재시도해도 결과가 같다.
+    ch.nack(msg, false, false);   // 바로 DLQ로
+  }
+}</code></pre>
+  </div>
+  <p>
+    두 갈래 모두 <code>requeue: false</code>인 게 포인트다. 재시도가 필요하면 <b>즉시 되돌리는 게 아니라
+    지연을 걸어 되돌린다</b>. 그 방법이 ITEM 22와 24다.
+  </p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>requeue: true</code>가 맞는 드문 경우</p>
+      <p>
+        컨슈머 <b>자신의 상태 문제</b>로 지금 이 인스턴스는 처리할 수 없지만 다른 인스턴스는 할 수 있을 때
+        (예: 로컬 캐시 미준비, 셧다운 진행 중) 정도다. 이때도 요청이 몰리면 핫루프가 되므로 짧은 대기를 넣거나
+        컨슈머를 취소하는 편이 낫다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>실무에서는 <code>nack</code> 하나로 통일해도 된다.</li>
+      <li><code>requeue: false</code>가 기본 전략. 재시도는 지연을 끼워서 한다.</li>
+      <li><code>requeue: false</code> + DLX 미설정 = 조용한 메시지 폐기다. DLX는 사실상 필수.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-12" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 12</div>
+    <h3>prefetch: 동시성의 진짜 손잡이</h3>
+    <p class="item-tagline">BullMQ의 <code>concurrency</code>에 가장 가까운 것.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    prefetch는 <b>한 컨슈머가 동시에 붙들 수 있는 미확인 메시지 수</b>다. 이 값을 안 정하면 브로커는 큐에 있는 걸 전부 밀어 넣는다.
+  </div>
+
+  <p>
+    <code>basic.qos</code>(amqplib의 <code>ch.prefetch(n)</code>)를 호출하지 않으면 기본값은 <b>무제한</b>이다.
+    컨슈머 하나가 10만 건을 통째로 받아 메모리에 쌓고, 다른 인스턴스는 놀게 된다. 수동 ack 모드에서만 의미가 있다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q["Queue: 미처리 10000건"] -->|"prefetch=1"| C1["컨슈머 A: 1건 처리 중"]
+  Q -->|"prefetch=1"| C2["컨슈머 B: 1건 처리 중"]
+  Q -.->|"prefetch 미설정"| C3["컨슈머 C: 10000건 전부 선점"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>prefetch는 부하 분산 손잡이이기도 하다</b> — 값이 클수록 한 인스턴스가 많이 선점한다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>작업 성격</th><th>권장 prefetch</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>건당 수 초 이상 걸리는 무거운 작업</td><td><b>1 ~ 5</b></td><td>공평한 분배가 처리량보다 중요</td></tr>
+        <tr><td>건당 수 ms 수준의 가벼운 작업</td><td><b>100 ~ 300</b></td><td>왕복 지연을 감추는 구간</td></tr>
+        <tr><td>매우 짧고 지연이 큰 네트워크</td><td>더 크게</td><td>단, 수확 체감이 빠르게 온다</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    공식 가이드도 <b>100~300 구간</b>을 처리량과 자원 소비의 균형점으로 제시하고, 그 이상은 수확 체감이라고
+    설명한다. <code>prefetch(1)</code>은 가장 안전하지만 지연이 큰 환경에서 처리량이 크게 떨어진다.
+  </p>
+
+  <h4>BullMQ concurrency와의 차이</h4>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">BullMQ</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">new Worker('email', handler, {
+  concurrency: 10,
+});
+// 한 워커가 최대 10개 잡을
+// 동시에 실행한다.</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">RabbitMQ</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.prefetch(10);
+await ch.consume(q, handler);
+// 미확인 10건까지 받아둘 뿐,
+// 동시 실행 여부는 내 핸들러가 정한다.</code></pre>
+    </div>
+  </div>
+  <p>
+    amqplib의 <code>consume</code> 콜백은 <b>순차 실행을 보장하지 않는다.</b> 콜백이 <code>async</code>이면
+    앞 건이 끝나기 전에 다음 건이 들어올 수 있다. 즉 실제 동시성은 <code>prefetch</code> 값이고,
+    이걸 넘는 동시 실행은 일어나지 않는다. 반대로 <b>순차 처리를 원하면 prefetch를 1로 두거나</b>
+    핸들러 안에서 직접 큐잉해야 한다.
+  </p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">global 플래그 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>ch.prefetch(n, true)</code>는 채널 전체에 걸쳐 n건으로 제한하고, 기본값(<code>false</code>)은
+        <b>컨슈머별</b>로 n건이다. 참고로 <b>quorum queue는 global QoS를 지원하지 않는다.</b>
+        컨슈머별 prefetch만 쓸 수 있으니, 채널 하나에 컨슈머를 여러 개 붙일 계획이면 이 점을 기억해 둔다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>prefetch를 설정하지 않으면 무제한이다. 반드시 명시한다.</li>
+      <li>무거운 작업은 1~5, 가벼운 작업은 100~300이 출발점.</li>
+      <li>prefetch가 사실상 컨슈머의 동시성 상한이다. 순차 보장은 prefetch=1.</li>
+      <li>quorum queue에서는 global QoS를 못 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-13" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 13</div>
+    <h3>퍼블리셔 컨펌</h3>
+    <p class="item-tagline"><code>publish()</code>가 true를 돌려줬다는 건 아무것도 보장하지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    기본 채널의 <code>publish()</code>는 <b>로컬 버퍼에 썼다</b>는 뜻일 뿐이다. 브로커가 실제로 받았는지 알려면 <b>confirm 모드</b>를 켜야 한다.
+  </div>
+
+  <p>
+    BullMQ에서는 <code>await queue.add()</code>가 Redis 응답까지 기다리기 때문에 이 고민이 없었다.
+    AMQP의 발행은 원래 <b>단방향(fire-and-forget)</b>이다. 브로커가 죽어 있거나 디스크가 꽉 찼어도
+    클라이언트는 모른다. 그래서 RabbitMQ는 <code>confirm.select</code>라는 확장을 제공한다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant P as Publisher
+  participant B as Broker
+  participant Q as Queue
+  P->>B: confirm.select (채널을 컨펌 모드로)
+  P->>B: basic.publish seq=1
+  B->>Q: 라우팅 후 저장
+  Q-->>B: 디스크 기록 완료
+  B-->>P: basic.ack seq=1
+  P->>B: basic.publish seq=2
+  B-->>P: basic.nack seq=2 (내부 오류)
+      </pre>
+    </div>
+    <div class="figure-cap"><b>컨펌은 비동기다</b> — 발행마다 순번이 붙고, ack/nack가 순서와 무관하게 돌아온다.</div>
+  </div>
+
+  <h4>ack가 오는 시점</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상황</th><th>ack 시점</th></tr></thead>
+      <tbody>
+        <tr><td>라우팅될 큐가 없음</td><td>라우팅 실패를 확인한 직후 (그래도 <b>ack</b>다)</td></tr>
+        <tr><td>persistent 메시지 → durable classic queue</td><td>디스크에 기록된 뒤</td></tr>
+        <tr><td>quorum queue</td><td>과반 복제본이 리더에게 확인한 뒤</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">라우팅 실패도 ack다</p>
+      <p>
+        갈 큐가 하나도 없어서 메시지가 버려져도 브로커는 <b>ack를 보낸다.</b> "브로커가 책임지고 받았다"와
+        "누군가 처리할 것이다"는 다른 얘기다. 라우팅 실패를 알고 싶으면 <code>mandatory</code>가 필요하다
+        (ITEM 14).
+      </p>
+    </div>
+  </div>
+
+  <h4>amqplib에서 쓰기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">confirm.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const ch = await conn.createConfirmChannel();
+
+// 방식 1: 건별 콜백 (권장) — 옵션 객체와 콜백이 필수 인자다
+ch.publish('order.events', 'order.paid', buf, { persistent: true }, (err) => {
+  if (err) markForRetry(buf);   // nack 또는 채널 종료
+  else markPublished(buf);
+});
+
+// 방식 2: 배치 후 한 번에 대기
+for (const e of events) ch.publish('order.events', e.key, e.buf, { persistent: true });
+await ch.waitForConfirms();     // 하나라도 nack면 reject</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">건별로 await하지 말 것</p>
+      <p>
+        <code>publish</code> 하나마다 컨펌을 <code>await</code>하면 왕복 지연이 그대로 처리량 상한이 된다.
+        persistent 메시지의 컨펌은 디스크 배치 기록 때문에 <b>수백 ms까지 걸릴 수 있다</b>고 공식 문서가 명시한다.
+        파이프라이닝(여러 건 발행 후 일괄 확인)이나 비동기 콜백으로 처리한다. 또한 컨펌은 <b>발행 순서대로
+        오지 않을 수 있으므로</b> 순서에 의존하는 코드를 쓰면 안 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>유실이 곤란한 발행에는 <code>createConfirmChannel()</code>을 쓴다.</li>
+      <li>ack = 브로커가 책임진다는 뜻. 처리된다는 뜻이 아니고, 라우팅 성공을 뜻하지도 않는다.</li>
+      <li>건별 <code>await</code>는 금물. 콜백이나 <code>waitForConfirms()</code> 배치를 쓴다.</li>
+      <li>컨펌 순서는 보장되지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 14</div>
+    <h3>라우팅 실패는 에러가 아니다</h3>
+    <p class="item-tagline">오타 하나로 메시지가 조용히 사라지는 게 RabbitMQ의 기본 동작이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    exchange가 갈 큐를 못 찾으면 메시지는 <b>말없이 버려진다</b>. 이걸 막는 장치가 <code>mandatory</code>와 <code>alternate-exchange</code>다.
+  </div>
+
+  <p>
+    BullMQ에는 없는 실패 유형이다. 큐 이름을 잘못 쓰면 BullMQ는 그 이름의 큐를 그냥 만들어버리지만,
+    RabbitMQ에서 routing key를 잘못 쓰면 <b>아무 일도 일어나지 않는다</b>. 로그도 없다. 신규 서비스 붙일 때
+    가장 많이 밟는 지뢰다.
+  </p>
+
+  <h4>1) mandatory + basic.return</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mandatory.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 반송된 메시지를 받는 핸들러를 먼저 등록한다
+ch.on('return', (msg) => {
+  logger.error({
+    exchange: msg.fields.exchange,
+    routingKey: msg.fields.routingKey,
+    replyText: msg.fields.replyText,   // NO_ROUTE
+  }, '라우팅 실패');
+});
+
+ch.publish('order.events', 'order.paidd', buf, {
+  persistent: true,
+  mandatory: true,      // 갈 큐가 없으면 되돌려 달라
+});</code></pre>
+  </div>
+  <p>
+    컨펌 모드와 같이 쓰면 <b><code>basic.return</code>이 <code>basic.ack</code>보다 먼저</b> 온다.
+    즉 "반송 이벤트가 안 왔고 ack가 왔다"면 최소한 어느 큐엔가 들어갔다는 뜻이 된다.
+  </p>
+
+  <h4>2) alternate exchange</h4>
+  <p>
+    exchange를 선언할 때 <code>alternateExchange</code>를 주면, 라우팅에 실패한 메시지를 그 exchange로
+    넘긴다. 여기에 <code>unrouted</code> 큐를 하나 걸어 두면 <b>잃어버린 메시지가 눈에 보이는 곳에 쌓인다</b>.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">alt-exchange.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertExchange('unrouted', 'fanout', { durable: true });
+await ch.assertQueue('unrouted.bucket', { durable: true, arguments: { 'x-queue-type': 'quorum' } });
+await ch.bindQueue('unrouted.bucket', 'unrouted', '');
+
+await ch.assertExchange('order.events', 'topic', {
+  durable: true,
+  alternateExchange: 'unrouted',
+});</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">둘 다 쓰는 게 정답</p>
+      <p>
+        <code>mandatory</code>는 <b>발행자가 즉시 알아차리게</b> 하고, alternate exchange는
+        <b>메시지를 잃지 않게</b> 한다. 역할이 다르니 같이 건다. <code>unrouted.bucket</code>의 길이에
+        알람을 걸어두면 새 서비스의 바인딩 누락을 배포 당일에 잡을 수 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>라우팅 실패는 예외가 아니라 정상 흐름이다. 기본은 조용한 폐기.</li>
+      <li><code>mandatory: true</code> + <code>channel.on('return')</code>으로 즉시 감지.</li>
+      <li>exchange에 <code>alternateExchange</code>를 걸어 미라우팅 메시지를 모은다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 15</div>
+    <h3>at-least-once와 멱등성</h3>
+    <p class="item-tagline">중복은 버그가 아니라 사양이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ의 보장은 <b>at-least-once</b>다. exactly-once는 브로커가 주는 게 아니라 <b>컨슈머가 만드는 성질</b>이다.
+  </div>
+
+  <h4>중복이 생기는 자리</h4>
+  <ol class="steps">
+    <li><div class="step-title">컨슈머가 처리는 끝냈는데 ack 직전에 죽는다</div><p>브로커는 미확인으로 보고 다른 컨슈머에게 다시 준다. 같은 일이 두 번 실행된다.</p></li>
+    <li><div class="step-title">네트워크가 끊겨 ack가 브로커에 도달하지 못한다</div><p>결과는 위와 같다.</p></li>
+    <li><div class="step-title">발행자가 컨펌을 못 받고 재발행한다</div><p>브로커는 이미 받았을 수 있다. 같은 메시지가 두 벌 생긴다.</p></li>
+  </ol>
+  <p>
+    <code>redelivered</code> 플래그(<code>msg.fields.redelivered</code>)가 <code>true</code>면 재배달이지만,
+    <b>이걸 중복 판정 기준으로 쓰면 안 된다.</b> 첫 배달에도 중복일 수 있고(3번 케이스),
+    재배달이어도 앞 시도가 아무것도 안 했을 수 있다.
+  </p>
+
+  <h4>컨슈머를 멱등하게 만드는 세 가지 방법</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방법</th><th>구현</th><th>적합한 곳</th></tr></thead>
+      <tbody>
+        <tr><td>자연 멱등</td><td><code>UPDATE ... SET status='paid'</code>처럼 몇 번 해도 같은 결과가 되게 쓴다</td><td>가능하면 항상 1순위</td></tr>
+        <tr><td>처리 기록 테이블</td><td><code>messageId</code>에 <b>유니크 제약</b>을 건 테이블에 먼저 insert. 중복이면 스킵</td><td>부작용이 있는 처리</td></tr>
+        <tr><td>조건부 갱신</td><td>버전/상태를 조건으로 건 업데이트. 영향 행이 0이면 이미 처리된 것</td><td>상태 머신이 있는 도메인</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">idempotent-consumer.ts</span><span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await db.transaction(async (tx) => {
+  // messageId 에 UNIQUE 제약. 이미 있으면 여기서 걸린다.
+  const inserted = await tx.insertProcessed(msg.properties.messageId);
+  if (!inserted) return;              // 이미 처리한 메시지
+
+  await tx.applyBusinessChange(payload);
+});
+ch.ack(msg);</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">"exactly once"라는 표현에 속지 않기</p>
+      <p>
+        BullMQ 문서도 exactly-once 시맨틱을 말하지만 <b>엣지 케이스에서는 at-least-once</b>임을 함께 밝힌다.
+        분산 시스템에서 진짜 exactly-once 전달은 불가능하고, 실제로 가능한 건 언제나
+        <b>at-least-once 전달 + 멱등한 처리</b>다. 이건 브로커를 바꿔도 달라지지 않는 성질이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>중복은 반드시 온다. 컨슈머를 멱등하게 짜는 것 외에 답이 없다.</li>
+      <li><code>redelivered</code> 플래그는 힌트일 뿐 중복 판정 근거가 아니다.</li>
+      <li><code>messageId</code> + 유니크 제약 + 트랜잭션이 가장 무난한 구현이다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,243 @@
+<article class="item" id="item-24" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-1</div>
+    <h3>해시 키 재배치 문제</h3>
+    <p class="item-tagline">서버 한 대가 빠지면 <code>% N</code>의 결과가 전부 바뀐다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>hash(key) % N</code>의 치명적인 결함은 <b>N이 바뀌면 거의 모든 키의 목적지가 바뀐다</b>는 것이다. 서버 하나가 빠졌을 뿐인데 캐시 전체가 무효화된다.
+  </div>
+
+  <ul>
+    <li>서버들에 부하를 분산하기 위해 해시 함수를 쓸 수 있다.</li>
+    <li><code>serverIndex = hash(key) % N</code> 공식으로 어떤 서버에 접근할지 결정한다.</li>
+    <li>이 방식은 서버 풀의 크기가 고정되어 있고 데이터 분포가 균등할 때는 잘 동작한다.</li>
+    <li>하지만 N대 중 1대에 장애가 나면 나머지 연산의 인덱스 값이 전부 달라진다.</li>
+    <li>결과적으로 <b>대규모 캐시 미스</b>가 발생한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>키</th><th>hash</th><th>서버 4대일 때 (% 4)</th><th>서버 3대로 줄면 (% 3)</th><th>이동?</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">key0</td><td class="t-center">18358617</td><td class="t-center">1</td><td class="t-center">0</td><td class="t-center t-no">✗ 이동</td></tr>
+        <tr><td class="dg-mono">key1</td><td class="t-center">26143584</td><td class="t-center">0</td><td class="t-center">0</td><td class="t-center t-ok">✓ 유지</td></tr>
+        <tr><td class="dg-mono">key2</td><td class="t-center">18131146</td><td class="t-center">2</td><td class="t-center">1</td><td class="t-center t-no">✗ 이동</td></tr>
+        <tr><td class="dg-mono">key3</td><td class="t-center">35863496</td><td class="t-center">0</td><td class="t-center">2</td><td class="t-center t-no">✗ 이동</td></tr>
+        <tr><td class="dg-mono">key4</td><td class="t-center">34085809</td><td class="t-center">1</td><td class="t-center">1</td><td class="t-center t-ok">✓ 유지</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">캐시 미스의 연쇄</p>
+      <p>대부분의 키가 엉뚱한 서버를 가리키게 되면, 그 서버들은 전부 캐시 미스를 내고 DB로 내려간다. 서버 한 대가 죽은 사고가 <b>DB 전체가 무너지는 사고</b>로 번지는 전형적인 경로다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>hash(key) % N</code>은 N이 고정일 때만 쓸 만하다.</li>
+      <li>N이 하나 바뀌면 거의 모든 키가 재배치된다.</li>
+      <li>결과는 대규모 캐시 미스 → DB 폭주.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-25" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-2</div>
+    <h3>안정 해시</h3>
+    <p class="item-tagline">키와 서버를 같은 링 위에 올려놓으면, 서버가 바뀌어도 이웃만 영향을 받는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    안정 해시의 발상은 <b>키의 목적지를 계산하지 말고 탐색하게 만드는 것</b>이다. 계산식에 N이 들어가지 않으므로 N이 바뀌어도 대부분의 키는 제자리에 남는다.
+  </div>
+
+  <ul>
+    <li>테이블 크기가 조정될 때 평균적으로 <b>k/n 개의 키만 재배치</b>하는 해시 기술이다. (k = 키의 개수, n = 슬롯의 개수)</li>
+    <li>이와 달리 전통적인 해시 테이블은 슬롯 수가 바뀌면 거의 모든 키를 재배치한다.</li>
+  </ul>
+
+  <h4>해시 공간과 해시 링</h4>
+  <ul>
+    <li>해시 함수로 SHA-1을 쓴다고 가정한다.</li>
+    <li>SHA-1의 해시 공간 범위는 0 ~ 2<sup>160</sup> − 1이다.</li>
+    <li>이 선분의 양 끝을 이어 붙이면 <b>해시 링</b>이 된다.</li>
+  </ul>
+
+  <h4>해시 서버</h4>
+  <ul>
+    <li>해시 함수 f를 쓰면 서버의 IP나 이름을 링 위의 어떤 위치에 대응시킬 수 있다.</li>
+  </ul>
+
+  <h4>해시 키</h4>
+  <ul>
+    <li>여기서 쓰는 해시 키는 <b>나머지 연산을 쓰지 않는다</b>. 이 점이 앞 절과의 결정적인 차이다.</li>
+    <li>키 역시 링 위 어느 지점에 배치된다.</li>
+  </ul>
+
+  <h4>서버 조회</h4>
+  <ul>
+    <li>어떤 키가 저장되는 서버는, 그 키의 위치에서 <b>시계 방향으로 링을 탐색하다 만나는 첫 번째 서버</b>다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 320" width="460" role="img" aria-label="해시 링 위에 서버와 키가 배치되고 키가 시계 방향으로 서버를 찾는 그림">
+        <circle cx="230" cy="155" r="115" class="dg-stroke" fill="none" stroke-dasharray="0"/>
+        <text x="230" y="28" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">0 / 2^160-1</text>
+
+        <circle cx="230" cy="40" r="8" fill="var(--accent)"/>
+        <text x="230" y="62" class="dg-text dg-mono" font-size="12" text-anchor="middle">s0</text>
+
+        <circle cx="330" cy="97" r="8" fill="var(--accent)"/>
+        <text x="356" y="94" class="dg-text dg-mono" font-size="12">s1</text>
+
+        <circle cx="330" cy="213" r="8" fill="var(--accent)"/>
+        <text x="356" y="220" class="dg-text dg-mono" font-size="12">s2</text>
+
+        <circle cx="130" cy="213" r="8" fill="var(--accent)"/>
+        <text x="92" y="220" class="dg-text dg-mono" font-size="12">s3</text>
+
+        <circle cx="285" cy="58" r="5" fill="var(--yellow)"/>
+        <text x="292" y="46" class="dg-text-sub dg-mono" font-size="11">k0</text>
+
+        <circle cx="342" cy="155" r="5" fill="var(--yellow)"/>
+        <text x="356" y="158" class="dg-text-sub dg-mono" font-size="11">k1</text>
+
+        <circle cx="230" cy="270" r="5" fill="var(--yellow)"/>
+        <text x="230" y="292" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">k2</text>
+
+        <path d="M292 52 A 115 115 0 0 1 324 90" stroke="var(--red)" stroke-width="2" fill="none" marker-end="url(#arrowA)"/>
+        <path d="M347 162 A 115 115 0 0 1 336 206" stroke="var(--red)" stroke-width="2" fill="none" marker-end="url(#arrowA)"/>
+        <path d="M222 274 A 115 115 0 0 1 137 220" stroke="var(--red)" stroke-width="2" fill="none" marker-end="url(#arrowA)"/>
+
+        <defs>
+          <marker id="arrowA" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 z" fill="var(--red)"/>
+          </marker>
+        </defs>
+
+        <text x="230" y="150" class="dg-text dg-mono" font-size="12" text-anchor="middle">시계 방향 탐색</text>
+        <text x="230" y="170" class="dg-text-sub" font-size="11" text-anchor="middle">k0→s1 / k1→s2 / k2→s3</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>키는 자기 오른쪽의 첫 서버에 배정된다</b> — 계산식이 아니라 위치 관계가 배정을 정하므로, 서버 목록이 바뀌어도 대부분의 키는 같은 이웃을 만난다.</div>
+  </div>
+
+  <h4>서버 추가</h4>
+  <ul>
+    <li>서버를 추가하더라도 키 가운데 <b>일부만</b> 재배치하면 된다.</li>
+    <li>기존에 k0 → s0였다면, s4가 k0과 s0 사이에 추가되는 순간 k0은 s4에 저장된다. 나머지 키는 그대로다.</li>
+  </ul>
+
+  <h4>서버 제거</h4>
+  <ul>
+    <li>서버 하나가 제거되어도 추가와 마찬가지로 일부만 재배치된다.</li>
+    <li>s1이 삭제되면 s1이 갖고 있던 k1이 다음 서버인 s2로 옮겨 간다. 그 밖의 키는 영향을 받지 않는다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph ADD["서버 추가 — s4 가 k0 과 s0 사이에 들어옴"]
+    A0["k0 → s0"] -->|"s4 추가"| A1["k0 → s4 (이동)"]
+    A2["k1 → s1"] -->|"영향 없음"| A3["k1 → s1 (그대로)"]
+  end
+  subgraph DEL["서버 제거 — s1 이 빠짐"]
+    B0["k1 → s1"] -->|"s1 제거"| B1["k1 → s2 (이동)"]
+    B2["k2 → s3"] -->|"영향 없음"| B3["k2 → s3 (그대로)"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>추가든 제거든 영향 범위는 그 서버가 맞닿은 구간뿐</b> — 나머지 키들은 목적지가 그대로다. 이것이 k/n의 의미다.</div>
+  </div>
+
+  <h4>안정 해시의 기본 절차</h4>
+  <ol class="steps">
+    <li><div class="step-title">서버와 키를 링에 배치한다</div><p>균등 분포 해시 함수를 써서 서버와 키 모두를 같은 해시 링 위에 올린다.</p></li>
+    <li><div class="step-title">시계 방향으로 탐색한다</div><p>키 위치에서 시계 방향으로 링을 돌다 만나는 최초의 서버가 그 키가 저장될 서버다.</p></li>
+  </ol>
+
+  <h4>기본 절차에서 발생하는 두 가지 문제</h4>
+  <ul>
+    <li>파티션(인접한 서버 사이의 해시 공간)의 크기를 균등하게 유지하는 것이 불가능하다. 어떤 서버는 작은 해시 공간을, 어떤 서버는 큰 공간을 할당받는다.</li>
+    <li>따라서 키의 균등한 분포를 달성하기가 어렵다.</li>
+    <li>이 두 문제는 <b>가상 노드</b>로 해결한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 200" width="620" role="img" aria-label="가상 노드 도입 전후의 파티션 크기 불균형 비교">
+        <text x="150" y="20" class="dg-text" font-size="12" text-anchor="middle">가상 노드 없음 — 물리 노드 3개</text>
+        <line x1="20" y1="60" x2="280" y2="60" class="dg-stroke"/>
+        <rect x="20" y="50" width="30" height="20" fill="var(--accent)" opacity="0.75"/>
+        <rect x="50" y="50" width="170" height="20" fill="var(--red)" opacity="0.6"/>
+        <rect x="220" y="50" width="60" height="20" fill="var(--accent)" opacity="0.75"/>
+        <text x="35" y="88" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">s0</text>
+        <text x="135" y="88" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">s1 — 혼자 65%</text>
+        <text x="250" y="88" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">s2</text>
+        <text x="150" y="112" class="dg-text-sub" font-size="11" text-anchor="middle">한 서버가 링의 절반 이상을 떠안는다</text>
+
+        <text x="465" y="20" class="dg-text" font-size="12" text-anchor="middle">가상 노드 도입 — 노드당 여러 조각</text>
+        <line x1="335" y1="60" x2="595" y2="60" class="dg-stroke"/>
+        <rect x="335" y="50" width="28" height="20" fill="var(--accent)" opacity="0.75"/>
+        <rect x="363" y="50" width="32" height="20" fill="var(--green)" opacity="0.6"/>
+        <rect x="395" y="50" width="26" height="20" fill="var(--purple)" opacity="0.6"/>
+        <rect x="421" y="50" width="30" height="20" fill="var(--accent)" opacity="0.75"/>
+        <rect x="451" y="50" width="28" height="20" fill="var(--green)" opacity="0.6"/>
+        <rect x="479" y="50" width="32" height="20" fill="var(--purple)" opacity="0.6"/>
+        <rect x="511" y="50" width="27" height="20" fill="var(--accent)" opacity="0.75"/>
+        <rect x="538" y="50" width="29" height="20" fill="var(--green)" opacity="0.6"/>
+        <rect x="567" y="50" width="28" height="20" fill="var(--purple)" opacity="0.6"/>
+        <text x="465" y="88" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">s0 / s1 / s2 가 번갈아 등장</text>
+        <text x="465" y="112" class="dg-text-sub" font-size="11" text-anchor="middle">각 서버가 링 전체에 흩어져 약 1/3씩 차지</text>
+
+        <text x="310" y="160" class="dg-text-sub" font-size="11" text-anchor="middle">가상 노드 수를 늘릴수록 분포의 표준편차가 줄어든다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>같은 서버 3대인데 부하는 완전히 다르다</b> — 왼쪽은 링 위에 서버가 3점만 찍혀 있고, 오른쪽은 각 서버가 여러 점으로 흩어져 있다.</div>
+  </div>
+
+  <h4>가상 노드</h4>
+  <ul>
+    <li>실제 노드(서버)를 가리키는 노드로, 서버 하나가 링 위에 여러 개의 가상 노드를 가질 수 있다.</li>
+    <li>각 서버는 하나가 아닌 여러 개의 파티션을 관리하게 된다.</li>
+    <li>탐색 방식은 같다. 링을 돌다 만나는 최초의 가상 노드가 가리키는 서버가 그 키의 저장소다.</li>
+    <li>가상 노드 수를 늘리면 키 분포는 점점 균등해지지만, 그만큼 저장 공간이 더 필요하다.</li>
+    <li>이 부분은 시스템 요구사항에 맞춰 적절한 트레이드오프가 필요하다.</li>
+  </ul>
+
+  <h4>재배치할 키 결정</h4>
+  <ul>
+    <li>서버가 추가되거나 제거되면 데이터 일부는 재배치가 필요하다.</li>
+    <li>삭제된 서버의 <b>다음 서버</b>가 그 키들을 넘겨받는다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">안정 해시가 실제로 쓰이는 곳 <span class="badge b-blue">보강</span></p>
+      <p>아마존 DynamoDB의 파티셔닝, 아파치 Cassandra의 클러스터 파티셔닝, Discord의 채팅 애플리케이션, Akamai CDN, Maglev 네트워크 부하 분산기가 모두 안정 해시를 쓴다. 이 책 안에서도 <b>6장 키-값 저장소의 데이터 파티션</b>과 <b>9장 다운로더 서버 부하 분산</b>에서 다시 등장한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>안정 해시는 슬롯 수가 바뀔 때 평균 k/n 개의 키만 재배치한다.</li>
+      <li>키는 링 위에서 시계 방향으로 만나는 첫 서버에 배정된다.</li>
+      <li>순진한 구현은 파티션 크기가 불균등하다는 문제가 있고, 가상 노드가 이를 해결한다.</li>
+      <li>가상 노드 수는 분포 균등성과 저장 공간 사이의 트레이드오프다.</li>
+    </ul>
+  </div>
+</article>

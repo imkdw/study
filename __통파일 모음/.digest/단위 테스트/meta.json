@@ -1,0 +1,167 @@
+{
+  "title": "단위 테스트",
+  "subtitle": "생산성과 품질을 위한 단위 테스트 원칙과 패턴",
+  "mark": "UT",
+  "eyebrow": "STUDY DIGEST",
+  "description": "블라디미르 코리코프 「단위 테스트」 학습 노트 정리 — 4대 요소, 목과 취약성, 함수형 아키텍쳐, 통합 테스트, 안티패턴까지",
+  "lead": "테스트를 <b>얼마나 많이</b> 쓰느냐가 아니라 <b>어떤 테스트를 남기느냐</b>에 대한 책이다. 회귀 방지 / 리팩터링 내성 / 빠른 피드백 / 유지 보수성 네 축으로 모든 테스트를 저울에 올리고, 그 저울이 가리키는 방향대로 코드까지 되돌려 놓는 과정을 따라간다.",
+  "coverNote": "<div class=\"callout tip\"><div class=\"ic\">i</div><div><p class=\"callout-title\">이 정리본을 읽는 법</p><p>원문 노트의 흐름과 코드 예제를 그대로 살렸다. 손그림 도해 30장은 전부 SVG / mermaid 로 다시 그렸고, 노트의 코드 오기와 잘못된 서술은 고친 뒤 <span class=\"badge b-red\">원문 교정</span> 으로 표시했다. 책 출간 이후 바뀐 내용은 <span class=\"badge b-purple\">최신 반영</span>, 실무에서 함께 알아둘 것은 <span class=\"badge b-blue\">보강</span> 이다.</p></div></div>",
+  "footer": "블라디미르 코리코프(Vladimir Khorikov), <b>『단위 테스트 — 생산성과 품질을 위한 단위 테스트 원칙과 패턴』</b> 학습 노트 정리. 예제 코드는 원서의 C# 을 TypeScript + Jest 로 옮긴 것이다.",
+  "stats": [
+    { "val": "50", "unit": "개", "label": "아이템" },
+    { "val": "11", "unit": "개", "label": "챕터" },
+    { "val": "30", "unit": "장", "label": "도해 재작도" },
+    { "val": "4", "unit": "대", "label": "요소" }
+  ],
+  "chapters": [
+    {
+      "id": "ch1",
+      "short": "CH 1",
+      "navTitle": "단위 테스트의 목표",
+      "title": "단위 테스트의 목표",
+      "lead": "단위 테스트의 목표는 좋은 설계도, 높은 커버리지도 아니다. <b>소프트웨어 프로젝트의 지속 가능한 성장</b>이다. 이 한 문장이 나머지 열 개 챕터의 판단 기준이 된다.",
+      "items": [
+        { "id": "item-1-1", "idx": "1-1", "title": "단위 테스트 현황", "keywords": "test ratio 제품코드 비율 좋은 단위 테스트" },
+        { "id": "item-1-2", "idx": "1-2", "title": "단위 테스트 목표", "keywords": "sustainable growth 지속 가능한 성장 회귀 regression 안전망 유지비" },
+        { "id": "item-1-3", "idx": "1-3", "title": "테스트 스위트 품질 측정을 위한 커버리지 지표", "keywords": "code coverage branch coverage 코드 커버리지 분기 커버리지 부정 지표" },
+        { "id": "item-1-4", "idx": "1-4", "title": "무엇이 성공적인 테스트를 만드는가", "keywords": "개발 주기 통합 도메인 모델 비즈니스 로직 최소 유지비" }
+      ]
+    },
+    {
+      "id": "ch2",
+      "short": "CH 2",
+      "navTitle": "단위 테스트란 무엇인가",
+      "title": "단위 테스트란 무엇인가",
+      "lead": "\"작은 코드 조각을, 빠르게, 격리해서\" 라는 정의에서 마지막 단어 하나 때문에 <b>런던파</b>와 <b>고전파</b>가 갈린다. 무엇을 무엇으로부터 격리할 것인가.",
+      "items": [
+        { "id": "item-2-1", "idx": "2-1", "title": "단위 테스트의 정의", "keywords": "SUT test double 테스트 대역 공유 의존성 shared dependency 프로세스 외부 out-of-process 휘발성 volatile" },
+        { "id": "item-2-2", "idx": "2-2", "title": "단위 테스트의 런던파와 고전파", "keywords": "London school classical school 협력자 collaborator 값 객체 value object 불변" },
+        { "id": "item-2-3", "idx": "2-3", "title": "고전파와 런던파의 비교", "keywords": "입자성 granularity 동작의 단위 의존성 그래프 하향식 상향식 TDD" },
+        { "id": "item-2-4", "idx": "2-4", "title": "두 분파의 통합 테스트", "keywords": "integration test E2E end-to-end 테스트 범위" }
+      ]
+    },
+    {
+      "id": "ch3",
+      "short": "CH 3",
+      "navTitle": "단위 테스트 구조",
+      "title": "단위 테스트 구조",
+      "lead": "AAA 로 뼈대를 세우고, 픽스처 재사용과 이름 짓기로 살을 붙인다. 테스트 하나는 <b>문제 영역에 대한 원자적인 사실 하나</b>여야 한다.",
+      "items": [
+        { "id": "item-3-1", "idx": "3-1", "title": "단위 테스트를 구성하는 방법", "keywords": "AAA arrange act assert given when then 준비 실행 검증 sut 캡슐화" },
+        { "id": "item-3-2", "idx": "3-2", "title": "XUnit 테스트 프레임워크", "keywords": "xunit 이야기 story 고수준 명세" },
+        { "id": "item-3-3", "idx": "3-3", "title": "테스트 간 테스트 픽스처 재사용", "keywords": "fixture beforeEach 팩토리 메소드 factory method 결합도" },
+        { "id": "item-3-4", "idx": "3-4", "title": "단위 테스트 명명법", "keywords": "naming 명명 규칙 should be 안티패턴 표현력" },
+        { "id": "item-3-5", "idx": "3-5", "title": "매개변수화된 테스트 리팩토링하기", "keywords": "parameterized test it.each 매개변수화 사실 fact" }
+      ]
+    },
+    {
+      "id": "ch4",
+      "short": "CH 4",
+      "navTitle": "좋은 단위 테스트의 4대 요소",
+      "title": "좋은 단위 테스트의 4대 요소",
+      "lead": "이 책의 심장. <b>회귀 방지 / 리팩터링 내성 / 빠른 피드백 / 유지 보수성</b> 네 축은 곱셈이라 하나만 0 이어도 테스트의 가치는 0 이다.",
+      "items": [
+        { "id": "item-4-1", "idx": "4-1", "title": "좋은 단위 테스트의 4대 요소", "keywords": "regression protection resistance to refactoring 거짓 양성 false positive 회귀 방지 리팩터링 내성" },
+        { "id": "item-4-2", "idx": "4-2", "title": "첫 번째 특성과 두 번째 특성 간 본질적인 관계", "keywords": "false positive false negative 1종 오류 2종 오류 정확도 신호 소음" },
+        { "id": "item-4-3", "idx": "4-3", "title": "세 번째, 네 번째 요소 빠른 피드백과 유지 보수성", "keywords": "fast feedback maintainability 피드백 루프 일급 시민" },
+        { "id": "item-4-4", "idx": "4-4", "title": "이상적인 테스트를 찾아서", "keywords": "동어 반복 tautology 깨지기 쉬운 테스트 brittle test 벤 다이어그램" },
+        { "id": "item-4-5", "idx": "4-5", "title": "대중적인 테스트 자동화 개념", "keywords": "test pyramid 테스트 피라미드 블랙박스 화이트박스 black-box white-box" }
+      ]
+    },
+    {
+      "id": "ch5",
+      "short": "CH 5",
+      "navTitle": "목과 테스트 취약성",
+      "title": "목과 테스트 취약성",
+      "lead": "목은 도구가 아니라 <b>선택</b>이다. 시스템 <em>간</em> 통신에 쓰면 테스트를 지켜주고, 시스템 <em>내부</em> 통신에 쓰면 테스트를 부순다.",
+      "items": [
+        { "id": "item-5-1", "idx": "5-1", "title": "목과 스텁 구분", "keywords": "mock stub spy dummy fake CQS command query separation 명령 조회 분리 과잉 명세" },
+        { "id": "item-5-2", "idx": "5-2", "title": "식별할 수 있는 동작과 구현 세부 사항", "keywords": "observable behavior implementation detail 공개 API 캡슐화 불변성" },
+        { "id": "item-5-3", "idx": "5-3", "title": "목과 테스트 취약성 간의 관계", "keywords": "hexagonal architecture 육각형 아키텍쳐 프랙탈 fractal 시스템 내부 통신 시스템 간 통신" },
+        { "id": "item-5-4", "idx": "5-4", "title": "단위 테스트 고전파 런던파 재고", "keywords": "테스트 격리 test isolation 통제권 관리 의존성" }
+      ]
+    },
+    {
+      "id": "ch6",
+      "short": "CH 6",
+      "navTitle": "단위 테스트 스타일",
+      "title": "단위 테스트 스타일",
+      "lead": "출력 기반 / 상태 기반 / 통신 기반. 셋 중 출력 기반이 압도적으로 좋고, 그걸 쓰려면 코드를 <b>함수형 아키텍쳐</b>로 바꿔야 한다.",
+      "items": [
+        { "id": "item-6-1", "idx": "6-1", "title": "단위 테스트의 세 가지 스타일", "keywords": "output-based state-based communication-based 출력 기반 상태 기반 통신 기반" },
+        { "id": "item-6-2", "idx": "6-2", "title": "단위 테스트 스타일 비교", "keywords": "회귀 방지 리팩터링 내성 유지 보수성 헬퍼 메소드 동등 멤버" },
+        { "id": "item-6-3", "idx": "6-3", "title": "함수형 아키텍쳐에 대한 이해", "keywords": "functional core mutable shell 수학적 함수 참조 투명성 referential transparency 사이드 이펙트" },
+        { "id": "item-6-4", "idx": "6-4", "title": "함수형 아키텍쳐와 출력 기반 테스트로의 전환", "keywords": "AuditManager Persister ApplicationService 감사 시스템 리팩터링" },
+        { "id": "item-6-5", "idx": "6-5", "title": "함수형 아키텍쳐 단점 이해하기", "keywords": "숨은 입력 성능 보일러플레이트 코드베이스 크기" }
+      ]
+    },
+    {
+      "id": "ch7",
+      "short": "CH 7",
+      "navTitle": "가치 있는 단위 테스트를 위한 리팩터링",
+      "title": "가치 있는 단위 테스트를 위한 리팩터링",
+      "lead": "테스트가 안 써지는 건 대개 테스트 탓이 아니다. <b>코드의 네 유형</b> 사분면에서 지금 어디에 서 있는지 확인하고, 험블 객체로 쪼갠다.",
+      "items": [
+        { "id": "item-7-1", "idx": "7-1", "title": "리팩터링할 코드 식별하기", "keywords": "code complexity domain significance 순환 복잡도 협력자 수 험블 객체 humble object 사분면" },
+        { "id": "item-7-2", "idx": "7-2", "title": "가치 있는 단위 테스트를 위한 리팩터링하기", "keywords": "CRM active record 암시적 의존성 앱 서비스 팩토리 Company 클래스" },
+        { "id": "item-7-3", "idx": "7-3", "title": "최적의 단위 테스트 커버리지 분석", "keywords": "도메인 계층 유틸리티 전제 조건 precondition 커버리지" },
+        { "id": "item-7-4", "idx": "7-4", "title": "컨트롤러에서 조건부 로직 처리", "keywords": "CanExecute Execute 도메인 이벤트 domain event 오케스트레이션 성능" }
+      ]
+    },
+    {
+      "id": "ch8",
+      "short": "CH 8",
+      "navTitle": "통합 테스트를 하는 이유",
+      "title": "통합 테스트를 하는 이유",
+      "lead": "단위 테스트는 비즈니스 시나리오를, 통합 테스트는 <b>가장 긴 주요 흐름</b>을 맡는다. 관리 의존성은 실제로 쓰고, 비관리 의존성만 목으로 바꾼다.",
+      "items": [
+        { "id": "item-8-1", "idx": "8-1", "title": "통합 테스트는 무엇인가", "keywords": "integration test 빠른 실패 fail fast 테스트 피라미드 지속성 상태" },
+        { "id": "item-8-2", "idx": "8-2", "title": "어떤 프로세스 외부 의존성을 직접 테스트할까", "keywords": "managed dependency unmanaged dependency 관리 의존성 비관리 의존성 공유 디비" },
+        { "id": "item-8-3", "idx": "8-3", "title": "통합 테스트 예제", "keywords": "가장 긴 주요 흐름 메세지 버스 E2E 시나리오" },
+        { "id": "item-8-4", "idx": "8-4", "title": "의존성 추상화를 위한 인터페이스 사용", "keywords": "interface OCP YAGNI 느슨한 결합 단일 구현" },
+        { "id": "item-8-5", "idx": "8-5", "title": "통합 테스트 모범 사례", "keywords": "도메인 모델 경계 계층 수 순환 의존성 circular dependency 다중 실행 구절" },
+        { "id": "item-8-6", "idx": "8-6", "title": "로깅 기능을 테스트하는 방법", "keywords": "logging 지원 로깅 진단 로깅 support logging diagnostic logging 구조화된 로깅 structured logging 앰비언트 컨텍스트" }
+      ]
+    },
+    {
+      "id": "ch9",
+      "short": "CH 9",
+      "navTitle": "목 처리에 대한 모범 사례",
+      "title": "목 처리에 대한 모범 사례",
+      "lead": "목을 쓸 자리는 딱 하나다. <b>통합 테스트에서, 시스템 끝단의 비관리 의존성</b>. 그 원칙에서 나오는 다섯 가지 실전 지침.",
+      "items": [
+        { "id": "item-9-1", "idx": "9-1", "title": "목의 가치를 극대화하기", "keywords": "시스템 끝 spy 스파이 플루언트 인터페이스 fluent interface 회귀 방지" },
+        { "id": "item-9-2", "idx": "9-2", "title": "목 처리에 대한 모범 사례", "keywords": "호출 횟수 검증 보유 타입 어댑터 손상 방지 계층 anti-corruption layer" }
+      ]
+    },
+    {
+      "id": "ch10",
+      "short": "CH 10",
+      "navTitle": "데이터베이스 테스트",
+      "title": "데이터베이스 테스트",
+      "lead": "실제 디비로 통합 테스트를 돌리려면 그 전에 갖춰야 할 것들이 있다. 스키마의 형상 관리, 마이그레이션, 그리고 <b>테스트 시작 시점의 데이터 정리</b>.",
+      "items": [
+        { "id": "item-10-1", "idx": "10-1", "title": "데이터베이스 테스트를 위한 전제 조건", "keywords": "형상 관리 참조 데이터 reference data 상태 기반 배포 마이그레이션 기반 배포 데이터 모션" },
+        { "id": "item-10-2", "idx": "10-2", "title": "디비 트랜잭션 관리", "keywords": "transaction repository unit of work 작업 단위 원자성" },
+        { "id": "item-10-3", "idx": "10-3", "title": "테스트 데이터 생명주기", "keywords": "병렬 실행 순차 실행 데이터 정리 인메모리 디비 in-memory sqlite" },
+        { "id": "item-10-4", "idx": "10-4", "title": "테스트 구절에서 코드 재사용하기", "keywords": "준비 실행 검증 헬퍼 대리자 delegate 플루언트" },
+        { "id": "item-10-5", "idx": "10-5", "title": "디비 테스트에 대한 일반적인 질문", "keywords": "읽기 테스트 쓰기 테스트 레포지토리 테스트" }
+      ]
+    },
+    {
+      "id": "ch11",
+      "short": "CH 11",
+      "navTitle": "단위 테스트 안티패턴",
+      "title": "단위 테스트 안티패턴",
+      "lead": "마지막은 함정 모음이다. 비공개 메소드 테스트, 상태 노출, 도메인 지식 유출, 코드 오염, 구체 클래스 목 처리, 그리고 시간.",
+      "items": [
+        { "id": "item-11-1", "idx": "11-1", "title": "비공개 메소드 단위 테스트", "keywords": "private method 죽은 코드 dead code 추상화 누락 PriceCalculator" },
+        { "id": "item-11-2", "idx": "11-2", "title": "비공개 상태 노출", "keywords": "private state 노출 안티패턴 식별할 수 있는 동작" },
+        { "id": "item-11-3", "idx": "11-3", "title": "테스트로 유출된 도메인 지식", "keywords": "domain knowledge leak 알고리즘 유출 하드코딩" },
+        { "id": "item-11-4", "idx": "11-4", "title": "코드 오염", "keywords": "code pollution 불린 스위치 FakeLogger 제품 코드" },
+        { "id": "item-11-5", "idx": "11-5", "title": "구체 클래스를 목으로 처리하기", "keywords": "concrete class partial mock 단일 책임 원칙 SRP StatisticsCalculator" },
+        { "id": "item-11-6", "idx": "11-6", "title": "시간 처리하기", "keywords": "DateTime 앰비언트 컨텍스트 ambient context 명시적 의존성 값으로 주입 fake timers" }
+      ]
+    }
+  ]
+}

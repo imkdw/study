@@ -1,0 +1,1479 @@
+<article class="item" id="item-16-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-1</div>
+    <h3>개요</h3>
+    <p class="item-tagline">복제는 <b>스케일 아웃</b>이자 <b>백업 전략</b>이자 <b>가용성 확보</b>다. 목적에 따라 구성이 달라진다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    복제의 본질은 <b>하나의 서버에서 다른 서버로 데이터를 동기화</b>하는 것이고, 그 위에 쌓이는 목적이 네 가지다.
+  </div>
+
+  <h4>왜 복제인가</h4>
+  <ul>
+    <li>대용량 트래픽을 안정적으로 처리하려면 DB 서버 확장이 필수다.</li>
+    <li>언제든 안정적으로 서비스하려면 <b>가용성</b>이 필요한데, 그때 쓰는 기술이 복제(Replication)다.</li>
+    <li>복제는 한 서버에서 다른 서버로 데이터가 동기화되는 것을 말한다.</li>
+    <li><b>소스 서버</b> — 원본 데이터를 가진 서버. <b>레플리카 서버</b> — 소스에서 복제한 데이터를 가진 서버.</li>
+    <li>보통 <b>소스 1대 + 레플리카 1대 이상</b>으로 구성한다.</li>
+  </ul>
+
+  <h4>복제의 네 가지 목적</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>목적</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>스케일 아웃</td>
+          <td>트래픽이 몰릴 때 부하를 분산한다. <b>스케일 업은 한 서버가 처리할 수 있는 양에 한계</b>가 있다</td>
+        </tr>
+        <tr>
+          <td>데이터 백업</td>
+          <td>백업 프로그램은 같은 서버의 자원을 나눠 쓰므로 쿼리 성능에 영향을 준다. <b>레플리카에서 백업</b>해 메인 서버의 부하를 최소화한다</td>
+        </tr>
+        <tr>
+          <td>데이터 분석</td>
+          <td>분석 쿼리는 많은 데이터를 읽어 매우 무겁다. <b>레플리카에서 실행</b>해 서비스에 영향이 없게 한다</td>
+        </tr>
+        <tr>
+          <td>지리적 분산</td>
+          <td>애플리케이션과 DB는 가까울수록 좋다. 메인 서버 이관이 어렵다면 <b>레플리카를 인근에 배치</b>해 해결할 수 있다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>복제 = 소스 → 레플리카 <b>데이터 동기화</b>.</li>
+      <li>목적은 <b>읽기 확장 · 백업 · 분석 · 지리적 분산</b> 네 가지.</li>
+      <li>어떤 목적이냐에 따라 <a href="#item-16-6">토폴로지</a>와 <a href="#item-16-5">동기화 방식</a>의 선택이 달라진다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-2</div>
+    <h3>복제 아키텍처</h3>
+    <p class="item-tagline">복제는 <b>3개의 스레드</b>가 만든다 — 소스에 1개, 레플리카에 2개.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>I/O 스레드(가져오기)</b> 와 <b>SQL 스레드(적용하기)</b> 는 서로 독립적으로 동작한다. 그래서 "받았는데 아직 적용 안 됨" 상태가 존재한다.
+  </div>
+
+  <h4>기본 구조</h4>
+  <ul>
+    <li>MySQL의 복제는 <b>바이너리 로그를 기반</b>으로 한다.</li>
+    <li>소스에서 바이너리 로그를 만들면 레플리카가 그것을 읽어 동기화한다.</li>
+    <li>레플리카가 읽어와 <b>로컬 디스크에 저장해 둔 파일</b>을 <b>릴레이 로그</b> 라고 한다.</li>
+    <li>복제는 총 <b>3개의 스레드</b>가 담당한다 — 소스에 1개, 레플리카에 2개.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph S["소스 서버"]
+    BL["바이너리 로그"] --> DT["바이너리 로그 덤프 스레드"]
+  end
+  subgraph R["레플리카 서버"]
+    IO["레플리케이션 I/O 스레드"] --> RL["릴레이 로그"]
+    RL --> SQ["레플리케이션 SQL 스레드"]
+    SQ --> DB["레플리카 데이터"]
+  end
+  DT -->|"네트워크 전송"| IO
+      </pre>
+    </div>
+    <div class="figure-cap"><b>릴레이 로그가 두 스레드를 분리한다</b> — 네트워크가 느려도 SQL 스레드는 계속 일할 수 있고, 반대도 마찬가지다.</div>
+  </div>
+
+  <h4>복제에서 사용하는 스레드</h4>
+  <p>레플리카의 두 스레드는 <b>서로 독립적으로 동작</b>한다.</p>
+
+  <h5>바이너리 로그 덤프 스레드 (Binary Log Dump Thread)</h5>
+  <ul>
+    <li>소스 서버에서, 레플리카가 연결될 때 <b>내부적으로 생성</b>되어 바이너리 로그를 전송한다.</li>
+    <li>각 이벤트를 읽을 때 <b>일시적으로 바이너리 로그에 잠금</b>이 필요하고, 끝나면 해제한다.</li>
+    <li><code>SHOW PROCESSLIST</code> 로 확인할 수 있다.</li>
+  </ul>
+
+  <h5>레플리케이션 I/O 스레드</h5>
+  <ul>
+    <li>소스에서 바이너리 로그를 <b>읽어와 릴레이 로그로 저장</b>하는 역할이다.</li>
+    <li>복제가 시작되면 생성되고, 멈추면 종료된다.</li>
+    <li><code>SHOW REPLICA STATUS</code> 의 <code>Replica_IO_Running</code> 으로 확인한다.</li>
+  </ul>
+
+  <h5>레플리케이션 SQL 스레드</h5>
+  <ul>
+    <li>I/O 스레드가 저장한 <b>릴레이 로그를 읽어 이벤트를 실행</b>한다.</li>
+    <li><code>SHOW REPLICA STATUS</code> 의 <code>Replica_SQL_Running</code> 으로 확인한다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 SQL 스레드의 상태도 <code>Replica_IO_Running</code> 컬럼으로 확인한다고 적혀 있으나, SQL 스레드는 <b><code>Replica_SQL_Running</code></b> 컬럼이다. 두 스레드가 독립적으로 동작하므로 <b>상태 컬럼도 따로</b> 존재한다 — 실제로 I/O는 <code>Yes</code> 인데 SQL만 <code>No</code> 인 장애가 흔하다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/show-replica-status.html">MySQL 8.0 Reference Manual — SHOW REPLICA STATUS</a>)</p>
+    </div>
+  </div>
+
+  <h4>복제에서 생성되는 데이터</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>데이터</th><th>내용</th><th>저장 위치</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>릴레이 로그</td>
+          <td>소스의 바이너리 로그에서 읽어온 이벤트(트랜잭션) 정보. <b>인덱스 파일 + 실제 로그 파일</b>로 구성</td>
+          <td>레플리카의 로컬 디스크</td>
+        </tr>
+        <tr>
+          <td>커넥션 메타데이터</td>
+          <td>소스 연결에 쓰인 <b>DB 계정, 바이너리 로그 파일명</b> 등</td>
+          <td><code>mysql.slave_master_info</code></td>
+        </tr>
+        <tr>
+          <td>어플라이어 메타데이터</td>
+          <td>최근 적용된 이벤트와 그 이벤트가 담긴 <b>릴레이 로그 파일명</b> 등. SQL 스레드가 이 정보로 나머지를 이어서 적용한다</td>
+          <td><code>mysql.slave_relay_log_info</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>스레드 3개 — 소스의 <b>덤프</b>, 레플리카의 <b>I/O</b> 와 <b>SQL</b>.</li>
+      <li>둘 사이에 <b>릴레이 로그</b>가 있어 네트워크 지연과 적용 지연이 분리된다.</li>
+      <li>상태 확인은 <code>Replica_IO_Running</code>(가져오기)과 <code>Replica_SQL_Running</code>(적용) <b>둘 다</b> 봐야 한다.</li>
+      <li>포지션 정보는 <code>mysql.slave_master_info</code> / <code>mysql.slave_relay_log_info</code> 테이블에 남는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-3</div>
+    <h3>복제 타입</h3>
+    <p class="item-tagline">파일명+위치 기반이냐 <b>GTID</b> 기반이냐. 장애 복구의 난이도가 여기서 갈린다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    바이너리 로그 위치는 <b>그 서버에서만 유효한 식별자</b>다. GTID는 <b>복제 그룹 전체에서 유일</b>하다. 토폴로지 변경의 난이도가 여기서 결정된다.
+  </div>
+
+  <h4>바이너리 로그 파일 위치 기반 복제</h4>
+  <ul>
+    <li>복제 기능이 처음 도입될 때부터 제공된 방식이다.</li>
+    <li>소스의 <b>바이너리 로그 파일명 + 파일 내 위치</b>로 각 이벤트를 식별한다.</li>
+    <li>복제에 참여하는 모든 서버는 <b>고유한 <code>server_id</code></b> 를 가져야 한다.</li>
+    <li>기록된 이벤트의 <code>server_id</code> 가 자신과 같으면 <b>적용하지 않고 무시</b>한다 (무한 루프 방지).</li>
+  </ul>
+
+  <h4>복제 구축 — 바이너리 로그 위치 기반</h4>
+
+  <h5>1. 설정 준비</h5>
+  <ul>
+    <li>소스에서 <b>바이너리 로그가 활성화</b>되어 있어야 한다.</li>
+    <li>각 서버가 <b>고유한 <code>server_id</code></b> 를 가져야 한다.</li>
+    <li>생성된 릴레이 로그는 자동 삭제된다. 유지하려면 <code>relay_log_purge</code> 를 수정해야 한다.
+      <ul><li>자동 삭제를 끄면 <b>저장 공간 모니터링</b>이 필요하다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">my.cnf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 소스 서버
+[mysqld]
+server_id=1
+
+# 레플리카 서버
+[mysqld]
+server_id=2</code></pre>
+  </div>
+
+  <h5>2. 복제 계정 준비</h5>
+  <ul>
+    <li>레플리카가 소스로 접속하기 위한 계정이다.</li>
+    <li>계정 정보가 <b>커넥션 메타데이터에 평문으로 저장</b>되므로, 권한을 최소화한 <b>전용 계정</b>을 쓰는 것을 권장한다.</li>
+    <li>필요한 권한은 <code>REPLICATION SLAVE</code> 하나다.</li>
+    <li>아래 예시는 <code>%</code> 지만, 실무에서는 <b>특정 IP 대역</b>으로 좁히는 것이 좋다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">소스 서버</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE USER 'repl_user'@'%' IDENTIFIED BY '1234';
+GRANT REPLICATION SLAVE ON *.* TO 'repl_user'@'%';</code></pre>
+  </div>
+
+  <h5>3. 데이터 복사</h5>
+  <ul>
+    <li>별도의 백업이나 <code>mysqldump</code> 를 쓴다.</li>
+    <li><code>mysqldump</code> 를 쓸 때는 반드시 두 옵션을 써야 한다.
+      <ul>
+        <li><code>--single-transaction</code> — 하나의 트랜잭션으로 덤프해 <b>테이블·레코드 잠금을 걸지 않게</b> 한다.</li>
+        <li><code>--master-data</code> — 소스의 <b>바이너리 로그 파일명과 위치</b>를 함께 기록한다.
+          <ul>
+            <li>MySQL 8.0 기준 <b><code>--source-data</code> 로 대체</b>되었고 구 옵션은 deprecated 예정이다.</li>
+            <li><code>1</code> — 덤프 파일에 복제 설정 구문이 <b>실행 가능한 형태</b>로 기록된다.</li>
+            <li><code>2</code> — 그 구문이 <b>주석 처리</b>되어 참조만 할 수 있다.</li>
+            <li>이 옵션은 바이너리 로그 위치를 순간적으로 고정하기 위해 <b>글로벌 락</b>을 건다.</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ mysqldump -u root -p1234 \
+    --single-transaction --source-data=2 \
+    --opt --routines --triggers --hex-blob \
+    --all-databases &gt; source_data.sql</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">레플리카 서버</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SOURCE source_data.sql;</code></pre>
+  </div>
+
+  <h5>4. 복제 시작</h5>
+  <ul>
+    <li><code>CHANGE REPLICATION SOURCE TO</code> (구: <code>CHANGE MASTER TO</code>) 로 설정한다.</li>
+    <li>SSL을 쓰지 않는다면 <code>GET_SOURCE_PUBLIC_KEY=1</code> 옵션이 필요하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST='172.17.0.3',
+  SOURCE_PORT=3306,
+  SOURCE_USER='repl_user',
+  SOURCE_PASSWORD='1234',
+  SOURCE_LOG_FILE='binlog.000003',
+  SOURCE_LOG_POS=691,
+  GET_SOURCE_PUBLIC_KEY=1;</code></pre>
+  </div>
+
+  <h5>5. 진행 상황 확인</h5>
+  <ul>
+    <li><code>START REPLICA</code> 로 복제를 시작한다.</li>
+    <li><code>SHOW REPLICA STATUS</code> 로 진행 상황을 확인한다.</li>
+    <li><code>Seconds_Behind_Source</code> 가 <b>0이 되면 동기화가 끝난 것</b>이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">mysql&gt; SHOW REPLICA STATUS \G
+             Replica_IO_State: Waiting for source to send event
+                  Source_Host: 172.17.0.3
+              Source_Log_File: binlog.000003
+          Read_Source_Log_Pos: 691
+               Relay_Log_File: 919a2516f4cd-relay-bin.000002
+                Relay_Log_Pos: 323
+           Replica_IO_Running: Yes
+          Replica_SQL_Running: Yes
+        Seconds_Behind_Source: 0</code></pre>
+  </div>
+
+  <h4>트랜잭션 스킵하기 (위치 기반)</h4>
+  <ul>
+    <li>레플리카가 소스에게 받은 트랜잭션을 실행하지 못해 <b>복제가 멈추는</b> 일이 있다.</li>
+    <li>대부분 사용자 실수 때문이고, 대표적인 것이 <b>중복 키 에러</b> 다.</li>
+    <li><code>sql_slave_skip_counter</code> 로 문제 트랜잭션을 건너뛸 수 있다.
+      <ul>
+        <li>DML이 트랜잭션 없이 개별 실행되었다면 <code>1</code> 로 그 쿼리 하나가 무시된다.</li>
+        <li>하지만 <b>여러 DML이 하나의 트랜잭션에 묶여 있다면 그 전체가 무시</b>된다.</li>
+        <li>즉 뒤의 숫자는 <b>이벤트(트랜잭션) 개수</b> 라고 생각하고 신중히 써야 한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag bad">데이터가 사라질 수 있다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">STOP REPLICA SQL_THREAD;
+SET GLOBAL sql_slave_skip_counter=1;
+START REPLICA SQL_THREAD;</code></pre>
+  </div>
+
+  <h4>GTID 기반 복제</h4>
+  <ul>
+    <li>바이너리 로그 위치 기반의 단점을 해결한 방식이다.</li>
+    <li>기존 방식의 식별자(파일명 + 위치)는 <b>그 바이너리 로그를 가진 소스 서버에서만 유효</b>하다.</li>
+    <li>같은 이벤트가 레플리카에서 <b>같은 파일명·같은 위치에 저장된다는 보장이 없어</b>, 동일한 이벤트에 서로 다른 식별자가 붙는다.</li>
+    <li>서로 호환되지 않는 정보로는 <b>토폴로지 변경이 어렵고</b>, 그것은 곧 <b>장애 복구가 어렵다</b>는 뜻이다.</li>
+    <li>GTID는 각 이벤트에 <b>복제 그룹 전체에서 유일한 식별자</b>를 부여한다.</li>
+  </ul>
+
+  <h5>GTID 가 필요한 이유 — 시나리오</h5>
+  <p>A(소스), B/C(레플리카)가 있는 상황에서, C가 아직 최신 지점까지 동기화되지 않은 상태로 <b>B가 소스로 승격</b>했다고 하자.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>C 서버의 상황</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-no">바이너리 로그 위치 기반</td>
+          <td>C는 아직 동기화가 안 되어 B의 요청을 수행할 수 없다. 동기화하려 해도 <b>A가 죽어 버려서 불가능</b>하다. B의 릴레이 로그를 읽어 시도할 수는 있지만 <b>자동 삭제되고, 있어도 쉽지 않다</b></td>
+        </tr>
+        <tr>
+          <td class="t-ok">GTID 기반</td>
+          <td>파일명도 위치도 필요 없다. <b>GTID 정보만 있으면</b> B의 바이너리 로그에서 특정 GTID 이후부터 동기화하면 된다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>장애 복구 외에도 GTID는 데이터 동기화 등 여러 문제를 함께 해결한다.</p>
+
+  <h5>GTID 란</h5>
+  <ul>
+    <li>커밋된 각 트랜잭션과 연결된 <b>고유 식별자</b> 다. <b>커밋되어 바이너리 로그에 저장된 트랜잭션에만</b> 할당된다.</li>
+    <li><b>소스 아이디 + 트랜잭션 아이디</b> 조합으로 생성되며, 소스 아이디로는 <code>server_uuid</code> 를 쓴다.</li>
+    <li><code>server_uuid</code> 는 직접 지정하는 것이 아니라 <b>서버 시작 시 <code>auto.cnf</code> 파일에 생성</b>된다.</li>
+    <li><code>mysql.gtid_executed</code> 테이블 등에서 확인할 수 있다.</li>
+  </ul>
+
+  <h4>GTID 기반 복제 구축</h4>
+  <ul>
+    <li>GTID 활성화와 GTID <b>기반 복제 사용은 별개</b>다. 활성화는 조건일 뿐이다.</li>
+    <li>전제 — 소스와 레플리카 <b>모두</b> GTID가 활성화되어야 한다.</li>
+    <li><code>enforce_gtid_consistency</code> 를 <b>반드시</b> 켜야 한다.</li>
+    <li><code>read_only</code>, <code>super_read_only</code> 는 레플리카에서 DDL/DML 실행 시 에러를 내 준다.
+      <ul><li>레플리카에서 변경이 일어나면 <b>레플리카의 uuid로 새 GTID가 추가</b>되어 소스와 GTID 셋이 달라지고, 역할 전환 시 문제가 된다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">my.cnf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 소스 서버
+[mysqld]
+server_id=1
+gtid_mode=ON
+enforce_gtid_consistency=ON
+
+# 레플리카 서버
+[mysqld]
+server_id=2
+gtid_mode=ON
+enforce_gtid_consistency=ON
+super_read_only</code></pre>
+  </div>
+
+  <h5>데이터 복사</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>gtid_executed</code></td><td>바이너리 로그에 기록된 <b>모든 GTID 셋</b></td></tr>
+        <tr><td><code>gtid_purged</code></td><td>바이너리 로그에 <b>기록되지 않은</b> 모든 트랜잭션의 GTID 셋</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">$ mysqldump -u root -p1234 -h 172.17.0.3 \
+    --single-transaction --source-data=2 --set-gtid-purged=ON \
+    --opt --routines --triggers --hex-blob \
+    --all-databases &gt; source_data.sql</code></pre>
+  </div>
+
+  <h5>복제 시작</h5>
+  <ul>
+    <li>위치 기반과의 차이는 <code>LOG_FILE</code>, <code>LOG_POS</code> 대신 <b><code>SOURCE_AUTO_POSITION</code></b> 을 쓴다는 점이다.</li>
+    <li>이 값으로 <code>gtid_executed</code> 를 참조해 <b>그 시점부터 알아서</b> 동기화한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">mysql&gt; SHOW REPLICA STATUS \G
+             Replica_IO_State: Waiting for source to send event
+                  Source_Host: 172.17.0.3
+              Source_Log_File: binlog.000005
+           Replica_IO_Running: Yes
+          Replica_SQL_Running: Yes
+            Executed_Gtid_Set: 21afb5a7-8223-11ef-a35d-0242ac110003:1-2
+                Auto_Position: 1</code></pre>
+  </div>
+
+  <h4>트랜잭션 스킵하기 (GTID 기반)</h4>
+  <ul>
+    <li><code>sql_slave_skip_counter</code> 는 <b>GTID 기반에서 쓸 수 없다.</b></li>
+    <li>대신 그 GTID로 <b>빈 트랜잭션을 수동 생성</b>해 "이미 실행했다"고 표시하면 건너뛴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">GTID 스킵 절차</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 복제 중단
+STOP REPLICA;
+
+-- 에러가 발생한 트랜잭션의 GTID 로 설정
+SET gtid_next='21afb5a7-8223-11ef-a35d-0242ac110003:3';
+
+-- 빈 트랜잭션 생성 (그 GTID 를 소비한다)
+BEGIN; COMMIT;
+
+-- 변수값을 자동으로 되돌린다
+SET gtid_next='automatic';
+
+-- 복제 재개
+START REPLICA;</code></pre>
+  </div>
+
+  <h4>Non-GTID → GTID 기반으로 온라인 전환</h4>
+  <p>8.0부터 <b>서비스 중단 없이</b> 전환할 수 있다. 두 개의 변수를 단계적으로 바꾸면 된다.</p>
+
+  <h5>enforce_gtid_consistency</h5>
+  <ul>
+    <li>GTID 복제에서 <b>소스-레플리카 간 일관성을 해칠 수 있는 쿼리</b>의 실행 여부를 제한한다.</li>
+    <li>트랜잭션 지원/미지원 테이블을 함께 변경하는 쿼리, <code>CREATE TABLE ... SELECT</code> 등이 해당한다.</li>
+    <li>공통점은 <b>단일 트랜잭션으로 처리되지 않을 수 있다</b>는 것이다. GTID는 <b>트랜잭션 단위로 올바르게 할당</b>되어야 복제가 정상 동작한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>값</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td><code>OFF</code></td><td>일관성을 해칠 수 있는 쿼리를 허용</td></tr>
+        <tr><td><code>ON</code></td><td>그런 쿼리를 <b>차단</b></td></tr>
+        <tr><td><code>WARN</code></td><td>허용하되 <b>경고 메시지</b>를 남긴다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>gtid_mode</h5>
+  <ul>
+    <li>바이너리 로그의 트랜잭션이 GTID 기반으로 기록될 수 있는지, 그리고 <b>유형별로 처리 가능한지</b>를 제어한다.</li>
+    <li>트랜잭션 유형은 두 가지다.
+      <ul>
+        <li><b>익명</b> — GTID가 없는 트랜잭션. 파일명과 위치로 식별한다.</li>
+        <li><b>GTID</b> — GTID가 부여된 트랜잭션.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>값</th><th>신규 트랜잭션</th><th>복제된 트랜잭션</th></tr></thead>
+      <tbody>
+        <tr><td><code>OFF</code></td><td>익명으로 기록</td><td>익명만 처리 가능</td></tr>
+        <tr><td><code>OFF_PERMISSIVE</code></td><td>익명으로 기록</td><td>익명 + GTID <b>둘 다</b> 처리 가능</td></tr>
+        <tr><td><code>ON_PERMISSIVE</code></td><td>GTID로 기록</td><td>GTID + 익명 <b>둘 다</b> 처리 가능</td></tr>
+        <tr><td><code>ON</code></td><td>GTID로 기록</td><td>GTID만 처리 가능</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>전환 절차</h5>
+  <ol class="steps">
+    <li>
+      <div class="step-title">모든 서버에서 enforce_gtid_consistency = WARN</div>
+      <p>변경 후 <b>일정 시간 모니터링</b>하며 경고 로그가 나오는지 본다. 경고가 있으면 애플리케이션을 수정하고, <b>더 이상 경고가 없을 때만</b> 다음으로 넘어간다.</p>
+    </li>
+    <li>
+      <div class="step-title">모든 서버에서 enforce_gtid_consistency = ON</div>
+      <p>GTID로 안전하게 복제되는 쿼리만 실행되도록 한다. <b>반드시 켜야 한다.</b></p>
+    </li>
+    <li>
+      <div class="step-title">모든 서버에서 gtid_mode = OFF_PERMISSIVE</div>
+      <p>소스는 여전히 익명으로 기록하지만, 레플리카는 <b>익명과 GTID를 모두 처리</b>할 수 있게 된다. 순서는 상관없지만 <b>다음 단계 전에 모든 서버가 바뀌어야</b> 한다.</p>
+    </li>
+    <li>
+      <div class="step-title">모든 서버에서 gtid_mode = ON_PERMISSIVE</div>
+      <p>이제 신규 트랜잭션이 <b>GTID로 기록</b>되기 시작한다. 레플리카는 여전히 둘 다 처리한다.</p>
+    </li>
+    <li>
+      <div class="step-title">잔여 익명 트랜잭션 확인</div>
+      <p>모든 서버에서 아래 값이 0인지 본다. 레플리카에서 0이 나왔다가 다시 바뀔 수도 있는데, <b>한 번 0으로 나왔다면 넘어가도 된다.</b></p>
+    </li>
+    <li>
+      <div class="step-title">모든 서버에서 gtid_mode = ON</div>
+    </li>
+    <li>
+      <div class="step-title">my.cnf 반영</div>
+      <p>재시작해도 유지되도록 설정 파일에 기록한다.</p>
+    </li>
+    <li>
+      <div class="step-title">복제 설정을 GTID 기반으로 변경</div>
+    </li>
+  </ol>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">5단계 — 잔여 익명 트랜잭션 확인</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW GLOBAL STATUS LIKE 'Ongoing_anonymous_transaction_count';
++-------------------------------------+-------+
+| Variable_name                       | Value |
++-------------------------------------+-------+
+| Ongoing_anonymous_transaction_count | 0     |
++-------------------------------------+-------+</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">7~8단계</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">[mysqld]
+enforce_gtid_consistency=on
+gtid_mode=on</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">STOP REPLICA;
+CHANGE REPLICATION SOURCE TO SOURCE_AUTO_POSITION=1;
+START REPLICA;</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.26 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>sql_slave_skip_counter</code> 는 <b>8.0.26에서 deprecated</b> 되었고 <code>sql_replica_skip_counter</code> 로 이름이 바뀌었다. 새 이름을 쓰는 편이 좋다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-options-replica.html">MySQL 8.0 Reference Manual — Replica Server Options and Variables</a>)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>위치 기반 식별자는 <b>그 서버에서만 유효</b>하고, GTID는 <b>그룹 전체에서 유일</b>하다.</li>
+      <li>GTID = <code>server_uuid</code> + 트랜잭션 번호. <code>auto.cnf</code> 에 uuid가 생성된다.</li>
+      <li>복제 시작 시 <code>SOURCE_LOG_FILE/POS</code> 대신 <code>SOURCE_AUTO_POSITION=1</code>.</li>
+      <li>스킵 방법이 다르다 — 위치 기반은 <b>카운터</b>, GTID는 <b>빈 트랜잭션 생성</b>.</li>
+      <li>온라인 전환은 <code>WARN</code> → <code>ON</code> → <code>OFF_PERMISSIVE</code> → <code>ON_PERMISSIVE</code> → <code>ON</code> 순서다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-4</div>
+    <h3>복제 데이터 포맷</h3>
+    <p class="item-tagline">SQL 문장을 보낼 것인가(<code>STATEMENT</code>), 바뀐 값을 보낼 것인가(<code>ROW</code>).</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>ROW</code> 는 <b>일관성이 가장 안전</b>하지만 로그가 크다. 그 크기를 <code>binlog_row_image</code> 와 <b>트랜잭션 압축</b>으로 줄인다.
+  </div>
+
+  <h4>Statement 형식</h4>
+  <ul>
+    <li>변경을 일으킨 <b>SQL 문장 자체</b>를 저장한다.</li>
+    <li>하나의 SQL이 수많은 레코드를 바꿔도 <b>실제로는 SQL 하나만</b> 저장된다.</li>
+    <li>변경 내역이 대부분 남으므로 <b>감사(audit) 목적</b>으로도 활용할 수 있다.</li>
+    <li>단점 — <b>비확정적(non-deterministic) 쿼리</b>에서 일관성이 깨질 수 있다.
+      <ul>
+        <li><code>ORDER BY</code> 없이 <code>LIMIT</code> 을 쓴 <code>DELETE</code>/<code>UPDATE</code></li>
+        <li>비확정적 함수를 쓰는 쿼리</li>
+      </ul>
+    </li>
+    <li>또 다른 단점 — <code>ROW</code> 방식보다 <b>데이터에 락을 더 많이</b> 건다.</li>
+    <li>제한 — 트랜잭션 격리 수준이 <b><code>REPEATABLE-READ</code> 이상</b> 이어야 한다.</li>
+  </ul>
+
+  <h4>Row 형식</h4>
+  <ul>
+    <li><b>변경된 값 그 자체</b>가 바이너리 로그에 저장된다.</li>
+    <li>소스와 레플리카 간 데이터 일관성을 지키는 <b>가장 안전한 방식</b>이다.</li>
+    <li>함수를 쓰더라도 <b>최종 결과값</b>이 기록되므로 문제가 없다.</li>
+    <li><code>STATEMENT</code> 에 비해 <b>락이 최소화</b>된다 — 쿼리를 실행하는 것이 아니라 값을 바로 적용하기 때문이다.</li>
+    <li><b>모든 격리 수준</b>에서 쓸 수 있다.</li>
+    <li>단, 계정 생성이나 권한 부여·회수 같은 <b>DDL은 여전히 <code>STATEMENT</code> 형태</b>로 저장된다.</li>
+  </ul>
+
+  <h4>Mixed 형식</h4>
+  <ul>
+    <li>기본적으로 <code>STATEMENT</code> 를 쓰되, 서버가 판단해 <b>필요할 때만 <code>ROW</code> 로 전환</b>한다.</li>
+    <li><code>STATEMENT</code> 로는 일관성이 보장되지 않는 쿼리를 자동으로 <code>ROW</code> 로 바꾼다.</li>
+    <li>만능은 아니므로 <b>쓰는 쿼리 형태에 가장 적합한 포맷</b>을 고르는 것이 좋다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>포맷</th><th>일관성</th><th>로그 크기</th><th>잠금</th><th>격리 수준 제약</th></tr></thead>
+      <tbody>
+        <tr><td><code>STATEMENT</code></td><td class="t-center t-no">비확정적 쿼리에서 위험</td><td class="t-center t-ok">작다</td><td class="t-center t-no">많다</td><td><code>REPEATABLE-READ</code> 이상</td></tr>
+        <tr><td><code>ROW</code></td><td class="t-center t-ok">가장 안전</td><td class="t-center t-no">크다</td><td class="t-center t-ok">최소</td><td class="t-center t-ok">없음</td></tr>
+        <tr><td><code>MIXED</code></td><td class="t-center">자동 전환</td><td class="t-center">중간</td><td class="t-center">중간</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Row 포맷의 용량 최적화</h4>
+  <p><code>ROW</code> 를 쓸 때 가장 망설이게 되는 것이 <b>저장 공간</b>이다. MySQL은 두 가지 방법을 제공한다.</p>
+
+  <h5>바이너리 로그 Row 이미지 — binlog_row_image</h5>
+  <ul>
+    <li><code>ROW</code> 포맷은 <b>변경 전/후 레코드가 함께</b> 저장되는데, 이 변수가 <b>어떤 컬럼을 기록할지</b> 결정한다.</li>
+    <li>세 가지 옵션이 있고 기본값은 <b><code>full</code></b> 이다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>값</th><th>기록 내용</th></tr></thead>
+      <tbody>
+        <tr><td><code>full</code></td><td>모든 컬럼의 값을 기록</td></tr>
+        <tr><td><code>minimal</code></td><td>꼭 필요한 컬럼만 기록 (아래 표 참고)</td></tr>
+        <tr><td><code>noblob</code></td><td><code>full</code> 처럼 동작하되, <b>변경되지 않은 BLOB/TEXT 컬럼은 제외</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><code>minimal</code> 의 상세 동작 (<code>PKE</code> = 기본키 또는 그 역할을 하는 컬럼 조합)</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>이벤트</th><th>변경 전 레코드</th><th>변경 후 레코드</th></tr></thead>
+      <tbody>
+        <tr><td>INSERT</td><td class="t-center">X</td><td>값이 명시된 컬럼 + <code>AUTO_INCREMENT</code> 컬럼이 있다면 그 값</td></tr>
+        <tr><td>UPDATE</td><td class="t-center"><code>PKE</code></td><td>값이 명시된 모든 컬럼</td></tr>
+        <tr><td>DELETE</td><td class="t-center"><code>PKE</code></td><td class="t-center">X</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>바이너리 로그 트랜잭션 압축</h5>
+  <ul>
+    <li>바이너리 로그는 안정적인 복제를 위해 일정 기간 보관되고, <b>시점 복구</b>를 위해 외부 스토리지에도 저장된다.</li>
+    <li>그만큼 <b>디스크 용량과 네트워크 대역폭</b>을 차지한다.</li>
+    <li><b>8.0.20 이후</b> 트랜잭션이 변경한 데이터를 압축해 기록할 수 있다.
+      <ul>
+        <li><b>zstd</b> 알고리즘으로 압축하고 <code>Transaction_payload_event</code> 라는 <b>하나의 이벤트</b>로 기록한다.</li>
+        <li>쿼리에 따라 다르지만, 약 50만 건 저장 시 <b>50% 정도 압축</b>되었다.</li>
+      </ul>
+    </li>
+    <li>압축된 트랜잭션은 <b>복제될 때도 압축 상태를 유지</b>하고, I/O 스레드도 그대로 릴레이 로그에 기록한다.</li>
+    <li><code>binlog_transaction_compression</code> 으로 압축 여부를, <code>binlog_transaction_compression_level_zstd</code> 로 압축률을 제어한다.
+      <ul><li>레벨은 <b>기본값 3</b> 으로 써도 별문제 없어 보인다.</li></ul>
+    </li>
+    <li>일부 상황에서는 압축이 지원되지 않고, 내용 확인을 위해 압축이 해제되기도 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>STATEMENT</code>(작지만 위험) / <code>ROW</code>(크지만 안전) / <code>MIXED</code>(자동 전환).</li>
+      <li><code>ROW</code> 여도 <b>DDL은 <code>STATEMENT</code></b> 로 기록된다.</li>
+      <li>로그 크기는 <code>binlog_row_image=minimal</code> 과 <b>zstd 트랜잭션 압축</b>(8.0.20+)으로 줄인다.</li>
+      <li><code>minimal</code> 이 제대로 동작하려면 <b>기본키가 있어야</b> 한다 — <code>PKE</code> 가 기준이기 때문이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-5</div>
+    <h3>복제 동기화 방식</h3>
+    <p class="item-tagline">비동기와 반동기. 반동기가 보장하는 것은 <b>전달</b>이지 <b>적용</b>이 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    반동기는 "레플리카의 <b>릴레이 로그에 기록되었다</b>"까지만 보장한다. 그 내용이 실제 데이터에 반영됐는지는 보장하지 않는다 — 그래서 <b>반</b>동기다.
+  </div>
+
+  <h4>비동기 복제 (Asynchronous Replication)</h4>
+  <ul>
+    <li>기본 동작 방식이다. 변경 이벤트가 <b>레플리카에 잘 전달·적용됐는지 확인하지 않는다.</b></li>
+    <li>어떤 확인도 하지 않으므로, 소스에 장애가 나면 <b>최근 트랜잭션이 전달되지 않았을 수 있다.</b> 즉 누락 가능성이 있다.</li>
+    <li>전달받지 못한 트랜잭션이 있다면 <b>직접 확인하고 수동으로 적용</b>해야 한다.</li>
+    <li>대신 <b>트랜잭션 처리가 빠르고</b>, 레플리카에 문제가 생겨도 <b>소스는 전혀 영향받지 않는다.</b></li>
+    <li>레플리카를 늘려 <b>읽기 트래픽을 분산</b>하는 용도에 제격이다.</li>
+  </ul>
+
+  <h4>반동기 복제 (Semi-Synchronous Replication)</h4>
+  <ul>
+    <li>비동기보다 향상된 무결성을 보장한다.</li>
+    <li>변경 이벤트를 <b>레플리카의 릴레이 로그에 기록한 뒤 응답</b>이 오면, 그때 트랜잭션을 커밋하고 클라이언트에 결과를 준다.</li>
+    <li><b>적어도 1대 이상의 레플리카에는 전달되었다</b>는 보장을 해 준다.</li>
+    <li>다만 <b>릴레이 로그에 기록된 내용이 실제 데이터에 반영됐는지는 보장하지 않는다.</b> 그래서 <b>반동기</b>다.</li>
+    <li><code>rpl_semi_sync_master_wait_point</code> 로 응답을 기다리는 지점을 제어한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>wait_point</th><th>대기 시점</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-ok"><code>AFTER_SYNC</code> (기본값)</td>
+          <td><b>스토리지 엔진 커밋 전</b></td>
+          <td>커밋 전에 기다리므로 <b>팬텀 리드가 발생하지 않는다.</b> 복제가 안 된 상황이어도 소스에 반영되지 않았으므로 <b>롤백할 필요가 없다</b></td>
+        </tr>
+        <tr>
+          <td><code>AFTER_COMMIT</code></td>
+          <td><b>스토리지 엔진 커밋 후</b>, 클라이언트에 결과 반환 직전</td>
+          <td>복제가 안 된 상태에서 소스에 장애가 나면 <b>수동으로 롤백</b>해야 한다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+    participant C as 클라이언트
+    participant S as 소스 서버
+    participant R as 레플리카
+    C->>S: COMMIT
+    S->>S: 바이너리 로그 기록
+    S->>R: 이벤트 전송
+    R->>R: 릴레이 로그에 기록
+    R-->>S: ACK (여기까지가 반동기의 보장 범위)
+    S->>S: 스토리지 엔진 커밋 (AFTER_SYNC 기준)
+    S-->>C: OK
+    R->>R: SQL 스레드가 실제 적용 (보장 범위 밖)
+      </pre>
+    </div>
+    <div class="figure-cap"><b>ACK 는 "받았다"이지 "적용했다"가 아니다</b> — 마지막 줄이 보장 범위 밖에 있다는 것이 반동기의 정의다.</div>
+  </div>
+
+  <h4>반동기 복제 설정</h4>
+  <ul>
+    <li>반동기 복제는 <b>플러그인</b>으로 구현되어 있어 설치가 필요하다.</li>
+    <li>설치 후 시스템 변수를 적절히 설정해야 실제로 적용된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">플러그인 설치</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 소스 서버
+INSTALL PLUGIN rpl_semi_sync_master SONAME 'semisync_master.so';
+
+-- 레플리카 서버
+INSTALL PLUGIN rpl_semi_sync_slave SONAME 'semisync_slave.so';</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">활성화</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 소스 서버
+SET GLOBAL rpl_semi_sync_master_enabled=1;
+SET GLOBAL rpl_semi_sync_master_timeout=5000;
+
+-- 레플리카 서버
+SET GLOBAL rpl_semi_sync_slave_enabled=1;</code></pre>
+  </div>
+
+  <p>기존 비동기에서 반동기로 바꾸려면 레플리카에서 <b>I/O 스레드 재시작</b>이 필요하다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">STOP REPLICA IO_THREAD;
+START REPLICA IO_THREAD;</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.26 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p>8.0.26에서 반동기 플러그인의 이름이 <b>source/replica 용어로 바뀌었다.</b> 새 이름은 <code>rpl_semi_sync_source</code>(<code>semisync_source.so</code>) 와 <code>rpl_semi_sync_replica</code>(<code>semisync_replica.so</code>) 이고, 변수도 <code>rpl_semi_sync_source_enabled</code> / <code>rpl_semi_sync_replica_enabled</code> 처럼 바뀐다. <b>구/신 플러그인을 한 인스턴스에 동시에 설치할 수 없고</b>, 설치한 쪽의 변수 이름만 유효하다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-semisync-installation.html">MySQL 8.0 Reference Manual — Semisynchronous Replication Installation</a>)</p>
+    </div>
+  </div>
+
+  <h4>반동기 복제 관련 변수</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>역할</th><th>기본값</th></tr></thead>
+      <tbody>
+        <tr><td><code>rpl_semi_sync_master_enabled</code></td><td>소스에서 반동기 활성화 여부 (ON/OFF)</td><td>—</td></tr>
+        <tr>
+          <td><code>rpl_semi_sync_master_timeout</code></td>
+          <td>레플리카 응답을 기다리는 시간(ms). 초과하면 <b>비동기로 전환</b>된다</td>
+          <td>10,000 (10초)</td>
+        </tr>
+        <tr><td><code>rpl_semi_sync_master_trace_level</code></td><td>디버그 로그 출력 레벨 (1, 16, 32, 64)</td><td>—</td></tr>
+        <tr>
+          <td><code>rpl_semi_sync_master_wait_for_slave_count</code></td>
+          <td>응답을 반드시 받아야 하는 레플리카 수. 최대 65,535. <b>많을수록 소스 성능이 저하</b>된다</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td><code>rpl_semi_sync_master_wait_no_slave</code></td>
+          <td>연결된 반동기 레플리카 수가 위 값보다 적을 때의 동작. <code>ON</code> — 타임아웃 시간 동안 <b>반동기를 유지</b>. <code>OFF</code> — <b>즉시 비동기 전환</b></td>
+          <td>ON</td>
+        </tr>
+        <tr><td><code>rpl_semi_sync_master_wait_point</code></td><td>응답 대기 지점 (<code>AFTER_SYNC</code> / <code>AFTER_COMMIT</code>)</td><td><code>AFTER_SYNC</code></td></tr>
+        <tr><td><code>rpl_semi_sync_slave_enabled</code></td><td>레플리카에서 반동기 활성화 여부</td><td>—</td></tr>
+        <tr><td><code>rpl_semi_sync_slave_trace_level</code></td><td>레플리카 쪽 디버그 로그 레벨</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">반동기는 언제든 비동기로 떨어진다</p>
+      <p><code>timeout</code> 이 지나면 <b>자동으로 비동기 복제로 전환</b>된다. 즉 반동기를 켜 두었다고 해서 항상 반동기로 동작하는 것이 아니다. <b>지금 실제로 반동기인지</b>는 <code>Rpl_semi_sync_master_status</code> 상태 변수로 확인해야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>비동기 — <b>빠르고 소스가 영향받지 않는다.</b> 읽기 분산에 적합.</li>
+      <li>반동기 — <b>1대 이상에 전달되었음</b>을 보장한다. 적용까지는 보장하지 않는다.</li>
+      <li><code>AFTER_SYNC</code>(기본)는 커밋 <b>전</b> 대기 — 팬텀 리드가 없고 롤백이 필요 없다.</li>
+      <li>타임아웃이 지나면 <b>조용히 비동기로 전환</b>된다. 상태 변수로 확인할 것.</li>
+      <li>8.0.26+ 에서는 <code>rpl_semi_sync_source</code> / <code>rpl_semi_sync_replica</code> 를 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-6</div>
+    <h3>복제 토폴로지</h3>
+    <p class="item-tagline">싱글 · 멀티 · 체인 · 듀얼 소스 · 멀티 소스. <b>목적이 구성을 정한다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    어떤 구성이든 <b>레플리카 1대는 예비용으로 남겨 두는 것</b>이 원칙이다. 읽기 분산에 전부 투입하면 한 대가 죽는 순간 나머지가 무너진다.
+  </div>
+
+  <h4>싱글 레플리카 복제 구성</h4>
+  <ul>
+    <li>소스 1대에 레플리카 1대만 연결한 형태다.</li>
+    <li>가장 기본적이고 <b>가장 많이 쓰이는</b> 형태다.</li>
+    <li>애플리케이션은 소스에만 접근하고, 레플리카는 <b>장애 대비 예비 서버나 백업 용도</b>로 쓴다.</li>
+    <li>이 구성에서 애플리케이션이 레플리카에도 접근한다면, <b>레플리카에 문제가 생겼을 때 위험</b>하므로 예비용으로만 쓰는 편이 좋다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+graph TD
+    W1["Web Server"]
+    MS["Source DB (Active)"]
+    SL["Replica DB (Standby)"]
+    W1 -->|"All Queries"| MS
+    MS -->|"Replication"| SL
+    SL -.->|"Failover"| MS
+      </pre>
+    </div>
+    <div class="figure-cap"><b>레플리카는 트래픽을 받지 않는다</b> — 오직 페일오버와 백업만을 위해 존재한다.</div>
+  </div>
+
+  <h4>멀티 레플리카 복제 구성</h4>
+  <ul>
+    <li>소스 1대에 <b>2대 이상의 레플리카</b>를 연결한다.</li>
+    <li>싱글 구성에서 추가 용도(분석·백업 등)로 서버가 더 필요할 때 쓴다.</li>
+    <li>읽기+쓰기는 소스로, <b>읽기는 레플리카로 분산</b>할 수 있다.</li>
+    <li>읽기 분산용으로 쓸 때도 <b>레플리카 1대는 예비용으로 남겨 두는 것</b>이 좋다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+graph TD
+    W1["Web Server"]
+    MS["Source DB (Read + Write)"]
+    SL1["Replica DB 1 (Read Only)"]
+    SL2["Replica DB 2 (Standby)"]
+    W1 -->|"Read + Write"| MS
+    W1 -->|"Read"| SL1
+    MS -->|"Replication"| SL1
+    MS -->|"Replication"| SL2
+    SL2 -.->|"Failover"| MS
+      </pre>
+    </div>
+    <div class="figure-cap"><b>Replica 2 는 일부러 놀린다</b> — 이 여유가 곧 장애 대응 능력이다.</div>
+  </div>
+
+  <h4>체인 복제 구성</h4>
+  <ul>
+    <li>레플리카가 너무 많아 소스 성능에 악영향이 예상되면 <b>1:M:M 체인 구성</b>을 고려할 수 있다.</li>
+    <li><b>장비 교체</b> 시에도 자주 쓴다 — 각 그룹을 구/신 버전 장비 그룹으로 묶어 생각하면 편하다.</li>
+    <li>다만 토폴로지가 복잡한 만큼 <b>장애 처리의 복잡도도 올라간다.</b></li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+graph TD
+  A["Web Server"] -->|"Read + Write"| B["Source Server 1"]
+  B -->|"Replication"| C["Replica 1-1"]
+  B -->|"Replication"| D["Replica 1-2"]
+  B -->|"Replication"| E["Replica 1-3"]
+  A -->|"Read"| D
+  E -->|"Source Role"| F["Source Server 2"]
+  F -->|"Replication"| G["Replica 2-1"]
+  F -->|"Replication"| H["Replica 2-2"]
+  I["Batch / Analytics"] -->|"Read"| H
+      </pre>
+    </div>
+    <div class="figure-cap"><b>중간 노드가 레플리카이면서 동시에 소스다</b> — 이 노드가 죽으면 아래 전체가 끊긴다는 것이 체인의 위험이다.</div>
+  </div>
+
+  <h4>듀얼 소스 복제 구성</h4>
+  <ul>
+    <li>두 서버가 <b>서로에게 소스이자 레플리카</b>인 형태다.</li>
+    <li>양쪽 모두 읽기·쓰기가 가능한 것이 특징이며, 목적에 따라 <code>active-passive</code> / <code>active-active</code> 로 나뉜다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+graph TD
+  A["Web Server"] -->|"Read + Write"| B["Source / Replica 1"]
+  A -->|"Read + Write"| C["Source / Replica 2"]
+  B <--> C
+      </pre>
+    </div>
+    <div class="figure-cap"><b>양방향 복제</b> — 편리한 만큼 데이터 충돌의 책임이 애플리케이션으로 넘어온다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구성</th><th>쓰기</th><th>용도</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ACTIVE-PASSIVE</code></td>
+          <td>한 서버에서만</td>
+          <td>싱글 레플리카와 유사하지만, 예비 서버가 <b>별도 설정 없이 즉시 쓰기 전환</b>이 가능하다</td>
+        </tr>
+        <tr>
+          <td><code>ACTIVE-ACTIVE</code></td>
+          <td>양쪽 모두</td>
+          <td>지리적으로 멀리 떨어진 쓰기 요청도 원활히 처리하기 위해. 단 <b>레이턴시로 인해 일관되지 않은 데이터</b>를 가질 수 있다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>주의사항</h5>
+  <ul>
+    <li>동시에 유입되면 <b>시점상 나중에 처리된 트랜잭션</b>이 최종 반영된다.</li>
+    <li><code>ACTIVE-ACTIVE</code> 에서는 <b>동시점에 같은 데이터를 변경하는 트랜잭션이 있어서는 안 된다.</b></li>
+    <li><code>AUTO_INCREMENT</code> 사용을 지양하고, 꼭 써야 한다면 <code>auto_increment_increment</code> / <code>auto_increment_offset</code> 을 적절히 설정해야 한다.</li>
+    <li>사실상 <b>쓰기 확장 효과는 크지 않다.</b> 쓰기 성능 확장이 필요하면 <b>샤딩</b>을 고려하는 편이 낫다.</li>
+  </ul>
+
+  <h4>멀티 소스 복제 구성</h4>
+  <ul>
+    <li>레플리카 하나가 <b>둘 이상의 소스</b>를 바라보는 형태다.</li>
+    <li>주요 용도
+      <ul>
+        <li>여러 서버의 서로 다른 데이터를 <b>하나로 통합</b></li>
+        <li>여러 서버에 샤딩된 테이블 데이터를 <b>하나의 테이블로 통합</b></li>
+        <li>여러 서버의 데이터를 모아 <b>한 곳에서 백업</b></li>
+      </ul>
+    </li>
+    <li>복제됐을 때 <b>충돌이 발생할 만한 부분이 없는지</b> 사전에 충분히 검토해야 한다.</li>
+    <li>장애 대비용 레플리카는 멀티 소스가 아니라 <b>각 소스와 1:1로</b> 구성하는 편이 좋다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+graph TD
+  A["Web Server"] -->|"Read + Write"| B["Source 1"]
+  A -->|"Read + Write"| C["Source 2"]
+  A -->|"Read + Write"| D["Source 3"]
+  A -->|"Read + Write"| E["Source 4"]
+  B -->|"Replication"| F["Replica (통합)"]
+  C -->|"Replication"| F
+  D -->|"Replication"| F
+  E -->|"Replication"| F
+      </pre>
+    </div>
+    <div class="figure-cap"><b>여러 소스가 하나의 레플리카로 모인다</b> — 통합 분석이나 통합 백업이 주된 목적이다.</div>
+  </div>
+
+  <h5>동작 방식</h5>
+  <ul>
+    <li>레플리카는 연결된 소스들의 변경 이벤트를 <b>동시점에 병렬로</b> 동기화한다.</li>
+    <li>각 소스에 대한 복제가 <b>독립적으로</b> 이루어지며, 이를 위한 독립 복제 처리 단위를 <b>채널</b> 이라고 한다.</li>
+    <li>레플리카는 최대 <b>256개의 복제 채널</b>을 가질 수 있다.</li>
+    <li><code>CHANGE REPLICATION SOURCE TO ... FOR CHANNEL '이름'</code> 으로 특정 채널을 지정할 수 있다.
+      <ul><li>지정하지 않으면 <b>전체 채널</b>에 명령이 적용된다.</li></ul>
+    </li>
+  </ul>
+
+  <h5>구축 시 고려사항</h5>
+  <ul>
+    <li>2개 이상의 소스에서 데이터를 가져올 때는 <b>공통 DB(<code>information_schema</code> 등)와 시스템 테이블스페이스의 충돌·병합</b>을 고려해야 한다.</li>
+    <li>초기에는 <code>mysqldump</code> 와 XtraBackup 을 적절히 조합하는 것이 가장 쉽다.</li>
+    <li><code>master_info_repository</code> 와 <code>relay_log_info_repository</code> 두 변수가 모두 <b><code>TABLE</code></b> 이어야 한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>백업 도구</th><th>장점</th><th>한계</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>mysqldump</code> (논리 백업)</td>
+          <td>시스템 테이블스페이스를 물리적으로 옮기지 않아 <b>병합에 문제가 없다</b></td>
+          <td>레코드가 많으면 <b>시간이 오래 걸린다</b></td>
+        </tr>
+        <tr>
+          <td>XtraBackup (물리 백업)</td>
+          <td>대용량 DB를 <b>빠르게</b> 가져올 수 있다</td>
+          <td>물리적 테이블스페이스까지 가져오므로 <b>병합이 불가능</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>A, B 의 크기</th><th>권장 방법</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>둘 다 작다</td>
+          <td><code>mysqldump</code> 로 충분하다. 이후 스토어드 프로시저·함수·유저 정보를 이관한다</td>
+        </tr>
+        <tr>
+          <td>A는 크고 B는 작다</td>
+          <td>작은 쪽은 <code>mysqldump</code>, 큰 쪽은 XtraBackup. <b>테이블 개수가 많은 쪽을 먼저</b> C에 복구한 뒤 나머지를 복구한다</td>
+        </tr>
+        <tr>
+          <td>둘 다 크다</td>
+          <td>둘 다 XtraBackup 으로 백업하고 테이블이 많은 쪽을 먼저 복구. 나머지는 시스템 테이블스페이스 때문에 복구가 안 되므로 <b><code>.ibd</code> 파일을 export/import</b> 해야 한다. 전부 수동이므로 <b>테이블이 적은 쪽</b>에 이 방법을 쓰는 것이 좋다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>싱글</b>(예비용) → <b>멀티</b>(읽기 분산) → <b>체인</b>(소스 부하 완화·장비 교체) 순으로 복잡해진다.</li>
+      <li><b>듀얼 소스</b> 는 즉시 전환이 장점이지만, <code>ACTIVE-ACTIVE</code> 는 충돌 관리를 애플리케이션이 떠안는다.</li>
+      <li>쓰기 확장이 목적이라면 듀얼 소스가 아니라 <b>샤딩</b>이다.</li>
+      <li><b>멀티 소스</b> 는 채널 단위로 독립 동작하며 최대 256채널. 통합·백업 용도.</li>
+      <li>어떤 구성이든 <b>예비 레플리카 1대는 남겨 둔다.</b></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">16-7</div>
+    <h3>복제 고급 설정</h3>
+    <p class="item-tagline">지연 복제 · 멀티 스레드 복제 · 크래시 세이프 · 필터링.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    복제 지연을 푸는 열쇠는 <b>멀티 스레드 복제</b>이고, 그 중 가장 병렬도가 높은 것이 <b>Writeset 방식</b>이다.
+  </div>
+
+  <h4>지연된 복제 (Delayed Replication)</h4>
+  <ul>
+    <li>복제의 원래 목적은 소스와 레플리카를 <b>같은 상태로</b> 만드는 것이다.</li>
+    <li>지연 복제를 쓰면 <b>이전 시점의 데이터를 확인</b>해야 할 때나 부하 테스트에 활용할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- MySQL 8.0.23 미만
+CHANGE MASTER TO MASTER_DELAY=86400;
+
+-- MySQL 8.0.23 이상
+CHANGE REPLICATION SOURCE TO SOURCE_DELAY=86400;</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 위 예시를 <b>"1시간의 딜레이"</b> 라고 설명하지만, <code>86400</code> 초는 <b>24시간(1일)</b> 이다. 1시간이라면 <code>3600</code> 이다. 또한 8.0.23 이상에서 <code>CHANGE REPLICATION SOURCE TO</code> 와 함께 쓰는 옵션 이름은 <code>MASTER_DELAY</code> 가 아니라 <b><code>SOURCE_DELAY</code></b> 다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-delayed.html">MySQL 8.0 Reference Manual — Delayed Replication</a>)</p>
+    </div>
+  </div>
+  <p>설정된 지연은 <code>SHOW REPLICA STATUS</code> 의 <code>SQL_Delay</code> 와 <code>Seconds_Behind_Source</code> 로 확인한다.</p>
+
+  <h4>8.0에서 추가된 타임스탬프</h4>
+  <p>8.0부터 바이너리 로그에 두 가지 타임스탬프가 추가되었다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>타임스탬프</th><th>의미</th><th>서버 간 값</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>OCT</code> (original_commit_timestamp)</td>
+          <td>트랜잭션이 <b>원본 소스</b>에 커밋된 시각 (밀리초 단위 유닉스 타임스탬프). 원본 = 트랜잭션이 최초로 실행된 서버</td>
+          <td class="t-center t-ok">모든 서버가 <b>동일</b></td>
+        </tr>
+        <tr>
+          <td><code>ICT</code> (immediate_commit_timestamp)</td>
+          <td>트랜잭션이 <b>직계 소스</b>(레플리카 기준 바로 위의 소스)에 커밋된 시각</td>
+          <td class="t-center">서버마다 <b>다르다</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li>원본 서버에서는 OCT와 ICT의 값이 같다.</li>
+    <li>이 값은 복제를 구성하는 <b>모든 서버가 8.0.1 이상</b>일 때만 동작한다.</li>
+  </ul>
+
+  <h4>멀티 스레드 복제</h4>
+  <ul>
+    <li>기존에는 단일 스레드로 동작해, 대량의 DML이 실행되면 <b>복제 지연</b>이 발생했다.</li>
+    <li><b>코디네이터 스레드</b>가 릴레이 로그를 읽어 각 큐에 저장하고, <b>워커 스레드</b>가 그것을 서버에 반영한다.</li>
+    <li>병렬 처리 방식은 <b>DB 기반</b>과 <b>LOGICAL_CLOCK 기반</b> 두 가지다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>역할</th><th>기본값 / 범위</th></tr></thead>
+      <tbody>
+        <tr><td><code>slave_parallel_type</code></td><td>처리 방식 (<code>DATABASE</code> / <code>LOGICAL_CLOCK</code>)</td><td><code>DATABASE</code></td></tr>
+        <tr>
+          <td><code>slave_parallel_workers</code></td>
+          <td>워커 스레드 개수. <b>0이면 기존 단일 스레드</b> 방식. 1은 코디네이터 + 워커 구조로 <b>동작 방식 자체가 다르다</b></td>
+          <td>0 ~ 1024</td>
+        </tr>
+        <tr>
+          <td><code>slave_pending_jobs_size_max</code></td>
+          <td>워커 큐에 할당 가능한 최대 메모리. 초과하면 기존 이벤트가 처리될 때까지 대기하므로, <b>자주 초과하면 복제 지연</b>이 생긴다</td>
+          <td>128MB</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.26 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p>위 세 변수는 <b>8.0.26에서 deprecated</b> 되었고 <code>replica_parallel_type</code>, <code>replica_parallel_workers</code>, <code>replica_pending_jobs_size_max</code> 로 이름이 바뀌었다. 같은 절에 나오는 <code>slave_preserve_commit_order</code> 도 <code>replica_preserve_commit_order</code> 다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/replication-options-replica.html">MySQL 8.0 Reference Manual — Replica Server Options and Variables</a>)</p>
+    </div>
+  </div>
+
+  <h4>데이터베이스 기반 멀티 스레드 복제</h4>
+  <ul>
+    <li><b>스키마 기반</b> 처리 방식이라고도 하며, 초기에 유일하게 쓸 수 있던 방식이다.</li>
+    <li>이름 그대로 <b>데이터베이스 단위로 병렬 처리</b>하므로, DB가 하나뿐이면 <b>아무런 이득이 없다.</b></li>
+    <li>워커가 작업 중일 때 <b>다른 DB의 트랜잭션</b>이 오면 다른 워커에게 할당한다.
+      <ul><li>하지만 <b>같은 DB에 또 하나의 트랜잭션</b>이 오면 대기했다가 처리된다.</li></ul>
+    </li>
+    <li>테이블·레코드 수준의 충돌 여부는 고려하지 않고 <b>DB가 같은지만</b> 비교한다.</li>
+    <li>소스와 레플리카의 바이너리 로그에 차이가 생겨 <b>일관성 보장이 어렵다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">[mysqld]
+slave_parallel_type='DATABASE'
+slave_parallel_workers=N   # N &gt; 0</code></pre>
+  </div>
+
+  <h4>LOGICAL CLOCK 기반 멀티 스레드 복제</h4>
+  <ul>
+    <li>멀티 스레드·분산 시스템의 상태 동기화에 널리 쓰이는 방법이다.</li>
+    <li>소스에서 트랜잭션을 바이너리 로그에 기록할 때 <b>논리적 순번을 부여</b>하고, 레플리카가 그 순번을 기준으로 병렬 처리한다.</li>
+    <li><b>Commit-Parent · Lock · Writeset</b> 세 가지 방식이 있다.</li>
+  </ul>
+
+  <h5>배경 — 바이너리 로그 그룹 커밋</h5>
+  <ul>
+    <li>5.5의 InnoDB는 <b>한 시점에 하나의 트랜잭션만</b> 커밋할 수 있었다.</li>
+    <li>바이너리 로그 기록과 디스크 동기화도 병렬로 진행할 수 없었다.</li>
+    <li>MySQL의 <b>분산 트랜잭션</b> 개념은 <b>Prepare → Commit</b> 2단계로 처리된다.
+      <ul><li>스토리지 엔진의 내용과 바이너리 로그 간 <b>일관성 유지</b>를 위한 것이다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant MySQL
+    participant BinaryLog as Binary Log
+    participant Engine as Storage Engine
+    Client ->> MySQL: COMMIT
+    MySQL ->> Engine: prepare
+    MySQL ->> BinaryLog: write
+    MySQL ->> BinaryLog: fsync
+    MySQL ->> Engine: commit
+    MySQL -->> Client: OK
+      </pre>
+    </div>
+    <div class="figure-cap"><b>5.5까지의 커밋 과정</b> — <code>fsync</code> 가 트랜잭션마다 한 번씩 일어나는 것이 병목이었다.</div>
+  </div>
+
+  <h5>5.6 이상의 바이너리 로그 그룹 커밋</h5>
+  <p>Prepare 이후 세 단계를 거쳐 커밋된다.</p>
+  <ol class="steps">
+    <li><div class="step-title">Flush 단계</div><p>대기 큐에 등록된 각 트랜잭션을 순서대로 바이너리 로그에 기록한다.</p></li>
+    <li>
+      <div class="step-title">Sync 단계</div>
+      <p>기록된 내용을 디스크와 동기화하는 <code>fsync()</code> 를 수행한다. <code>sync_binlog</code> 설정에 따라 매번 할지 정한다. <b>한 번에 많은 트랜잭션이 동기화될수록 효율적</b>이라, 일부러 지연시킬 수도 있다.</p>
+    </li>
+    <li><div class="step-title">Commit 단계</div><p>대기 큐의 트랜잭션들에 대해 스토리지 엔진 커밋을 진행한다.</p></li>
+  </ol>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>binlog_group_commit_sync_delay</code></td>
+          <td>동기화를 얼마나 지연시킬지 (마이크로초). 기본값 0. <b>클수록 그룹핑되는 트랜잭션이 많아져 <code>fsync()</code> 호출이 줄지만</b>, 너무 크면 오히려 성능에 악영향</td>
+        </tr>
+        <tr>
+          <td><code>binlog_group_commit_sync_no_delay_count</code></td>
+          <td>동기화 전에 대기할 수 있는 <b>최대 트랜잭션 개수</b>. 딜레이가 0이면 무시된다</td>
+        </tr>
+        <tr>
+          <td><code>binlog_order_commits</code></td>
+          <td><code>ON</code> — 바이너리 로그에 기록된 <b>순서대로</b> 스토리지 엔진에 커밋. <code>OFF</code> — 병렬 처리하며 순서를 보장하지 않는다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>세 가지 LOGICAL CLOCK 방식</h5>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>버전</th><th>병렬 처리 기준</th><th>병렬도</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Commit-Parent</td><td>5.7.2 ~ 5.7.5</td>
+          <td>같은 시점에 커밋이 <b>시작</b>된 트랜잭션들이 <b>동일한 <code>commit_seq_no</code></b> 를 가지면 병렬 처리</td>
+          <td class="t-center">낮음</td>
+        </tr>
+        <tr>
+          <td>Lock 기반</td><td>5.7.6 이상</td>
+          <td>순번이 달라도 <b>커밋 시점이 겹치면</b> 병렬 처리. <code>sequence_number</code> 와 <code>last_committed</code> 를 함께 기록</td>
+          <td class="t-center">중간</td>
+        </tr>
+        <tr>
+          <td>Writeset 기반</td><td>8.0</td>
+          <td>커밋 시점이 아니라 <b>변경한 데이터</b> 기준. <b>같은 데이터를 건드리지 않는 모든 트랜잭션</b>이 병렬 처리 가능</td>
+          <td class="t-center t-ok">가장 높음</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>Lock 기반 상세</h5>
+  <ul>
+    <li><code>sequence_number</code> — 커밋된 트랜잭션의 논리적 순번</li>
+    <li><code>last_committed</code> — 현 트랜잭션 이전에 커밋된 <b>가장 최신 트랜잭션의 순번</b></li>
+    <li>바이너리 로그가 새 파일로 로테이션되면 <code>sequence_number</code> 는 1, <code>last_committed</code> 는 0이 된다.</li>
+    <li>실행 가능 여부의 판단 기준 — <b>실행하려는 트랜잭션의 <code>last_committed</code> &lt; 현재 실행 중인 트랜잭션들의 최소 <code>sequence_number</code></b></li>
+  </ul>
+
+  <h5>Writeset 기반 상세</h5>
+  <ul>
+    <li>같은 세션에서 실행된 트랜잭션의 병렬 처리 여부에 따라 <code>WRITESET</code> 과 <code>WRITESET_SESSION</code> 으로 나뉜다.
+      <ul>
+        <li><code>WRITESET</code> — 같은 데이터를 변경하지 않는 <b>모든</b> 트랜잭션을 병렬 실행</li>
+        <li><code>WRITESET_SESSION</code> — 위와 같되 <b>같은 세션의 트랜잭션은 순서를 유지</b></li>
+      </ul>
+    </li>
+    <li>트랜잭션이 변경한 데이터 목록을 관리하며, 그 값은 모두 <b>해시</b> 로 표현된다. 이 해시된 목록이 <b>Writeset</b> 이다.</li>
+    <li>Writeset은 테이블의 <b>유니크 키 개수만큼</b> 만들어진다.</li>
+    <li>해시 알고리즘은 <code>transaction_write_set_extraction</code> 으로 관리하며 기본은 <b>xxHash64</b> 다.
+      <ul><li>다른 알고리즘으로 바꾸려면 바이너리 로그 포맷이 <b><code>ROW</code></b> 여야 한다.</li></ul>
+    </li>
+    <li>서버 메모리에서 <b>해시맵 테이블로 히스토리</b>가 관리되며, 최대 아이템 수는 기본 <b>25,000</b> 개다.
+      <ul><li>최대에 도달하거나 <b>DDL이 실행되면</b> 이 값은 초기화된다.</li></ul>
+    </li>
+    <li>다른 방식보다 처리량을 크게 높여 주지만 <b>Writeset 관리 오버헤드</b>가 발생한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Writeset 기반 설정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 소스 서버
+[mysqld]
+binlog_format=ROW
+binlog_transaction_dependency_tracking=WRITESET   # 또는 WRITESET_SESSION
+transaction_write_set_extraction=XXHASH64
+
+# 레플리카 서버
+[mysqld]
+binlog_format=ROW
+slave_parallel_type=LOGICAL_CLOCK
+slave_parallel_workers=N   # N &gt; 0</code></pre>
+  </div>
+
+  <h5>멀티 스레드 복제와 복제 포지션</h5>
+  <ul>
+    <li>각 워커가 실행한 바이너리 로그 이벤트의 포지션은 <code>slave_worker_info</code> 테이블이나 데이터 디렉터리의 <code>worker-relay-log.info</code> 파일에 기록된다.</li>
+    <li>워커가 이벤트를 완료할 때마다 갱신된다.</li>
+  </ul>
+
+  <h4>크래시 세이프 복제</h4>
+  <ul>
+    <li>서버 장애 이후에도 <b>문제없이 복제가 계속되는</b> 방식이다.</li>
+    <li>대표적인 장애가 <code>Duplicate Key</code> 에러다.</li>
+    <li><b>MySQL 서버 장애</b>는 이 방식으로 복구되지만, <b>OS 자체의 장애는 보장되지 않는다.</b></li>
+  </ul>
+
+  <h5>서버 장애와 복제 실패</h5>
+  <ul>
+    <li>복제 스레드는 읽은 포지션, 재실행한 트랜잭션 등을 기록한다.</li>
+    <li><b>파일</b>로 관리하면 처리 내용과 포지션 정보를 <b>원자적으로 동기화할 수 없었다.</b></li>
+    <li><b>테이블</b>로 관리하면 SQL 스레드가 <b>트랜잭션 적용과 포지션 갱신을 하나의 트랜잭션</b>으로 처리한다.</li>
+    <li>그래도 <b>릴레이 로그 파일 기록과 포지션 갱신</b>은 원자적으로 처리할 수 없어 여전히 불일치가 생겼다.</li>
+    <li><code>relay_log_recovery</code> 옵션으로 완화되었다.
+      <ul>
+        <li>I/O 스레드의 포지션을 <b>마지막으로 실행했던 포지션으로 초기화</b>한다.</li>
+        <li>새 릴레이 로그 파일을 만들고 SQL 스레드가 읽어야 할 포지션을 초기화한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">relay_log_recovery=ON
+relay_log_info_repository=TABLE</code></pre>
+  </div>
+
+  <h5>사용 형태별 크래시 세이프 설정</h5>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>복제 타입 + 동기화</th><th>설정</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>위치 기반 + <b>싱글 스레드</b></td>
+          <td><code>relay_log_recovery=ON</code>, <code>relay_log_info_repository=TABLE</code> — <b>MySQL 서버만 비정상 종료된 경우</b>에만 정상 재개된다</td>
+        </tr>
+        <tr>
+          <td>GTID 기반 + 싱글/멀티 스레드 (<code>gtid_executed</code> 매번 갱신)</td>
+          <td><code>relay_log_recovery=ON</code>, <code>SOURCE_AUTO_POSITION=1</code></td>
+        </tr>
+        <tr>
+          <td>GTID 기반 (매번 갱신되지 않음)</td>
+          <td>위에 더해 <code>sync_binlog=1</code>, <code>innodb_flush_log_at_trx_commit=1</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>위치 기반 + <b>멀티 스레드</b> 는 <b>소스와 레플리카의 커밋 순서가 일치하는지</b>에 따라 설정이 갈린다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>커밋 순서</th><th>레플리카 설정</th><th>크래시 세이프 설정</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-ok">일치</td>
+          <td><code>slave_parallel_type=LOGICAL_CLOCK</code><br><code>slave_preserve_commit_order=1</code></td>
+          <td><code>relay_log_recovery=ON</code><br><code>relay_log_info_repository=TABLE</code></td>
+        </tr>
+        <tr>
+          <td class="t-no">불일치</td>
+          <td><code>slave_parallel_type=LOGICAL_CLOCK</code><br><code>slave_preserve_commit_order=0</code></td>
+          <td>위에 더해 <code>sync_relay_log=1</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li><code>sync_relay_log</code> — 지정한 개수만큼 이벤트가 기록되면 디스크와 동기화한다. 기본값 10,000이고 0이면 OS에 맡긴다.</li>
+    <li>이 값을 1이 아닌 값으로 두면 <b>트랜잭션 갭 때문에 릴레이 로그가 유실될 수 있다.</b>
+      <ul><li><b>트랜잭션 갭</b> — 멀티 스레드 복제의 병렬 처리로 트랜잭션이 순서대로 처리되지 않아 일시적으로 생기는 간격</li></ul>
+    </li>
+    <li>가능하면 멀티 스레드 복제는 <b><code>LOGICAL_CLOCK</code> + 커밋 순서 보장</b> 조합으로 쓰는 것을 권장한다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 표에는 커밋 순서 <b>일치와 불일치 양쪽 모두</b> <code>slave_preserve_commit_order=1</code> 로 적혀 있는데, 이러면 두 행이 구분되지 않는다. <b>커밋 순서를 보장하는 쪽이 <code>=1</code>, 보장하지 않는 쪽이 <code>=0</code></b> 이다. 이어지는 본문이 "커밋 순서가 불일치하면 <code>sync_relay_log</code> 를 써야 한다"고 설명하는 것과도 이렇게 읽어야 앞뒤가 맞는다.</p>
+    </div>
+  </div>
+
+  <h5>GTID 기반 + 멀티 스레드의 알려진 이슈</h5>
+  <ul>
+    <li>설정 자체는 싱글 스레드와 동일하다.</li>
+    <li>복구 작업 시 <b>갭을 메우는 작업이 실패</b>하면서 복제 연결이 실패하는 경우가 있었다.</li>
+    <li><b>8.0.18 또는 5.7.28 미만</b> 에서는 <code>STOP SLAVE; RESET SLAVE; START SLAVE;</code> 로 복제를 재개할 수 있다.</li>
+  </ul>
+
+  <h4>필터링된 복제 (Filtered Replication)</h4>
+  <ul>
+    <li>소스의 <b>특정 이벤트만</b> 레플리카에 적용되도록 필터링한다.</li>
+    <li>소스에서는 <b>데이터베이스 단위</b>로만 필터링할 수 있고, 레플리카에서는 더 다양한 형태가 가능하다.</li>
+    <li>동작 방식은 소스가 걸러 주는 것이 아니라, <b>레플리카가 일단 전부 가져온 뒤 거기서 필터링</b>하는 형태다.</li>
+    <li>1차로 DB 수준에서 걸러내고, 2차로 테이블 수준 옵션을 확인해 최종 적용 여부를 결정한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">my.cnf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">[mysqld]
+binlog-do-db=[바이너리 로그에 기록할 DB]
+binlog-ignore-db=[바이너리 로그에 기록하지 않을 DB]</code></pre>
+  </div>
+
+  <p>레플리카 쪽 필터링 옵션은 <code>CHANGE REPLICATION FILTER</code> 구문으로 지정하며 <code>FOR CHANNEL</code> 로 채널을 명시할 수도 있다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>지연 복제는 8.0.23+ 에서 <code>SOURCE_DELAY</code> (단위: <b>초</b>).</li>
+      <li>멀티 스레드 복제 — <b>DB 기반</b>(DB가 하나면 무의미) vs <b>LOGICAL_CLOCK</b>. 후자 중 <b>Writeset</b> 이 병렬도가 가장 높다.</li>
+      <li>Writeset 은 <code>binlog_format=ROW</code> 가 전제이고, <b>유니크 키 개수만큼</b> 해시를 만든다.</li>
+      <li>크래시 세이프의 기본은 <code>relay_log_recovery=ON</code> + 포지션 정보를 <b>TABLE</b> 로 관리하는 것.</li>
+      <li>필터링은 <b>레플리카가 전부 받은 뒤 걸러낸다</b> — 네트워크 절감 효과는 없다.</li>
+      <li>8.0.26+ 에서는 <code>replica_*</code> 계열 새 변수명을 쓴다.</li>
+    </ul>
+  </div>
+</article>

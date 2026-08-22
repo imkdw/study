@@ -1,0 +1,554 @@
+<article class="item" id="item-45" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-1</div>
+    <h3>애플리케이션 확장 소개</h3>
+    <p class="item-tagline">확장은 한 방향이 아니라 세 축이다. 어느 축이 막혔는지 먼저 알아야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    Node 는 단일 스레드라서 <b>X축(복제)이 선택이 아니라 기본값</b>이다.
+    다른 언어에서는 한 프로세스로 코어를 다 쓸 수 있지만, Node 는 그럴 수 없기 때문이다.
+  </div>
+
+  <h4>Node.js 애플리케이션 확장</h4>
+  <p>Node 는 단일 스레드 특성상 여러 프로세스와 여러 시스템에 걸쳐 확장할 필요가 있다.</p>
+
+  <h4>확장성 3차원</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 210" width="460" role="img" aria-label="확장성 3차원 - X축 복제, Y축 기능 분해, Z축 데이터 분할">
+        <path d="M60 170 L400 170" class="dg-stroke" fill="none" marker-end="url(#axA)"/>
+        <path d="M60 170 L60 25" class="dg-stroke" fill="none" marker-end="url(#axA)"/>
+        <path d="M60 170 L170 195" class="dg-stroke" fill="none" marker-end="url(#axA)"/>
+        <defs><marker id="axA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" class="dg-accent"/></marker></defs>
+        <text x="408" y="174" class="dg-text dg-mono" font-size="12" text-anchor="start">X</text>
+        <text x="330" y="192" class="dg-text-sub" font-size="11" text-anchor="middle">복제 (같은 앱 N개)</text>
+        <text x="54" y="20" class="dg-text dg-mono" font-size="12" text-anchor="middle">Y</text>
+        <text x="128" y="46" class="dg-text-sub" font-size="11" text-anchor="middle">기능별 분해 (마이크로서비스)</text>
+        <text x="180" y="200" class="dg-text dg-mono" font-size="12" text-anchor="start">Z</text>
+        <text x="140" y="152" class="dg-text-sub" font-size="11" text-anchor="middle">데이터 파티셔닝 (샤딩)</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>세 축은 독립적이며 동시에 적용할 수 있다</b> —
+      마이크로서비스로 쪼갠(Y) 각 서비스를 여러 인스턴스로 복제하고(X), 그 뒤의 DB 를 샤딩한다(Z).
+      "확장이 안 된다"는 말은 항상 <b>어느 축이 막혔는지</b>를 먼저 물어야 한다.</div>
+  </div>
+
+  <h5>X축 — 복제</h5>
+  <ul>
+    <li>대부분의 경우 시간과 비용 측면에서 가장 저렴하고 효과적이다.</li>
+    <li>동일한 앱을 N번 복제하고, 각 인스턴스가 1/N 의 부하를 처리한다.</li>
+  </ul>
+
+  <h5>Y축 — 서비스/기능별 분해</h5>
+  <ul>
+    <li>고유한 코드베이스를 가진 앱들로 나누는 것을 의미한다.</li>
+    <li>흔히 <b>마이크로서비스 아키텍처</b>라고 부른다(<a href="#item-47">12-3</a>).</li>
+  </ul>
+
+  <h5>Z축 — 데이터 파티션 분할</h5>
+  <ul>
+    <li>주로 데이터베이스에서 쓰는 개념으로, 수평/수직 분할이라고 부른다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">축마다 비용의 종류가 다르다 <span class="badge b-blue">보강</span></p>
+      <p><b>X축</b>은 인프라 비용만 늘고 코드는 그대로다 — 단, <b>상태가 없어야</b> 가능하다(<a href="#item-46">12-2</a>).<br>
+        <b>Y축</b>은 코드를 나누는 순간 <b>분산 시스템의 모든 문제</b>가 따라온다(<a href="#item-48">13장</a>).<br>
+        <b>Z축</b>은 셋 중 가장 복잡하며, 파티션 키를 잘못 고르면 되돌리기가 거의 불가능하다.</p>
+      <p>순서는 대체로 X → Y → Z 다. 가장 싼 축부터 밀어 보고, 막히면 다음으로 간다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>확장성 3차원: X(복제) / Y(기능 분해) / Z(데이터 분할)</li>
+      <li>Node 는 단일 스레드이므로 X축이 기본값이다 — 코어를 쓰려면 프로세스를 늘려야 한다</li>
+      <li>세 축은 독립적이며 동시에 적용된다</li>
+      <li>비용이 싼 순서대로: X → Y → Z</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-46" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-2</div>
+    <h3>복제 및 로드밸런싱</h3>
+    <p class="item-tagline">프로세스를 늘리는 순간 모든 상태가 갈라진다. 그 사실을 먼저 받아들여야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>cluster</code> 모듈은 CPU 활용과 무중단 배포를 거의 공짜로 준다.
+    대신 <b>메모리에 있던 모든 것(세션, 캐시)이 워커마다 갈라진다.</b>
+    복제의 진짜 작업은 프로세스를 늘리는 것이 아니라 <b>상태를 밖으로 빼는 것</b>이다.
+  </div>
+
+  <h4>복제 및 로드밸런싱</h4>
+  <ul>
+    <li>기존의 멀티스레드 웹 서버는 사용 가능한 모든 프로세서와 메모리를 써서 처리 능력을 전부 활용할 수 있다.</li>
+    <li>Node 는 단일 스레드 환경이라 기존 웹 서버보다 <b>더 이른 시점에</b> 확장이 필요하다.</li>
+  </ul>
+
+  <h4>클러스터 모듈</h4>
+  <ul>
+    <li>여러 인스턴스에 부하를 분산하는 가장 간단한 패턴이다.</li>
+    <li>마스터(primary) 프로세스가 요청을 받고 워커 프로세스에 작업을 분산한다.</li>
+    <li>보통 <b>라운드로빈</b> 알고리즘으로 모든 워커에 균등하게 분산한다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">용어와 기본값 <span class="badge b-purple">최신 반영</span></p>
+      <p><b>Node 16.0.0 부터 <code>cluster.isMaster</code> 는 deprecated</b> 이며 <code>cluster.isPrimary</code> 로 대체되었다.
+        <code>cluster.setupMaster()</code> 도 <code>cluster.setupPrimary()</code> 로 바뀌었다.
+        아래 예제들은 노트의 <code>isMaster</code> 를 그대로 두었으나, 새 코드에는 <code>isPrimary</code> 를 쓴다.</p>
+      <p>라운드로빈(<code>SCHED_RR</code>)이 기본인 것도 맞지만 <b>윈도우는 예외</b>다.
+        윈도우에서는 OS 가 분배하는 <code>SCHED_NONE</code> 이 기본이며,
+        <code>NODE_CLUSTER_SCHED_POLICY</code> 환경 변수로 바꿀 수 있다.
+        (근거: <a href="https://nodejs.org/api/cluster.html">Node.js Docs — Cluster</a>)</p>
+    </div>
+  </div>
+
+  <h5>간단한 웹 서버</h5>
+  <p>현재는 하나의 프로세스가 모두 처리하므로 pid 가 항상 같다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">single.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createServer } from "http";
+
+const { pid } = process;
+const server = createServer((req, res) =&gt; {
+  let i = 1e7;
+  while (i &gt; 0) {
+    i--;                       // 의도적인 CPU 부하
+  }
+
+  console.log(`Worker pid: ${pid}`);
+  res.end(`Hello from worker ${pid}`);
+});
+
+server.listen(8080, () =&gt; {
+  console.log(`Master pid: ${pid}`);
+});</code></pre>
+  </div>
+
+  <h5>클러스터 모듈을 통한 확장</h5>
+  <p>기존 단일 프로세스보다 처리 가능한 양이 9~10배 정도 늘어난다(노트 저자의 코어 수 기준).</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">cluster.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createServer } from "http";
+import { cpus } from "os";
+import cluster from "cluster";
+
+if (cluster.isMaster) {          // 새 코드에서는 cluster.isPrimary
+  const availableCpus = cpus();
+  console.log("Clustering with %d CPUs", availableCpus.length);
+
+  availableCpus.forEach(() =&gt; cluster.fork());
+} else {
+  const { pid } = process;
+
+  const server = createServer((req, res) =&gt; {
+    let i = 1e7;
+    while (i &gt; 0) {
+      i--;
+    }
+
+    res.end(`Hello from worker ${pid}`);
+  });
+
+  server.listen(8080, () =&gt; {    // 같은 포트를 여러 워커가 listen 한다
+    console.log(`Worker pid: ${pid}`);
+  });
+}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">같은 포트를 여러 프로세스가 listen 할 수 있는 이유 <span class="badge b-blue">보강</span></p>
+      <p>실제로는 <b>마스터만 포트를 열고</b>, 워커의 <code>listen()</code> 호출은
+        IPC 를 통해 마스터로 전달된다. 마스터가 들어온 연결을 라운드로빈으로 워커에 넘긴다.
+        그래서 <code>EADDRINUSE</code> 가 나지 않는 것이다.
+        <a href="#item-44">11-4</a>의 프로세스 풀과 구조가 같고, 분배하는 것이 작업이 아니라 <b>소켓</b>일 뿐이다.</p>
+    </div>
+  </div>
+
+  <h5>클러스터 모듈의 탄력성 및 가용성</h5>
+  <ul>
+    <li>워커 프로세스는 서로 완전히 별개이므로, 다른 워커에 영향 없이 제거하거나 추가할 수 있다.</li>
+    <li>Node 는 워커 수를 자동으로 관리해 주지 않는다. <b>관리는 앱의 책임</b>이다.</li>
+    <li>인스턴스가 여러 개면 하나가 죽어도 요청을 처리할 백업이 항상 존재한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">resilient.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createServer } from "http";
+import { cpus } from "os";
+import cluster from "cluster";
+
+if (cluster.isMaster) {
+  const availableCpus = cpus();
+  console.log("Clustering with %d CPUs", availableCpus.length);
+  availableCpus.forEach(() =&gt; cluster.fork());
+
+  cluster.on("exit", (worker, code) =&gt; {
+    if (code !== 0 &amp;&amp; !worker.exitedAfterDisconnect) {
+      console.log(`Worker ${worker.id} crashed. Restarting...`);
+      cluster.fork();          // 의도치 않은 종료만 재시작
+    }
+  });
+} else {
+  setTimeout(() =&gt; {
+    throw new Error("OOOPS");  // 랜덤하게 죽는 워커
+  }, Math.ceil(Math.random() * 3) * 1000);
+  const { pid } = process;
+
+  const server = createServer((req, res) =&gt; {
+    let i = 1e7;
+    while (i &gt; 0) {
+      i--;
+    }
+
+    res.end(`Hello from worker ${pid}`);
+  });
+
+  server.listen(8080, () =&gt; {
+    console.log(`Worker pid: ${pid}`);
+  });
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">Req/Bytes counts sampled once per second.
+# of samples: 10
+
+25k requests in 10.04s, 3.48 MB read
+1k errors (7 timeouts)</code></pre>
+  </div>
+
+  <p>워커가 무작위로 죽고 재시작되는 와중에도 25,000개 요청 중 1,000개만 실패했다.
+    <code>exitedAfterDisconnect</code> 검사가 중요한 이유는, 아래의 <b>의도적인 종료</b>까지 재시작해 버리면
+    무중단 배포가 무한 루프가 되기 때문이다.</p>
+
+  <h5>다운타임 제로 시작</h5>
+  <ul>
+    <li>새 버전을 릴리즈할 때 다운타임이 생길 수 있다.</li>
+    <li>다운타임 동안에는 새 요청을 처리할 수 없고, 제약에 따라 이를 허용할 수 없는 경우가 있다.</li>
+    <li><code>SIGUSR2</code> 신호를 받으면 <b>워커를 하나씩</b> 종료하고 새 워커를 만들어 무중단 배포를 구현한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">zero-downtime.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { createServer } from "http";
+import { cpus } from "os";
+import cluster from "cluster";
+import { once } from "events";
+
+const { pid } = process;
+
+if (cluster.isMaster) {
+  console.log("master", pid);
+
+  const availableCpus = cpus();
+  console.log("Clustering with %d CPUs", availableCpus.length);
+  availableCpus.forEach(() =&gt; cluster.fork());
+
+  process.on("SIGUSR2", async () =&gt; {
+    const workers = Object.values(cluster.workers!);
+    for (const worker of workers) {
+      console.log("Stopping Worker: %d", worker?.process.pid);
+      worker?.disconnect();                  // 새 연결을 받지 않는다
+      await once(worker!, "exit");           // 기존 요청이 끝나기를 기다린다
+      if (!worker?.exitedAfterDisconnect) {
+        continue;
+      }
+      const newWorker = cluster.fork();
+      await once(newWorker!, "listening");   // 새 워커가 준비될 때까지
+    }
+  });
+} else {
+  const server = createServer((req, res) =&gt; {
+    let i = 1e7;
+    while (i &gt; 0) {
+      i--;
+    }
+
+    res.end(`Hello from worker ${pid}`);
+  });
+
+  server.listen(8080, () =&gt; {
+    console.log(`Worker pid: ${pid}`);
+  });
+}</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant M as 마스터
+  participant W1 as 워커 1 (구버전)
+  participant W1n as 워커 1' (신버전)
+  participant W2 as 워커 2 (구버전)
+  M->>W1: disconnect() — 새 연결 거부
+  Note over W1: 진행 중인 요청만 마무리
+  Note over W2: 이 동안 계속 요청 처리 중
+  W1-->>M: 'exit'
+  M->>W1n: fork()
+  W1n-->>M: 'listening'
+  M->>W2: 이제 워커 2 차례
+      </pre>
+    </div>
+    <div class="figure-cap"><b>한 번에 하나씩 교체하므로 언제나 처리 가능한 워커가 남아 있다</b> —
+      <code>await once(newWorker, "listening")</code> 이 핵심이다.
+      이걸 빼고 동시에 다 죽이면 그냥 다운타임이 있는 재시작이 된다.</div>
+  </div>
+
+  <h4>상태 저장 통신 다루기</h4>
+  <ul>
+    <li>클러스터 모듈의 문제는 <b>캐싱된 데이터가 각 워커에만 남는다</b>는 점이다.</li>
+    <li>이는 클러스터에만 국한된 문제가 아니라, 상태를 고려하지 않는 <b>모든 로드밸런싱 알고리즘</b>에 적용된다.</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">단일 프로세스에서 잘 돌던 코드가 조용히 깨진다</p>
+      <p><a href="#item-42">11-2</a>에서 만든 <code>Map</code> 기반 캐시를 떠올려 보자.
+        워커가 4개면 캐시도 4개가 되어 <b>적중률이 1/4로 떨어지고</b>, 워커마다 다른 값을 들고 있을 수 있다.
+        메모리 세션도 마찬가지다 — 로그인한 사용자가 다음 요청에서 로그아웃 상태로 보인다.
+        코드는 그대로인데 프로세스만 늘렸을 뿐인데도 그렇다.</p>
+    </div>
+  </div>
+
+  <h5>여러 인스턴스의 상태 공유</h5>
+  <ul>
+    <li>외부 저장소인 데이터베이스나 Redis 같은 캐시 계층을 쓸 수 있다.</li>
+    <li>단점은 기존 코드에서 바꿔야 하는 부분이 상당히 많다는 것이다.</li>
+    <li>간단히 하려면 스티키 세션처럼 <b>고정 로드밸런싱</b>을 쓸 수도 있다.</li>
+  </ul>
+
+  <h5>고정 로드밸런싱</h5>
+  <ul>
+    <li>모든 요청을 항상 고정된 인스턴스로 라우팅하는 방법이 <b>고정(스티키) 로드밸런싱</b>이다.</li>
+    <li>로드밸런서가 새 요청을 받으면, 알고리즘이 고른 인스턴스가 아니라 <b>정해진 인스턴스</b>로 보낸다.</li>
+    <li>보통 세션 ID 나 IP 를 기준으로 하는데, IP 는 LTE 환경이나 네트워크 로밍처럼 <b>주소가 바뀌는 환경</b>에서 제대로 동작하지 않는다.</li>
+    <li>또한 고정된 인스턴스에 장애가 나면 답이 없으므로, 가능하면 <b>공유 저장소</b>에 세션 상태를 두는 편이 좋다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기준</th><th>공유 저장소 (Redis 등)</th><th>스티키 세션</th></tr></thead>
+      <tbody>
+        <tr><td>코드 변경</td><td class="t-center t-no">많음</td><td class="t-center t-ok">거의 없음</td></tr>
+        <tr><td>인스턴스 장애</td><td class="t-center t-ok">다른 인스턴스가 이어받음</td><td class="t-center t-no">해당 사용자 세션 소실</td></tr>
+        <tr><td>부하 분산 균형</td><td class="t-center t-ok">고름</td><td class="t-center t-no">치우칠 수 있음</td></tr>
+        <tr><td>무중단 배포</td><td class="t-center t-ok">영향 없음</td><td class="t-center t-no">워커 교체 시 세션 끊김</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>역방향 프록시 확장</h4>
+  <ul>
+    <li>클러스터 외에, 전통적인 기술들은 고가용성 운영 환경에서 더 많은 제어와 성능을 보장해 선호된다.</li>
+    <li>동일한 앱을 실행하는 인스턴스들 앞에 로드밸런서를 두어 트래픽을 분산한다.</li>
+    <li>Nginx, HAProxy 등 다양한 방법이 있다.</li>
+  </ul>
+
+  <h4>동적 수평 확장</h4>
+  <ul>
+    <li>서버 개수를 미리 모르는 상태에서, 트래픽에 따라 <b>동적으로 조정</b>할 수 있다.</li>
+  </ul>
+
+  <h5>서비스 레지스트리 사용</h5>
+  <ul>
+    <li>실행 중인 서버와 그들이 제공하는 서비스를 추적하는 중앙 서비스(<b>서비스 레지스트리</b>)를 두는 것이 일반적인 패턴이다.</li>
+  </ul>
+
+  <h4>피어 투 피어 로드밸런싱</h4>
+  <ul>
+    <li>중앙 집중식 로드밸런서를 제거하고 클라이언트가 서버에 직접 접근하는 방식이다.</li>
+  </ul>
+
+  <h4>컨테이너를 사용한 앱 확장</h4>
+  <ul>
+    <li>Docker 를 사용해 컨테이너 단위로 확장할 수 있다.</li>
+    <li><b>Kubernetes</b> — 컨테이너를 관리할 수 있는 도구.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">그럼 클러스터 모듈은 언제 쓰는가 <span class="badge b-blue">보강</span></p>
+      <p>오케스트레이터(Kubernetes 등)를 쓰는 환경이라면 <b>컨테이너 하나에 프로세스 하나</b>가 일반적이다.
+        복제·재시작·무중단 배포를 오케스트레이터가 이미 하기 때문에 클러스터 모듈이 그 일을 중복한다.</p>
+      <p>반대로 <b>단일 VM 에 직접 배포</b>하는 환경에서는 클러스터(또는 PM2 같은 프로세스 매니저)가
+        코어를 다 쓰는 가장 저렴한 방법이다. 어느 쪽이든 <b>상태를 밖으로 빼야 한다</b>는 결론은 같다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>cluster</code> 로 코어 수만큼 워커를 띄운다. 마스터가 소켓을 라운드로빈으로 분배 (윈도우 제외)</li>
+      <li><code>cluster.isMaster</code> 는 deprecated → <code>cluster.isPrimary</code> (Node 16+)</li>
+      <li>워커 재시작 시 <code>exitedAfterDisconnect</code> 로 의도적 종료와 크래시를 구분한다</li>
+      <li>무중단 배포는 한 번에 하나씩 교체하고, 새 워커의 <code>listening</code> 을 기다린다</li>
+      <li>복제의 진짜 비용은 상태 분산이다 — 스티키 세션은 임시방편, 공유 저장소가 정답</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-47" data-spy>
+  <header class="item-head">
+    <div class="item-num">12-3</div>
+    <h3>복잡한 애플리케이션 분해</h3>
+    <p class="item-tagline">쪼개는 것은 쉽다. 어려운 것은 쪼갠 것들을 다시 잇는 방법이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    마이크로서비스의 비용은 대부분 <b>통합 방식</b>에서 나온다.
+    프록시 → 오케스트레이션 → 메시지 브로커 순으로 결합도가 낮아지고, 대신 추적 난이도가 올라간다.
+  </div>
+
+  <h4>모놀리식 아키텍처</h4>
+  <ul>
+    <li>모든 구성요소가 하나로 합쳐진 아키텍처다.</li>
+    <li>단점은 구성요소 하나에 장애가 나도 전체에 영향을 미친다는 것이다.</li>
+  </ul>
+
+  <h4>마이크로서비스 아키텍처</h4>
+  <ul>
+    <li>작은 단위로 모듈을 쪼개서 하나의 큰 애플리케이션을 이루는 아키텍처다.</li>
+    <li>하나의 서비스는 <b>단일 데이터베이스</b>를 가지고, 그 서비스들이 상호작용한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph MONO["모놀리식"]
+    M1["주문 · 결제 · 배송"] --> MDB["단일 DB"]
+  end
+  subgraph MICRO["마이크로서비스"]
+    S1["주문"] --> D1["주문 DB"]
+    S2["결제"] --> D2["결제 DB"]
+    S3["배송"] --> D3["배송 DB"]
+    S1 -.->|"통신"| S2
+    S2 -.->|"통신"| S3
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>서비스마다 자기 DB 를 갖는다는 것이 결정적이다</b> —
+      DB 를 공유하면 스키마 변경이 다시 전체를 묶어 버려 분해의 의미가 사라진다.
+      대신 <b>트랜잭션이 서비스 경계를 넘지 못한다</b>는 대가를 치른다.</div>
+  </div>
+
+  <h5>장단점</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>장점</th><th>단점</th></tr></thead>
+      <tbody>
+        <tr><td>충돌이 전체 시스템으로 전파되지 않는다</td><td rowspan="3">배포, 통합 등 인프라 복잡성이 크게 증가한다</td></tr>
+        <tr><td>각 서비스를 독립적으로 배포하고 확장할 수 있다</td></tr>
+        <tr><td>언어와 프레임워크에 구애받지 않는다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>마이크로서비스 아키텍처의 통합 패턴</h4>
+
+  <h5>API 프록시</h5>
+  <ul>
+    <li>서비스 간 통신을 프록시하는 <b>API 프록시 / 게이트웨이</b>를 둔다.</li>
+    <li>단일 진입점 제공, 캐싱, 확장 등에 매우 유용하다.</li>
+  </ul>
+
+  <h5>API 오케스트레이션</h5>
+  <ul>
+    <li>서비스 집합을 통합하고 구성하는 가장 일반적인 방법이다.</li>
+    <li>서로 다른 서비스의 데이터를 <b>단일 응답으로 결합</b>한다.</li>
+    <li><code>completeCheckout</code> 같은 함수가 각 서비스를 호출해 최종적으로 하나의 진입점을 만든다.</li>
+  </ul>
+
+  <h5>메시지 브로커와의 통합</h5>
+  <ul>
+    <li>오케스트레이터의 단점은 <b>너무 많은 것을 알고 수행하는 God 객체</b>가 된다는 점이다.</li>
+    <li>높은 결합도, 낮은 응집력, 높은 복잡도를 야기한다.</li>
+    <li>이를 해결하기 위해 중앙에 <b>메시지 브로커</b>를 두고 pub/sub 방식으로 구현할 수 있다(<a href="#item-49">13-2</a>).</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph O["오케스트레이션 — 중앙이 모두 안다"]
+    OR["오케스트레이터"] --> OA["주문"]
+    OR --> OB["결제"]
+    OR --> OC["배송"]
+  end
+  subgraph B["브로커 — 아무도 서로를 모른다"]
+    BA["주문"] -->|"주문완료 발행"| BR["메시지 브로커"]
+    BR -->|"구독"| BB["결제"]
+    BR -->|"구독"| BC["배송"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>화살표의 방향이 결합도를 말해 준다</b> —
+      왼쪽은 오케스트레이터가 세 서비스를 전부 알아야 하고, 배송 서비스가 추가되면 오케스트레이터를 고쳐야 한다.
+      오른쪽은 주문 서비스가 누가 듣는지 모르므로 <b>구독자를 늘려도 발행자는 그대로다</b>.
+      대신 "이 요청이 어디까지 갔는지" 추적하기가 훨씬 어려워진다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">패턴 이름은 다르지만 이미 아는 이야기다 <span class="badge b-blue">보강</span></p>
+      <p>API 프록시는 <a href="#item-29">8-1 프록시</a>를 네트워크 경계로 옮긴 것이고,
+        메시지 브로커 방식은 <a href="#item-12">3-2 관찰자 패턴</a>을 프로세스 경계 너머로 확장한 것이다
+        (그래서 <a href="#item-49">13-2</a>가 pub/sub 을 "분산된 옵저버 패턴"이라 부른다).
+        <b>같은 패턴이 규모만 바뀌어 반복된다</b>는 것이 이 책 전체를 관통하는 구조다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>모놀리식은 한 곳의 장애가 전체로 번지고, 마이크로서비스는 격리되는 대신 인프라가 복잡해진다</li>
+      <li>서비스마다 자기 DB 를 갖는 것이 원칙 — 공유하면 분해의 의미가 사라진다</li>
+      <li>통합은 API 프록시 → 오케스트레이션 → 메시지 브로커 순으로 결합도가 낮아진다</li>
+      <li>오케스트레이터는 God 객체가 되기 쉽다. 브로커는 결합을 끊는 대신 추적을 어렵게 한다</li>
+    </ul>
+  </div>
+</article>

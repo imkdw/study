@@ -1,0 +1,528 @@
+<article class="item" id="item-17-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 17-1</div>
+    <h3>도커 이미지를 최적화하는 방법</h3>
+    <p class="item-tagline">한 번 레이어에 들어간 파일은 지워도 사라지지 않는다. 애초에 넣지 않는 것만이 답이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>RUN rm -rf</code> 는 <b>파일을 안 보이게 만들 뿐 이미지 크기를 줄이지 않는다</b>.
+    레이어는 쌓이기만 하고 아래 레이어의 내용을 되돌릴 수 없기 때문이다.
+  </div>
+
+  <h4>도커 이미지의 특성</h4>
+  <ul>
+    <li>한 번 내려받은 이미지는 명시적으로 삭제하지 않으면 계속 남아 있다.</li>
+    <li><code>docker system df</code> 로 도커 자원이 점유하는 사용량을 확인할 수 있다.</li>
+    <li>가능하면 <code>docker system prune</code> 으로 미사용 자원을 주기적으로 지워 주는 게 좋다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>prune</code> 은 범위를 알고 쓰자 <span class="badge b-blue">보강</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>명령</th><th>지우는 것</th></tr></thead>
+          <tbody>
+            <tr><td class="dg-mono">docker system prune</td><td>정지된 컨테이너, 미사용 네트워크, dangling 이미지, 빌드 캐시</td></tr>
+            <tr><td class="dg-mono">docker system prune -a</td><td>위 + <b>컨테이너가 쓰지 않는 모든 이미지</b></td></tr>
+            <tr><td class="dg-mono">docker system prune --volumes</td><td>위 + <b>미사용 볼륨 (데이터 손실)</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <code>-a</code> 는 잠시 안 쓰는 이미지까지 전부 날려 다음 빌드가 크게 느려진다.
+        <code>--volumes</code> 는 DB 데이터를 지울 수 있다. 상세 내역은
+        <code>docker system df -v</code> 로 먼저 확인하는 습관을 들이자.
+      </p>
+    </div>
+  </div>
+
+  <h4>도커 이미지 개선하기 &mdash; 꼭 필요한 파일만 이미지에 포함하기</h4>
+  <ul>
+    <li>이미지 크기는 내부에서 실행한 명령이 아니라, <b>인스트럭션이 만들어 낸 레이어</b>에 영향을 받는다.</li>
+    <li>아래 v2 예제에서 <code>rm -rf docs</code> 로 폴더를 삭제했지만, 앞선 <code>COPY</code> 레이어에는 그대로 남아 있다.</li>
+    <li>이미지는 여러 레이어를 겹쳐 하나로 보이게 만든 것이다. 즉 <b>한 번 복사된 것은 뺄 수 없다</b>.</li>
+    <li>결국 각 레이어마다 최적화가 필요하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">Dockerfile</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-dockerfile"># v1) 모든 디렉토리 구조를 이미지에 복사함
+FROM diamol/base
+CMD echo app- &amp;&amp; ls app &amp;&amp; echo docs- &amp;&amp; ls docs
+COPY . .
+
+# v2) 불필요한 파일을 별도로 삭제 — 화면에서만 사라지고 크기는 그대로
+FROM diamol/base
+CMD echo app- &amp;&amp; ls app &amp;&amp; echo docs- &amp;&amp; ls docs
+COPY . .
+RUN rm -rf docs
+
+# v3) 꼭 필요한 파일만 복제하기 — 이것만이 실제로 작아진다
+FROM diamol/base
+CMD echo app- &amp;&amp; ls app &amp;&amp; echo docs- &amp;&amp; ls docs
+COPY ./app ./app</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 250" width="640" role="img" aria-label="v2 는 COPY 레이어에 docs 가 남고 RUN 레이어가 그것을 가리기만 하지만, v3 는 처음부터 app 만 복사해 docs 가 없다">
+        <text x="160" y="26" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">v2 &mdash; 복사 후 삭제</text>
+        <rect x="30" y="40" width="260" height="42" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="46" y="66" class="dg-mono dg-text" font-size="11">RUN rm -rf docs</text>
+        <text x="274" y="66" font-size="10.5" fill="var(--red)" text-anchor="end">가림막(whiteout)만 기록</text>
+        <rect x="30" y="90" width="260" height="52" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="46" y="112" class="dg-mono dg-text" font-size="11">COPY . .</text>
+        <text x="46" y="132" class="dg-mono" font-size="10.5" fill="var(--red)">app/ + docs/ 가 그대로 남아 있음</text>
+        <rect x="30" y="150" width="260" height="34" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="46" y="172" class="dg-mono dg-text-sub" font-size="11">FROM diamol/base</text>
+        <text x="160" y="212" font-size="12" fill="var(--red)" font-weight="700" text-anchor="middle">이미지 크기: 줄지 않음</text>
+        <text x="160" y="232" class="dg-text-sub" font-size="10.5" text-anchor="middle">docs 는 보이지 않을 뿐 레이어에 존재한다</text>
+
+        <text x="480" y="26" class="dg-text" font-size="12.5" font-weight="700" text-anchor="middle">v3 &mdash; 필요한 것만 복사</text>
+        <rect x="350" y="90" width="260" height="52" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="366" y="112" class="dg-mono dg-text" font-size="11">COPY ./app ./app</text>
+        <text x="366" y="132" class="dg-mono" font-size="10.5" fill="var(--green)">app/ 만 존재</text>
+        <rect x="350" y="150" width="260" height="34" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="366" y="172" class="dg-mono dg-text-sub" font-size="11">FROM diamol/base</text>
+        <text x="480" y="212" font-size="12" fill="var(--green)" font-weight="700" text-anchor="middle">이미지 크기: 실제로 감소</text>
+        <text x="480" y="232" class="dg-text-sub" font-size="10.5" text-anchor="middle">레이어 수도 하나 적다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>삭제는 위 레이어에 "가림막"을 하나 더 얹는 일이다</b> —
+      아래 레이어의 파일은 그대로 남아 전송량과 디스크를 그대로 잡아먹는다.
+      게다가 그 파일은 여전히 이미지 안에 있으므로 <b>추출도 가능하다</b>. 비밀 파일을 이렇게 지우면 안 되는 이유다.
+    </div>
+  </div>
+
+  <h4>.dockerignore</h4>
+  <ul>
+    <li><code>.gitignore</code> 와 유사한 파일로, 제외하고 싶은 목록을 적으면 된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">.dockerignore</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">.git
+node_modules
+docs
+*.md
+.env
+**/*.test.js</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>.dockerignore</code> 는 두 가지를 동시에 해결한다 <span class="badge b-blue">보강</span></p>
+      <p>
+        첫째, <a href="#item-3-3">빌드 컨텍스트</a> 전송량이 줄어 빌드가 빨라진다.
+        둘째, <code>COPY . .</code> 를 써도 제외된 파일은 애초에 복사되지 않는다.
+        <b><code>RUN rm</code> 으로 지우는 것과 달리 레이어에 흔적도 남지 않는다</b>는 점이 결정적이다.
+      </p>
+      <p>
+        한 가지 함정 &mdash; <code>.dockerignore</code> 에 <code>node_modules</code> 를 넣어 두면
+        캐시 최적화(<a href="#item-3-5">3-5</a>)와도 잘 맞는다.
+        호스트의 <code>node_modules</code> 가 컨텍스트에 안 들어가므로
+        <code>COPY . .</code> 가 그것 때문에 캐시를 깨뜨리는 일이 없어진다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>레이어는 쌓이기만 한다. <code>RUN rm</code> 은 가림막만 얹을 뿐 크기를 줄이지 않는다.</li>
+      <li>애초에 필요한 것만 <code>COPY</code> 하고, 나머지는 <code>.dockerignore</code> 로 막는다.</li>
+      <li>지운 파일도 이미지에서 추출 가능하다. 비밀 파일을 이 방식으로 처리하면 안 된다.</li>
+      <li><code>docker system df</code> 로 확인하고 <code>prune</code> 은 범위를 알고 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 17-2</div>
+    <h3>좋은 기반 이미지 고르기</h3>
+    <p class="item-tagline">이미지 크기 문제는 디스크 문제가 아니라 공격 표면 문제다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이미지에 들어 있는 모든 실행 파일은 <b>침입자도 쓸 수 있는 도구</b>다.
+    앱 실행에 필요 없는 것이 하나도 없어야 한다는 원칙은 보안에서 나온다.
+  </div>
+
+  <h4>이미지의 취약점</h4>
+  <ul>
+    <li>크기가 큰 이미지는 OS 입장에서는 편하겠지만, 그만큼 내부에 많은 것이 포함된다.</li>
+    <li>예를 들어 <code>curl</code> 이 들어 있다면 컨테이너에 침입한 공격자가 악성 프로그램을 내려받을 수 있다.</li>
+    <li>또한 빌드가 가능한 SDK 등이 포함돼 있다면 컨테이너 자체가 망가질 수도 있다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기반 이미지</th><th>대략적 크기</th><th>포함된 것</th><th>성격</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">ubuntu / debian</td><td>~75MB+</td><td>완전한 배포판, 패키지 관리자, 셸, curl 등</td><td>디버깅 편함 / 공격 표면 큼</td></tr>
+        <tr><td class="dg-mono">*-slim</td><td>~30MB+</td><td>배포판에서 문서와 부가 도구를 뺀 것</td><td>절충안</td></tr>
+        <tr><td class="dg-mono">alpine</td><td>~8MB</td><td>musl libc 기반 최소 배포판, 셸 있음</td><td>작지만 glibc 호환 이슈 가능</td></tr>
+        <tr><td class="dg-mono">distroless</td><td>~2MB+</td><td>런타임만. <b>셸도 패키지 관리자도 없음</b></td><td>가장 안전 / <code>exec</code> 로 못 들어감</td></tr>
+        <tr><td class="dg-mono">scratch</td><td>0</td><td>아무것도 없음</td><td>정적 링크된 바이너리 전용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">작을수록 좋지만 공짜는 아니다 <span class="badge b-blue">보강</span></p>
+      <p>
+        distroless 나 scratch 이미지는 <b>셸이 없어서 <code>docker exec -it ... sh</code> 가 안 된다</b>.
+        장애 상황에서 컨테이너 안을 들여다보는 통상적인 방법이 막힌다는 뜻이다.
+        그래서 이런 이미지를 쓸 때는 <a href="#item-8-3">8-3</a> 처럼 <b>앱과 같은 언어로 만든 체크 유틸리티</b>가
+        더욱 중요해진다. 셸 스크립트를 쓸 수 없으니 선택의 여지도 없다.
+      </p>
+      <p>
+        alpine 은 glibc 대신 musl libc 를 쓰기 때문에, 네이티브 모듈을 쓰는
+        Node.js / Python 앱에서 미묘한 호환성 문제나 성능 차이가 나타나는 경우가 있다.
+        무조건 alpine 이 정답은 아니다.
+      </p>
+    </div>
+  </div>
+
+  <h4>골든 이미지</h4>
+  <ul>
+    <li>앞서 설명한 <a href="#item-5-5">골든 이미지</a>는 인증을 받고 공유되는 이미지라서 이러한 문제를 피할 수 있는 방법 중 하나다.</li>
+  </ul>
+
+  <h4>이미지 검증 도구</h4>
+  <ul>
+    <li><b>앤코어(Anchore)</b> 같은 오픈소스 도커 이미지 분석 도구로 CI/CD 파이프라인에서 이미지를 검증할 수 있다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">지금은 선택지가 더 많다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        노트가 언급한 Anchore 외에도, 그사이 이미지 스캐닝이 훨씬 흔한 일이 됐다.
+      </p>
+      <ul>
+        <li><b>Docker Scout</b> &mdash; 도커의 자체 서비스. 이미지에서 SBOM 을 만들어 취약점 DB 와 대조한다.
+          Docker Hub, Docker CLI, Scout 대시보드에서 쓸 수 있다.</li>
+        <li><b>Trivy</b> &mdash; 오픈소스. 컨테이너 이미지뿐 아니라 파일 시스템, IaC 설정까지 스캔한다. CI 에 붙이기 쉽다.</li>
+        <li><b>Grype</b> &mdash; Anchore 계열의 오픈소스 스캐너.</li>
+      </ul>
+      <p>
+        핵심은 도구 선택이 아니라 <b>스캔을 파이프라인에 자동으로 넣는 것</b>이다.
+        <a href="#item-11-1">11-1</a> 의 CI 흐름에서 빌드와 푸시 사이에 스캔 단계를 두고,
+        심각도 기준을 넘으면 푸시를 막는 방식이 표준적이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>이미지에 든 도구는 침입자의 도구이기도 하다. 앱에 필요 없는 것은 넣지 않는다.</li>
+      <li>slim / alpine / distroless / scratch 순으로 작아지지만 디버깅은 어려워진다.</li>
+      <li>alpine 은 musl libc 라 네이티브 모듈에서 호환성 문제가 날 수 있다.</li>
+      <li>이미지 스캔을 CI 파이프라인에 자동으로 넣는다. Scout / Trivy / Grype 등.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 17-3</div>
+    <h3>이미지 레이어 수와 이미지 크기는 최소한으로</h3>
+    <p class="item-tagline">패키지를 설치하고 캐시를 지우는 일은 <b>같은 <code>RUN</code> 안에서</b> 끝내야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>RUN</code> 을 <code>&amp;&amp;</code> 로 이어 붙이는 이유는 문법 취향이 아니다.
+    <b>설치와 정리가 같은 레이어에서 일어나야 캐시 파일이 이미지에 남지 않기 때문</b>이다.
+  </div>
+
+  <h4>이미지 레이어 수 최소화하기</h4>
+  <ul>
+    <li>이미지를 만들 때 기본은 <b>보안성을 갖춘 기반 이미지</b>를 쓰는 것이다.</li>
+    <li>추가로 꼭 필요한 것만 포함하는 이미지를 만들어야 한다.</li>
+  </ul>
+
+  <h4>예제 1. 패키지 설치</h4>
+  <ul>
+    <li>차이점은 인스트럭션의 개수와, <code>RUN</code> 커맨드 뒤에 apt 캐시를 삭제하는 구문이 추가된 것이다.</li>
+    <li>인스트럭션을 줄이면 여러 장점이 있다.
+      <ul>
+        <li>OS 별로 다르지만 <b>최대 레이어 개수 제한</b>이 존재한다.</li>
+        <li>레이어 수가 적으면 컨테이너 파일 시스템의 내용을 추적하기도 쉽다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">v1 &mdash; 이미지 90MB</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-dockerfile">FROM debian:stretch-slim
+
+RUN apt-get update
+RUN apt-get install -y curl=7.52.1-5+deb9u16
+RUN apt-get install -y socat=1.7.3.1-2+deb9u1</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">v2 &mdash; 이미지 70MB</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-dockerfile">FROM debian:stretch-slim
+
+RUN apt-get update \
+ &amp;&amp; apt-get install -y --no-install-recommends \
+    curl=7.52.1-5+deb9u16 \
+    socat=1.7.3.1-2+deb9u1 \
+ &amp;&amp; rm -rf /var/lib/apt/lists/*</code></pre>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">v2 가 20MB 를 아낀 두 가지 이유 <span class="badge b-blue">보강</span></p>
+      <ul>
+        <li><b><code>--no-install-recommends</code></b> &mdash; apt 는 기본적으로 "추천 패키지"까지 함께 설치한다.
+          이 플래그로 진짜 의존성만 설치한다.</li>
+        <li><b><code>rm -rf /var/lib/apt/lists/*</code> 를 같은 <code>RUN</code> 안에</b> 둔 것 &mdash;
+          <code>apt-get update</code> 가 받아 온 패키지 목록 캐시를 지운다.
+          <a href="#item-17-1">17-1</a> 에서 봤듯 <b>별도의 <code>RUN</code> 으로 지우면 소용이 없다.</b>
+          같은 레이어 안에서 만들었다 지워야 그 레이어의 최종 결과에 캐시가 없다.</li>
+      </ul>
+      <p>
+        참고로 <code>apt-get update</code> 와 <code>install</code> 을 나누면 캐시 관점에서도 위험하다.
+        <code>update</code> 레이어가 캐시에 걸린 채 <code>install</code> 만 다시 실행되면,
+        오래된 패키지 목록으로 설치를 시도해 실패하거나 낡은 버전이 깔린다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">"최대 레이어 개수"의 실제 수치 <span class="badge b-blue">보강</span></p>
+      <p>
+        지금 표준 스토리지 드라이버인 <b>overlay2 는 최대 128개의 lower 레이어</b>를 지원한다.
+        이를 넘기면 <code>max depth exceeded</code> 로 빌드가 실패한다.
+      </p>
+      <p>
+        실제로는 128 보다 적은 수에서 터지는 경우가 흔한데, 커널의 마운트 옵션 문자열이
+        4KB 로 제한되어 있어 <code>data-root</code> 경로가 길수록 쓸 수 있는 레이어가 줄기 때문이다.
+        보고 사례에서는 120~126 층 부근에서 실패했다.
+        어쨌든 정상적인 Dockerfile 이 128 층에 닿는 일은 드물다.
+        <b>레이어를 줄이는 진짜 이유는 개수 제한이 아니라 크기와 추적 가능성</b>이다.
+      </p>
+    </div>
+  </div>
+
+  <h4>예제 2. 머신러닝 데이터 압축 해제</h4>
+  <p>단순히 삭제만 한다고 해서 이미지 레이어의 크기가 줄지 않는다.</p>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">v1 &mdash; 이미지 2.5GB</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-dockerfile">FROM diamol/base
+
+ARG DATASET_URL=https://archive.ics.uci.edu/ml/\
+machine-learning-databases/url/url_svmlight.tar.gz
+
+WORKDIR /dataset
+
+RUN wget -O dataset.tar.gz ${DATASET_URL} &amp;&amp; \
+    tar xvzf dataset.tar.gz
+
+WORKDIR /dataset/url_svmlight
+RUN cp Day1.svm Day1.bak &amp;&amp; \
+    rm -f *.svm &amp;&amp; \
+    mv Day1.bak Day1.svm</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head">
+        <div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">v2 &mdash; 이미지 25MB</span>
+        <span class="code-spacer"></span>
+      </div>
+<pre><code class="language-dockerfile">FROM diamol/base
+
+ARG DATASET_URL=https://archive.ics.uci.edu/ml/\
+machine-learning-databases/url/url_svmlight.tar.gz
+
+WORKDIR /dataset
+
+RUN wget -O dataset.tar.gz ${DATASET_URL} &amp;&amp; \
+    tar -xf dataset.tar.gz url_svmlight/Day1.svm &amp;&amp; \
+    rm -f dataset.tar.gz</code></pre>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">2.5GB → 25MB, 100배 차이</p>
+      <p>
+        v1 은 전체를 풀어놓은 뒤 지웠기 때문에, 아래 레이어에 <b>압축 파일과 풀린 전체 데이터가 모두 남아</b> 있다.
+        v2 는 <code>tar</code> 에 파일 이름을 지정해 <b>필요한 하나만 꺼냈다</b>.
+        원칙은 언제나 같다 &mdash; <b>지우지 말고 애초에 만들지 않는다.</b>
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>설치와 정리는 반드시 같은 <code>RUN</code> 안에서 끝낸다. 나누면 정리 효과가 없다.</li>
+      <li><code>apt-get</code> 은 <code>--no-install-recommends</code> + <code>rm -rf /var/lib/apt/lists/*</code> 가 기본형이다.</li>
+      <li>overlay2 의 레이어 한계는 128 이지만, 줄이는 진짜 이유는 크기와 추적 가능성이다.</li>
+      <li>큰 아카이브는 통째로 풀고 지우는 대신 필요한 파일만 꺼낸다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 17-4</div>
+    <h3>멀티 스테이지 빌드를 한 단계 업그레이드하기</h3>
+    <p class="item-tagline"><code>--target</code> 으로 중간 스테이지까지만 빌드하면, 어느 단계에서 크기가 폭발하는지 눈으로 확인할 수 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>--target</code> 은 디버깅 도구다. 스테이지별 이미지를 각각 만들어 크기를 재 보면,
+    <b>어느 단계가 무엇을 남기고 있는지</b>가 그대로 드러난다.
+  </div>
+
+  <h4><code>--target</code> 인자</h4>
+  <p>이 인자로 특정 스테이지에서 빌드를 중단할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 이미지 끝까지 빌드
+$ docker image build -t diamol/ch17-ml-dataset:v3 -f Dockerfile.v3 .
+
+# download 스테이지까지만 빌드
+$ docker build -t diamol/ch17-ml-dataset:v3-download -f Dockerfile.v3 --target download .
+
+# expand 스테이지까지만 빌드
+$ docker build -t diamol/ch17-ml-dataset:v3-expand -f Dockerfile.v3 --target expand .
+
+# 각 단계마다 이미지의 크기가 다르다
+$ docker image ls | grep diamol/ch17-ml-dataset
+diamol/ch17-ml-dataset   v3            26080e7d3ce4   13 minutes ago   25.3MB
+diamol/ch17-ml-dataset   v3-expand     adb8e54075dd   13 minutes ago   2.46GB
+diamol/ch17-ml-dataset   v3-download   35e3d8920e1e   14 minutes ago   252MB</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 200" width="620" role="img" aria-label="download 스테이지는 252MB, expand 스테이지는 2.46GB, 최종 이미지는 25.3MB 로 최종만 작다">
+        <line x1="120" y1="30" x2="120" y2="150" class="dg-stroke"/>
+        <line x1="120" y1="150" x2="600" y2="150" class="dg-stroke"/>
+
+        <rect x="150" y="126" width="90" height="24" class="dg-fill-soft dg-stroke"/>
+        <text x="195" y="143" class="dg-text dg-mono" font-size="10" text-anchor="middle">252MB</text>
+        <text x="195" y="168" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">download</text>
+
+        <rect x="290" y="40" width="90" height="110" class="dg-fill-soft dg-stroke" fill="var(--red)" opacity="0.18"/>
+        <rect x="290" y="40" width="90" height="110" class="dg-stroke" fill="none"/>
+        <text x="335" y="100" class="dg-text dg-mono" font-size="12" font-weight="700" text-anchor="middle">2.46GB</text>
+        <text x="335" y="168" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">expand</text>
+
+        <rect x="430" y="142" width="90" height="8" class="dg-stroke" fill="var(--green)"/>
+        <text x="475" y="132" class="dg-mono" font-size="11" font-weight="700" fill="var(--green)" text-anchor="middle">25.3MB</text>
+        <text x="475" y="168" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">최종 이미지</text>
+
+        <text x="112" y="46" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">2.5GB</text>
+        <text x="112" y="154" class="dg-text-sub dg-mono" font-size="9" text-anchor="end">0</text>
+
+        <text x="360" y="190" class="dg-accent" font-size="11.5" text-anchor="middle">중간 스테이지가 아무리 커도 최종 이미지에는 전달한 것만 남는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>2.46GB 짜리 스테이지를 거쳐 25.3MB 이미지가 나온다</b> —
+      <code>COPY --from</code> 으로 명시한 파일만 넘어오기 때문이다.
+      <code>--target</code> 이 없으면 이 중간 크기는 보이지 않는다.
+    </div>
+  </div>
+
+  <h4>주의점</h4>
+  <ul>
+    <li><code>RUN</code> 으로 내려받거나 설치한 소프트웨어 등 불필요한 데이터가 캐싱되지 않도록 주의해야 한다.</li>
+    <li>앞 단계에서 캐싱된 데이터는 해당 <code>Dockerfile</code> 안에서 그 인스트럭션을 수정할 때까지 캐시에 유지된다.</li>
+    <li>이미지에 패키지를 추가할 때는 <b>정확한 버전을 명시</b>해서 설치하거나 업데이트하는 게 좋다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">버전 고정이 중요한 이유 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>RUN apt-get install -y curl</code> 처럼 버전 없이 쓰면, 이 레이어가 캐시에 걸려 있는 동안은
+        <b>몇 달 전 버전이 계속 쓰이다가</b> 어느 날 캐시가 깨지는 순간 갑자기 최신 버전으로 바뀐다.
+        빌드가 언제 깨질지 예측할 수 없다는 뜻이다.
+      </p>
+      <p>
+        그래서 <a href="#item-17-3">17-3</a> 의 예제처럼 <code>curl=7.52.1-5+deb9u16</code> 로 버전을 못 박는다.
+        업그레이드는 사람이 의도적으로 그 줄을 고칠 때만 일어나야 한다.
+        <code>FROM</code> 의 기반 이미지도 마찬가지로 <code>latest</code> 대신 구체적인 태그를 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>--target</code> 의 또 다른 쓰임 <span class="badge b-blue">보강</span></p>
+      <p>
+        CI 에서 <b>테스트 스테이지까지만 빌드</b>하는 데도 쓴다.
+        <code>docker build --target test .</code> 로 테스트만 돌리고,
+        통과하면 <code>--target</code> 없이 최종 이미지를 만드는 식이다.
+        개발용으로 디버깅 도구가 포함된 스테이지를 따로 두고
+        <code>--target dev</code> 로 뽑아 쓰는 패턴도 흔하다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>--target</code> 으로 중간 스테이지까지만 빌드해 어느 단계가 무거운지 확인한다.</li>
+      <li>중간 스테이지가 커도 최종 이미지에는 <code>COPY --from</code> 으로 넘긴 것만 남는다.</li>
+      <li>패키지와 기반 이미지의 버전은 못 박는다. 캐시가 깨지는 순간 조용히 바뀌는 것을 막는다.</li>
+      <li><code>--target</code> 은 CI 의 테스트 전용 빌드, 개발용 이미지 분리에도 쓰인다.</li>
+    </ul>
+  </div>
+</article>

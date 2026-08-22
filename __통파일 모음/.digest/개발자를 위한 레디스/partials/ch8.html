@@ -1,0 +1,213 @@
+<article class="item" id="item-8-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-1</div>
+    <h3>복제</h3>
+    <p class="item-tagline">한 벌 더 만들어 두는 일. 그것만으로 장애가 해결되지는 않지만, 해결의 전제 조건은 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    복제는 마스터 하나에 복제본 여럿인 <b>단방향</b> 구조다. 쓰기는 마스터로 모이고 읽기는 흩어질 수 있으며, 승격은 사람이나 센티널/클러스터가 결정한다.
+  </div>
+
+  <ul>
+    <li>마스터 노드의 데이터를 복제본 노드로 실시간 복사한다</li>
+    <li>마스터에 장애가 나도 복제본에서 데이터를 확인할 수 있다</li>
+    <li>복제본은 트래픽 분산에도 쓸 수 있다. 마스터와 복제본 양쪽이 모두 트래픽을 받을 수 있다</li>
+    <li>데이터를 공유하므로 복제본 노드에서 백업을 수행할 수도 있다</li>
+    <li>보통 마스터가 쓰기를, 복제본이 읽기를 담당한다</li>
+  </ul>
+
+  <h4>복제 구조 구성하기</h4>
+  <ul>
+    <li><code>REPLICAOF</code> 커맨드로 간단히 복제 구조를 만들 수 있다</li>
+    <li>마스터는 한 개만 존재하며, 복제본 아래에 다시 복제본을 둘 수도 있다(연쇄 복제)</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">REPLICAOF &lt;master-ip&gt; &lt;master-port&gt;</code></pre>
+  </div>
+
+  <p>복제를 끊고 독립 마스터로 되돌릴 때는 <code>REPLICAOF NO ONE</code> 을 쓴다. 이때 이미 받은 데이터는 그대로 유지된다.</p>
+
+  <h4>패스워드 설정</h4>
+  <ul>
+    <li>ACL 이 아닌 기본 비밀번호를 쓰는 경우 <code>masterauth</code> 옵션에 비밀번호를 넣어야 한다</li>
+    <li>마스터는 <code>requirepass</code> 로 비밀번호를 설정하고, 복제본은 <code>masterauth</code> 로 설정한다</li>
+    <li><code>CONFIG SET</code> 으로 실행 중에도 비밀번호를 설정할 수 있다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">모든 노드에 두 옵션을 다 넣어 둔다</p>
+      <p>복제본은 언제든 마스터로 승격될 수 있고, 그러면 지금의 마스터가 복제본이 된다. 그러므로 <code>requirepass</code> 와 <code>masterauth</code> 를 <b>모든 노드에 같은 값으로</b> 설정해 두어야 페일오버 이후에도 복제가 이어진다. (<a href="#item-9-3">9-3 패스워드 인증</a> 참고)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>REPLICAOF host port</code> 한 줄로 복제가 시작되고, <code>REPLICAOF NO ONE</code> 으로 끊는다.</li>
+      <li>복제본은 읽기 분산과 백업 전용 노드로 활용할 수 있다.</li>
+      <li>인증은 모든 노드에 <code>requirepass</code> + <code>masterauth</code> 를 동일하게 설정한다. 역할은 언제든 뒤바뀐다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-2</div>
+    <h3>복제 메커니즘</h3>
+    <p class="item-tagline">전체 동기화는 비싸다. 그래서 레디스는 끊긴 자리부터 이어 붙이는 <b>부분 재동기화</b>에 공을 들인다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    복제본이 붙을 때는 RDB 를 통째로 받는다(전체 동기화). 잠깐 끊겼다 붙을 때는 백로그 버퍼에서 <b>빠진 offset 만</b> 받아 온다(부분 재동기화).
+  </div>
+
+  <h4>복제 메커니즘 — 디스크를 사용하는 방식</h4>
+  <ol class="steps">
+    <li><div class="step-title">복제본이 REPLICAOF 로 복제를 시도한다</div></li>
+    <li><div class="step-title">마스터가 fork 로 자식 프로세스를 만들고 RDB 스냅숏을 생성한다</div></li>
+    <li><div class="step-title">그동안의 변경은 복제 버퍼에 쌓인다</div><p>RESP 형태로 마스터 노드의 복제 버퍼에 저장된다.</p></li>
+    <li><div class="step-title">RDB 생성이 끝나면 복제본으로 전송되고, 복제본이 그것을 로딩한다</div></li>
+    <li><div class="step-title">그동안 버퍼에 쌓인 변경을 복제본에 전달해 수행시킨다</div></li>
+  </ol>
+
+  <h5>최대 복제 작업의 수</h5>
+  <ul>
+    <li>복제(전체 동기화)를 위한 RDB 생성은 한 번에 하나만 진행되고, 나머지 요청은 대기한다</li>
+    <li><code>repl-diskless-sync-delay</code> 옵션
+      <ul>
+        <li>디스크리스 복제를 시작하기 전에 <b>설정한 초만큼 기다렸다가</b> 전송을 시작한다는 뜻이다 (기본값 5초)</li>
+        <li>네트워크 문제로 재동기화를 요청할 때는 여러 복제본이 한꺼번에 몰려드는 것이 일반적이라, 잠시 기다렸다가 <b>하나의 스트림으로 함께 보내면</b> 마스터의 부담이 줄어든다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p><code>repl-diskless-sync-delay</code> 는 "활성화/비활성화"하는 스위치가 아니라 <b>대기 시간(초)</b> 값이며 기본값은 <code>5</code> 다. 또한 이 옵션은 디스크를 쓰는 방식이 아니라 <b>디스크리스 복제에만</b> 적용된다. 0 으로 두면 기다리지 않고 즉시 전송을 시작한다. (근거: <a href="https://github.com/redis/redis/blob/7.4/redis.conf">redis.conf</a>)</p>
+    </div>
+  </div>
+
+  <h4>복제 메커니즘 — 디스크를 사용하지 않는 방식 (디스크리스)</h4>
+  <ol class="steps">
+    <li><div class="step-title">복제본이 REPLICAOF 로 복제를 시도한다</div></li>
+    <li><div class="step-title">마스터가 복제본과 소켓으로 직접 연결한다</div><p>RDB 를 파일로 남기지 않고, 만들어지는 대로 복제본의 소켓으로 흘려보낸다.</p></li>
+    <li><div class="step-title">그동안의 변경은 마스터의 복제 버퍼에 쌓인다</div></li>
+    <li><div class="step-title">복제본은 소켓에서 읽은 RDB 를 디스크에 저장하거나 곧바로 메모리에 로딩한다</div></li>
+    <li><div class="step-title">이후는 디스크 방식과 동일하다</div></li>
+  </ol>
+
+  <p>디스크 I/O 보다 네트워크가 빠른 환경에서 유리한 방식이다.</p>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Redis 7.0 이후 기본값이 바뀌었다 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>repl-diskless-sync</code> 의 기본값이 <b>7.0 부터 <code>yes</code></b> 다. 즉 별도 설정을 하지 않았다면 지금 돌아가는 레디스는 이미 디스크리스 복제를 쓰고 있다. 복제본 쪽에도 <code>repl-diskless-load</code> 옵션이 있어 받은 데이터를 디스크를 거치지 않고 바로 메모리에 올릴 수 있다. (근거: <a href="https://github.com/redis/redis/blob/7.4/redis.conf">redis.conf</a>)</p>
+    </div>
+  </div>
+
+  <h4>비동기 방식으로 동작하는 복제 연결</h4>
+  <ul>
+    <li>정상적으로 연결된 상태에서 마스터에서 복제본으로의 데이터 전달은 <b>비동기</b>로 동작한다</li>
+    <li>마스터 장애로 데이터가 복제본에 전달되지 못하면 그만큼 유실이 발생한다
+      <ul><li>전달 속도가 매우 빠르므로 이런 현상이 빈번하지는 않다</li></ul>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">비동기라는 말의 무게</p>
+      <p>마스터는 복제본의 응답을 기다리지 않고 클라이언트에게 <code>OK</code> 를 준다. 즉 <b>성공 응답을 받은 쓰기도 페일오버에서 사라질 수 있다</b>. 손실 폭을 제한하고 싶다면 <code>min-replicas-to-write</code> / <code>min-replicas-max-lag</code> 로 "복제본 N개가 M초 이내로 따라오고 있지 않으면 쓰기를 거부"하도록 설정할 수 있다. 완전한 동기 복제는 아니지만 유실 창을 좁혀 준다.</p>
+    </div>
+  </div>
+
+  <h4>복제 아이디</h4>
+  <ul>
+    <li>복제 기능을 쓰지 않는 인스턴스를 포함해 모든 인스턴스가 복제 ID 를 가진다</li>
+    <li><code>INFO REPLICATION</code> 으로 복제 관련 상태를 확인할 수 있다</li>
+  </ul>
+
+  <h4>부분 재동기화</h4>
+  <ul>
+    <li>네트워크가 불안정해 연결이 끊길 때마다 RDB 를 새로 받으면 성능이 크게 나빠진다</li>
+    <li>이를 방지하기 위해 부분 재동기화를 제공한다</li>
+    <li>마스터는 커넥션 유실에 대비해 <b>백로그 버퍼</b>에 복제본으로 보낼 데이터를 남겨 둔다</li>
+    <li>복제본은 <code>PSYNC</code> 로 자신의 replication id 와 offset 을 마스터에 전달한다
+      <ul><li>모든 데이터를 다시 받는 대신 차이 나는 offset 부터의 데이터만 백로그 버퍼에서 받아 온다</li></ul>
+    </li>
+    <li>백로그 버퍼에 필요한 구간이 없거나 replication id 가 다르면 <b>전체 재동기화</b>를 수행한다</li>
+    <li>백로그 크기는 기본 1MB 이며 <code>repl-backlog-size</code> 로 조정한다</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["복제본이 PSYNC replid offset 전송"] --> B{"replid 가 일치하는가"}
+  B -->|"아니오"| F["전체 재동기화<br>RDB 전송"]
+  B -->|"예"| C{"백로그에 그 offset 이 남아 있는가"}
+  C -->|"아니오"| F
+  C -->|"예"| D["부분 재동기화<br>차이 구간만 전송"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>부분 재동기화는 두 관문을 모두 통과해야 한다</b> — 복제 ID 가 같고, 끊긴 동안의 데이터가 아직 백로그에 남아 있어야 한다. 끊김이 길어질수록 백로그를 넘겨 버리므로, 불안정한 환경일수록 <code>repl-backlog-size</code> 를 키운다.</div>
+  </div>
+
+  <h4>Secondary 복제 ID</h4>
+  <ul>
+    <li>기존 마스터 A 가 다운되어 복제본 B 가 마스터로 승격되는 상황을 가정한다</li>
+    <li>B, C 모두 A 를 바라보던 구조에서, 세컨더리 복제 ID 덕분에 C 는 B 를 새 마스터로 삼는다</li>
+    <li>승격된 B 는 <b>새 복제 ID 를 만들면서 이전 ID 를 세컨더리로 기억</b>한다. 그래서 C 가 예전 ID 로 <code>PSYNC</code> 를 걸어도 알아본다</li>
+    <li>덕분에 C 는 B 에 대해 전체 재동기화 없이 부분 재동기화로 이어 붙일 수 있다</li>
+    <li>결국 세컨더리 복제 ID 가 존재하는 이유는 <b>페일오버 이후 승격되는 복제본</b> 때문이다</li>
+  </ul>
+
+  <h4>읽기 전용 모드로 동작하는 복제본 노드</h4>
+  <ul>
+    <li>기본적으로 복제본은 읽기 전용으로 동작하며 <code>SET</code> 을 쓸 수 없다</li>
+    <li><code>replica-read-only</code> 옵션으로 끌 수 있지만, 복제본에 쓴 데이터는 마스터로 전달되지 않고 재동기화 때 사라지므로 권장하지 않는다</li>
+  </ul>
+
+  <h4>유효하지 않은 복제본 데이터</h4>
+  <ul>
+    <li>유효하지 않은 데이터란 마스터와 복제본의 데이터가 정확히 일치하지 않는 상태를 뜻한다</li>
+    <li>이 상태에서는 기본적으로 에러를 반환하며, <code>replica-serve-stale-data</code> 옵션으로 <b>오래된 데이터라도 응답</b>하게 바꿀 수 있다</li>
+  </ul>
+
+  <h4>백업을 사용하지 않는 경우에서의 복제</h4>
+  <ul>
+    <li>복제를 사용한다면 마스터와 복제본 모두 백업 기능을 켜 두는 것이 좋다</li>
+    <li>백업을 쓰지 않으려면 재부팅 후 레디스가 <b>자동으로 시작되지 않도록</b> 설정할 것을 권장한다</li>
+    <li>마스터가 빈 상태로 재시작하면, 복제본은 그 빈 데이터를 그대로 복제해 와 데이터가 전부 사라진다</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">백업 없는 복제 구성에서 가장 흔한 사고</p>
+      <p>마스터가 죽었다가 <b>혼자 살아 돌아오면</b> 데이터가 없는 채로 복제를 재개하고, 복제본들이 그 빈 상태를 따라가면서 전체 데이터가 사라진다. 그래서 백업을 끌 거라면 자동 재시작도 함께 꺼야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>전체 동기화는 fork + RDB, 부분 재동기화는 백로그 버퍼에서 offset 차이만 보낸다.</li>
+      <li>7.0 부터 디스크리스 복제(<code>repl-diskless-sync yes</code>)가 기본이며, <code>repl-diskless-sync-delay</code>(기본 5초)는 여러 복제본을 모아 한 번에 보내기 위한 대기 시간이다.</li>
+      <li>복제는 비동기다. 성공 응답을 받은 쓰기도 유실될 수 있으며 <code>min-replicas-*</code> 로 창을 좁힌다.</li>
+      <li>세컨더리 복제 ID 덕분에 페일오버 이후에도 전체 재동기화를 피할 수 있다.</li>
+      <li>백업을 끄면 자동 재시작도 꺼야 한다. 빈 마스터가 복제본을 지워 버릴 수 있다.</li>
+    </ul>
+  </div>
+</article>

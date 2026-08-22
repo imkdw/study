@@ -1,0 +1,251 @@
+{
+  "title": "Real MySQL 8.0",
+  "subtitle": "17개 챕터 81개 노트 정리",
+  "mark": "MY",
+  "eyebrow": "STUDY DIGEST",
+  "description": "Real MySQL 8.0 학습 노트를 한 권으로 정리한 단일 HTML 학습자료. 아키텍처, 인덱스, 옵티마이저, 실행 계획, 복제까지.",
+  "lead": "MySQL 서버가 <b>쿼리 한 줄을 받아 디스크까지 내려가는 전 과정</b>을 따라가며 정리한 노트다. 엔진 구조와 잠금에서 시작해 인덱스와 옵티마이저, 실행 계획 읽는 법을 지나 복제와 클러스터까지 이어진다. 원문 노트의 흐름을 그대로 두되 <b>공식 문서로 검증해 교정하고</b>, 8.0.20 이후 바뀐 부분은 따로 표시했다.",
+  "coverNote": "<div class=\"callout tip\"><div class=\"ic\">i</div><div><p class=\"callout-title\">읽는 법</p><p>왼쪽 사이드바에서 챕터를 펼쳐 원하는 절로 바로 이동할 수 있다. 검색창에는 한글 제목뿐 아니라 <code>buffer pool</code>, <code>ICP</code>, <code>GTID</code> 같은 영문 키워드도 걸린다. <span class=\"badge b-red\">원문 교정</span> 은 노트의 서술이 실제와 달라 고친 곳, <span class=\"badge b-purple\">최신 반영</span> 은 책 출간 이후 바뀐 동작, <span class=\"badge b-blue\">보강</span> 은 노트에 없지만 함께 알아두면 좋은 내용이다.</p></div></div>",
+  "footer": "원본 노트 — <b>Real MySQL 8.0</b> (백은빈 / 이성욱) 학습 기록 · 검증 기준 MySQL 8.0 공식 레퍼런스 매뉴얼",
+  "stats": [
+    { "val": "81", "unit": "개", "label": "노트" },
+    { "val": "17", "unit": "개", "label": "챕터" },
+    { "val": "500", "unit": "KB+", "label": "원문 분량" }
+  ],
+  "chapters": [
+    {
+      "id": "ch2",
+      "short": "CH 2",
+      "navTitle": "설치와 설정",
+      "title": "설치와 설정",
+      "lead": "MySQL 서버의 동작은 570여 개의 시스템 변수가 결정한다. 어디에 적히고, 언제 반영되며, 무엇이 재시작을 요구하는지부터 잡는다.",
+      "items": [
+        { "id": "item-2-4", "idx": "2-4", "title": "서버 설정", "keywords": "my.cnf system variable SET PERSIST global session dynamic static mysqld-auto.cnf" }
+      ]
+    },
+    {
+      "id": "ch3",
+      "short": "CH 3",
+      "navTitle": "사용자 및 권한",
+      "title": "사용자 및 권한",
+      "lead": "MySQL의 계정은 아이디 하나가 아니라 <code>아이디@호스트</code> 쌍이다. 이 전제 위에 계정/비밀번호/권한/역할이 얹힌다.",
+      "items": [
+        { "id": "item-3-1", "idx": "3-1", "title": "사용자 식별", "keywords": "user host wildcard identification narrow scope" },
+        { "id": "item-3-2", "idx": "3-2", "title": "사용자 계정 관리", "keywords": "CREATE USER SYSTEM_USER IDENTIFIED WITH caching_sha2_password PASSWORD EXPIRE ACCOUNT LOCK" },
+        { "id": "item-3-3", "idx": "3-3", "title": "비밀번호 관리", "keywords": "validate_password component dual password RETAIN CURRENT PASSWORD policy" },
+        { "id": "item-3-4", "idx": "3-4", "title": "권한", "keywords": "GRANT global object privilege static dynamic ALL PRIVILEGES" },
+        { "id": "item-3-5", "idx": "3-5", "title": "역할", "keywords": "ROLE SET ROLE activate_all_roles_on_login mysql.user" }
+      ]
+    },
+    {
+      "id": "ch4",
+      "short": "CH 4",
+      "navTitle": "아키텍처",
+      "title": "아키텍처",
+      "lead": "MySQL 엔진은 머리, 스토리지 엔진은 손발이다. 이 분리가 핸들러 API/버퍼 풀/리두 로그로 어떻게 이어지는지가 이 챕터의 전부다.",
+      "items": [
+        { "id": "item-4-1", "idx": "4-1", "title": "MySQL 엔진 아키텍처", "keywords": "handler API foreground background thread global local memory plugin component query cache thread pool data dictionary" },
+        { "id": "item-4-2", "idx": "4-2", "title": "InnoDB 스토리지 엔진 아키텍처", "keywords": "MVCC undo redo buffer pool LRU flush list double write change buffer adaptive hash index checkpoint LSN" },
+        { "id": "item-4-3", "idx": "4-3", "title": "MyISAM 스토리지 엔진 아키텍처", "keywords": "key cache ROWID myisam_data_pointer_size heap" },
+        { "id": "item-4-4", "idx": "4-4", "title": "MySQL 로그 파일", "keywords": "error log general log slow query log Aborted connection pt-query-digest long_query_time" }
+      ]
+    },
+    {
+      "id": "ch5",
+      "short": "CH 5",
+      "navTitle": "트랜잭션과 잠금",
+      "title": "트랜잭션과 잠금",
+      "lead": "잠금은 MySQL 엔진 레벨과 스토리지 엔진 레벨 두 층에 있다. 그리고 InnoDB는 <b>레코드가 아니라 인덱스를 잠근다.</b>",
+      "items": [
+        { "id": "item-5-1", "idx": "5-1", "title": "트랜잭션", "keywords": "transaction partial update rollback MyISAM InnoDB scope" },
+        { "id": "item-5-2", "idx": "5-2", "title": "MySQL 엔진의 잠금", "keywords": "global lock backup lock table lock named lock GET_LOCK metadata lock FLUSH TABLES WITH READ LOCK" },
+        { "id": "item-5-3", "idx": "5-3", "title": "InnoDB 스토리지 엔진 잠금", "keywords": "record lock gap lock next key lock auto increment innodb_autoinc_lock_mode interleaved" },
+        { "id": "item-5-4", "idx": "5-4", "title": "MySQL의 격리 수준", "keywords": "isolation level READ UNCOMMITTED READ COMMITTED REPEATABLE READ SERIALIZABLE dirty read phantom read MVCC undo" }
+      ]
+    },
+    {
+      "id": "ch6",
+      "short": "CH 6",
+      "navTitle": "데이터 압축",
+      "title": "데이터 압축",
+      "lead": "압축은 페이지 단위와 테이블 단위 두 갈래다. 하나는 파일시스템의 펀치 홀에 기대고, 다른 하나는 버퍼 풀을 두 벌 쓴다.",
+      "items": [
+        { "id": "item-6-1", "idx": "6-1", "title": "페이지 압축", "keywords": "transparent page compression punch hole sparse file zlib COMPRESSION" },
+        { "id": "item-6-2", "idx": "6-2", "title": "테이블 압축", "keywords": "ROW_FORMAT COMPRESSED KEY_BLOCK_SIZE unzip_LRU adaptive innodb_compression_level" }
+      ]
+    },
+    {
+      "id": "ch7",
+      "short": "CH 7",
+      "navTitle": "데이터 암호화",
+      "title": "데이터 암호화",
+      "lead": "MySQL의 암호화는 스토리지 엔진의 I/O 레이어에서만 일어난다. 그래서 인덱스를 그대로 쓸 수 있고, 그래서 TDE(Transparent)다.",
+      "items": [
+        { "id": "item-7-1", "idx": "7-1", "title": "MySQL 서버의 암호화", "keywords": "TDE transparent data encryption master key tablespace key AES-256 CBC ECB keyring" },
+        { "id": "item-7-2", "idx": "7-2", "title": "keyring_file 플러그인 설치", "keywords": "keyring_file early-plugin-load keyring component_keyring_file ROTATE MASTER KEY" },
+        { "id": "item-7-3", "idx": "7-3", "title": "테이블 암호화", "keywords": "ENCRYPTION default_table_encryption FLUSH TABLES FOR EXPORT cfg transportable tablespace" },
+        { "id": "item-7-4", "idx": "7-4", "title": "언두 로그 및 리두 로그 암호화", "keywords": "innodb_undo_log_encrypt innodb_redo_log_encrypt" },
+        { "id": "item-7-5", "idx": "7-5", "title": "바이너리 로그 암호화", "keywords": "binlog_encryption mysqlbinlog read-from-remote-server file key" }
+      ]
+    },
+    {
+      "id": "ch8",
+      "short": "CH 8",
+      "navTitle": "인덱스",
+      "title": "인덱스",
+      "lead": "인덱스는 쓰기를 팔아 읽기를 사는 거래다. 이 챕터는 그 거래의 단가를 B-Tree의 구조에서 직접 계산해 본다.",
+      "items": [
+        { "id": "item-8-1", "idx": "8-1", "title": "디스크 읽기 방식", "keywords": "HDD SSD random IO sequential IO system call OLTP" },
+        { "id": "item-8-2", "idx": "8-2", "title": "인덱스", "keywords": "index B-Tree hash algorithm sorted key value" },
+        { "id": "item-8-3", "idx": "8-3", "title": "B-Tree 인덱스", "keywords": "balanced tree leaf branch root cardinality selectivity range scan full index scan loose index scan skip scan multi column descending index" },
+        { "id": "item-8-4", "idx": "8-4", "title": "R-Tree 인덱스", "keywords": "spatial index MBR minimum bounding rectangle ST_Contains ST_Within GEOMETRY" },
+        { "id": "item-8-5", "idx": "8-5", "title": "전문 검색 인덱스", "keywords": "fulltext stopword stemming n-gram MeCab MATCH AGAINST innodb_ft_enable_stopword" },
+        { "id": "item-8-6", "idx": "8-6", "title": "함수 기반 인덱스", "keywords": "functional index virtual generated column CONCAT expression" },
+        { "id": "item-8-7", "idx": "8-7", "title": "멀티 밸류 인덱스", "keywords": "multi-valued index CAST AS UNSIGNED ARRAY MEMBER OF JSON_CONTAINS JSON_OVERLAPS" },
+        { "id": "item-8-8", "idx": "8-8", "title": "클러스터링 인덱스", "keywords": "clustering index primary key secondary index covering index auto_increment surrogate key" },
+        { "id": "item-8-9", "idx": "8-9", "title": "유니크 인덱스", "keywords": "unique index constraint change buffer duplicate check deadlock" },
+        { "id": "item-8-10", "idx": "8-10", "title": "외래키", "keywords": "foreign key FOREIGN_KEY_CHECKS ON DELETE CASCADE lock contention parent child" }
+      ]
+    },
+    {
+      "id": "ch9",
+      "short": "CH 9",
+      "navTitle": "옵티마이저와 힌트",
+      "title": "옵티마이저와 힌트",
+      "lead": "옵티마이저가 쿼리를 어떻게 뜯어 고치는지 모르면, 힌트는 그냥 주술이 된다. 기본 처리부터 세미 조인 최적화까지 순서대로 본다.",
+      "items": [
+        { "id": "item-9-1", "idx": "9-1", "title": "개요", "keywords": "SQL parser optimizer execution plan CBO RBO cost based rule based" },
+        { "id": "item-9-2", "idx": "9-2", "title": "기본 데이터 처리", "keywords": "full table scan read ahead filesort sort buffer single pass two pass GROUP BY DISTINCT temporary table streaming buffering TempTable" },
+        { "id": "item-9-3", "idx": "9-3", "title": "고급 최적화", "keywords": "optimizer_switch MRR BKA block nested loop ICP index condition pushdown index merge semijoin table pullout firstmatch loosescan materialization duplicate weedout condition fanout derived merge hash join skip scan" },
+        { "id": "item-9-4", "idx": "9-4", "title": "쿼리 힌트", "keywords": "STRAIGHT_JOIN USE INDEX FORCE INDEX IGNORE INDEX MAX_EXECUTION_TIME SET_VAR SEMIJOIN BNL JOIN_ORDER MERGE NO_ICP QB_NAME" }
+      ]
+    },
+    {
+      "id": "ch10",
+      "short": "CH 10",
+      "navTitle": "실행 계획",
+      "title": "실행 계획",
+      "lead": "통계 정보와 코스트 모델이 실행 계획을 만들고, EXPLAIN이 그 결과를 12개 컬럼으로 요약한다. 이 챕터는 그 12개 컬럼 사전이다.",
+      "items": [
+        { "id": "item-10-1", "idx": "10-1", "title": "통계 정보", "keywords": "innodb_index_stats innodb_table_stats histogram singleton equi-height bucket index dive cost model server_cost engine_cost" },
+        { "id": "item-10-2", "idx": "10-2", "title": "실행 계획 확인", "keywords": "EXPLAIN FORMAT JSON TREE EXPLAIN ANALYZE actual time loops" },
+        { "id": "item-10-3", "idx": "10-3", "title": "실행 계획 분석", "keywords": "id select_type table partitions type possible_keys key key_len ref rows filtered Extra const eq_ref range index_merge DERIVED MATERIALIZED Using filesort Using index Using temporary" }
+      ]
+    },
+    {
+      "id": "ch11",
+      "short": "CH 11",
+      "navTitle": "쿼리 작성 및 최적화",
+      "title": "쿼리 작성 및 최적화",
+      "lead": "앞 챕터들이 서버의 사정이었다면, 이 챕터는 <b>내가 쓰는 SQL</b>이다. SELECT의 처리 순서에서 시작해 DDL과 성능 테스트까지 간다.",
+      "items": [
+        { "id": "item-11-1", "idx": "11-1", "title": "쿼리 작성과 연관된 시스템 변수", "keywords": "sql_mode ONLY_FULL_GROUP_BY STRICT_TRANS_TABLES case sensitivity reserved word backtick" },
+        { "id": "item-11-2", "idx": "11-2", "title": "매뉴얼의 SQL 문법 표기를 읽는 법", "keywords": "syntax notation italic bracket pipe brace ellipsis INSERT grammar" },
+        { "id": "item-11-3", "idx": "11-3", "title": "MySQL 연산자와 내장 함수", "keywords": "literal collation NULL safe equal REGEXP LIKE BETWEEN IN DIV MOD boolean tinyint introducer" },
+        { "id": "item-11-4", "idx": "11-4", "title": "SELECT", "keywords": "execution order LIMIT COUNT JOIN driving driven outer join delayed join lateral join GROUP BY WITH ROLLUP ORDER BY subquery CTE recursive window function FOR UPDATE FOR SHARE NOWAIT SKIP LOCKED" },
+        { "id": "item-11-5", "idx": "11-5", "title": "INSERT", "keywords": "INSERT IGNORE ON DUPLICATE KEY UPDATE LOAD DATA primary key auto_increment LAST_INSERT_ID bulk insert" },
+        { "id": "item-11-6", "idx": "11-6", "title": "UPDATE, DELETE", "keywords": "join update join delete ORDER BY LIMIT binlog_format STATEMENT VALUES ROW derived table deadlock" },
+        { "id": "item-11-7", "idx": "11-7", "title": "스키마 조작(DDL)", "keywords": "online DDL INSTANT INPLACE COPY ALGORITHM LOCK NONE SHARED rebuild tablespace RENAME TABLE index visibility SHOW PROCESSLIST" },
+        { "id": "item-11-8", "idx": "11-8", "title": "쿼리 성능 테스트", "keywords": "os cache direct io buffer pool warm up cold drop_caches innodb_buffer_pool_load_at_startup" }
+      ]
+    },
+    {
+      "id": "ch12",
+      "short": "CH 12",
+      "navTitle": "확장 검색",
+      "title": "확장 검색",
+      "lead": "한글에는 형태소 분석보다 n-gram이 현실적이다. 전문 검색 인덱스를 실제로 만들고, 자연어/불린 모드로 검색해 본다.",
+      "items": [
+        { "id": "item-12-1", "idx": "12-1", "title": "전문 검색", "keywords": "fulltext ngram_token_size bi-gram tri-gram natural language boolean mode query expansion innodb_ft_aux_table" },
+        { "id": "item-12-2", "idx": "12-2", "title": "공간 검색", "keywords": "spatial search skipped pass" }
+      ]
+    },
+    {
+      "id": "ch13",
+      "short": "CH 13",
+      "navTitle": "파티션",
+      "title": "파티션",
+      "lead": "파티션은 성능 기능이 아니라 <b>관리 기능</b>에 가깝다. 프루닝이 걸리지 않으면 파티션 수만큼 오버헤드가 곱해진다.",
+      "items": [
+        { "id": "item-13-1", "idx": "13-1", "title": "개요", "keywords": "partition pruning working set INSERT UPDATE SELECT priority queue" },
+        { "id": "item-13-2", "idx": "13-2", "title": "주의사항", "keywords": "unique key constraint foreign key open_files_limit partition expression" },
+        { "id": "item-13-3", "idx": "13-3", "title": "MySQL 파티션의 종류", "keywords": "range list hash key linear MAXVALUE REORGANIZE PARTITION COALESCE PARTITION" }
+      ]
+    },
+    {
+      "id": "ch14",
+      "short": "CH 14",
+      "navTitle": "스토어드 프로그램",
+      "title": "스토어드 프로그램",
+      "lead": "프로시저/함수/트리거/이벤트를 한 묶음으로 본다. 쓸 수 있다는 것과 써야 한다는 것은 다르다는 관점도 함께.",
+      "items": [
+        { "id": "item-14-1", "idx": "14-1", "title": "스토어드 프로그램 장단점", "keywords": "stored program procedure function trigger security abstraction network round trip" },
+        { "id": "item-14-2", "idx": "14-2", "title": "스토어드 프로그램의 문법", "keywords": "CREATE PROCEDURE FUNCTION IN OUT INOUT CALL RETURN trigger OLD NEW event scheduler ROUTINES TRIGGERS" },
+        { "id": "item-14-3", "title": "본문 작성 — 패스한 절", "keywords": "skip pass 본문 작성" }
+      ]
+    },
+    {
+      "id": "ch15",
+      "short": "CH 15",
+      "navTitle": "데이터 타입",
+      "title": "데이터 타입",
+      "lead": "컬럼 타입 하나가 저장 공간, 인덱스 크기, 그리고 스키마 변경 시 잠금 수준까지 결정한다.",
+      "items": [
+        { "id": "item-15-1", "idx": "15-1", "title": "문자열 (CHAR vs VARCHAR)", "keywords": "char varchar length prefix character set collation utf8mb4 UCA 0900 introducer row size" },
+        { "id": "item-15-2", "idx": "15-2", "title": "숫자", "keywords": "integer bigint decimal float double signed unsigned precision auto_increment binary decimal notation" },
+        { "id": "item-15-3", "idx": "15-3", "title": "날짜와 시간", "keywords": "date datetime timestamp year time fractional seconds timezone UTC CURRENT_TIMESTAMP ON UPDATE" },
+        { "id": "item-15-4", "idx": "15-4", "title": "ENUM, SET", "keywords": "enum set bit-or cast ordering instant metadata rebuild" },
+        { "id": "item-15-5", "idx": "15-5", "title": "TEXT, BLOB", "keywords": "text blob tinytext longblob off-page external page max_sort_length max_allowed_packet DYNAMIC COMPACT 3072" },
+        { "id": "item-15-6", "idx": "15-6", "title": "공간 데이터 타입", "keywords": "spatial data type skipped pass" },
+        { "id": "item-15-7", "idx": "15-7", "title": "JSON 타입", "keywords": "json binary BSON partial update json_set json_replace json_remove binlog_row_value_options" },
+        { "id": "item-15-8", "idx": "15-8", "title": "가상 컬럼(파생 컬럼)", "keywords": "virtual column stored generated column AS STORED functional index rebuild" }
+      ]
+    },
+    {
+      "id": "ch16",
+      "short": "CH 16",
+      "navTitle": "복제",
+      "title": "복제",
+      "lead": "복제는 결국 <b>바이너리 로그를 옮겨 다시 실행하는 일</b>이다. 무엇을 옮기고(포맷), 어떻게 식별하고(GTID), 얼마나 기다릴지(동기화)가 전부다.",
+      "items": [
+        { "id": "item-16-1", "idx": "16-1", "title": "개요", "keywords": "replication scale out backup analytics geographic distribution source replica" },
+        { "id": "item-16-2", "idx": "16-2", "title": "복제 아키텍처", "keywords": "binary log dump thread IO thread SQL thread relay log connection metadata applier metadata" },
+        { "id": "item-16-3", "idx": "16-3", "title": "복제 타입", "keywords": "binary log position based GTID gtid_mode enforce_gtid_consistency server_uuid CHANGE REPLICATION SOURCE TO AUTO_POSITION skip transaction" },
+        { "id": "item-16-4", "idx": "16-4", "title": "복제 데이터 포맷", "keywords": "statement row mixed binlog_row_image full minimal noblob binlog transaction compression zstd" },
+        { "id": "item-16-5", "idx": "16-5", "title": "복제 동기화 방식", "keywords": "asynchronous semi-synchronous AFTER_SYNC AFTER_COMMIT rpl_semi_sync_source rpl_semi_sync_replica wait point timeout" },
+        { "id": "item-16-6", "idx": "16-6", "title": "복제 토폴로지", "keywords": "single replica multi replica chain dual source active-active active-passive multi source channel" },
+        { "id": "item-16-7", "idx": "16-7", "title": "복제 고급 설정", "keywords": "delayed replication SOURCE_DELAY multi-threaded replica LOGICAL_CLOCK writeset group commit crash-safe relay_log_recovery filtered replication" }
+      ]
+    },
+    {
+      "id": "ch17",
+      "short": "CH 17",
+      "navTitle": "InnoDB 클러스터",
+      "title": "InnoDB 클러스터",
+      "lead": "복제만으로는 HA가 되지 않는다. 그룹 복제 + 라우터 + 셸이 합쳐져야 자동 페일오버가 완성된다.",
+      "items": [
+        { "id": "item-17-1", "idx": "17-1", "title": "InnoDB 클러스터 아키텍처", "keywords": "InnoDB cluster group replication MySQL Router MySQL Shell high availability primary secondary" },
+        { "id": "item-17-2", "idx": "17-2", "title": "그룹 복제", "keywords": "group replication consensus Paxos Mencius xCom 33061 certification single primary multi primary flow control distributed recovery donor clone" },
+        { "id": "item-17-3", "idx": "17-3", "title": "MySQL 셸", "keywords": "mysqlsh X DevAPI AdminAPI javascript python" },
+        { "id": "item-17-4", "idx": "17-4", "title": "MySQL 라우터", "keywords": "mysqlrouter proxy load balancing failover" },
+        { "id": "item-17-5", "idx": "17-5", "title": "InnoDB 클러스터 구축", "keywords": "requirements version performance schema python setup" }
+      ]
+    },
+    {
+      "id": "ch18",
+      "short": "CH 18",
+      "navTitle": "Performance & Sys 스키마",
+      "title": "Performance & Sys 스키마",
+      "lead": "서버가 자기 자신에 대해 남기는 계측 데이터. Performance 스키마가 원재료라면 Sys 스키마는 조리된 접시다.",
+      "items": [
+        { "id": "item-18-1", "idx": "18-1", "title": "Performance 스키마란", "keywords": "performance_schema instrumentation memory storage engine not replicated" },
+        { "id": "item-18-2", "idx": "18-2", "title": "Performance 스키마 구성", "keywords": "setup instance connection variable event wait stage statement transaction summary lock replication clone table" },
+        { "id": "item-18-3", "idx": "18-3", "title": "Performance 스키마 설정", "keywords": "setup_instruments setup_consumers setup_objects setup_actors setup_threads memory usage persistence" },
+        { "id": "item-18-4", "idx": "18-4", "title": "Sys 스키마란", "keywords": "sys schema view procedure function readable" },
+        { "id": "item-18-5", "idx": "18-5", "title": "Sys 스키마 사용을 위한 사전설정", "keywords": "prerequisite performance schema enabled" },
+        { "id": "item-18-6", "idx": "18-6", "title": "Sys 스키마 구성", "keywords": "formatted view raw view x$ prefix sys_config stored procedure function" },
+        { "id": "item-18-7", "idx": "18-7", "title": "활용 예제", "keywords": "skipped pass example" }
+      ]
+    }
+  ]
+}

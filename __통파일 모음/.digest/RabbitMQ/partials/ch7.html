@@ -1,0 +1,239 @@
+<article class="item" id="item-30" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 30</div>
+    <h3>관리 UI와 봐야 할 지표</h3>
+    <p class="item-tagline">Ready와 Unacked 두 숫자만 봐도 절반은 진단된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>Ready</b>는 아무도 안 가져간 메시지, <b>Unacked</b>는 누군가 붙들고 있는 메시지다. 둘 중 어느 쪽이 쌓이느냐로 원인이 갈린다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>증상</th><th>해석</th><th>조치</th></tr></thead>
+      <tbody>
+        <tr><td><b>Ready</b>가 계속 증가</td><td>컨슈머 처리 능력 부족, 또는 컨슈머가 아예 없음</td><td>컨슈머 인스턴스 증설, prefetch 상향, 큐에 Consumers 수 확인</td></tr>
+        <tr><td><b>Unacked</b>가 증가만 하고 안 줄어듦</td><td>ack 누락 또는 핸들러가 멈춤(무한 대기)</td><td>ack 경로 점검, 외부 호출 타임아웃 설정</td></tr>
+        <tr><td>Unacked ≈ prefetch × 컨슈머 수에서 고정</td><td>정상. 포화 상태로 돌고 있음</td><td>처리량이 부족하면 컨슈머 증설</td></tr>
+        <tr><td>Publish rate만 있고 Deliver rate가 0</td><td>바인딩이 없거나 컨슈머 미등록</td><td>바인딩 확인, unrouted 큐 확인</td></tr>
+        <tr><td>DLQ 길이 증가</td><td>지속적 처리 실패</td><td><code>x-death</code>의 reason으로 원인 분류</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>관리 UI 켜기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">rabbitmq-plugins enable rabbitmq_management
+# 브라우저에서 http://localhost:15672
+# 도커의 management 태그 이미지에는 이미 켜져 있다</code></pre>
+  </div>
+
+  <h4>UI에서 실제로 보는 화면</h4>
+  <ul>
+    <li><b>Queues 탭</b> — 큐별 Ready / Unacked / Total, Consumers 수, 큐 타입. 정렬해서 이상한 큐를 먼저 찾는다.</li>
+    <li><b>큐 상세의 Get messages</b> — 메시지를 실제로 꺼내 본다. <code>Ack Mode</code>를 <b>Nack message requeue true</b>로 두지 않으면 <b>메시지가 사라지니</b> 주의한다.</li>
+    <li><b>Connections / Channels</b> — <code>connection_name</code>을 채워 두면 어느 서비스가 붙었는지 바로 보인다. Channel 수가 계속 늘면 채널 누수다.</li>
+    <li><b>Exchanges 탭의 바인딩</b> — 새 서비스 배포 후 바인딩이 실제로 걸렸는지 확인하는 곳.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">알람으로 걸어 둘 것 <span class="badge b-blue">보강</span></p>
+      <p>
+        Prometheus 플러그인(<code>rabbitmq_prometheus</code>)을 켜면 지표를 그대로 긁어갈 수 있다.
+        최소한 이 네 개는 알람을 건다. <b>큐별 Ready 수</b>(임계 초과), <b>DLQ 길이</b>(0보다 큼),
+        <b>unrouted 큐 길이</b>(0보다 큼), <b>컨슈머 수 0</b>(있어야 할 큐에 컨슈머가 없음).
+        마지막 것이 배포 사고를 가장 빨리 잡아준다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Ready가 쌓이면 처리 능력 문제, Unacked가 쌓이면 컨슈머 코드 문제다.</li>
+      <li>Get messages는 기본 설정으로 누르면 메시지를 소비해 버린다.</li>
+      <li>DLQ 길이, unrouted 길이, 컨슈머 수 0에 알람을 건다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-31" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 31</div>
+    <h3>알람과 flow control</h3>
+    <p class="item-tagline">브로커는 죽는 대신 발행자를 멈춰 세운다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    메모리나 디스크가 임계에 닿으면 RabbitMQ는 <b>발행하는 커넥션을 블록</b>한다. 앱에서는 <code>publish</code>가 조용히 멈춘 것처럼 보인다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>설정</th><th>기본값</th><th>권장</th></tr></thead>
+      <tbody>
+        <tr><td><code>vm_memory_high_watermark.relative</code></td><td>0.6 (RAM의 60%)</td><td>0.4 ~ 0.7 범위. 0.7 이상은 모니터링이 확실할 때만</td></tr>
+        <tr><td><code>disk_free_limit.absolute</code></td><td>50MB</td><td class="t-no">운영에는 절대 부족. <b>4GB 이상</b>으로 올린다</td></tr>
+        <tr><td>파일 디스크립터</td><td>OS 기본</td><td>최소 50K, 필요하면 500K까지</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] -->|"publish"| B["브로커"]
+  B --> M{"메모리 60% 초과?"}
+  M -->|"아니오"| Q["큐에 저장"]
+  M -->|"예"| BL["connection.blocked 전송 후 발행 차단"]
+  BL --> C["컨슈머가 큐를 비우면"]
+  C --> UB["connection.unblocked 후 재개"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>백프레셔는 기능이다</b> — 브로커가 OOM으로 죽는 대신 발행 쪽을 눌러 시스템을 살린다.</div>
+  </div>
+
+  <h4>앱에서 감지하기</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">blocked.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">conn.on('blocked', (reason) => {
+  logger.error({ reason }, '브로커가 발행을 차단했다');
+  metrics.gauge('amqp.blocked', 1);
+});
+conn.on('unblocked', () => {
+  logger.info('발행 차단 해제');
+  metrics.gauge('amqp.blocked', 0);
+});</code></pre>
+  </div>
+  <p>
+    이 이벤트를 안 잡으면 "발행이 멈췄는데 에러는 없는" 상황을 디버깅하느라 오래 헤맨다. 반드시 로깅과
+    알람을 건다.
+  </p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">발행/소비 커넥션 분리가 여기서 효과를 낸다</p>
+      <p>
+        블록은 <b>커넥션 단위</b>다. 발행과 소비가 같은 커넥션을 공유하면 블록된 순간 컨슈머까지 멈춰
+        큐를 비울 주체가 사라진다. ITEM 5에서 커넥션을 나누라고 한 이유가 이것이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">근본 원인은 대개 큐 길이 <span class="badge b-blue">보강</span></p>
+      <p>
+        메모리 알람이 뜨는 진짜 이유는 대부분 <b>컨슈머가 멈춰 큐가 무한정 자란 것</b>이다.
+        브로커 메모리를 늘리는 건 시간을 버는 것뿐이다. 업무 큐에는 <code>x-max-length</code>와
+        <code>x-overflow</code>를 걸어 상한을 두고, 넘치면 DLQ로 흘리거나 발행을 거부하게 설계한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메모리 60%, 디스크 여유 부족 시 발행 커넥션이 블록된다. 에러가 아니라 대기다.</li>
+      <li><code>disk_free_limit</code> 기본값 50MB는 운영에 쓰면 안 된다.</li>
+      <li><code>'blocked'</code>/<code>'unblocked'</code> 이벤트를 반드시 로깅한다.</li>
+      <li>큐 길이 상한을 걸어 알람 자체가 안 뜨게 하는 게 근본 대책이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-32" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 32</div>
+    <h3>로컬 환경과 자주 밟는 지뢰</h3>
+    <p class="item-tagline">처음 한 달 동안 만날 문제는 대체로 이 목록 안에 있다.</p>
+  </header>
+
+  <h4>docker compose</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">docker-compose.yml</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"      # AMQP
+      - "15672:15672"    # 관리 UI
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+      RABBITMQ_DEFAULT_VHOST: /dev
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 5
+volumes:
+  rabbitmq-data:</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">vhost는 URL에 인코딩해서 넣는다</p>
+      <p>
+        vhost <code>/dev</code>에 붙으려면 접속 URL이 <code>amqp://app:app@localhost:5672/%2Fdev</code>가 된다.
+        슬래시를 <code>%2F</code>로 인코딩하지 않으면 <b>기본 vhost <code>/</code></b>에 붙어서
+        "큐를 만들었는데 UI에 안 보이는" 상황이 된다. 처음 이틀 안에 반드시 한 번 겪는다.
+      </p>
+    </div>
+  </div>
+
+  <h4>체크리스트</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>증상</th><th>원인</th></tr></thead>
+      <tbody>
+        <tr><td>메시지를 보냈는데 큐에 안 들어온다</td><td>바인딩 누락 또는 routing key 오타. <code>mandatory</code>를 안 켜서 조용히 폐기됨 (ITEM 14)</td></tr>
+        <tr><td>큐를 만들었는데 UI에 없다</td><td>다른 vhost에 붙었다</td></tr>
+        <tr><td><code>PRECONDITION_FAILED - inequivalent arg</code></td><td>기존 큐와 다른 인자로 <code>assertQueue</code>. 큐를 지우거나 인자를 맞춘다</td></tr>
+        <tr><td><code>ACCESS_REFUSED</code></td><td><code>guest</code> 계정은 <b>localhost에서만</b> 접속 가능. 컨테이너 밖에서는 별도 계정을 만든다</td></tr>
+        <tr><td>브로커 재시작 후 메시지가 사라졌다</td><td><code>persistent: true</code> 누락 또는 큐가 durable이 아님</td></tr>
+        <tr><td>컨슈머 하나가 전부 가져가고 나머지가 논다</td><td><code>prefetch</code> 미설정 (기본 무제한)</td></tr>
+        <tr><td>Unacked만 쌓이고 안 줄어든다</td><td>ack 누락 경로가 있다</td></tr>
+        <tr><td>같은 메시지가 무한 반복된다</td><td><code>nack(msg, false, true)</code>로 즉시 재큐 중. <code>false</code>로 바꾸고 DLX를 건다</td></tr>
+        <tr><td>배포할 때마다 중복 처리가 난다</td><td>graceful shutdown 부재 (ITEM 28)</td></tr>
+        <tr><td>브로커 재시작 때 앱이 통째로 죽는다</td><td>커넥션/채널의 <code>'error'</code> 핸들러 누락</td></tr>
+        <tr><td>발행이 멈췄는데 에러가 없다</td><td>메모리/디스크 알람으로 커넥션이 블록됨 (ITEM 31)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">입사 첫 주에 물어볼 것</p>
+      <p>
+        <b>브로커 버전</b>(4.3 여부에 따라 재시도 설계가 달라진다), <b>큐 타입</b>(classic인지 quorum인지),
+        <b>클라이언트 라이브러리</b>(amqplib인지 래퍼인지), <b>토폴로지 선언 주체</b>(앱인지 definitions인지 policy인지),
+        <b>DLQ 운영 방식</b>(누가 보고 어떻게 재투입하는지). 이 다섯 개면 기존 코드를 읽을 좌표가 잡힌다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>로컬은 <code>rabbitmq:4-management</code> 이미지 하나면 충분하다.</li>
+      <li>vhost는 URL에 <code>%2F</code>로 인코딩한다.</li>
+      <li>대부분의 초기 문제는 바인딩 누락, prefetch 미설정, ack 누락, 에러 핸들러 누락 넷 중 하나다.</li>
+    </ul>
+  </div>
+</article>

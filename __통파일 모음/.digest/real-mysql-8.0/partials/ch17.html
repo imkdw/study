@@ -1,0 +1,551 @@
+<article class="item" id="item-17-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">17-1</div>
+    <h3>InnoDB 클러스터 아키텍처</h3>
+    <p class="item-tagline">복제만으로는 HA가 되지 않는다. <b>세 가지 구성 요소</b>가 합쳐져야 완성된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    소스-레플리카 복제는 <b>데이터를 복제</b>할 뿐이다. <b>누가 새 소스인지 결정하고(그룹 복제)</b>, <b>트래픽을 그쪽으로 보내는(라우터)</b> 두 가지가 더 있어야 자동 페일오버가 된다.
+  </div>
+
+  <h4>왜 클러스터인가</h4>
+  <ul>
+    <li>일반적으로 소스-레플리카 구성만으로는 <b>HA가 보장되지 않는다.</b></li>
+    <li>InnoDB 클러스터는 HA 보장을 위해 만들어진 <b>여러 구성 요소의 집합체</b>다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["애플리케이션"] --> R["MySQL Router (프록시)"]
+  R --> P["Primary (읽기 + 쓰기)"]
+  R --> S1["Secondary (읽기 전용)"]
+  R --> S2["Secondary (읽기 전용)"]
+  P <-->|"그룹 복제"| S1
+  P <-->|"그룹 복제"| S2
+  S1 <-->|"그룹 복제"| S2
+  SH["MySQL Shell (AdminAPI)"] -.->|"구축 / 관리"| P
+      </pre>
+    </div>
+    <div class="figure-cap"><b>애플리케이션은 라우터 주소만 안다</b> — Primary 가 바뀌어도 애플리케이션 설정은 그대로다.</div>
+  </div>
+
+  <h4>구성 요소</h4>
+
+  <h5>그룹 복제 (Group Replication)</h5>
+  <ul>
+    <li>소스 → 레플리카 복제와 <b>서버들의 자동화된 멤버십 관리</b>를 담당한다.</li>
+    <li>각 서버는 읽기·쓰기가 모두 가능한 <b>프라이머리</b> 또는 읽기만 가능한 <b>세컨더리</b> 중 하나로 동작한다.</li>
+    <li>프라이머리는 그룹 내에 <b>1개 이상</b> 존재할 수 있다.</li>
+    <li>고가용성을 위해 기본적으로 <b>서버가 3대 이상</b> 필요하다.</li>
+  </ul>
+
+  <h5>MySQL Router</h5>
+  <ul>
+    <li>애플리케이션과 DB 사이에서 동작하는 미들웨어로, 쿼리를 적절한 서버로 전달하는 <b>프록시</b> 역할이다.</li>
+    <li>애플리케이션에는 <b>라우터의 커넥션 정보만</b> 설정해 두면 알아서 실제 서버로 프록시해 준다.</li>
+  </ul>
+
+  <h5>MySQL Shell</h5>
+  <ul>
+    <li>기존 클라이언트보다 확장된 기능을 가진 클라이언트 프로그램이다. 다양한 API를 제공한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>InnoDB 클러스터 = <b>그룹 복제 + MySQL Router + MySQL Shell</b>.</li>
+      <li>역할은 <b>프라이머리</b>(읽기+쓰기)와 <b>세컨더리</b>(읽기 전용).</li>
+      <li>고가용성을 위해 <b>최소 3대</b>가 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">17-2</div>
+    <h3>그룹 복제</h3>
+    <p class="item-tagline">반동기처럼 보이지만 다르다 — <b>과반수의 합의(Consensus)</b> 로 커밋을 결정한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    그룹 복제는 <b>과반수 이상의 동의</b>가 있어야 트랜잭션이 적용된다. 그래서 서버 수가 <code>n = 2f + 1</code> 공식을 따라야 한다.
+  </div>
+
+  <h4>기본 특징</h4>
+  <ul>
+    <li>내부적으로 <b><code>ROW</code> 포맷 바이너리 로그 + 릴레이 로그 + GTID</b> 를 사용한다.</li>
+    <li>모든 서버가 서로 통신하며 <b>양방향 복제</b>도 가능하다.</li>
+    <li>하나의 복제 그룹 안에 <b>쓰기를 처리하는 서버가 여러 개</b> 있을 수 있다.</li>
+    <li>서버를 소스·레플리카가 아닌 <b>프라이머리·세컨더리</b> 로 지칭한다.</li>
+    <li>그룹에 <b>최소 3대 이상</b>이 있어야 한다.
+      <ul><li><code>n = 2f + 1</code> — <code>n</code>은 전체 서버 수, <code>f</code>는 허용할 장애 서버 수</li></ul>
+    </li>
+  </ul>
+
+  <h4>반동기와 무엇이 다른가</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>반동기 복제</th><th>그룹 복제</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>커밋 조건</td>
+          <td>레플리카에서 <b>응답을 받으면</b> 커밋</td>
+          <td>다른 멤버에게 전송 후 <b>과반수 이상의 응답</b>이 있어야 커밋</td>
+        </tr>
+        <tr>
+          <td>실패 시</td>
+          <td>타임아웃 후 <b>비동기로 전환</b>하고 커밋</td>
+          <td class="t-no"><b>전체 복제 그룹에서 트랜잭션이 적용되지 않는다</b> — 롤백</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li>그룹의 다른 멤버들에게 응답을 확인하는 과정을 <b>합의(Consensus)</b> 라고 한다.</li>
+    <li>멤버들의 응답에 따라 <b>전체 그룹에서 그 트랜잭션의 적용 여부가 결정된다</b> — 이것이 가장 큰 차이다.</li>
+    <li>데이터를 변경하는 작업에만 필요하고, <b>읽기만 하는 작업에는 필요 없다.</b></li>
+  </ul>
+
+  <h4>그룹 복제 아키텍처</h4>
+  <ul>
+    <li>별도의 <b>플러그인</b>으로 구현되어 있어 설치해야 쓸 수 있다.</li>
+    <li>클러스터에 참여한 서버들이 이 플러그인을 통해 지속적으로 통신하고 동기화한다.</li>
+    <li><code>group_replication_applier</code> 채널 — 그룹에서 실행된 모든 트랜잭션을 전달받아 적용한다.</li>
+    <li><code>group_replication_recovery</code> 채널 — 새 서버가 추가되었을 때 <b>분산 복구</b> 작업을 진행한다.</li>
+  </ul>
+
+  <h5>플러그인 계층 구조</h5>
+  <ol class="steps">
+    <li>
+      <div class="step-title">플러그인 API 집합 (최상위)</div>
+      <p>DB 서버 → 플러그인으로는 <b>서버 시작·복구, 트랜잭션 커밋</b> 등의 이벤트를 전달하고, 플러그인 → DB 서버로는 <b>커밋·중단·릴레이 로그 기록 요청</b> 등을 전달한다.</p>
+    </li>
+    <li>
+      <div class="step-title">복제 플러그인 계층 (중간)</div>
+      <p>그룹 복제 기능이 실제로 구현된 곳이다. 여러 모듈로 나뉘어 있고 <b>트랜잭션 처리·충돌 감지·전파·분산 복구</b> 가 여기서 이루어진다.</p>
+    </li>
+    <li>
+      <div class="step-title">그룹 통신 시스템 API + 엔진 (하위 두 계층)</div>
+      <p><b>eXtended COMmunication</b>, 줄여서 <b>xCom</b> 이라 부른다. 서버 간 통신을 담당하는 핵심이며 <b>별도 포트 33061</b> 로 통신한다. 트랜잭션이 <b>모든 멤버에게 동일한 순서로</b> 전달되도록 보장한다.</p>
+    </li>
+  </ol>
+
+  <h5>합의 알고리즘</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>알고리즘</th><th>주로 쓰이는 상황</th></tr></thead>
+      <tbody>
+        <tr><td>Paxos</td><td>분산 시스템에서 <b>데이터 변경이 여러 서버</b>에서 발생할 때</td></tr>
+        <tr><td>Raft</td><td>데이터 변경이 <b>한 대에서만</b> 발생할 때</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>그룹 복제는 멀티 프라이머리까지 지원해야 하므로 <b>Paxos 계열의 Mencius 알고리즘</b>을 기반으로 구현되어 있다.</p>
+
+  <h4>그룹 복제 모드</h4>
+  <ul>
+    <li>프라이머리 서버 수에 따라 <b>싱글 프라이머리</b> 와 <b>멀티 프라이머리</b> 로 나뉜다.</li>
+    <li><code>group_replication_single_primary_mode</code> 로 제어한다. <code>ON</code>=싱글, <code>OFF</code>=멀티이며 <b>기본값은 <code>ON</code></b> 이다.</li>
+    <li>그룹에 참여하는 <b>모든 서버가 같은 값</b>이어야 한다.</li>
+    <li>8.0.13부터는 <b>UDF로 온라인 변경</b>이 가능하다.
+      <ul>
+        <li><code>group_replication_switch_to_single_primary_mode()</code></li>
+        <li><code>group_replication_switch_to_multi_primary_mode()</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>싱글 프라이머리 모드</h5>
+  <ul>
+    <li>그룹 안에서 쓰기를 처리할 수 있는 서버가 <b>한 대뿐</b>이다.</li>
+    <li>처음 구축할 때는 <b>구축을 진행한 서버가 프라이머리</b>가 된다.</li>
+    <li>프라이머리가 그룹을 탈퇴하거나 UDF로 멀티 모드로 바꾸면 프라이머리가 변경된다.</li>
+  </ul>
+
+  <h5>프라이머리 선출 기준</h5>
+  <ol class="steps">
+    <li>
+      <div class="step-title">MySQL 서버 버전</div>
+      <p>가장 우선하는 요소다. <b>모든 멤버가 8.0.17 이상이면 패치 버전</b>으로, <b>미만인 서버가 있으면 메이저 버전</b>으로 정렬한다.</p>
+    </li>
+    <li>
+      <div class="step-title">각 멤버의 가중치</div>
+      <p><code>group_replication_member_weight</code> 를 비교한다. 기본값 <b>50</b>, 범위 0~100.</p>
+    </li>
+    <li>
+      <div class="step-title">UUID 사전식 순서</div>
+      <p>위 둘로도 결정되지 않으면 <b>UUID가 사전 순으로 가장 낮은</b> 멤버가 선정된다.</p>
+    </li>
+  </ol>
+
+  <h5>멀티 프라이머리 모드</h5>
+  <ul>
+    <li>모든 멤버가 프라이머리로 동작하고, 클라이언트는 <b>어느 서버로든 읽기·쓰기</b> 요청을 보낼 수 있다.</li>
+    <li><b>호환성이 매우 중요</b>하므로 가능하면 모든 서버가 같은 버전을 쓰는 것이 좋다.</li>
+    <li>새 멤버가 추가될 때 호환 기준에 따라 참여 가능 여부와 읽기 전용 유지 여부가 결정된다.
+      <ul>
+        <li>그룹 내 <b>가장 낮은 버전보다 더 낮으면</b> 참여 불가</li>
+        <li>그룹 내 <b>가장 낮은 버전보다 더 높으면</b> 읽기 전용 모드 유지</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>그룹 멤버 관리</h4>
+  <ul>
+    <li>어떤 서버가 참여 중인지 <b>멤버 목록과 상태</b>를 내부적으로 관리한다.
+      <ul><li><code>performance_schema.replication_group_members</code> 테이블</li></ul>
+    </li>
+    <li>멤버 변동을 자동으로 감지해 상태를 갱신한다.</li>
+    <li>이 목록과 상태 정보를 <b>뷰(View)</b> 라고도 부르며, 멤버가 바뀔 때마다 <b>새로운 뷰 ID</b> 가 생성된다.
+      <ul>
+        <li>이 값으로 뷰의 변경을 추적하고 변경 시점을 구분할 수 있다.</li>
+        <li>형식은 <code>View ID = [Prefix]:[Sequence]</code> — 예: <code>87116:4</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>그룹 복제에서의 트랜잭션 처리</h4>
+
+  <h5>합의 (Consensus)</h5>
+  <ul>
+    <li>그룹 내 일관된 트랜잭션 적용을 위해 <b>멤버들에게 적용을 제안하고 승낙받는</b> 과정이다.</li>
+    <li>xCom을 통해 트랜잭션이 변경한 데이터의 <b>Writeset</b> 과 <code>gtid_executed</code> 스냅샷 등을 전파한다.</li>
+    <li>Paxos 계열 알고리즘으로 최종 합의가 이루어져 <b>과반수 이상 동의</b>하면 트랜잭션을 적용한다.</li>
+    <li>동의를 얻지 못하면 <b>롤백되고 클라이언트로 에러가 반환</b>된다.</li>
+  </ul>
+
+  <h5>인증 (Certification)</h5>
+  <ul>
+    <li>xCom으로 전달받은 Writeset과 <b>로컬이 가진 Writeset을 비교</b>해 충돌 여부를 검사한다.</li>
+    <li>충돌이 발생하면 롤백되므로, <b>충돌이 잦은 환경에서는 이 과정이 없는 싱글 프라이머리 모드</b>가 권장된다.</li>
+  </ul>
+
+  <h4>트랜잭션 일관성 수준</h4>
+  <p><code>group_replication_consistency</code> 시스템 변수로 설정한다. 각 수준은 <b>읽기 전용 트랜잭션</b>과 <b>읽기-쓰기 트랜잭션</b>에 다른 영향을 준다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>수준</th><th>읽기</th><th>쓰기</th><th>적합한 경우</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>EVENTUAL</code> <span class="badge">기본값</span></td>
+          <td>구버전 데이터를 읽을 수 있다</td>
+          <td>제약 없이 즉시 실행</td>
+          <td>일관성보다 성능이 중요할 때</td>
+        </tr>
+        <tr>
+          <td><code>BEFORE_ON_PRIMARY_FAILOVER</code></td>
+          <td class="t-ok">항상 최신 보장</td>
+          <td class="t-ok">충돌로 인한 롤백 없음</td>
+          <td><b>페일오버 직후</b>의 일관성만 보장하고 싶을 때</td>
+        </tr>
+        <tr>
+          <td><code>BEFORE</code></td>
+          <td class="t-ok">항상 최신</td>
+          <td>선행 트랜잭션 완료까지 대기</td>
+          <td><b>읽기가 적고 쓰기가 많을</b> 때</td>
+        </tr>
+        <tr>
+          <td><code>AFTER</code></td>
+          <td>읽기 전용은 즉시 처리</td>
+          <td>모든 멤버가 준비될 때까지 대기</td>
+          <td><b>쓰기보다 읽기가 많고</b> 분산된 최신 읽기가 필요할 때</td>
+        </tr>
+        <tr>
+          <td><code>BEFORE_AND_AFTER</code></td>
+          <td class="t-ok">항상 최신</td>
+          <td>양쪽 모두 대기</td>
+          <td>가장 엄격. <b>대기 시간 초과 위험</b>이 있다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>EVENTUAL</h5>
+  <ul>
+    <li>기본값이며, <b>최종적으로는</b> 멤버들이 일관된 데이터를 가지게 됨을 의미한다.</li>
+    <li>모든 트랜잭션이 제약 없이 즉시 실행되지만, 다른 서버에서 <b>일시적으로 구버전 데이터</b>를 읽을 수 있다.</li>
+    <li>페일오버 시 새 프라이머리가 이전 프라이머리의 변경을 적용하느라 <b>트랜잭션 충돌로 롤백</b>이 생길 수 있다.</li>
+  </ul>
+
+  <h5>BEFORE_ON_PRIMARY_FAILOVER</h5>
+  <ul>
+    <li><b>싱글 모드에서 프라이머리 페일오버가 발생해 새 프라이머리가 선출됐을 때만</b> 영향을 준다.</li>
+    <li>이전 프라이머리의 트랜잭션을 반영하는 동안 <b>모든 트랜잭션이 블로킹</b>된다.</li>
+    <li>영구 대기는 안 되고 <code>wait_timeout</code> 만큼 기다린 뒤 에러를 반환한다.
+      <ul><li><code>wait_timeout</code> 기본값은 <b>28,800초(8시간)</b> 이므로, <b>애플리케이션에서 적절한 타임아웃</b>을 두는 것이 좋다.</li></ul>
+    </li>
+    <li>모든 쿼리가 막히는 것은 아니다 — <code>SHOW</code>, <code>SET</code>, <code>DO</code> 등 모니터링용 일부 쿼리는 바로 실행된다.</li>
+    <li>읽기는 항상 최신을 보장하고, 쓰기는 <b>충돌이 발생하지 않아 롤백되지 않는다.</b></li>
+  </ul>
+
+  <h5>BEFORE / AFTER / BEFORE_AND_AFTER</h5>
+  <ul>
+    <li><b>BEFORE</b> — 모든 트랜잭션이 <b>선행 트랜잭션이 완료될 때까지 대기</b>한다. 항상 최신을 읽지만 대기가 길어질 수 있다.</li>
+    <li><b>AFTER</b> — 읽기-쓰기 트랜잭션이 <b>다른 모든 멤버가 커밋할 준비가 될 때까지</b> 대기한 후 처리된다. 읽기 전용은 변경을 만들지 않으므로 즉시 처리된다.</li>
+    <li><b>BEFORE_AND_AFTER</b> — 양쪽을 모두 적용한다. 읽기 전용 요청도 선행 트랜잭션을 기다린다.</li>
+  </ul>
+
+  <h4>흐름 제어 (Flow Control)</h4>
+  <ul>
+    <li>멤버 간 <b>트랜잭션 적용 불균형</b>으로 생기는 문제를 막기 위해 쓰기 처리량을 조절하는 메커니즘이다.</li>
+    <li>멤버 간 <b>트랜잭션 갭을 작게 유지</b>해 데이터가 최대한 동기화된 상태로 있게 한다.</li>
+    <li>평소와 다른 워크로드가 유입되어도 <b>빠르게 적응</b>해 각 멤버의 쓰기 처리량을 균등하게 만든다.</li>
+    <li><code>group_replication_flow_control_mode</code> 로 제어하며 현재 <code>QUOTA</code> 와 <code>DISABLED</code> 두 모드만 있다.</li>
+  </ul>
+
+  <h5>QUOTA 모드</h5>
+  <ul>
+    <li>모든 멤버의 <b>쓰기 처리량과 대기 중인 트랜잭션 통계</b>를 수집해 흐름 제어의 필요성을 판단한다.</li>
+    <li>조절이 필요하면 통계를 바탕으로 <b>멤버가 최대 쓰기량을 넘지 않도록</b> 제한한다.</li>
+    <li>그룹 전체가 아니라 <b>각 멤버별로 적용</b>되며, 수집된 정보는 다른 멤버와도 공유된다.
+      <ul><li>인증 큐 크기, 적용 큐 크기, 인증된 트랜잭션 수, 적용된 원격 트랜잭션 수, 로컬 트랜잭션 수</li></ul>
+    </li>
+    <li>실제 조절은 <b>인증 큐 크기와 적용 큐 크기</b>를 기반으로 한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>역할</th><th>기본값</th></tr></thead>
+      <tbody>
+        <tr><td><code>group_replication_flow_control_certifier_threshold</code></td><td><b>인증 큐</b>의 대기 트랜잭션 수가 이 값을 넘으면 흐름 제어 작동</td><td>25,000</td></tr>
+        <tr><td><code>group_replication_flow_control_applier_threshold</code></td><td><b>어플라이어 큐</b>의 대기 트랜잭션 수가 이 값을 넘으면 흐름 제어 작동</td><td>25,000</td></tr>
+        <tr><td><code>group_replication_flow_control_min_quota</code></td><td>계산 결과와 무관하게 멤버에게 할당되어야 할 <b>최소</b> 쓰기 처리량</td><td>0</td></tr>
+        <tr><td><code>group_replication_flow_control_max_quota</code></td><td>계산 결과와 무관하게 멤버에게 할당되어야 할 <b>최대</b> 쓰기 처리량</td><td>0</td></tr>
+        <tr><td><code>group_replication_flow_control_min_recovery_quota</code></td><td>그룹에 <b>복구 상태의 멤버</b>가 있을 때 <code>min_quota</code> 대신 적용</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>범위는 대체로 0 ~ 약 21억이며, 이 밖에도 여러 변수가 있다.</p>
+
+  <h4>자동 장애 감지 및 대응</h4>
+  <ul>
+    <li>일부 멤버에 장애가 나도 그룹이 정상 동작하도록 장애 감지 메커니즘이 구현되어 있다.</li>
+    <li>멤버로부터 <b>5초 이내에 응답을 못 받으면 의심</b>을 시작하고, <b>과반수가 동의하면 추방</b>한다.
+      <ul><li>추방 전 의심받은 멤버는 대기 시간 동안 <b><code>UNREACHABLE</code></b> 상태로 표시된다.</li></ul>
+    </li>
+    <li>추방된 멤버는 통신이 복구되면 추방 사실을 감지하고, <b>5분 간격으로 총 3번</b> 재가입을 시도한다.</li>
+    <li>통신이 계속 불가능하면 <code>group_replication_unreachable_majority_timeout</code> 으로 <b>스스로 탈퇴</b>할 수도 있다.</li>
+  </ul>
+
+  <h4>분산 복구</h4>
+  <ul>
+    <li>새 멤버나 추방됐던 멤버는 그룹 가입 시 <b>동기화된 최신 데이터</b>를 받아야 한다.</li>
+    <li>이 복구 프로세스를 자동으로 수행하는 것을 <b>분산 복구</b> 라고 한다.</li>
+    <li>복구를 도와줄 기존 멤버를 <b>기증자(Donor)</b> 라고 부르며, <b>모든 멤버가 기증자가 될 수 있다.</b></li>
+  </ul>
+
+  <h5>복구 방식</h5>
+  <ul>
+    <li>기존에 가입했던 멤버라면 릴레이 로그에서 <b>탈퇴 시점을 찾아</b> 미적용 트랜잭션을 복구한다.</li>
+    <li>신규 멤버는 <b>처음부터</b> 복구한다.</li>
+    <li>방식은 <b>바이너리 로그 복제</b> 와 <b>원격 클론</b> 두 가지다.</li>
+    <li>서버가 알아서 적절한 방식을 고르며, <b>원격 클론 플러그인이 없으면 바이너리 로그 복제</b>로 진행한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>동작</th><th>전제조건</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>바이너리 로그 복제</td>
+          <td>비동기 복제 기반. 기증자와 <b>별도 채널로 연결</b>해 미적용 트랜잭션을 가져와 적용</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>원격 클론</td>
+          <td>다른 멤버의 <b>모든 데이터와 메타데이터를 일관된 스냅샷</b>으로 가져와 재구축</td>
+          <td><b>기증자와 신규 멤버 모두</b> 클론 플러그인이 설치되어 있어야 한다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>복구 프로세스</h5>
+  <ol class="steps">
+    <li><div class="step-title">로컬 복구</div><p>이전에 가입한 적이 있다면 릴레이 로그에 미적용 트랜잭션이 남아 있을 수 있다. 이를 먼저 적용한다.</p></li>
+    <li><div class="step-title">글로벌 복구</div><p>그룹 내에서 기증자를 선택해 데이터를 가져와 적용한다. 이 작업 동안 그룹은 <b>새 트랜잭션을 내부적으로 캐싱</b>해 둔다.</p></li>
+    <li><div class="step-title">캐시 트랜잭션 적용</div><p>글로벌 복구 동안 캐싱해 둔 트랜잭션들을 적용하고 그룹에 참여한다.</p></li>
+  </ol>
+
+  <h5>복구 설정</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변수</th><th>역할</th><th>기본값</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>group_replication_recovery_retry_count</code></td>
+          <td>바이너리 로그 복제 방식에서 <b>연결 시도 횟수</b>. 원격 클론은 이 값과 무관하게 <b>멤버당 1번</b>만 시도한다</td>
+          <td>10</td>
+        </tr>
+        <tr><td><code>group_replication_recovery_reconnect_interval</code></td><td>대상 멤버들에게 한 바퀴 시도한 뒤 <b>대기하는 시간</b></td><td>60초</td></tr>
+        <tr><td><code>group_replication_recovery_complete_at</code></td><td>복구 완료 후 <b>어느 시점에 online 으로 표기</b>할지</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>복구 오류 처리</h5>
+  <ul>
+    <li>복구 도중 오류가 나도 <b>자동으로 재시도</b>하는 장애 감지 메커니즘이 있다.</li>
+    <li>재시도 횟수를 모두 소진하거나, 바이너리 로그가 없는데 클론 방식도 안 되는 경우 <b>그 멤버는 그룹을 떠난다.</b></li>
+  </ul>
+
+  <h4>그룹 복제 요구사항</h4>
+  <ul>
+    <li>InnoDB 스토리지 엔진 사용</li>
+    <li><b>기본키 사용</b></li>
+    <li>원활한 네트워크 환경</li>
+    <li>바이너리 로그 활성화 및 <b><code>ROW</code> 포맷</b> 사용</li>
+    <li>바이너리 로그 체크섬 설정</li>
+    <li><code>log_slave_updates</code> 활성화</li>
+    <li><b>GTID</b> 사용</li>
+    <li>고유한 <code>server_id</code></li>
+    <li>복제 메타데이터 저장소 설정</li>
+    <li>트랜잭션 Writeset 설정</li>
+    <li>테이블스페이스 암호화 설정</li>
+    <li><code>lower_case_table_names</code> 설정</li>
+    <li>멀티 스레드 복제 설정</li>
+  </ul>
+
+  <h4>그룹 복제 제약사항</h4>
+  <ul>
+    <li>갭 락이 적용되지 않는 <b><code>READ-COMMITTED</code></b> 격리 수준을 써야 한다</li>
+    <li>테이블 락과 네임드 락은 <b>고려되지 않는다</b></li>
+    <li>바이너리 로그 체크섬은 <b>8.0.21부터</b> 지원</li>
+    <li>멀티 프라이머리 모드에서는 <b><code>SERIALIZABLE</code> 격리 수준을 쓸 수 없다</b></li>
+    <li>같은 테이블에 대해 <b>서로 다른 멤버에서 DDL과 DML을 함께 실행할 수 없다</b></li>
+    <li><b><code>CASCADE</code> 제약조건을 쓸 수 없다</b> (동작하지 않는다)</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">도입 전 확인할 두 가지</p>
+      <p>요구사항 중 <b>모든 테이블에 기본키가 있어야 한다</b>는 것과, 제약사항 중 <b><code>ON DELETE CASCADE</code> 가 동작하지 않는다</b>는 것이 실제 도입을 가장 자주 막는다. 기존 스키마를 그대로 옮길 수 있다고 가정하지 말고 <b>먼저 점검</b>해야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>그룹 복제는 <b>과반수 합의</b>로 커밋을 결정한다 — 반동기와 결정적으로 다른 점이다.</li>
+      <li>서버 수는 <code>n = 2f + 1</code>. 통신은 <b>xCom, 포트 33061</b>, 알고리즘은 Paxos 계열 Mencius.</li>
+      <li>일관성 수준 5단계 — 기본은 <code>EVENTUAL</code>, 페일오버만 챙기려면 <code>BEFORE_ON_PRIMARY_FAILOVER</code>.</li>
+      <li>흐름 제어는 <b>인증 큐 / 적용 큐 크기</b> 기준으로 쓰기 처리량을 조절한다.</li>
+      <li>분산 복구는 <b>바이너리 로그 복제</b> 또는 <b>원격 클론</b>. 5초 무응답 → 의심 → 과반수 동의 시 추방.</li>
+      <li>전제조건 중 <b>기본키</b>와 <b><code>ROW</code> + GTID</b>, 제약 중 <b>CASCADE 불가</b> 를 먼저 확인한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">17-3</div>
+    <h3>MySQL 셸</h3>
+    <p class="item-tagline"><code>mysql</code> 클라이언트의 확장판. <b>AdminAPI</b> 가 클러스터 구축을 담당한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    InnoDB 클러스터 구축은 사실상 <b>MySQL Shell 의 AdminAPI 로 하는 작업</b>이다.
+  </div>
+
+  <ul>
+    <li>MySQL을 위한 <b>고급 클라이언트 툴</b>이다.</li>
+    <li>SQL만 실행할 수 있던 <code>mysql</code> 보다 확장된 기능을 제공한다.</li>
+    <li><b>파이썬, 자바스크립트</b> 등 여러 모드를 지원한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>API</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr><td><b>X DevAPI</b></td><td>X 프로토콜로 RDBMS에서 <b>문서 기반 데이터</b>를 처리할 수 있게 해 준다</td></tr>
+        <tr><td><b>AdminAPI</b></td><td><b>레플리카 셋이나 클러스터</b> 등 서버의 설정을 변경한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>MySQL Shell = <code>mysql</code> + <b>스크립팅 모드(JS/Python)</b> + <b>API</b>.</li>
+      <li>클러스터 구축·관리는 <b>AdminAPI</b>, 문서 지향 접근은 <b>X DevAPI</b>.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">17-4</div>
+    <h3>MySQL 라우터</h3>
+    <p class="item-tagline">애플리케이션이 <b>서버 목록을 몰라도 되게</b> 만들어 주는 프록시.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    라우터가 있어야 <b>페일오버가 애플리케이션에 투명</b>해진다. 이것이 클러스터에 라우터가 필요한 이유의 전부다.
+  </div>
+
+  <ul>
+    <li>InnoDB 클러스터에서 애플리케이션 서버의 요청을 <b>적절한 서버에 전달</b>하는 프록시 역할을 한다.</li>
+    <li>내부 서버들에 대한 <b>부하 분산</b>을 수행한다.</li>
+    <li>여러 서버 중 특정 서버에서 에러가 나면 <b>다른 서버로 넘겨서 처리</b>해 준다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>라우터는 <b>프록시 + 부하 분산 + 자동 페일오버 전달</b> 세 역할을 한다.</li>
+      <li>애플리케이션은 <b>라우터 주소만</b> 알면 된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">17-5</div>
+    <h3>InnoDB 클러스터 구축</h3>
+    <p class="item-tagline">구축 전 확인할 다섯 가지 요구사항.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    구축의 전제는 <b>모든 서버의 Performance 스키마 활성화</b> 다 — 그룹 멤버 상태를 그 스키마로 관리하기 때문이다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구성 요소</th><th>최소 요구 버전 / 조건</th></tr></thead>
+      <tbody>
+        <tr><td>MySQL 서버</td><td>5.7.17 이상</td></tr>
+        <tr><td>MySQL 셸</td><td>1.0.8 이상</td></tr>
+        <tr><td>MySQL 라우터</td><td>2.1.2 이상</td></tr>
+        <tr><td>모든 서버</td><td><b>Performance 스키마 활성화</b></td></tr>
+        <tr><td>MySQL 셸이 설치될 서버</td><td>파이썬 <b>2.7 이상</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 절은 구축 실습까지 진행하지 않았다</p>
+      <p>노트에는 요구사항 목록과 <b>"시간되면 구성해보기.."</b> 라는 메모까지만 남아 있다. 실제 구축은 MySQL Shell 의 <b>AdminAPI</b>(<code>dba.createCluster()</code>, <code>cluster.addInstance()</code>)로 진행하며, 그에 앞서 <a href="#item-17-2">17-2 그룹 복제 요구사항</a> 의 항목들이 먼저 충족되어야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>서버 5.7.17+ / 셸 1.0.8+ / 라우터 2.1.2+ / 파이썬 2.7+.</li>
+      <li>모든 서버에서 <b>Performance 스키마가 활성화</b>되어 있어야 한다.</li>
+      <li>구축 자체는 <b>AdminAPI</b> 로 진행한다.</li>
+    </ul>
+  </div>
+</article>

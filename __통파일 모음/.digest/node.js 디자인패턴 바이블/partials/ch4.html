@@ -1,0 +1,580 @@
+<article class="item" id="item-14" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-1</div>
+    <h3>비동기 프로그래밍의 어려움</h3>
+    <p class="item-tagline">콜백 지옥은 언어의 결함이 아니라 규칙의 부재다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    문제는 비동기 자체가 아니라 <b>익명 함수를 남용해 코드가 한 덩어리로 뭉치는 것</b>이다.
+    이름을 붙이고 밖으로 꺼내는 것만으로 대부분 해결된다.
+  </div>
+
+  <ul>
+    <li>클로저와 익명 함수는 개발자가 코드베이스 이곳저곳을 옮겨 다니지 않고 원활하게 작업하도록 도와준다.</li>
+    <li>대부분의 경우 익명 함수를 만드는 것이 절대적으로 요구되지는 않는다.
+      비동기 프로그래밍 자체보다 <b>규칙 문제</b>가 더 중요하다.</li>
+  </ul>
+
+  <h4>콜백 지옥</h4>
+  <ul>
+    <li>많은 클로저와 익명 함수 정의가 코드의 가독성을 떨어뜨리고 관리 불가능한 덩어리로 만드는 상황.</li>
+    <li>바로 보이는 건 <b>가독성</b> 문제다. 중첩이 깊으면 추적이 불가능해진다.</li>
+    <li>예제처럼 <code>err</code> 같은 변수 이름이 계속 중복되면서 <b>섀도잉</b>이 발생한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">callback-hell.ts</span>
+      <span class="code-tag bad">피라미드</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">asyncFoo((err) =&gt; {
+  asyncBar((err) =&gt; {
+    asyncFooBar((err) =&gt; {
+      // ...
+    });
+  });
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">가독성보다 위험한 것</p>
+      <p>안쪽 <code>err</code> 이 바깥쪽 <code>err</code> 을 가리기 때문에,
+        <b>바깥 에러를 참조하려는 코드가 조용히 엉뚱한 값을 읽는다.</b>
+        들여쓰기는 눈에 보이지만 섀도잉은 보이지 않는다. 이쪽이 실제 버그의 원천이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>콜백 지옥의 원인은 비동기가 아니라 익명 함수 남용</li>
+      <li>증상 1: 중첩 깊이로 인한 추적 불가</li>
+      <li>증상 2: 같은 이름의 변수 섀도잉 — 이쪽이 더 위험하다</li>
+      <li>해법은 <a href="#item-15">4-2</a>의 규칙들 — 빠른 반환, 이름 붙이기, 모듈화</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-2</div>
+    <h3>콜백 모범 사례와 제어 흐름 패턴</h3>
+    <p class="item-tagline">순차 · 병렬 · 제한된 병렬. 세 가지 제어 흐름을 손으로 짜 보면 Promise가 무엇을 대신해 주는지 보인다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    비동기 제어 흐름은 결국 <b>카운터 하나</b>로 요약된다.
+    "몇 개 끝났나"를 세다가 목표치에 도달하면 다음으로 넘어간다 — 순차든 병렬이든 제한된 병렬이든 마찬가지다.
+  </div>
+
+  <h4>콜백 규칙</h4>
+  <ul>
+    <li>콜백을 정의할 때 익명 함수 정의를 남용하지 않는다.
+      <ul>
+        <li>가능하면 빠르게 함수를 종료한다.</li>
+        <li>콜백을 위한 함수를 따로 만들어 <b>클로저 바깥에 배치</b>하고, 중간 결과를 인자로 전달한다.</li>
+        <li>재사용 가능한 함수들로 분할하여 모듈화한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>콜백 규칙 적용</h4>
+
+  <h5>1. else 구문 제거하기 — 빠른 반환 원칙</h5>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">전</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">if (err) {
+  cb(err);
+} else {
+  // 에러가 없을 때 실행할 코드
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">후</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">if (err) {
+  return cb(err);
+}
+
+// 에러가 없을 때 실행할 코드</code></pre>
+    </div>
+  </div>
+
+  <p><code>return</code> 하나로 들여쓰기 한 단계가 사라진다. 중첩이 3~4단이면 이것만으로 체감이 크게 달라진다.</p>
+
+  <h5>2. 재사용 가능한 코드의 구분 시도하기</h5>
+  <ul>
+    <li>콜백 안에 명령형 코드를 그대로 쓰지 말고 <b>외부로 분리</b>한다.</li>
+    <li>재사용 가능성과 테스트 가능성이 함께 올라간다.</li>
+  </ul>
+
+  <h4>순차 실행</h4>
+  <ul>
+    <li>비동기 작업이 완료될 때 다음 작업을 호출하는 가장 일반적인 방법이다.</li>
+    <li><b>작업의 모듈화</b>에 중점을 두면, 비동기 코드를 처리할 때 굳이 클로저가 필요하지 않다는 점을 보여준다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">sequential.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function task1(cb: () =&gt; void) {
+  asyncOperation(() =&gt; {
+    task2(cb);
+  });
+}
+
+function task2(cb: () =&gt; void) {
+  asyncOperation(() =&gt; {
+    task3(cb);
+  });
+}
+
+function task3(cb: () =&gt; void) {
+  asyncOperation(() =&gt; {
+    cb();
+  });
+}
+
+task1(() =&gt; {
+  console.log("task 1, 2, 3 are done");
+});
+
+// output: task 1, 2, 3 are done</code></pre>
+  </div>
+
+  <p>중첩이 사라진 것이 아니라 <b>펼쳐졌을 뿐</b>이다. 하지만 각 태스크가 독립적으로 이름을 갖고
+    따로 테스트할 수 있게 되었다는 점이 다르다.</p>
+
+  <h4>순차 반복</h4>
+  <ul>
+    <li>순차 실행은 작업의 수와 내용을 미리 알고 있을 때 완벽하게 작동한다.</li>
+    <li>하지만 <b>컬렉션의 각 항목</b>에 대해 비동기 작업을 순서대로 실행해야 한다면 이 방식으로는 불가능하다.
+      태스크의 개수를 코드 작성 시점에 모르기 때문이다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원본 노트가 여기서 끊겨 있습니다</p>
+      <p>노트에는 이 자리에 <code># ............</code> 만 남아 있어 구현이 비어 있다.
+        아래는 책의 <b>순차 반복(sequential iteration)</b> 패턴을 표준 형태로 복원한 것으로,
+        Node v24.17.0 에서 동작을 확인했다. 원문의 주장을 새로 만든 것이 아니라
+        바로 위 두 문장이 예고한 코드를 채운 것이다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">sequential-iteration.ts</span>
+      <span class="code-tag good">재귀로 인덱스를 전진시킨다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function iterate(collection: string[], index: number, finish: () =&gt; void) {
+  if (index === collection.length) {
+    return finish();          // 끝났다
+  }
+
+  asyncOperation(collection[index], () =&gt; {
+    iterate(collection, index + 1, finish);   // 다음 항목으로
+  });
+}
+
+iterate(collection, 0, () =&gt; {
+  console.log("모든 항목 처리 완료");
+});</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  I0["iterate(0)"] --> A0["asyncOperation(item 0)"]
+  A0 --> I1["iterate(1)"]
+  I1 --> A1["asyncOperation(item 1)"]
+  A1 --> I2["iterate(2)"]
+  I2 --> Q{"index === length?"}
+  Q -->|"예"| F["finish()"]
+  Q -->|"아니오"| A2["asyncOperation(item 2)"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>루프가 아니라 꼬리 재귀다</b> — <code>for</code> 문 안에서 비동기 호출을 하면 전부 동시에 출발해 버린다.
+      순서를 지키려면 "콜백이 다음 반복을 호출"하는 구조여야 한다.</div>
+  </div>
+
+  <h4>병렬 실행</h4>
+  <ul>
+    <li>Node는 논 블로킹 성질 덕분에 <b>단 하나의 스레드로 동시성</b>을 달성할 수 있다.</li>
+    <li>작업들은 논 블로킹 API 위에서 실행되고 이벤트 루프에 의해 <b>인터리빙</b>된다.</li>
+  </ul>
+
+  <h5>패턴</h5>
+  <ul>
+    <li>모든 작업을 한꺼번에 시작하고, 완료 카운트가 전체 개수에 도달하면 <code>finish</code> 를 호출한다.</li>
+    <li>한 번에 모든 태스크를 동시에 실행하면 <b>경쟁 상태(race condition)</b>가 발생할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">parallel.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const tasks = [
+  /*...*/
+];
+
+let completed = 0;
+
+tasks.forEach((task) =&gt; {
+  task(() =&gt; {
+    if (++completed === tasks.length) {
+      finish();
+    }
+  });
+});
+
+function finish() {
+  console.log("all tasks are done");
+}</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  S["forEach 로 전부 시작"] --> T1["task 1"]
+  S --> T2["task 2"]
+  S --> T3["task 3"]
+  T1 --> C["completed++"]
+  T2 --> C
+  T3 --> C
+  C --> Q{"completed === tasks.length?"}
+  Q -->|"예"| F["finish()"]
+  Q -->|"아니오"| W["대기"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>병렬 실행의 전부는 카운터 하나다</b> — 완료 순서는 보장되지 않지만
+      "몇 개 끝났는지"만 세면 언제 끝났는지는 알 수 있다. <code>Promise.all()</code> 이 내부에서 하는 일도 정확히 이것이다.</div>
+  </div>
+
+  <h5>동시 작업과 경쟁 상태 수정</h5>
+  <ul>
+    <li>Node에서 여러 비동기 작업을 병렬로 실행하는 것은 리소스 측면에서 직관적이고 비용이 적다.</li>
+    <li>모든 것이 단일 스레드에서 실행되므로 일반적으로 정교한 동기화 메커니즘이 필요하지 않다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">spider.ts</span>
+      <span class="code-tag good">Set 하나로 중복 방지</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const spidering = new Set();
+
+function spider(url: string, nesting: number, cb: () =&gt; void) {
+  if (spidering.has(url)) {
+    return process.nextTick(cb);
+  }
+
+  spidering.add(url);
+  // ... 실제 크롤링
+}</code></pre>
+  </div>
+
+  <p>각 작업을 <code>Set</code> 에 기록해 동시에 여러 개의 <code>spider()</code> 가 같은 URL 을 처리하는 것을 막는다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">여기서도 Zalgo 를 피한다 <span class="badge b-blue">보강</span></p>
+      <p>이미 처리 중인 URL 일 때 <code>cb()</code> 를 바로 부르지 않고 <code>process.nextTick(cb)</code> 로 감싼 이유가 있다.
+        그냥 부르면 <b>캐시 히트일 때만 동기</b>가 되어 <a href="#item-11">3-1</a>에서 본 Zalgo 가 그대로 재현된다.
+        이 한 줄이 그 방지책이다.</p>
+    </div>
+  </div>
+
+  <h4>제한된 병렬 실행</h4>
+  <ul>
+    <li>제어되지 않는 병렬 작업 생성은 <b>과부하</b>를 일으킬 수 있다.</li>
+    <li>무한한 병렬 작업을 생성하는 서버는 DoS 공격에 취약하다.</li>
+  </ul>
+
+  <h5>전역적 동시성 제한</h5>
+  <ul>
+    <li>현재 진행 중인 작업 수가 최대치보다 작고, 아직 시작하지 않은 작업이 남아 있을 때만 새 작업을 시작한다.</li>
+    <li>일반적으로 이 패턴은 <b>작업 목록이 미리 정해져 있거나</b>, 시간이 지나며 작업 수가 선형적으로 증가할 때 적합하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">limited-parallel.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const tasks: any[] = [
+  // ...
+];
+
+const concurrency = 2;
+let running = 0;
+let completed = 0;
+let index = 0;
+
+function next() {
+  while (running &lt; concurrency &amp;&amp; index &lt; tasks.length) {
+    const task = tasks[index++];
+    task(() =&gt; {
+      if (++completed === tasks.length) {
+        return finish();
+      }
+
+      running--;
+      next();          // 슬롯이 비었으니 다음 작업 투입
+    });
+
+    running++;
+  }
+}
+
+next();
+
+function finish() {
+  console.log("all tasks are done");
+}</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 170" width="460" role="img" aria-label="동시성 2로 제한된 작업 슬롯 도식">
+        <rect x="20" y="30" width="180" height="46" rx="10" class="dg-fill-soft dg-stroke"/>
+        <text x="110" y="24" class="dg-text-sub" font-size="11" text-anchor="middle">실행 슬롯 (concurrency = 2)</text>
+        <rect x="32" y="42" width="76" height="22" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="70" y="57" class="dg-text dg-mono" font-size="11" text-anchor="middle">task 1</text>
+        <rect x="114" y="42" width="76" height="22" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="152" y="57" class="dg-text dg-mono" font-size="11" text-anchor="middle">task 2</text>
+        <rect x="250" y="30" width="190" height="46" rx="10" class="dg-fill-soft dg-stroke"/>
+        <text x="345" y="24" class="dg-text-sub" font-size="11" text-anchor="middle">대기 (index 부터)</text>
+        <text x="345" y="58" class="dg-text dg-mono" font-size="11" text-anchor="middle">task 3 · task 4 · task 5 …</text>
+        <path d="M200 53 L246 53" class="dg-stroke" fill="none" marker-end="url(#arrowL)"/>
+        <defs><marker id="arrowL" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" class="dg-accent"/></marker></defs>
+        <text x="223" y="46" class="dg-text-sub" font-size="10" text-anchor="middle">완료 시</text>
+        <text x="230" y="120" class="dg-text-sub" font-size="11" text-anchor="middle">running &lt; concurrency 이고 남은 작업이 있을 때만 새 작업 투입</text>
+        <text x="230" y="140" class="dg-text-sub" font-size="11" text-anchor="middle">completed === tasks.length 가 되면 finish()</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>슬롯이 비면 채운다</b> — 병렬 실행의 카운터에 <code>running</code> 이라는 상한 조건 하나가 추가됐을 뿐이다.
+      이 구조가 그대로 <code>p-limit</code> 같은 라이브러리의 핵심이다.</div>
+  </div>
+
+  <h5>큐를 사용한 해결</h5>
+  <ul>
+    <li>동시성 제한을 넘지 않는 한 큐에서 가능한 한 많은 작업을 시작한다.</li>
+    <li>새 작업을 <b>동적으로</b> 큐에 추가할 수 있다는 것이 앞의 방식과의 차이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">TaskQueue.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class TaskQueue {
+  private concurrency: number; // 동시성 제한
+  private queue: any[];        // 보류 중인 작업 저장
+  private running: number;     // 실행 중인 작업 개수
+  private completed: number;
+
+  constructor(concurrency: number) {
+    this.concurrency = concurrency;
+    this.queue = [];
+    this.running = 0;
+    this.completed = 0;
+  }
+
+  pushTask(task: any) {
+    this.queue.push(task);
+
+    // process.nextTick 으로 넘기면 this 컨텍스트를 잃으므로 bind 사용
+    process.nextTick(this.next.bind(this));
+    return this;
+  }
+
+  next() {
+    while (this.running &lt; this.concurrency &amp;&amp; this.queue.length) {
+      const task = this.queue.shift();
+      task(() =&gt; {
+        this.running--;
+        process.nextTick(this.next.bind(this));
+      });
+      this.running++;
+    }
+  }
+}</code></pre>
+  </div>
+
+  <h5>큐 개선하기</h5>
+  <ul>
+    <li>이벤트를 발생시키기 위해 <code>EventEmitter</code> 를 상속받는다.</li>
+    <li>에러 핸들링과 "더 이상 작업이 없다"는 <code>empty</code> 이벤트를 추가한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">TaskQueue.ts (EventEmitter 버전)</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import EventEmitter from "events";
+
+class TaskQueue extends EventEmitter {
+  private concurrency: number;
+  private queue: any[];
+  private running: number;
+  private completed: number;
+
+  constructor(concurrency: number) {
+    super();
+
+    this.concurrency = concurrency;
+    this.queue = [];
+    this.running = 0;
+    this.completed = 0;
+  }
+
+  pushTask(task: any) {
+    this.queue.push(task);
+    process.nextTick(this.next.bind(this));
+    return this;
+  }
+
+  next() {
+    if (this.running === 0 &amp;&amp; this.queue.length === 0) {
+      return this.emit("empty");
+    }
+
+    while (this.running &lt; this.concurrency &amp;&amp; this.queue.length) {
+      const task = this.queue.shift();
+      task((err: unknown) =&gt; {
+        if (err) {
+          return this.emit("error", err);
+        }
+
+        this.running--;
+        process.nextTick(this.next.bind(this));
+      });
+      this.running++;
+    }
+  }
+}
+
+const queue = new TaskQueue(2);
+queue
+  .on("empty", () =&gt; {
+    console.log("all tasks are done");
+  })
+  .on("error", (err) =&gt; {
+    console.error(err);
+  });</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>next()</code> 는 <code>empty</code> 검사를 <code>while</code> 문으로 감싸고 있다
+        (<code>while (this.running === 0 &amp;&amp; this.queue.length === 0)</code>).
+        조건이 참일 때 <code>return</code> 하므로 결과적으로는 한 번만 돌지만,
+        <b>루프가 아니라 단순 분기</b>이므로 <code>if</code> 로 쓰는 것이 의도에 맞다. 위 코드는 그렇게 고쳐 두었다.</p>
+      <p>또한 에러 발생 시 <code>this.running--</code> 없이 바로 <code>return this.emit("error", err)</code> 하기 때문에,
+        실패한 작업이 슬롯을 영구히 점유해 결국 큐가 멈춘다.
+        실무에서는 <code>running--</code> 을 먼저 하고 에러를 emit 해야 한다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">지금 이 코드를 쓸 일이 있을까 <span class="badge b-blue">보강</span></p>
+      <p>실무에서 이 세 패턴을 직접 짤 일은 거의 없다. 순차는 <code>for await</code>,
+        병렬은 <code>Promise.all()</code>, 제한된 병렬은 <code>p-limit</code> 이나
+        <code>Promise.all</code> + 세마포어로 대체된다(<a href="#item-18">5-2</a>).
+        그럼에도 짜 보는 이유는, 이 구조를 알아야 <code>Promise.all</code> 이 왜 하나라도 실패하면 즉시 reject 하는지,
+        왜 동시성 제한은 표준에 없는지가 이해되기 때문이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>빠른 반환 + 이름 붙여 밖으로 꺼내기 = 콜백 지옥 해소의 90%</li>
+      <li>순차 실행은 콜백이 다음 태스크를 호출, 순차 반복은 인덱스를 전진시키는 재귀</li>
+      <li>병렬 실행은 완료 카운터 하나. <code>Promise.all()</code> 이 하는 일이 이것이다</li>
+      <li>제한된 병렬은 여기에 <code>running &lt; concurrency</code> 조건을 더한 것</li>
+      <li>큐로 만들면 작업을 동적으로 추가할 수 있고, <code>EventEmitter</code> 상속으로 완료/에러를 알릴 수 있다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-3</div>
+    <h3>비동기 라이브러리</h3>
+    <p class="item-tagline">원본 노트가 제목만 남아 있는 항목입니다.</p>
+  </header>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">미완성 노트</p>
+      <p>원본 파일 <code>4-3. 비동기 라이브러리.md</code> 에는 제목 한 줄 외에 내용이 없다.
+        내용을 지어내지 않고, 이 절이 다루려던 주제만 아래에 적어 둔다.
+        나중에 노트를 채우면 이 아이템을 다시 생성하면 된다.</p>
+    </div>
+  </div>
+
+  <h4>이 절이 다루려던 것</h4>
+  <p>책의 4장 마지막 절은 <a href="#item-15">4-2</a>에서 손으로 짠 순차/병렬/제한된 병렬 패턴을
+    <b>라이브러리로 대체</b>하는 이야기다. 대표적으로 <code>async</code> 패키지가
+    <code>series</code>, <code>parallel</code>, <code>eachLimit</code>, <code>queue</code> 같은 헬퍼로
+    앞 절의 구현을 그대로 제공한다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">2026년 기준으로는 <span class="badge b-blue">보강</span></p>
+      <p>콜백 기반 <code>async</code> 라이브러리를 새 코드에 도입할 이유는 거의 없다.
+        같은 역할이 표준과 소형 패키지로 흡수되었다.</p>
+      <ul>
+        <li>순차 → <code>for await (const x of items)</code></li>
+        <li>병렬 → <code>Promise.all()</code> / <code>Promise.allSettled()</code></li>
+        <li>제한된 병렬 → <code>p-limit</code>, <code>p-map</code> (<code>concurrency</code> 옵션)</li>
+        <li>큐 → <code>p-queue</code></li>
+      </ul>
+      <p>레거시 코드에서 <code>async</code> 를 만났을 때 읽을 수 있으면 충분하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>원본 노트 미완성 — 내용을 채우지 않고 주제만 표시</li>
+      <li>이 절의 요지는 "손으로 짠 패턴을 라이브러리로 대체하기"</li>
+      <li>지금은 <code>for await</code> / <code>Promise.all</code> / <code>p-limit</code> 조합이 사실상의 표준</li>
+    </ul>
+  </div>
+</article>

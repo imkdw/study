@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>스터디 통파일 모음</title>
+<meta name="description" content="study-digest 로 만든 학습자료 10권 한곳에 모아보기">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+<style>
+:root {
+  --grey-50:#F9FAFB; --grey-100:#F2F4F6; --grey-200:#E5E8EB; --grey-300:#D1D6DB;
+  --grey-400:#B0B8C1; --grey-500:#8B95A1; --grey-600:#6B7684; --grey-700:#4E5968;
+  --grey-800:#333D4B; --grey-900:#191F28;
+  --blue:#3182F6; --blue-weak:#E8F3FF; --red:#F04452; --red-weak:#FEF0F1;
+  --green:#15C47E; --green-weak:#EAFBF3; --yellow:#F5A623; --yellow-weak:#FFF9E7;
+  --purple:#7F5AF0; --purple-weak:#F1EDFE;
+  --bg:#FFFFFF; --bg-sunken:var(--grey-50); --surface:#FFFFFF; --surface-alt:var(--grey-50);
+  --border:var(--grey-200); --border-strong:var(--grey-300);
+  --text:var(--grey-900); --text-sub:var(--grey-700); --text-muted:var(--grey-600); --text-faint:var(--grey-500);
+  --accent:var(--blue); --accent-weak:var(--blue-weak);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 1px 3px rgba(0,0,0,.04);
+  --shadow-lg:0 12px 32px rgba(0,0,0,.10);
+  --r-md:12px; --r-lg:16px;
+  --font-sans:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,"Apple SD Gothic Neo",sans-serif;
+  color-scheme:light;
+}
+[data-theme="dark"] {
+  --bg:#16181D; --bg-sunken:#101215; --surface:#1C1F25; --surface-alt:#21242B;
+  --border:#2C3038; --border-strong:#3A3F49;
+  --text:#EDEFF2; --text-sub:#C3C8D0; --text-muted:#9AA1AC; --text-faint:#7C838F;
+  --accent:#4E8FF7; --accent-weak:#16233A;
+  --blue:#4E8FF7; --blue-weak:#16233A; --red:#FF6B77; --red-weak:#2E1A1D;
+  --green:#2FD69A; --green-weak:#12271F; --yellow:#FFC44D; --yellow-weak:#2B2415;
+  --purple:#9B7BFF; --purple-weak:#211B36;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 12px 32px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+*,*::before,*::after { box-sizing:border-box; }
+html,body { margin:0; padding:0; }
+body { font-family:var(--font-sans); background:var(--bg-sunken); color:var(--text); -webkit-font-smoothing:antialiased; letter-spacing:-.01em; }
+.wrap { max-width:1120px; margin:0 auto; padding:0 24px 96px; }
+.topbar { position:sticky; top:0; z-index:20; backdrop-filter:saturate(180%) blur(12px); background:color-mix(in srgb, var(--bg) 82%, transparent); border-bottom:1px solid var(--border); }
+.topbar-inner { max-width:1120px; margin:0 auto; padding:0 24px; height:56px; display:flex; align-items:center; gap:12px; }
+.logo { display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px; }
+.logo .sq { width:26px; height:26px; border-radius:8px; background:var(--accent); color:#fff; display:grid; place-items:center; font-size:14px; }
+.spacer { flex:1; }
+.icon-btn { width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); display:grid; place-items:center; cursor:pointer; transition:.15s; }
+.icon-btn:hover { background:var(--surface-alt); color:var(--text); }
+.hero { padding:64px 0 40px; }
+.eyebrow { display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:700; letter-spacing:.11em; color:var(--accent); background:var(--accent-weak); padding:6px 11px; border-radius:999px; margin-bottom:18px; }
+h1 { margin:0 0 14px; font-size:clamp(30px,4.6vw,44px); font-weight:800; line-height:1.24; letter-spacing:-.035em; }
+.lead { margin:0; font-size:17px; line-height:1.72; color:var(--text-sub); max-width:680px; }
+.lead b { color:var(--text); font-weight:700; }
+.stats { display:flex; flex-wrap:wrap; gap:10px; margin-top:28px; }
+.stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:13px 18px; box-shadow:var(--shadow-sm); min-width:104px; }
+.stat .v { font-size:23px; font-weight:800; letter-spacing:-.03em; line-height:1.1; }
+.stat .v span { font-size:13px; font-weight:600; color:var(--text-muted); margin-left:2px; }
+.stat .l { font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
+.controls { position:sticky; top:56px; z-index:15; padding:14px 0 16px; background:var(--bg-sunken); }
+.search { display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:0 14px; height:44px; box-shadow:var(--shadow-sm); transition:.15s; }
+.search:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak); }
+.search svg { color:var(--text-faint); flex:none; }
+.search input { flex:1; border:0; background:none; outline:none; font:inherit; font-size:15px; color:var(--text); }
+.search input::placeholder { color:var(--text-faint); }
+.search kbd { font:inherit; font-size:11px; font-weight:600; color:var(--text-faint); border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+.chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:11px; }
+.chip { font:inherit; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:6px 13px; transition:.15s; }
+.chip:hover { color:var(--text); border-color:var(--border-strong); }
+.chip.on { background:var(--text); border-color:var(--text); color:var(--bg); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; margin-top:8px; }
+.card { position:relative; display:flex; flex-direction:column; text-decoration:none; color:inherit; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:22px 22px 18px; box-shadow:var(--shadow-sm); transition:transform .16s cubic-bezier(.2,.8,.3,1), box-shadow .16s, border-color .16s; overflow:hidden; }
+.card::before { content:""; position:absolute; inset:0 0 auto; height:3px; background:var(--tone); opacity:.9; }
+.card:hover { transform:translateY(-3px); box-shadow:var(--shadow-lg); border-color:var(--border-strong); }
+.t-blue { --tone:var(--blue); --tone-weak:var(--blue-weak); }
+.t-green { --tone:var(--green); --tone-weak:var(--green-weak); }
+.t-purple { --tone:var(--purple); --tone-weak:var(--purple-weak); }
+.t-yellow { --tone:var(--yellow); --tone-weak:var(--yellow-weak); }
+.t-red { --tone:var(--red); --tone-weak:var(--red-weak); }
+.card-top { display:flex; align-items:center; gap:9px; margin-bottom:14px; }
+.mark { width:36px; height:36px; border-radius:11px; background:var(--tone-weak); color:var(--tone); display:grid; place-items:center; font-size:13px; font-weight:800; letter-spacing:-.02em; flex:none; }
+.cat { font-size:11.5px; font-weight:700; color:var(--tone); letter-spacing:.02em; }
+.card-title { margin:0 0 5px; font-size:18px; font-weight:800; letter-spacing:-.03em; line-height:1.35; }
+.card-sub { margin:0 0 10px; font-size:13px; font-weight:600; color:var(--text-muted); }
+.card-desc { margin:0 0 14px; font-size:13.5px; line-height:1.68; color:var(--text-sub); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.chap { list-style:none; margin:0 0 16px; padding:0; display:flex; flex-wrap:wrap; gap:5px; max-height:52px; overflow:hidden; }
+.chap li { font-size:11.5px; font-weight:600; color:var(--text-muted); background:var(--surface-alt); border:1px solid var(--border); border-radius:6px; padding:3px 7px; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.card-foot { margin-top:auto; display:flex; align-items:center; gap:9px; padding-top:14px; border-top:1px solid var(--border); }
+.metric { font-size:12.5px; color:var(--text-muted); font-weight:500; }
+.metric b { color:var(--text); font-weight:700; margin-right:3px; }
+.dot { width:3px; height:3px; border-radius:50%; background:var(--border-strong); }
+.grow { flex:1; }
+.go { display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:700; color:var(--tone); }
+.go svg { transition:transform .16s; }
+.card:hover .go svg { transform:translateX(3px); }
+.empty { display:none; text-align:center; padding:64px 0; color:var(--text-muted); font-size:15px; }
+.empty.on { display:block; }
+.card.hide { display:none; }
+footer.pagefoot { margin-top:56px; padding-top:22px; border-top:1px solid var(--border); font-size:12.5px; color:var(--text-faint); line-height:1.8; }
+@media (max-width:640px) {
+  .wrap { padding:0 16px 72px; } .topbar-inner { padding:0 16px; }
+  .hero { padding:44px 0 28px; } .grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="logo"><span class="sq">📚</span> 통파일 모음</div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="테마 전환">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">STUDY DIGEST / 2026-08-22</div>
+    <h1>공부하려고 만든 정리본,<br>여기 다 모여 있다</h1>
+    <p class="lead">노트와 스크린샷을 합쳐 만든 <b>단일 HTML 학습자료 10권</b>. 각 파일은 그 자체로 완결된 책이라 이 폴더만 통째로 들고 다녀도 된다. 카드를 누르면 바로 열린다.</p>
+    <div class="stats">
+      <div class="stat"><div class="v">10<span>권</span></div><div class="l">학습자료</div></div>
+      <div class="stat"><div class="v">116<span>개</span></div><div class="l">챕터</div></div>
+      <div class="stat"><div class="v">496<span>개</span></div><div class="l">아이템</div></div>
+      <div class="stat"><div class="v">4.4<span>MB</span></div><div class="l">총 용량</div></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="책 제목 / 챕터 / 주제 검색" autocomplete="off" spellcheck="false">
+      <kbd>/</kbd>
+    </label>
+    <div class="chips">
+      <button class="chip on" type="button" data-filter="all">전체</button>
+      <button class="chip" type="button" data-filter="언어/설계">언어/설계</button>
+      <button class="chip" type="button" data-filter="DB">DB</button>
+      <button class="chip" type="button" data-filter="인프라">인프라</button>
+      <button class="chip" type="button" data-filter="아키텍처">아키텍처</button>
+      <button class="chip" type="button" data-filter="AI">AI</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+      <a class="card t-purple" href="./%EC%9D%B4%ED%8E%99%ED%8B%B0%EB%B8%8C%20%ED%83%80%EC%9E%85%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8.html" data-cat="언어/설계" data-search="이펙티브 타입스크립트 62 items · 학습 정리본 이펙티브 타입스크립트 62개 아이템 학습 정리본. 타입 시스템, 타입 추론, 타입 설계, any 다루기, 타입 선언, 마이그레이션까지. 언어/설계 타입스크립트 알아보기 타입스크립트의 타입 시스템 타입 추론 타입 설계 any 다루기 타입 선언과 @types 코드를 작성하고 실행하기 타입스크립트로 마이그레이션하기">
+        <div class="card-top"><span class="mark">TS</span><span class="cat">언어/설계</span></div>
+        <h3 class="card-title">이펙티브 타입스크립트</h3>
+        <p class="card-sub">62 items · 학습 정리본</p>
+        <p class="card-desc">이펙티브 타입스크립트 62개 아이템 학습 정리본. 타입 시스템, 타입 추론, 타입 설계, any 다루기, 타입 선언, 마이그레이션까지.</p>
+        <ul class="chap"><li>타입스크립트 알아보기</li><li>타입스크립트의 타입 시스템</li><li>타입 추론</li><li>타입 설계</li><li>any 다루기</li><li>타입 선언과 @types</li><li>코드를 작성하고 실행하기</li><li>타입스크립트로 마이그레이션하기</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>8</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>62</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-purple" href="./node.js%20%EB%94%94%EC%9E%90%EC%9D%B8%ED%8C%A8%ED%84%B4%20%EB%B0%94%EC%9D%B4%EB%B8%94.html" data-cat="언어/설계" data-search="node.js 디자인 패턴 바이블 13챕터 51편 / 학습 정리본 node.js 디자인 패턴 바이블 학습 정리본. 리액터 패턴과 이벤트 루프, 모듈 시스템, 콜백/promise/async·await 제어 흐름, 스트림, 생성자/구조적/행위 디자인 패턴, 확장성과 메시징까지 51편의 노트를 한 권으로 엮었습니다. 언어/설계 node.js 플랫폼 모듈 시스템 콜백과 이벤트 콜백 비동기 제어 흐름 promise와 async/await 스트림 코딩 생성자 디자인 패턴 구조적 설계 패턴 행위 디자인 패턴 범용 자바스크립트 고급 레시피 확장성과 아키텍처 메시징과 통합 패턴">
+        <div class="card-top"><span class="mark">N</span><span class="cat">언어/설계</span></div>
+        <h3 class="card-title">Node.js 디자인 패턴 바이블</h3>
+        <p class="card-sub">13챕터 51편 / 학습 정리본</p>
+        <p class="card-desc">Node.js 디자인 패턴 바이블 학습 정리본. 리액터 패턴과 이벤트 루프, 모듈 시스템, 콜백/Promise/async·await 제어 흐름, 스트림, 생성자/구조적/행위 디자인 패턴, 확장성과 메시징까지 51편의 노트를 한 권으로 엮었습니다.</p>
+        <ul class="chap"><li>Node.js 플랫폼</li><li>모듈 시스템</li><li>콜백과 이벤트</li><li>콜백 비동기 제어 흐름</li><li>Promise와 async/await</li><li>스트림 코딩</li><li>생성자 디자인 패턴</li><li>구조적 설계 패턴</li><li>행위 디자인 패턴</li><li>범용 자바스크립트</li><li>고급 레시피</li><li>확장성과 아키텍처</li><li>메시징과 통합 패턴</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>13</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>51</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-purple" href="./%EB%8B%A8%EC%9C%84%20%ED%85%8C%EC%8A%A4%ED%8A%B8.html" data-cat="언어/설계" data-search="단위 테스트 생산성과 품질을 위한 단위 테스트 원칙과 패턴 블라디미르 코리코프 「단위 테스트」 학습 노트 정리 — 4대 요소, 목과 취약성, 함수형 아키텍쳐, 통합 테스트, 안티패턴까지 언어/설계 단위 테스트의 목표 단위 테스트란 무엇인가 단위 테스트 구조 좋은 단위 테스트의 4대 요소 목과 테스트 취약성 단위 테스트 스타일 가치 있는 단위 테스트를 위한 리팩터링 통합 테스트를 하는 이유 목 처리에 대한 모범 사례 데이터베이스 테스트 단위 테스트 안티패턴">
+        <div class="card-top"><span class="mark">UT</span><span class="cat">언어/설계</span></div>
+        <h3 class="card-title">단위 테스트</h3>
+        <p class="card-sub">생산성과 품질을 위한 단위 테스트 원칙과 패턴</p>
+        <p class="card-desc">블라디미르 코리코프 「단위 테스트」 학습 노트 정리 — 4대 요소, 목과 취약성, 함수형 아키텍쳐, 통합 테스트, 안티패턴까지</p>
+        <ul class="chap"><li>단위 테스트의 목표</li><li>단위 테스트란 무엇인가</li><li>단위 테스트 구조</li><li>좋은 단위 테스트의 4대 요소</li><li>목과 테스트 취약성</li><li>단위 테스트 스타일</li><li>가치 있는 단위 테스트를 위한 리팩터링</li><li>통합 테스트를 하는 이유</li><li>목 처리에 대한 모범 사례</li><li>데이터베이스 테스트</li><li>단위 테스트 안티패턴</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>11</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>50</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-blue" href="./real-mysql-8.0.html" data-cat="DB" data-search="real mysql 8.0 17개 챕터 81개 노트 정리 real mysql 8.0 학습 노트를 한 권으로 정리한 단일 html 학습자료. 아키텍처, 인덱스, 옵티마이저, 실행 계획, 복제까지. db 설치와 설정 사용자 및 권한 아키텍처 트랜잭션과 잠금 데이터 압축 데이터 암호화 인덱스 옵티마이저와 힌트 실행 계획 쿼리 작성 및 최적화 확장 검색 파티션 스토어드 프로그램 데이터 타입 복제 innodb 클러스터 performance &amp; sys 스키마">
+        <div class="card-top"><span class="mark">MY</span><span class="cat">DB</span></div>
+        <h3 class="card-title">Real MySQL 8.0</h3>
+        <p class="card-sub">17개 챕터 81개 노트 정리</p>
+        <p class="card-desc">Real MySQL 8.0 학습 노트를 한 권으로 정리한 단일 HTML 학습자료. 아키텍처, 인덱스, 옵티마이저, 실행 계획, 복제까지.</p>
+        <ul class="chap"><li>설치와 설정</li><li>사용자 및 권한</li><li>아키텍처</li><li>트랜잭션과 잠금</li><li>데이터 압축</li><li>데이터 암호화</li><li>인덱스</li><li>옵티마이저와 힌트</li><li>실행 계획</li><li>쿼리 작성 및 최적화</li><li>확장 검색</li><li>파티션</li><li>스토어드 프로그램</li><li>데이터 타입</li><li>복제</li><li>InnoDB 클러스터</li><li>Performance &amp; Sys 스키마</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>17</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>81</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-blue" href="./%EA%B0%9C%EB%B0%9C%EC%9E%90%EB%A5%BC%20%EC%9C%84%ED%95%9C%20%EB%A0%88%EB%94%94%EC%8A%A4.html" data-cat="DB" data-search="개발자를 위한 레디스 37개 노트 정리 레디스 자료구조부터 캐시/메시지 브로커 활용, 백업과 복제, 센티널과 클러스터, 보안과 운영까지 정리한 학습자료 db 레디스 기본 개념 자료구조 활용 사례 레디스를 캐시로 사용하기 메시지 브로커로 사용하기 데이터 백업 방법 복제 센티널 확장성 보안 클라이언트 관리 레디스 운영하기">
+        <div class="card-top"><span class="mark">RD</span><span class="cat">DB</span></div>
+        <h3 class="card-title">개발자를 위한 레디스</h3>
+        <p class="card-sub">37개 노트 정리</p>
+        <p class="card-desc">레디스 자료구조부터 캐시/메시지 브로커 활용, 백업과 복제, 센티널과 클러스터, 보안과 운영까지 정리한 학습자료</p>
+        <ul class="chap"><li>레디스 기본 개념</li><li>자료구조 활용 사례</li><li>레디스를 캐시로 사용하기</li><li>메시지 브로커로 사용하기</li><li>데이터 백업 방법</li><li>복제</li><li>센티널</li><li>확장성</li><li>보안</li><li>클라이언트 관리</li><li>레디스 운영하기</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>11</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>37</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-blue" href="./postgres%20dba%20%EC%9D%B4%EC%95%BC%EA%B8%B0.html" data-cat="DB" data-search="postgresql dba 이야기 26개 노트 정리 인덱스, 파티션, 아키텍처, 복제, 백업, 모니터링, 락, vacuum까지 postgresql 운영의 핵심을 정리한 학습자료 db 오브젝트 아키텍처 복제 백업과 복구 모니터링 트랜잭션과 대기이벤트 vacuum">
+        <div class="card-top"><span class="mark">PG</span><span class="cat">DB</span></div>
+        <h3 class="card-title">PostgreSQL DBA 이야기</h3>
+        <p class="card-sub">26개 노트 정리</p>
+        <p class="card-desc">인덱스, 파티션, 아키텍처, 복제, 백업, 모니터링, 락, Vacuum까지 PostgreSQL 운영의 핵심을 정리한 학습자료</p>
+        <ul class="chap"><li>오브젝트</li><li>아키텍처</li><li>복제</li><li>백업과 복구</li><li>모니터링</li><li>트랜잭션과 대기이벤트</li><li>Vacuum</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>7</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>26</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-green" href="./%EB%8F%84%EC%BB%A4%20%EA%B5%90%EA%B3%BC%EC%84%9C.html" data-cat="인프라" data-search="도커 교과서 learn docker in a month of lunches 정리 도커 교과서(learn docker in a month of lunches) 학습 노트를 한 권으로 정리한 자료. 컨테이너 기초부터 이미지 최적화, 컴포즈, 헬스체크, 모니터링, 오케스트레이션까지. 인프라 시작하기 전에 도커의 기본적인 사용법 도커 이미지 만들기 소스코드에서 도커 이미지까지 레지스트리에 이미지 공유하기 도커 볼륨과 퍼시스턴트 스토리지 도커 컴포즈로 분산 앱 실행 헬스체크와 디펜던시 체크 컨테이너 모니터링 컴포즈로 여러 환경 구성 도커로 앱 빌드 및 테스트 컨테이너 오케스트레이션 도커 이미지 최적화하기 컨테이너의 앱 설정관리">
+        <div class="card-top"><span class="mark">DK</span><span class="cat">인프라</span></div>
+        <h3 class="card-title">도커 교과서</h3>
+        <p class="card-sub">Learn Docker in a Month of Lunches 정리</p>
+        <p class="card-desc">도커 교과서(Learn Docker in a Month of Lunches) 학습 노트를 한 권으로 정리한 자료. 컨테이너 기초부터 이미지 최적화, 컴포즈, 헬스체크, 모니터링, 오케스트레이션까지.</p>
+        <ul class="chap"><li>시작하기 전에</li><li>도커의 기본적인 사용법</li><li>도커 이미지 만들기</li><li>소스코드에서 도커 이미지까지</li><li>레지스트리에 이미지 공유하기</li><li>도커 볼륨과 퍼시스턴트 스토리지</li><li>도커 컴포즈로 분산 앱 실행</li><li>헬스체크와 디펜던시 체크</li><li>컨테이너 모니터링</li><li>컴포즈로 여러 환경 구성</li><li>도커로 앱 빌드 및 테스트</li><li>컨테이너 오케스트레이션</li><li>도커 이미지 최적화하기</li><li>컨테이너의 앱 설정관리</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>14</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>57</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-green" href="./RabbitMQ.html" data-cat="인프라" data-search="rabbitmq bullmq 쓰던 사람을 위한 정리 bullmq 경험자가 rabbitmq로 넘어갈 때 필요한 개념/운영/node.js 실전 정리. rabbitmq 4.3 기준. 인프라 두 물건의 정체 amqp 0-9-1 모델 전달 보장 큐 타입 고르기 실패와 재시도 node.js 실전 운영 치트시트">
+        <div class="card-top"><span class="mark">MQ</span><span class="cat">인프라</span></div>
+        <h3 class="card-title">RabbitMQ</h3>
+        <p class="card-sub">BullMQ 쓰던 사람을 위한 정리</p>
+        <p class="card-desc">BullMQ 경험자가 RabbitMQ로 넘어갈 때 필요한 개념/운영/Node.js 실전 정리. RabbitMQ 4.3 기준.</p>
+        <ul class="chap"><li>두 물건의 정체</li><li>AMQP 0-9-1 모델</li><li>전달 보장</li><li>큐 타입 고르기</li><li>실패와 재시도</li><li>Node.js 실전</li><li>운영</li><li>치트시트</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>8</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>34</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-yellow" href="./%EA%B0%80%EC%83%81%EB%A9%B4%EC%A0%91%EC%82%AC%EB%A1%80%EB%A1%9C%20%EB%B0%B0%EC%9A%B0%EB%8A%94%20%EB%8C%80%EA%B7%9C%EB%AA%A8%20%EC%8B%9C%EC%8A%A4%ED%85%9C%20%EC%84%A4%EA%B3%84%20%EA%B8%B0%EC%B4%88.html" data-cat="아키텍처" data-search="가상 면접 사례로 배우는 대규모 시스템 설계 기초 63개 주제 정리 대규모 시스템 설계 면접의 16개 주제를 규모 확장성 기초부터 결제 시스템까지 한 권으로 정리한 학습 노트 아키텍처 사용자 수에 따른 규모 확장성 개략적인 규모 측정 처리율 제한 장치의 설계 안정 해시 설계 키-값 저장소 설계 유일 id 생성기 설계 url 단축기 설계 웹 크롤러 설계 알림 시스템 설계 뉴스 피드 시스템 설계 채팅 시스템 설계 검색어 자동완성 시스템 유튜브 설계 구글 드라이브 설계 분산 메시지 큐 결제 시스템">
+        <div class="card-top"><span class="mark">SD</span><span class="cat">아키텍처</span></div>
+        <h3 class="card-title">가상 면접 사례로 배우는 대규모 시스템 설계 기초</h3>
+        <p class="card-sub">63개 주제 정리</p>
+        <p class="card-desc">대규모 시스템 설계 면접의 16개 주제를 규모 확장성 기초부터 결제 시스템까지 한 권으로 정리한 학습 노트</p>
+        <ul class="chap"><li>사용자 수에 따른 규모 확장성</li><li>개략적인 규모 측정</li><li>처리율 제한 장치의 설계</li><li>안정 해시 설계</li><li>키-값 저장소 설계</li><li>유일 ID 생성기 설계</li><li>URL 단축기 설계</li><li>웹 크롤러 설계</li><li>알림 시스템 설계</li><li>뉴스 피드 시스템 설계</li><li>채팅 시스템 설계</li><li>검색어 자동완성 시스템</li><li>유튜브 설계</li><li>구글 드라이브 설계</li><li>분산 메시지 큐</li><li>결제 시스템</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>16</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>63</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+      <a class="card t-red" href="./LLM%EC%9D%84%20%ED%99%9C%EC%9A%A9%ED%95%9C%20%EC%8B%A4%EC%A0%84%20AI%20%EC%95%B1%20%EA%B0%9C%EB%B0%9C.html" data-cat="AI" data-search="llm을 활용한 실전 ai 앱 개발 35개 절 학습 정리 허깅페이스 트랜스포머부터 정렬 학습, 임베딩, 벡터 데이터베이스, 멀티 모달, llm 에이전트까지 실습 코드 중심으로 정리한 학습자료 ai 허깅페이스 트랜스포머 말 잘 듣는 모델 만들기 gpu 효율적인 학습 sllm 학습하기 llm 앱 개발하기 임베딩으로 의미 압축하기 임베딩 모델 만들기 벡터 데이터베이스 llm 운영하기 멀티 모달 llm llm 에이전트">
+        <div class="card-top"><span class="mark">AI</span><span class="cat">AI</span></div>
+        <h3 class="card-title">LLM을 활용한 실전 AI 앱 개발</h3>
+        <p class="card-sub">35개 절 학습 정리</p>
+        <p class="card-desc">허깅페이스 트랜스포머부터 정렬 학습, 임베딩, 벡터 데이터베이스, 멀티 모달, LLM 에이전트까지 실습 코드 중심으로 정리한 학습자료</p>
+        <ul class="chap"><li>허깅페이스 트랜스포머</li><li>말 잘 듣는 모델 만들기</li><li>GPU 효율적인 학습</li><li>sLLM 학습하기</li><li>LLM 앱 개발하기</li><li>임베딩으로 의미 압축하기</li><li>임베딩 모델 만들기</li><li>벡터 데이터베이스</li><li>LLM 운영하기</li><li>멀티 모달 LLM</li><li>LLM 에이전트</li></ul>
+        <div class="card-foot">
+          <span class="metric"><b>11</b>챕터</span>
+          <span class="dot"></span>
+          <span class="metric"><b>35</b>아이템</span>
+          <span class="grow"></span>
+          <span class="go">열기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7-7 7 7"/></svg></span>
+        </div>
+      </a>
+  </div>
+  <div class="empty" id="empty">검색 결과가 없다.</div>
+
+  <footer class="pagefoot">
+    study-digest 스킬이 만든 단일 HTML 학습자료 모음. 빌드 중간물은 <code>.digest/&lt;슬러그&gt;/</code> 에 있고, 원본 노트는 각 스터디 폴더에 그대로 둔다.<br>
+    이 표지는 <code>build-index.mjs</code> 가 <code>.digest/*/meta.json</code> 을 읽어 생성한다. 마지막 갱신 2026-08-22.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var saved = null;
+  try { saved = localStorage.getItem("digest-index-theme"); } catch (e) {}
+  if (saved) root.setAttribute("data-theme", saved);
+  else if (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) root.setAttribute("data-theme", "dark");
+
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("digest-index-theme", next); } catch (e) {}
+  });
+
+  var q = document.getElementById("q");
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+  var chips = Array.prototype.slice.call(document.querySelectorAll(".chip"));
+  var empty = document.getElementById("empty");
+  var filter = "all";
+
+  function apply() {
+    var term = q.value.trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = (filter === "all" || c.dataset.cat === filter) &&
+               (!term || c.dataset.search.indexOf(term) !== -1);
+      c.classList.toggle("hide", !ok);
+      if (ok) shown++;
+    });
+    empty.classList.toggle("on", shown === 0);
+  }
+
+  q.addEventListener("input", apply);
+  chips.forEach(function (ch) {
+    ch.addEventListener("click", function () {
+      chips.forEach(function (o) { o.classList.remove("on"); });
+      ch.classList.add("on");
+      filter = ch.dataset.filter;
+      apply();
+    });
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "/" && document.activeElement !== q) { ev.preventDefault(); q.focus(); }
+    if (ev.key === "Escape" && document.activeElement === q) { q.value = ""; q.blur(); apply(); }
+  });
+})();
+</script>
+</body>
+</html>

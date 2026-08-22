@@ -1,0 +1,739 @@
+<article class="item" id="item-6-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-1</div>
+    <h3>레디스를 메시지 브로커로 사용하기</h3>
+    <p class="item-tagline">읽으면 사라지는 큐, 읽어도 남는 스트림. 이 차이 하나가 자료구조 선택을 결정한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    메시징 큐는 <b>1:1 로 일을 시키는</b> 통로이고, 이벤트 스트림은 <b>N:M 으로 사실을 알리는</b> 저장소다. 레디스는 list, pub/sub, stream 으로 그 스펙트럼을 모두 커버한다.
+  </div>
+
+  <h4>메시지 브로커</h4>
+  <ul>
+    <li>최근 아키텍처는 여러 모듈이 느슨하게 연결된 구조를 선호한다</li>
+    <li>모듈 간 느슨하지만 탄탄한 상호작용을 위해 메시지 브로커가 필요하다</li>
+    <li>모듈 간 상호작용은 동기보다 <b>비동기</b> 방식을 권장한다</li>
+    <li>메시지 브로커는 <b>메시징 큐</b>와 <b>이벤트 스트림</b> 두 가지로 나눌 수 있다</li>
+  </ul>
+
+  <h4>메시징 큐</h4>
+  <ul>
+    <li>데이터를 생성하는 쪽을 생산자, 수신하는 쪽을 소비자라 부른다</li>
+    <li>생산자는 소비자의 큐로 메시지를 직접 푸시한다</li>
+    <li>소비자가 메시지를 읽으면 해당 데이터는 삭제된다</li>
+    <li>두 소비자에게 같은 메시지를 전달해야 하면 메시지를 두 개 푸시해야 한다</li>
+    <li>이미 데이터가 있는 상태에서 새 소비자가 추가되면 기존 데이터를 읽을 수 없다</li>
+    <li>보통 1:1 상황에서 한 서비스가 다른 서비스에게 동작을 지시할 때 유용하다</li>
+  </ul>
+
+  <h4>이벤트 스트림</h4>
+  <ul>
+    <li>데이터를 생성하는 쪽을 발행자, 조회하는 쪽을 구독자라 부른다</li>
+    <li>발행자는 특정 저장소에 데이터를 <b>하나만</b> 푸시하면 된다</li>
+    <li>구독자들은 동일한 메시지를 각자 읽어 가므로 메시지를 복제해 저장하지 않아도 된다</li>
+    <li>구독자가 읽은 메시지는 큐와 달리 바로 삭제되지 않고 일정 시간 뒤에 정리된다</li>
+    <li>저장소에 데이터가 남으므로 히스토리 조회가 가능하다</li>
+    <li>보통 다대다(N:M) 상황에서 유리하다</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>메시징 큐</th><th>이벤트 스트림</th></tr></thead>
+      <tbody>
+        <tr><td>읽은 뒤 메시지</td><td>삭제됨</td><td>남아 있음</td></tr>
+        <tr><td>같은 메시지를 여럿에게</td><td class="t-center t-no">개수만큼 푸시 필요</td><td class="t-center t-ok">한 번 푸시로 충분</td></tr>
+        <tr><td>나중에 합류한 소비자</td><td class="t-center t-no">과거 메시지 못 읽음</td><td class="t-center t-ok">처음부터 읽기 가능</td></tr>
+        <tr><td>주 사용 형태</td><td>1:1 작업 지시</td><td>N:M 사실 전파</td></tr>
+        <tr><td>레디스에서</td><td><code>list</code></td><td><code>stream</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>레디스를 메시지 브로커로 사용하기</h4>
+  <ul>
+    <li>자체적으로 제공하는 pub/sub 패턴으로 구현할 수 있다</li>
+    <li>한번 전송된 데이터는 바로 삭제되고, 잘 전달됐는지 등의 정보는 보장하지 않는다</li>
+    <li>fire-and-forget 처럼 일회성으로 간단한 알림 서비스에 유용하다</li>
+  </ul>
+
+  <h5>레디스에서 메시징 큐</h5>
+  <ul>
+    <li>list 자료구조가 메시징 큐로 쓰기에 알맞다</li>
+    <li>데이터 푸시/팝이 가능하고, 매번 데이터가 있는지 확인하지 않아도 되는 <b>블로킹</b> 기능을 쓸 수 있다</li>
+  </ul>
+
+  <h5>레디스에서 이벤트 스트림</h5>
+  <ul>
+    <li>stream 자료구조가 이벤트 스트림에 알맞다</li>
+    <li>Kafka 에서 영감을 받은 구조로, 오직 데이터 추가만 지원한다</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">셋 중 무엇을 고를 것인가 <span class="badge b-blue">보강</span></p>
+      <p>보증 수준으로 갈린다. <b>pub/sub</b> 은 구독 중인 클라이언트에만 전달되고 기록이 남지 않는다(at most once). <b>list</b> 는 메시지가 남지만 소비자가 꺼낸 뒤 죽으면 그 메시지는 사라진다. <b>stream</b> 만이 소비자 그룹, ACK, 보류 리스트를 갖춰 재처리를 지원한다(at least once). 잃어도 되는 알림은 pub/sub, 반드시 처리돼야 하는 일은 stream 이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>큐는 소비되면 사라지고 1:1 작업 지시에, 스트림은 남고 N:M 전파에 쓴다.</li>
+      <li>레디스는 pub/sub(휘발), list(블로킹 큐), stream(그룹+ACK) 세 가지를 제공하며 보증 수준이 각각 다르다.</li>
+      <li>메시지가 유실돼도 되는지 여부가 선택의 첫 번째 기준이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-2</div>
+    <h3>레디스의 pub/sub</h3>
+    <p class="item-tagline">가볍다는 것은 곧 <b>아무것도 보장하지 않는다</b>는 뜻이다. 그 대가로 지연이 거의 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    레디스 pub/sub 은 메시지를 저장하지 않는다. 발행 순간 <b>구독 중이 아니었던 클라이언트</b>는 그 메시지를 영원히 볼 수 없다.
+  </div>
+
+  <ul>
+    <li>레디스는 자체적으로 아주 간단한 pub/sub 패턴을 제공한다
+      <ul><li>매우 가벼워서 최소한의 메시지 전달 기능만 제공한다</li></ul>
+    </li>
+    <li>발행자는 특정 채널에 메시지를 보내고, 구독자는 리스닝하다가 메시지를 읽는다</li>
+    <li>한번 전달된 데이터는 저장되지 않으니 정합성이 중요한 데이터에는 권장하지 않는다
+      <ul><li>앱에서 메시지 송수신과 관련한 추가 로직이 필요할 수 있다</li></ul>
+    </li>
+  </ul>
+
+  <h4>메시지 보내기</h4>
+  <ul>
+    <li><code>PUBLISH</code> 로 메시지를 보낸다</li>
+    <li>반환값은 <b>메시지를 받은 구독자의 수</b>다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; publish hello world
+(integer) 1</code></pre>
+  </div>
+
+  <p>이 반환값이 <code>0</code> 이면 <b>아무도 받지 못했다</b>는 뜻이며, 레디스는 그 메시지를 버린다. 발행 결과를 확인하고 싶다면 이 숫자를 봐야 한다.</p>
+
+  <h4>메시지 구독하기</h4>
+  <ul>
+    <li><code>SUBSCRIBE</code> 로 채널을 구독한다</li>
+    <li>구독 중인 커넥션에서는 pub/sub 과 관련되지 않은 다른 커맨드를 쓸 수 없다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; subscribe hello
+1) "subscribe"
+2) "hello"
+3) (integer) 1
+1) "message"
+2) "hello"
+3) "world"
+Reading messages... (press Ctrl-C to quit or any key to type command)</code></pre>
+  </div>
+
+  <p>그래서 애플리케이션에서는 구독 전용 커넥션을 <b>따로</b> 잡아야 한다. 일반 커맨드용 커넥션과 같은 것을 쓰면 구독하는 순간 그 커넥션으로는 <code>GET</code> 하나 날릴 수 없다.</p>
+
+  <p><code>PSUBSCRIBE</code> 로는 글롭 패턴을 이용해 여러 채널을 동시에 구독할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; PSUBSCRIBE mail-*
+1) "psubscribe"
+2) "mail-*"
+3) (integer) 1
+1) "pmessage"
+2) "mail-*"
+3) "mail-all"
+4) "all mail"</code></pre>
+  </div>
+
+  <p>패턴 구독의 응답은 <code>message</code> 가 아니라 <code>pmessage</code> 이고, <b>매칭된 패턴</b>과 <b>실제 채널명</b>이 함께 온다. 그래서 응답 요소가 하나 더 많다.</p>
+
+  <h4>클러스터 구조에서 pub/sub</h4>
+  <ul>
+    <li>클러스터는 대규모 서비스에서 데이터를 분산해 저장하고 처리하기 위해 도입됐다</li>
+    <li>메시지를 발행하면 클러스터에 속한 <b>모든 노드</b>에서 메시지를 수신할 수 있다</li>
+    <li>하지만 모든 노드에 같은 메시지가 복제되는 것은 클러스터의 목표와 어긋난다</li>
+    <li>불필요한 리소스 사용과 네트워크 부하가 발생한다</li>
+  </ul>
+
+  <h4>sharded pub/sub</h4>
+  <ul>
+    <li>클러스터 환경의 비효율을 해결하기 위해 <b>Redis 7.0</b> 에서 도입됐다</li>
+    <li>각 채널이 슬롯에 매핑되는 구조이며, 해당 슬롯을 담당하는 노드에만 메시지가 전파된다</li>
+    <li><code>SPUBLISH</code> 로 메시지를 보낸다
+      <ul><li>모든 노드에 퍼지지 않고, 슬롯을 담당하는 노드와 그 복제본에만 전달된다</li></ul>
+    </li>
+    <li><code>SSUBSCRIBE</code> 로 메시지를 구독한다</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph SG1["일반 PUBLISH"]
+    P1["PUBLISH ch"] --> N1["노드 A"]
+    N1 -.->|"전파"| N2["노드 B"]
+    N1 -.->|"전파"| N3["노드 C"]
+  end
+  subgraph SG2["SPUBLISH (7.0)"]
+    P2["SPUBLISH ch"] --> M1["슬롯 담당 노드"]
+    M1 --> R1["그 노드의 복제본"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>sharded pub/sub 은 메시지의 이동 범위를 슬롯으로 좁힌다</b> — 일반 <code>PUBLISH</code> 는 노드 수에 비례해 클러스터 버스 트래픽이 늘지만, <code>SPUBLISH</code> 는 채널이 속한 슬롯의 노드와 복제본까지만 간다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>pub/sub 은 저장하지 않는다. <code>PUBLISH</code> 의 반환값(수신 구독자 수)이 유일한 전달 단서다.</li>
+      <li>구독 중인 커넥션은 다른 커맨드를 못 쓰므로 전용 커넥션이 필요하다.</li>
+      <li>클러스터에서 일반 pub/sub 은 전 노드로 퍼진다. 7.0 의 <code>SPUBLISH</code>/<code>SSUBSCRIBE</code> 로 범위를 슬롯 단위로 좁힐 수 있다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-3</div>
+    <h3>레디스의 list를 메시징 큐로 사용하기</h3>
+    <p class="item-tagline">폴링을 없애는 커맨드 <code>BLPOP</code>, 그리고 트위터가 타임라인을 담아 둔 자료구조.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    큐를 계속 들여다보는 폴링은 앱과 레디스 양쪽의 자원을 태운다. 블로킹 커맨드는 <b>데이터가 도착하는 순간</b> 클라이언트를 깨워 그 낭비를 없앤다.
+  </div>
+
+  <h4>LIST 의 EX 기능</h4>
+  <ul>
+    <li>SNS 에는 유저별 타임라인이 존재한다
+      <ul>
+        <li>타임라인에는 팔로우한 계정의 게시글, 관련 있는 게시글 등이 표시된다</li>
+        <li>트위터의 경우 각 유저의 타임라인 데이터를 레디스의 list 로 관리했다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>RPUSHX 커맨드</h4>
+  <ul>
+    <li><code>RPUSH</code> 와 달리 <code>RPUSHX</code> 는 <b>키가 이미 존재할 때만</b> 데이터를 추가한다</li>
+    <li>자주 접속하지 않는 유저의 데이터는 굳이 만들어 두지 않을 때 유용하다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 기존에 타임라인이 있는 유저에게는 데이터가 추가됨
+127.0.0.1:6379&gt; rpush timeline:user:a timeline:1
+(integer) 1
+127.0.0.1:6379&gt; rpushx timeline:user:a timeline:2
+(integer) 2
+127.0.0.1:6379&gt; lrange timeline:user:a 0 -1
+1) "timeline:1"
+2) "timeline:2"
+
+# 타임라인이 없는 유저에게는 아무 일도 일어나지 않음
+127.0.0.1:6379&gt; rpushx timeline:user:b timeline:1
+(integer) 0
+127.0.0.1:6379&gt; lrange timeline:user:b 0 -1
+(empty array)</code></pre>
+  </div>
+
+  <p>수천만 명의 팔로워에게 게시글을 밀어 넣을 때, 최근 접속한 유저(=타임라인 키가 살아 있는 유저)에게만 쓰기가 일어나게 하는 장치다. 휴면 유저의 타임라인은 다음 접속 때 DB 에서 다시 만들면 된다.</p>
+
+  <h4>list 의 블로킹 기능</h4>
+
+  <h5>이벤트 루프</h5>
+  <ul>
+    <li>이벤트 루프는 새로운 이벤트가 있는지 확인하고, 없으면 대기했다가 다시 반복한다</li>
+    <li>이런 작업을 <b>폴링</b>이라 하며, 진행 중인 동안 앱과 큐의 리소스가 불필요하게 소모된다</li>
+    <li>폴링 간격 사이에 새 이벤트가 들어와도 그만큼 지연이 생겨 즉시 처리되지 않는다</li>
+  </ul>
+
+  <h5>list 블로킹</h5>
+  <ul>
+    <li>레디스 list 의 블로킹 기능으로 이벤트 루프의 단점을 보완할 수 있다</li>
+    <li><code>BLPOP</code>, <code>BRPOP</code> 커맨드를 쓴다</li>
+    <li>값이 있으면 바로 반환하고, 없으면 지정한 시간 동안 기다렸다가 값을 반환한다
+      <ul><li>시간이 만료되면 nil 을 반환한다</li></ul>
+    </li>
+    <li>일반 <code>RPOP</code> 과 달리 반환값이 두 개인데, <b>키 이름과 값</b>을 함께 준다
+      <ul><li>여러 개의 큐를 동시에 기다릴 수 있도록 하기 위해서다</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; brpop q:a 5
+(nil)
+(5.10s)
+127.0.0.1:6379&gt; brpop q:a 5
+1) "q:a"
+2) "1"
+(1.46s)</code></pre>
+  </div>
+
+  <p>첫 호출은 5초를 다 기다린 뒤 nil, 두 번째는 1.46초 만에 다른 클라이언트가 넣은 값을 받아 즉시 깨어났다. <code>BRPOP q:a q:b 0</code> 처럼 여러 키를 나열하면 <b>왼쪽 키부터 먼저</b> 확인하며, 타임아웃 <code>0</code> 은 무한 대기다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 보완 <span class="badge b-red">원문 교정</span></p>
+      <p>노트 13-2 에는 "트랜잭션 내부에서는 <code>BRPOP</code>, <code>BLPOP</code> 을 쓸 수 없다"고 되어 있는데, 정확히는 <b>쓸 수는 있으나 블로킹하지 않는다</b>. <code>MULTI</code>/<code>EXEC</code> 안에서 리스트가 비어 있으면 기다리지 않고 즉시 nil 을 반환한다 — 타임아웃이 지난 것과 같은 동작이다. 블록을 원자적으로 실행하는 동안 서버 전체가 멈춰야 하므로 기다릴 방법이 없기 때문이다. (근거: <a href="https://redis.io/docs/latest/commands/blpop/">Redis Docs — BLPOP</a>)</p>
+    </div>
+  </div>
+
+  <h5>list 를 사용한 원형 큐</h5>
+  <ul>
+    <li>특정 아이템을 계속 반복해서 순회해야 하거나, 여러 클라이언트가 병렬로 같은 아이템 집합에 접근해야 할 때 원형 큐를 쓸 수 있다</li>
+    <li><code>RPOPLPUSH</code> 로 원형 큐를 만든다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; lpush clist a
+(integer) 1
+127.0.0.1:6379&gt; lpush clist b
+(integer) 2
+127.0.0.1:6379&gt; lpush clist c
+(integer) 3
+127.0.0.1:6379&gt; lrange clist 0 -1
+1) "c"
+2) "b"
+3) "a"
+127.0.0.1:6379&gt; rpoplpush clist clist
+"a"
+127.0.0.1:6379&gt; lrange clist 0 -1
+1) "a"
+2) "c"
+3) "b"</code></pre>
+  </div>
+
+  <p>출발지와 목적지를 같은 키로 주면 <b>맨 뒤 원소가 맨 앞으로</b> 이동한다. 여러 워커가 동시에 호출해도 각자 다른 원소를 받으므로, 목록 전체를 클라이언트로 끌어오지 않고 나눠 처리할 수 있다.</p>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Redis 6.2 이후 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>RPOPLPUSH</code> 와 <code>BRPOPLPUSH</code> 는 6.2.0 부터 deprecated 다. 대체 커맨드는 <code>LMOVE</code> / <code>BLMOVE</code> 로, 양쪽 끝을 인자로 직접 지정한다 — <code>LMOVE clist clist RIGHT LEFT</code> 가 위 예제와 같은 동작이다. 방향을 바꿔 <code>LEFT RIGHT</code> 로도 돌릴 수 있어 더 유연하다. (근거: <a href="https://redis.io/docs/latest/commands/rpoplpush/">Redis Docs — RPOPLPUSH</a>)</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">신뢰할 수 있는 큐 패턴 <span class="badge b-blue">보강</span></p>
+      <p><code>BLPOP</code> 으로 꺼낸 직후 워커가 죽으면 그 메시지는 사라진다. 그래서 공식 문서는 <code>BLMOVE</code> 로 <b>작업 큐에서 처리 중 큐로 옮기며</b> 꺼내고, 처리가 끝나면 <code>LREM</code> 으로 처리 중 큐에서 지우는 패턴을 권한다. 처리 중 큐에 오래 남은 항목을 감시하는 별도 프로세스를 두면 유실 없는 큐가 된다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>RPUSHX</code> 는 키가 있을 때만 쓴다. 휴면 유저의 타임라인을 만들지 않는 데 쓰인다.</li>
+      <li><code>BLPOP</code>/<code>BRPOP</code> 은 폴링을 없앤다. 반환값이 (키, 값) 두 개인 이유는 여러 큐를 동시에 기다릴 수 있기 때문이다.</li>
+      <li>트랜잭션 안에서는 블로킹 커맨드가 기다리지 않고 즉시 nil 을 돌려준다.</li>
+      <li>원형 큐/신뢰할 수 있는 큐는 이제 <code>LMOVE</code>/<code>BLMOVE</code> 로 만든다. <code>RPOPLPUSH</code> 는 6.2 부터 deprecated.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-4</div>
+    <h3>스트림</h3>
+    <p class="item-tagline">추가만 되는 로그, 소비자 그룹, ACK 와 보류 리스트. 레디스가 카프카의 문법을 빌려 온 자리.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    stream 은 메시지를 <b>지우지 않고</b> 누가 어디까지 읽었는지를 대신 기록한다. 그래서 장애 후 재처리가 가능하다.
+  </div>
+
+  <h4>레디스의 스트림</h4>
+  <ul>
+    <li><b>Redis 5.0</b> 에서 추가된 자료구조</li>
+    <li>대용량/대규모 메시징 데이터 처리가 가능하도록 설계됐다</li>
+    <li>계속해서 데이터를 추가만 할 수 있는 구조다</li>
+    <li>사용처
+      <ul>
+        <li>대량의 데이터를 효율적으로 처리하는 플랫폼</li>
+        <li>생성된 데이터를 소비자들이 처리할 수 있게 지원하는 저장소 및 큐잉 시스템</li>
+      </ul>
+    </li>
+    <li>Kafka 와 유사하며 일부 기능은 더 낫게 설계됐다</li>
+  </ul>
+
+  <h4>스트림</h4>
+  <ul>
+    <li>연속적인 데이터의 흐름, 일정한 데이터 조각의 연속을 의미한다</li>
+    <li>예를 들면 대용량 데이터를 한 번에 다 읽는 대신 여러 조각으로 쪼개어 로딩하는 것</li>
+  </ul>
+
+  <h4>데이터의 저장</h4>
+  <p>레디스 스트림에서 각 메시지는 시간과 관련된 고유한 ID 를 가진다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">메시지 ID 형식</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">&lt;millisecondsTime&gt;-&lt;sequenceNumber&gt;</code></pre>
+  </div>
+
+  <p>앞부분이 밀리초 단위 시각이라 <b>ID 만으로 시간순이 보장</b>되고, 같은 밀리초에 여러 건이 들어오면 뒤의 시퀀스 번호가 올라간다.</p>
+
+  <h5>XADD</h5>
+  <ul>
+    <li>새 이름의 스트림에 데이터를 저장하면 자료구조가 바로 생성된다</li>
+    <li>기존 스트림에 추가하면 데이터만 붙는다</li>
+    <li>hash 와 유사하게 필드-값 쌍으로 저장되므로 메시지마다 유동적인 구조를 가질 수 있다</li>
+    <li>기본 ID 대신 직접 지정하고 싶다면 <code>*</code> 자리에 ID 를 넣는다
+      <ul><li>최솟값은 <code>0-1</code> 이며 이후 ID 는 더 큰 값이어야 한다</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; xadd email * subject "first" body "hello?"
+"1726208369577-0"
+127.0.0.1:6379&gt; xadd email * subject "second" body "world"
+"1726208392652-0"
+127.0.0.1:6379&gt; xadd noob 0-1 "hello" "world"
+"0-1"
+127.0.0.1:6379&gt; xadd noob 0-2 "hello" "world"
+"0-2"</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">스트림도 잘라 줘야 한다 <span class="badge b-blue">보강</span></p>
+      <p>추가만 되는 구조라 그냥 두면 메모리를 끝없이 먹는다. <code>XADD stream MAXLEN ~ 10000 * ...</code> 처럼 길이 상한을 함께 지정하는 것이 정석이다. 물결표(<code>~</code>)를 붙이면 "대략 그 정도"로 잘라 내며, 내부 노드 경계에서만 정리하므로 훨씬 빠르다. 시간 기준으로 자르려면 <code>MINID</code> 를 쓴다.</p>
+    </div>
+  </div>
+
+  <h4>데이터 조회</h4>
+
+  <h5>실시간 리스닝</h5>
+  <ul>
+    <li><code>XREAD</code> 로 스트림에 저장되는 데이터를 실시간으로 읽어 올 수 있다</li>
+    <li><code>xread block 0 streams email 0</code>
+      <ul>
+        <li><code>block 0</code> : 더 가져올 데이터가 없어도 연결을 끊지 말고 계속 리스닝</li>
+        <li><code>block 1000</code> : 최대 1초(1000ms) 리스닝</li>
+        <li><code>streams email 0</code> : ID 가 0 보다 큰 값을 읽어 오라는 뜻, 즉 처음부터 전부</li>
+        <li><code>streams email $</code> : 커맨드를 실행한 <b>이후</b> 추가된 값만 읽어 오라는 뜻</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; xread block 0 streams email 0
+1) 1) "email"
+   2) 1) 1) "1726208369577-0"
+         2) 1) "subject"
+            2) "first"
+            3) "body"
+            4) "hello?"
+      2) 1) "1726208392652-0"
+         2) 1) "subject"
+            2) "second"
+            3) "body"
+            4) "world"</code></pre>
+  </div>
+
+  <h5>특정 데이터 조회</h5>
+  <ul>
+    <li><code>XRANGE</code> 로 ID 를 통해 특정 시간대의 데이터를 조회한다</li>
+    <li>가장 작은 ID 는 <code>-</code>, 마지막 ID 는 <code>+</code> 로 지정한다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 스트림의 모든 값 조회
+127.0.0.1:6379&gt; xrange email - +
+1) 1) "1726208369577-0"
+   2) 1) "subject"
+      2) "first"
+      3) "body"
+      4) "hello?"
+2) 1) "1726208392652-0"
+   2) 1) "subject"
+      2) "second"
+      3) "body"
+      4) "world"
+
+# 특정 시간대의 값 조회
+127.0.0.1:6379&gt; xrange email 1726208369577 1726208369579
+1) 1) "1726208369577-0"
+   2) 1) "subject"
+      2) "first"
+      3) "body"
+      4) "hello?"
+
+# 시작 경계를 제외하고 조회
+127.0.0.1:6379&gt; xrange email (1726208369577 1726208369579
+(empty array)
+
+# 조회할 최대 개수 지정 (COUNT)
+127.0.0.1:6379&gt; xrange email 1726208369577 1726208369579 count 1
+1) 1) "1726208369577-0"
+   2) 1) "subject"
+      2) "first"
+      3) "body"
+      4) "hello?"</code></pre>
+  </div>
+
+  <p>시퀀스 번호를 생략하고 밀리초만 적으면 시작 경계는 <code>-0</code>, 끝 경계는 그 밀리초의 최대 시퀀스로 해석된다. sorted set 과 마찬가지로 여는 괄호 <code>(</code> 가 경계 제외를 뜻한다.</p>
+
+  <h4>소비자, 소비자 그룹</h4>
+  <ul>
+    <li>동일한 데이터를 여러 소비자에게 전달하는 것을 <b>fan-out</b> 이라 한다</li>
+    <li><code>XREAD</code> 를 쓰면 여러 소비자가 하나의 스트림을 각자 구독할 수 있다</li>
+    <li>레디스는 데이터가 저장되는 순간 ID 를 부여하므로 순서가 보장된다</li>
+    <li>소비자 그룹은 <b>그룹 내 다른 소비자가 읽지 않은 메시지만</b> 읽어 간다</li>
+    <li>그룹 내부에서 각 소비자는 고유한 이름을 가져야 한다</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  S["stream: email"] --> G1["그룹 EmailService"]
+  S --> G2["그룹 Analytics"]
+  G1 --> C1["소비자 worker-1"]
+  G1 --> C2["소비자 worker-2"]
+  G2 --> C3["소비자 log-1"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>그룹 사이에는 fan-out, 그룹 안에서는 분배</b> — 같은 메시지를 EmailService 와 Analytics 가 각각 한 번씩 받고, 그룹 안의 worker-1 과 worker-2 는 서로 다른 메시지를 나눠 가진다. 그룹마다 <code>last_delivered_id</code> 를 따로 들고 있기 때문이다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 새 소비자 그룹 생성. 생성 이후에 발생한 메시지만 읽도록 지정
+127.0.0.1:6379&gt; xgroup create email EmailServiceGroup $
+OK
+127.0.0.1:6379&gt; xreadgroup group EmailServiceGroup emailService1 count 1 streams email &gt;
+(nil)</code></pre>
+  </div>
+
+  <h5>커맨드의 의미</h5>
+  <ul>
+    <li><code>COUNT 1</code> : email 스트림에서 메시지 1개만 읽어 오기, 없으면 nil</li>
+    <li><code>streams email &gt;</code> : 다른 소비자에게 전달되지 않은 메시지를 읽어 오기</li>
+  </ul>
+
+  <p>여기서 <code>&gt;</code> 대신 <code>0</code> 을 주면 의미가 완전히 달라진다 — <b>이 소비자가 받았지만 아직 ACK 하지 않은</b> 메시지를 다시 읽는다. 워커를 재시작한 뒤 처리하다 만 메시지를 이어받을 때 쓰는 형태다.</p>
+
+  <h4>부하 분산</h4>
+  <ul>
+    <li>스트림과 소비자 그룹은 별개로 동작한다</li>
+    <li>여러 소비자 그룹이 존재할 수 있고, 다른 그룹이 이미 수신한 메시지도 각자 읽을 수 있다</li>
+    <li>따라서 특정 메시지가 필요한 여러 서비스로 분산할 수 있다</li>
+  </ul>
+
+  <h4>ACK 와 보류 리스트</h4>
+  <ul>
+    <li>장애로 시스템이 종료되면 어디까지 처리했는지, 처리했는지 여부를 알아야 한다</li>
+    <li>레디스는 읽어 간 메시지 목록을 관리하며, 이 값으로 같은 메시지를 중복 전달하지 않는다
+      <ul><li>마지막으로 읽어 간 ID 는 <code>last_delivered_id</code> 로 저장/갱신된다</li></ul>
+    </li>
+    <li>소비자마다 <b>보류 리스트(PEL)</b> 를 가지며, 처리가 완료되면 ACK 로 해당 항목이 지워진다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; xpending email EmailServiceGroup
+1) (integer) 0
+2) (nil)
+3) (nil)
+4) (nil)</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>위치</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>ACK 를 받지 못해 보류 중인 메시지의 총 개수</td></tr>
+        <tr><td>2</td><td>보류 중인 ID 의 최솟값</td></tr>
+        <tr><td>3</td><td>보류 중인 ID 의 최댓값</td></tr>
+        <tr><td>4</td><td><b>소비자별 보류 개수 목록</b> (소비자 이름과 개수의 쌍)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 네 번째 항목이 1번과 같은 "보류 중인 개수"로 적혀 있으나, 실제로는 <b>소비자별 보류 개수 목록</b>이다. 어느 워커에 일이 밀려 있는지 확인하는 자리이므로 1번과 역할이 다르다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 데이터를 처리했다는 신호 보내기
+127.0.0.1:6379&gt; xack email EmailServiceGroup 1726212055826-0
+(integer) 0</code></pre>
+  </div>
+
+  <p>반환값 <code>0</code> 은 <b>보류 리스트에 그 ID 가 없었다</b>는 뜻이다. 이미 ACK 했거나 애초에 이 그룹이 읽어 간 적 없는 메시지를 지우려 한 경우다.</p>
+
+  <h4>보증 전략</h4>
+
+  <h5>at most once</h5>
+  <ul>
+    <li>메시지를 최대 한 번 보내는 것을 의미한다</li>
+    <li>소비자는 실제로 처리하기 <b>전에</b> ACK 를 보낸다
+      <ul><li>속도는 빠르지만 장애 복구 시 처리하지 못한 데이터가 유실될 수 있다</li></ul>
+    </li>
+    <li>일부 메시지가 손실돼도 빠른 응답이 필요한 경우에 쓴다</li>
+  </ul>
+
+  <h5>at least once</h5>
+  <ul>
+    <li>소비자는 받은 메시지를 실제로 처리한 <b>뒤에</b> ACK 를 보낸다</li>
+    <li>처리 도중 장애가 나 재처리하면 중복 처리가 발생할 수 있다</li>
+    <li>멱등한 서비스면 괜찮지만, 그렇지 않으면 문제가 된다</li>
+  </ul>
+
+  <h5>exactly once</h5>
+  <ul>
+    <li>모든 메시지가 정확히 한 번씩 처리되는 것을 보장한다는 의미</li>
+    <li>레디스 내부에서 set 등을 활용해 이미 처리된 메시지인지 관리하는 <b>추가 작업이 필요</b>하다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">exactly once 는 브로커가 주는 기능이 아니다</p>
+      <p>레디스 스트림이 자체적으로 보장하는 것은 <b>at least once</b> 까지다. exactly once 처럼 보이게 만드는 것은 소비자 쪽의 멱등 처리 — 처리한 메시지 ID 를 set 에 남기고 이미 있으면 건너뛰는 식 — 이며, 이때 "처리"와 "ID 기록"이 같은 트랜잭션 안에 있어야 한다.</p>
+    </div>
+  </div>
+
+  <h4>메시지 재할당</h4>
+  <ul>
+    <li>특정 소비자가 장애 이후 복구되지 않으면 다른 소비자가 그 일을 대신 처리해야 한다</li>
+    <li><code>XCLAIM</code> 으로 메시지 소유권을 다른 소비자에게 넘길 수 있다</li>
+    <li>사용 시 <b>최소 대기시간</b> 설정이 필요하다
+      <ul><li>그 시간을 넘긴 메시지만 소유권을 바꿀 수 있게 해서, 같은 메시지가 여러 소비자에게 중복 할당되는 것을 막는다</li></ul>
+    </li>
+  </ul>
+
+  <h4>메시지 자동 재할당</h4>
+  <ul>
+    <li><code>XCLAIM</code> 은 <code>XPENDING</code> 으로 먼저 보류 메시지를 확인해야 해서 번거롭다</li>
+    <li><code>XAUTOCLAIM</code>(6.2 이상) 으로 보류 메시지를 훑으며 자동으로 재할당할 수 있다</li>
+  </ul>
+
+  <h4>메시지 수동 재할당</h4>
+  <ul>
+    <li>스트림 내부의 메시지는 각각 <b>전달 카운터</b>를 가지고 있다</li>
+    <li><code>XREADGROUP</code>, <code>XCLAIM</code> 으로 소비자에게 할당/재할당될 때마다 1씩 증가한다</li>
+    <li>메시지에 문제가 있어 처리되지 못하면 이 카운터가 끝없이 올라간다</li>
+    <li>카운터가 특정 값에 도달하면 그 메시지를 다른 특수한 스트림으로 보내 나중에 수동으로 처리하게 하는 편이 현명하다</li>
+    <li>이를 <b>dead letter</b> 라고 부른다</li>
+  </ul>
+
+  <h4>스트림 상태 확인</h4>
+  <p><code>XINFO</code> 로 스트림의 상태를 확인할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 특정 소비자 그룹에 속한 소비자의 정보 확인
+127.0.0.1:6379&gt; xinfo consumers email EmailServiceGroup
+(empty array)
+
+# 스트림에 속한 전체 소비자 그룹 리스트
+127.0.0.1:6379&gt; xinfo groups email
+1)  1) "name"
+    2) "EmailServiceGroup"
+    3) "consumers"
+    4) (integer) 0
+    5) "pending"
+    6) (integer) 0
+    7) "last-delivered-id"
+    8) "1726211987802-0"
+    9) "entries-read"
+   10) (nil)
+   11) "lag"
+   12) (integer) 1</code></pre>
+  </div>
+
+  <p><code>lag</code> 은 <b>이 그룹이 아직 읽지 않은 메시지 수</b>다. 소비자가 생산 속도를 못 따라가는지 확인하는 가장 중요한 지표이므로, 스트림을 운영한다면 이 값을 모니터링에 올려 두는 것이 좋다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 스트림 자체의 정보
+127.0.0.1:6379&gt; xinfo stream email
+ 1) "length"
+ 2) (integer) 2
+ 3) "radix-tree-keys"
+ 4) (integer) 1
+ 5) "radix-tree-nodes"
+ 6) (integer) 2
+ 7) "last-generated-id"
+ 8) "1726212055826-0"
+ 9) "max-deleted-entry-id"
+10) "0-0"
+11) "entries-added"
+12) (integer) 2
+13) "recorded-first-entry-id"
+14) "1726211987802-0"
+15) "groups"
+16) (integer) 1
+17) "first-entry"
+18) 1) "1726211987802-0"
+    2) 1) "subject"
+       2) "New Features"
+       3) "body"
+       4) "redis 9"
+19) "last-entry"
+20) 1) "1726212055826-0"
+    2) 1) "subject"
+       2) "New Features"
+       3) "body"
+       4) "redis 9"</code></pre>
+  </div>
+
+  <p><code>radix-tree-*</code> 항목이 보이는 것에서 알 수 있듯 스트림의 내부 구조는 <b>기수 트리(radix tree)</b> 다. ID 로 범위 조회가 빠른 이유가 여기에 있다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메시지 ID <code>밀리초-시퀀스</code> 가 순서를 보장한다. <code>-</code>/<code>+</code>/<code>$</code>/<code>&gt;</code> 같은 특수 ID 의 의미를 구분해야 한다.</li>
+      <li>그룹 사이에는 fan-out, 그룹 안에서는 분배. 각 그룹이 <code>last_delivered_id</code> 를 따로 관리한다.</li>
+      <li>읽으면 보류 리스트(PEL)에 들어가고 <code>XACK</code> 로 빠진다. 죽은 워커의 메시지는 <code>XCLAIM</code>/<code>XAUTOCLAIM</code> 으로 회수한다.</li>
+      <li>레디스가 보장하는 것은 at least once 까지. exactly once 는 소비자의 멱등 처리로 만든다.</li>
+      <li>추가만 되는 구조이므로 <code>MAXLEN</code>/<code>MINID</code> 로 반드시 잘라 준다. 소비 지연은 <code>XINFO GROUPS</code> 의 <code>lag</code> 으로 본다.</li>
+    </ul>
+  </div>
+</article>

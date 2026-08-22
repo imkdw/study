@@ -1,0 +1,425 @@
+<article class="item" id="item-7-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-1</div>
+    <h3>레디스에서 데이터를 영구 저장하기</h3>
+    <p class="item-tagline">스냅숏을 찍을 것인가, 일지를 쓸 것인가. 백업 방식의 선택은 곧 <b>얼마까지 잃어도 되는가</b>에 대한 대답이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RDB 는 <b>어느 시점의 사진</b>이고 AOF 는 <b>모든 변경의 일지</b>다. 사진은 가볍고 빠르지만 찍은 순간 이후를 잃고, 일지는 무겁지만 마지막 순간까지 복원한다.
+  </div>
+
+  <ul>
+    <li>레디스는 모든 데이터를 메모리에서 관리한다</li>
+    <li>재부팅하면 모든 데이터가 사라진다</li>
+    <li>캐시가 아닌 영구 저장소로 쓰려면 RDB, AOF 두 가지 백업 방법을 사용할 수 있다
+      <ul><li>데이터 복구는 <b>재부팅 시점</b>에만 가능하며, 실행 중에는 불가능하다</li></ul>
+    </li>
+  </ul>
+
+  <h4>AOF (Append Only File)</h4>
+  <ul>
+    <li>처리한 모든 쓰기 작업을 차례대로 기록한다</li>
+    <li>복원할 때는 파일을 다시 읽어 가며 데이터 세트를 재구성한다</li>
+    <li>파일은 레디스 자체 프로토콜인 <b>RESP</b> 형태로 저장된다</li>
+    <li>원하는 시점으로 복구가 가능하다</li>
+  </ul>
+
+  <h4>RDB (Redis Database)</h4>
+  <ul>
+    <li>일정 시점에 메모리에 있는 전체 데이터를 저장한다. <b>스냅숏</b> 방식이라고도 한다</li>
+    <li>원하는 시점으로의 복구는 불가능하다. 저장된 시점으로만 돌아갈 수 있다</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>RDB</th><th>AOF</th></tr></thead>
+      <tbody>
+        <tr><td>저장 형태</td><td>바이너리 스냅숏</td><td>RESP 형식의 쓰기 커맨드</td></tr>
+        <tr><td>파일 크기</td><td class="t-center t-ok">작다</td><td class="t-center t-no">크다 (재구성 필요)</td></tr>
+        <tr><td>재시작 로딩 속도</td><td class="t-center t-ok">빠르다</td><td class="t-center t-no">느리다</td></tr>
+        <tr><td>손실 가능 범위</td><td class="t-center t-no">마지막 저장 이후 전부</td><td class="t-center t-ok">최대 1초 (everysec)</td></tr>
+        <tr><td>시점 복구</td><td class="t-center t-no">불가</td><td class="t-center t-ok">가능</td></tr>
+        <tr><td>복제 전송</td><td class="t-center t-ok">그대로 사용</td><td class="t-center">-</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">둘 중 하나가 아니다 <span class="badge b-blue">보강</span></p>
+      <p>RDB 와 AOF 는 <b>동시에 켤 수 있고, 대개 그렇게 쓴다</b>. 둘 다 켜져 있으면 재시작 시 더 완전한 AOF 를 우선 읽어 복원한다. RDB 는 그 자체로 백업 파일을 다른 서버에 옮기기 좋고 복제의 전체 동기화에도 쓰이므로, "AOF 를 켰으니 RDB 는 끈다"는 선택은 대개 손해다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메모리 저장소이므로 재시작하면 데이터는 사라진다. 복구는 재부팅 시점에만 일어난다.</li>
+      <li>RDB 는 작고 빠르지만 마지막 스냅숏 이후를 잃는다. AOF 는 크고 느리지만 거의 잃지 않는다.</li>
+      <li>실무에서는 둘 다 켜고, 재시작 시에는 AOF 가 우선한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-2</div>
+    <h3>RDB 방식의 데이터 백업</h3>
+    <p class="item-tagline">가장 간단한 백업. 대신 "언제 찍었느냐"가 곧 "언제까지 살아남았느냐"가 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>SAVE</code> 는 서버를 멈추고 찍고, <code>BGSAVE</code> 는 자식 프로세스를 <b>fork</b> 해서 찍는다. 운영에서 쓰는 것은 후자뿐이다.
+  </div>
+
+  <ul>
+    <li>레디스에서 데이터를 백업하는 가장 간단한 방법</li>
+    <li>장애 시 손실 가능성을 최소화해야 하는 서비스에는 권장하지 않는다</li>
+  </ul>
+
+  <h4>특정 조건에 자동으로 RDB 생성</h4>
+  <p><code>redis.conf</code> 파일에 정의할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">save &lt;기간(초)&gt; &lt;변경된 키 개수&gt;
+dbfilename &lt;파일명&gt;
+dir &lt;RDB 파일이 저장될 경로&gt;</code></pre>
+  </div>
+
+  <h5>save</h5>
+  <ul>
+    <li><code>save 900 1</code> : 900초(15분) 동안 1개 이상의 키가 변경된 경우 저장</li>
+    <li><code>save ""</code> : RDB 생성 비활성화</li>
+    <li><code>CONFIG SET save ""</code> 후 <code>CONFIG REWRITE</code> : 실행 중인 상태에서 RDB 생성 비활성화</li>
+  </ul>
+
+  <p><code>save</code> 는 여러 줄을 겹쳐 쓸 수 있고, 조건 중 <b>하나라도 만족하면</b> 저장이 일어난다. 변경이 잦을수록 자주, 뜸할수록 드물게 찍히도록 계단식으로 설정하는 것이 기본 구성이다.</p>
+
+  <h4>수동으로 RDB 생성</h4>
+  <ul>
+    <li><code>SAVE</code>, <code>BGSAVE</code> 로 수동 생성할 수 있다</li>
+    <li><code>LASTSAVE</code> 로 최근 RDB 생성 시각을 확인할 수 있다</li>
+  </ul>
+
+  <h5>SAVE</h5>
+  <ul>
+    <li>동기 방식으로 파일을 생성한다
+      <ul><li>파일이 생성되는 동안 다른 커맨드를 실행할 수 없다</li></ul>
+    </li>
+    <li>일반적인 운영 환경에서는 사용하지 않는 것을 권장한다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span>
+      <span class="code-tag bad">운영 금지</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; save
+OK</code></pre>
+  </div>
+
+  <h5>BGSAVE</h5>
+  <ul>
+    <li><code>fork</code> 로 자식 프로세스를 만들고, 그 프로세스가 RDB 를 생성한다</li>
+    <li>이미 백그라운드 저장이 진행 중이면 에러가 나므로 <code>BGSAVE SCHEDULE</code> 로 예약하는 편이 안전하다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span>
+      <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; bgsave
+Background saving started</code></pre>
+  </div>
+
+  <h4>복제를 사용하는 경우 자동으로 RDB 생성</h4>
+  <ul>
+    <li><code>REPLICAOF</code> 로 복제를 요청하면 마스터가 RDB 를 만들어 복제본에 전달한다</li>
+    <li>네트워크 장애 등으로 재동기화가 필요할 때도 복제본으로 RDB 를 전달한다</li>
+    <li>처음 연결이든 이미 연결된 상태든 언제든 RDB 가 생성될 수 있다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">RDB 를 껐다고 fork 가 사라지지 않는다</p>
+      <p><code>save ""</code> 로 자동 저장을 꺼도, 복제본이 붙는 순간 전체 동기화를 위해 <code>fork</code> 가 일어난다. 뒤의 <a href="#item-7-4">7-4</a> 에서 다루는 copy-on-write 메모리 급증은 백업을 끈 인스턴스에서도 발생할 수 있다는 뜻이다. (7.0 부터는 기본값이 디스크리스 복제라 RDB 파일 자체는 만들지 않지만 <code>fork</code> 는 그대로다.)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>save &lt;초&gt; &lt;변경 키 수&gt;</code> 조건을 여러 줄 겹쳐 두면 변경 빈도에 따라 저장 주기가 달라진다.</li>
+      <li>운영에서는 <code>SAVE</code> 를 쓰지 않는다. <code>BGSAVE</code> 를, 중복이 걱정되면 <code>BGSAVE SCHEDULE</code> 을 쓴다.</li>
+      <li>복제 연결 때도 RDB 생성(과 fork)이 일어난다. 백업 설정과 무관하게 메모리 여유가 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-3</div>
+    <h3>AOF 방식의 데이터 백업</h3>
+    <p class="item-tagline">모든 쓰기를 적어 두는 대신, 그 파일이 무한히 커지지 않게 하는 일이 운영의 절반이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    AOF 의 안정성은 <code>appendfsync</code> 하나로 결정된다. 기본값 <code>everysec</code> 은 <b>최대 1초치 손실</b>과 <b>거의 no 수준의 성능</b>을 맞바꾼 지점이다.
+  </div>
+
+  <ul>
+    <li>파일명은 기본적으로 <code>appendonly.aof</code> 로 저장된다</li>
+    <li>메모리상 데이터가 <b>변화하는 작업만</b> 기록된다
+      <ul><li><code>FLUSHALL</code> 로 모든 데이터를 날려도 (그 커맨드 앞까지는) 복구할 수 있다</li></ul>
+    </li>
+    <li>모든 데이터가 실제 입력한 커맨드 그대로 저장되지는 않는다
+      <ul><li><code>BRPOP</code> 같은 경우 AOF 에는 <code>RPOP</code> 으로 기록된다</li></ul>
+    </li>
+  </ul>
+
+  <p>블로킹 커맨드가 비블로킹 형태로 바뀌어 기록되는 이유는, 복원할 때는 기다릴 대상이 없기 때문이다. 같은 이유로 <code>SPOP</code>, <code>EXPIRE</code> 처럼 <b>실행할 때마다 결과가 달라지는 커맨드</b>도 결정적인 형태(<code>SREM</code>, <code>PEXPIREAT</code>)로 변환되어 기록된다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">appendonly yes
+appendfilename "appendonly.aof"
+appenddirname "appendonlydir"</code></pre>
+  </div>
+
+  <h4>AOF 파일 재구성하기</h4>
+  <ul>
+    <li>AOF 를 안정적으로 쓰려면 점점 커지는 파일을 주기적으로 압축(재구성)해야 한다
+      <ul><li>조건부 또는 수동으로 재구성할 수 있다</li></ul>
+    </li>
+    <li>디스크에 있는 기존 AOF 를 재사용하는 것이 아니라, <b>메모리에 있는 현재 데이터</b>로 새 파일을 만든다</li>
+  </ul>
+
+  <p>그래서 <code>INCR counter</code> 를 백만 번 실행했더라도 재구성 후에는 <code>SET counter 1000000</code> 한 줄로 줄어든다.</p>
+
+  <h5>버전 7 이전의 재구성 과정</h5>
+  <ol class="steps">
+    <li><div class="step-title">fork 로 자식 프로세스 생성</div><p>메모리의 데이터를 새 임시 파일로 쓰기 시작한다.</p></li>
+    <li><div class="step-title">그동안의 변경은 두 곳에 기록</div><p>기존 AOF 파일과 인메모리 버퍼에 동시에 저장된다.</p></li>
+    <li><div class="step-title">버퍼 내용을 임시 파일 끝에 이어 붙임</div><p>재구성이 끝나면 버퍼에 쌓인 변경을 임시 파일 마지막에 추가한다.</p></li>
+    <li><div class="step-title">임시 파일로 기존 AOF 를 덮어씀</div><p>이 과정에서 큰 파일 쓰기가 한 번 더 일어난다.</p></li>
+  </ol>
+
+  <h5>버전 7 이후의 재구성 과정</h5>
+  <ol class="steps">
+    <li><div class="step-title">fork 로 자식 프로세스 생성</div><p>메모리의 데이터를 새 임시 파일(base)로 쓴다.</p></li>
+    <li><div class="step-title">그동안의 변경은 신규 AOF 에 기록</div><p>이전처럼 두 곳에 중복 기록하지 않는다.</p></li>
+    <li><div class="step-title">임시 manifest 파일 생성 후 갱신</div><p>어떤 base 와 incr 파일이 현재 세트인지 manifest 가 가리킨다.</p></li>
+    <li><div class="step-title">manifest 를 덮어쓰고 이전 파일 삭제</div><p>순차적인 I/O 만 발생해 디스크 접근이 매우 효율적이다.</p></li>
+  </ol>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Redis 7.0 의 multi-part AOF <span class="badge b-purple">최신 반영</span></p>
+      <p>7.0 부터 AOF 는 파일 하나가 아니라 <code>appenddirname</code>(기본 <code>appendonlydir</code>) 디렉터리 안의 <b>base 파일 + incr 파일 + manifest 파일</b> 세트로 관리된다. 그래서 백업 스크립트가 <code>appendonly.aof</code> 파일 하나만 복사하도록 짜여 있다면 7.0 업그레이드 후 반드시 고쳐야 한다.</p>
+    </div>
+  </div>
+
+  <h4>자동 AOF 재구성</h4>
+  <ul>
+    <li>현재 파일 크기와 마지막으로 재구성했을 때의 크기를 비교해 처리한다</li>
+    <li>파일이 작을 때 재구성하는 것은 비효율적이니, 일정 크기 이상일 때만 하도록 지정하는 것을 권장한다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb</code></pre>
+  </div>
+
+  <p>위 기본값은 "직전 재구성 시점보다 <b>100% 커졌고</b>(즉 두 배), 그러면서 <b>64MB 이상</b>일 때" 재구성한다는 뜻이다. 두 조건을 모두 만족해야 한다.</p>
+
+  <h4>수동 AOF 재구성</h4>
+  <ul>
+    <li><code>BGREWRITEAOF</code> 로 원하는 시점에 수동으로 재구성할 수 있다</li>
+    <li>자동 재구성과 동일하게 동작한다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>BGREWRITEOF</code> 는 <code>BGREWRITEAOF</code> 의 오타다 (A 가 빠졌다).</p>
+    </div>
+  </div>
+
+  <h4>AOF 타임스탬프</h4>
+  <ul>
+    <li>버전 7 이상부터 AOF 에 타임스탬프를 남길 수 있다</li>
+    <li><code>aof-timestamp-enabled</code> 옵션을 켜서 사용한다 (기본값 <code>no</code>)</li>
+    <li>타임스탬프가 있으면 <code>redis-check-aof</code> 로 특정 시점까지만 잘라 복원할 수 있다</li>
+  </ul>
+
+  <h4>AOF 파일 복원</h4>
+  <ul>
+    <li><code>redis-check-aof</code> 는 AOF 파일이 손상됐을 때도 사용할 수 있다</li>
+    <li><code>--fix</code> 옵션은 원본 파일을 직접 고치므로, 가능하면 사본을 만들어 두고 작업하는 것을 권장한다</li>
+  </ul>
+
+  <h4>AOF 파일의 안정성</h4>
+
+  <h5>OS 가 파일을 저장하는 방법</h5>
+  <ol class="steps">
+    <li><div class="step-title">레디스가 커널에 WRITE 를 호출</div><p>애플리케이션 입장에서는 여기서 "썼다"고 판단한다.</p></li>
+    <li><div class="step-title">커널이 OS 버퍼(page cache)에 담는다</div><p>아직 디스크에는 없다. 이 상태에서 전원이 나가면 사라진다.</p></li>
+    <li><div class="step-title">OS 가 여유가 있거나 지연 한계에 도달하면 디스크에 쓴다</div><p>리눅스의 기본 지연 한계는 약 30초다. <code>FSYNC</code> 는 이 버퍼 내용을 디스크에 <b>강제로</b> 내리는 시스템 콜이다.</p></li>
+  </ol>
+
+  <h5>레디스에서의 옵션 제어</h5>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에 <code>APPENDASYNC</code> 로 적힌 설정의 실제 이름은 <code>appendfsync</code> 다. 값은 <code>no</code> / <code>always</code> / <code>everysec</code> 세 가지이며 <b>기본값은 everysec</b> 이다. (근거: <a href="https://github.com/redis/redis/blob/7.4/redis.conf">redis.conf</a>)</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>appendfsync</code></th><th>호출하는 시스템 콜</th><th>최대 손실</th><th>성능</th></tr></thead>
+      <tbody>
+        <tr><td><code>no</code></td><td>WRITE 만</td><td class="t-no">OS 에 맡김 (최대 30초)</td><td class="t-ok">가장 빠름</td></tr>
+        <tr><td><code>always</code></td><td>WRITE + FSYNC (매 쓰기)</td><td class="t-ok">사실상 없음</td><td class="t-no">가장 느림</td></tr>
+        <tr><td><code>everysec</code> (기본/권장)</td><td>WRITE + 1초마다 FSYNC</td><td>최대 1초</td><td class="t-ok"><code>no</code> 와 거의 동일</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li><code>appendfsync no</code>
+      <ul>
+        <li>AOF 를 쓸 때 WRITE 시스템 콜만 호출한다</li>
+        <li>커널 영역까지 잘 넘어갔는지만 확인하므로 성능이 가장 좋다</li>
+      </ul>
+    </li>
+    <li><code>appendfsync always</code>
+      <ul>
+        <li>쓸 때마다 WRITE + FSYNC 를 호출한다</li>
+        <li>매번 디스크에 정확히 저장되기를 기다리므로 성능이 가장 낮다</li>
+      </ul>
+    </li>
+    <li><code>appendfsync everysec</code>
+      <ul>
+        <li>WRITE 를 호출하고, FSYNC 는 1초에 한 번 호출한다</li>
+        <li>성능은 <code>no</code> 와 거의 비슷하면서 손실 범위는 1초로 묶인다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>AOF 는 쓰기 커맨드를 RESP 로 기록하되, 비결정적인 커맨드는 결정적인 형태로 바꿔 저장한다.</li>
+      <li>재구성은 디스크의 옛 파일이 아니라 <b>메모리의 현재 상태</b>로 새로 쓴다. 기본 조건은 "직전의 2배 그리고 64MB 이상".</li>
+      <li>7.0 부터 AOF 는 base + incr + manifest 의 디렉터리 구조다. 백업 스크립트를 함께 손봐야 한다.</li>
+      <li>설정 이름은 <code>appendfsync</code>. 기본값 <code>everysec</code> 이 손실 1초와 성능을 맞바꾼 실용적인 지점이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-4</div>
+    <h3>백업 사용 시 주의할 점</h3>
+    <p class="item-tagline">백업이 장애의 원인이 되는 순간 — fork 와 copy-on-write 가 메모리를 두 배로 부풀릴 때.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>fork</code> 직후 메모리는 공유되지만, 부모가 데이터를 고칠 때마다 그 페이지가 복사된다. <b>쓰기가 많을수록 백업 중 메모리가 부푼다.</b>
+  </div>
+
+  <ul>
+    <li>RDB, AOF 를 사용하는 경우 인스턴스의 <code>maxmemory</code> 는 실제 서버 메모리보다 여유를 두고 설정하는 것이 좋다</li>
+  </ul>
+
+  <h4>BGSAVE 커맨드</h4>
+  <ul>
+    <li><code>fork</code> 로 프로세스를 하나 더 만든다</li>
+    <li>부모 프로세스는 그동안에도 다른 요청을 계속 받아야 한다</li>
+    <li>레디스는 <b>copy-on-write</b> 방식이라 변경이 일어난 부분만 메모리에 하나 더 만든다
+      <ul><li>최악의 경우 실제로 메모리를 2배 이상 쓸 수도 있다</li></ul>
+    </li>
+    <li>OS 메모리가 가득 차 out of memory 가 발생하면 그대로 장애로 이어진다</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 230" width="620" role="img" aria-label="fork 직후 메모리 페이지를 공유하다가 쓰기가 발생한 페이지만 복사되는 copy-on-write 과정">
+        <text x="105" y="28" class="dg-text" font-size="12" text-anchor="middle">fork 직후</text>
+        <text x="420" y="28" class="dg-text" font-size="12" text-anchor="middle">부모가 P2, P4 를 수정한 뒤</text>
+
+        <text x="45" y="60" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">부모</text>
+        <text x="45" y="152" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">자식</text>
+
+        <rect x="70" y="90" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="70" y="90" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="122" y="90" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="122" y="90" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="174" y="90" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="174" y="90" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="226" y="90" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="226" y="90" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <text x="93" y="112" class="dg-text dg-mono" font-size="12" text-anchor="middle">P1</text>
+        <text x="145" y="112" class="dg-text dg-mono" font-size="12" text-anchor="middle">P2</text>
+        <text x="197" y="112" class="dg-text dg-mono" font-size="12" text-anchor="middle">P3</text>
+        <text x="249" y="112" class="dg-text dg-mono" font-size="12" text-anchor="middle">P4</text>
+        <text x="171" y="160" class="dg-text-sub" font-size="11" text-anchor="middle">같은 페이지를 함께 본다 (복사 0)</text>
+
+        <path d="M93 132 L93 140" class="dg-stroke" fill="none" stroke-width="1.3" stroke-dasharray="3 3"/>
+        <path d="M145 132 L145 140" class="dg-stroke" fill="none" stroke-width="1.3" stroke-dasharray="3 3"/>
+        <path d="M197 132 L197 140" class="dg-stroke" fill="none" stroke-width="1.3" stroke-dasharray="3 3"/>
+        <path d="M249 132 L249 140" class="dg-stroke" fill="none" stroke-width="1.3" stroke-dasharray="3 3"/>
+
+        <rect x="330" y="60" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="330" y="60" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="382" y="60" width="46" height="34" rx="5" class="dg-fill-bg"/><rect x="382" y="60" width="46" height="34" rx="5" class="dg-stroke" fill="none" stroke-width="2"/>
+        <rect x="434" y="60" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="434" y="60" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="486" y="60" width="46" height="34" rx="5" class="dg-fill-bg"/><rect x="486" y="60" width="46" height="34" rx="5" class="dg-stroke" fill="none" stroke-width="2"/>
+        <text x="353" y="82" class="dg-text dg-mono" font-size="12" text-anchor="middle">P1</text>
+        <text x="405" y="82" class="dg-accent dg-mono" font-size="12" text-anchor="middle" font-weight="700">P2'</text>
+        <text x="457" y="82" class="dg-text dg-mono" font-size="12" text-anchor="middle">P3</text>
+        <text x="509" y="82" class="dg-accent dg-mono" font-size="12" text-anchor="middle" font-weight="700">P4'</text>
+
+        <rect x="330" y="150" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="330" y="150" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="382" y="150" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="382" y="150" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="434" y="150" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="434" y="150" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <rect x="486" y="150" width="46" height="34" rx="5" class="dg-fill-soft"/><rect x="486" y="150" width="46" height="34" rx="5" class="dg-stroke" fill="none"/>
+        <text x="353" y="172" class="dg-text dg-mono" font-size="12" text-anchor="middle">P1</text>
+        <text x="405" y="172" class="dg-text dg-mono" font-size="12" text-anchor="middle">P2</text>
+        <text x="457" y="172" class="dg-text dg-mono" font-size="12" text-anchor="middle">P3</text>
+        <text x="509" y="172" class="dg-text dg-mono" font-size="12" text-anchor="middle">P4</text>
+
+        <text x="431" y="212" class="dg-text-sub" font-size="11" text-anchor="middle">수정된 페이지만 실제로 복사되어 메모리가 늘어난다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>백업 중 늘어나는 메모리는 데이터 크기가 아니라 "그동안 바뀐 양"에 비례한다</b> — 읽기만 많은 인스턴스는 거의 늘지 않지만, 쓰기가 몰리는 시간대에 백업이 겹치면 최악의 경우 두 배까지 뛴다. 백업 시각을 트래픽이 한가한 때로 옮겨야 하는 이유다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">현장에서 하는 조치 <span class="badge b-blue">보강</span></p>
+      <p>가장 흔한 대응은 <b>백업을 복제본에서 수행</b>하는 것이다. 마스터에서는 자동 저장을 끄고, 트래픽을 받지 않는 복제본에 <code>BGSAVE</code> 를 걸면 마스터의 fork 부담이 사라진다. 그리고 <code>vm.overcommit_memory = 1</code> 을 설정해 두라는 레디스의 시작 경고 로그는 바로 이 fork 실패를 막기 위한 것이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>BGSAVE</code>/<code>BGREWRITEAOF</code>/복제 전체 동기화는 모두 <code>fork</code> 를 부른다.</li>
+      <li>copy-on-write 로 인해 늘어나는 메모리는 백업 도중의 <b>쓰기 양</b>에 비례한다. 최악의 경우 2배 이상.</li>
+      <li><code>maxmemory</code> 는 물리 메모리보다 충분히 낮게 잡고, 가능하면 백업은 복제본에서 돌린다.</li>
+    </ul>
+  </div>
+</article>

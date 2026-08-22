@@ -1,0 +1,631 @@
+<article class="item" id="item-17" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-1</div>
+    <h3>Promise</h3>
+    <p class="item-tagline">비동기 결과를 "값"으로 만든 순간, 저장하고 합치고 캐싱할 수 있게 되었다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    콜백은 <b>전달할 수만</b> 있지만 Promise 는 <b>변수에 담을 수 있다.</b>
+    <a href="#item-42">11-2</a>의 요청 일괄 처리와 캐싱 레시피는 전부 이 한 가지 성질에서 나온다.
+  </div>
+
+  <h4>Promise</h4>
+  <ul>
+    <li>비동기 결과를 전파하기 위한 CPS 방식 콜백을 대신할 강력한 대안이다.</li>
+    <li>ECMAScript 2015의 일부이며 Node v4 이후부터 기본적으로 사용할 수 있었다.</li>
+  </ul>
+
+  <h4>Promise란 무엇일까</h4>
+  <p>비동기 작업의 <b>최종적인 결과 또는 에러</b>를 가지고 있는 객체다.</p>
+
+  <h5>Promise의 상태</h5>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> pending
+  pending --> fulfilled : resolve(value)
+  pending --> rejected : reject(reason)
+  fulfilled --> [*]
+  rejected --> [*]
+  note right of fulfilled
+    settled (결정됨)
+  end note
+      </pre>
+    </div>
+    <div class="figure-cap"><b>한 번 결정되면 되돌릴 수 없다</b> — <code>pending</code> 에서 나가는 화살표는 두 개뿐이고,
+      <code>fulfilled</code> / <code>rejected</code> 에서 나가는 화살표는 없다. 이 불변성 덕분에
+      같은 Promise 에 <code>then</code> 을 몇 개 붙이든, 언제 붙이든 항상 같은 결과를 받는다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상태</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><b>대기중(pending)</b></td><td>비동기 작업이 아직 완료되지 않은 상태</td></tr>
+        <tr><td><b>완료됨(fulfilled)</b></td><td>비동기 작업이 성공적으로 끝났을 때</td></tr>
+        <tr><td><b>실패함(rejected)</b></td><td>비동기 작업이 에러와 함께 종료됐을 때</td></tr>
+        <tr><td><b>결정된(settled)</b></td><td>이행되거나 거부된 상태 — 위 둘을 묶어 부르는 말</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>CPS 방식과의 차이점</h5>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">CPS</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">asyncOperation(arg, (err, result) =&gt; {
+  if (err) {
+    // 에러 처리
+  }
+
+  // 성공 처리
+});</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">Promise</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">asyncOperationPromise(arg)
+  .then((result) =&gt; {
+    // 성공 처리
+  })
+  .catch((err) =&gt; {
+    // 에러 처리
+  });</code></pre>
+    </div>
+  </div>
+
+  <p>성공 경로와 실패 경로가 <b>코드상에서도 분리</b>된다는 점이 핵심이다.
+    CPS 에서는 두 경로가 같은 함수 안에 뒤섞여 있었다.</p>
+
+  <h5>Promise 체인</h5>
+  <ul>
+    <li>체인 중 <b>어디서</b> 실패하든 <code>catch</code> 구문으로 넘어간다.</li>
+    <li>각 상위 체인의 성공값을 하위 체인에서 사용할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">chain.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">asyncOperationPromise(arg)
+  .then((result1) =&gt; {
+    // 성공 처리
+  })
+  .then((result2) =&gt; {
+    // 성공 처리
+  })
+  .then((result3) =&gt; {
+    // 성공 처리
+  })
+  .catch((err) =&gt; {
+    // 체인 전체의 에러 처리를 담당
+  });</code></pre>
+  </div>
+
+  <p><a href="#item-14">4-1</a>의 콜백 지옥과 나란히 놓고 보면 차이가 명확하다.
+    중첩이 <b>평평한 체인</b>으로 펴지고, 에러 처리가 마지막 한 곳으로 모인다.</p>
+
+  <h5>Promise/A+ 와 thenable</h5>
+  <ul>
+    <li>과거에는 여러 Promise 구현이 존재했고 대부분 서로 호환되지 않았다.</li>
+    <li>이 한계를 극복하기 위해 <b>Promise/A+</b> 사양이 만들어졌다.</li>
+    <li>Promise API 를 포함한 구현들은 <code>then()</code> 함수가 있는 모든 객체를 <b>thenable</b> 로 간주한다.</li>
+  </ul>
+
+  <h4>Promise API</h4>
+
+  <h5>Promise 생성</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">create.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const promise = new Promise((resolve, reject) =&gt; {});</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>정적 메서드</th><th>동작</th></tr></thead>
+      <tbody>
+        <tr><td><code>Promise.resolve(obj)</code></td>
+          <td>다른 Promise, thenable 또는 값에서 새 Promise 를 생성.<br>
+            Promise 가 전달되면 <b>그대로</b> 반환되고, thenable 이면 해당 라이브러리의 Promise 로 변환되며,
+            일반 값이면 그 값으로 이행된 Promise 가 된다.</td></tr>
+        <tr><td><code>Promise.reject(err)</code></td><td><code>err</code> 를 이유로 실패하는 Promise 를 만든다</td></tr>
+        <tr><td><code>Promise.all(iterable)</code></td>
+          <td>모두 이행되면 결과값 배열을 반환. <b>하나라도 실패하면 그 사유로 즉시 reject</b></td></tr>
+        <tr><td><code>Promise.allSettled(iterable)</code></td>
+          <td>실패해도 기다린다. 각 원소는 <code>{ status, value }</code> 또는 <code>{ status, reason }</code></td></tr>
+        <tr><td><code>Promise.race(iterable)</code></td><td>가장 먼저 <b>결정된</b> Promise 의 결과만 반환 (성공이든 실패든)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">allSettled.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const promises = [
+  Promise.resolve(1),
+  Promise.resolve(2),
+  Promise.resolve(3),
+  Promise.reject(new Error("error")),
+];
+
+Promise.allSettled(promises).then((results) =&gt; {
+  console.log(results);
+});
+// [
+//   { status: 'fulfilled', value: 1 },
+//   { status: 'fulfilled', value: 2 },
+//   { status: 'fulfilled', value: 3 },
+//   { status: 'rejected', reason: Error: error }
+// ]</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">노트에 없는 조합자 하나 더 <span class="badge b-blue">보강</span></p>
+      <p><code>Promise.any(iterable)</code>(ES2021, Node 15+)는 <code>race</code> 와 달리
+        <b>가장 먼저 성공한</b> 것을 반환하고 실패는 무시한다. 전부 실패해야 비로소
+        <code>AggregateError</code> 로 reject 된다. "여러 미러 중 아무거나 먼저 응답한 곳"처럼
+        실패를 관용해야 하는 상황에 쓴다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>언제 이행</th><th>언제 거부</th></tr></thead>
+          <tbody>
+            <tr><td><code>all</code></td><td>전부 성공</td><td>하나라도 실패 (즉시)</td></tr>
+            <tr><td><code>allSettled</code></td><td>전부 결정</td><td>거부되지 않음</td></tr>
+            <tr><td><code>race</code></td><td>첫 결정이 성공</td><td>첫 결정이 실패</td></tr>
+            <tr><td><code>any</code></td><td>첫 성공</td><td>전부 실패</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>인스턴스 메서드</th><th>동작</th></tr></thead>
+      <tbody>
+        <tr><td><code>then(onFulfilled, onRejected)</code></td><td>Promise 의 필수 함수. 성공(과 선택적으로 실패)에 대한 콜백을 받는다</td></tr>
+        <tr><td><code>catch(onRejected)</code></td><td>실패에 대한 콜백. <code>then(undefined, fn)</code> 의 축약</td></tr>
+        <tr><td><code>finally(onFinally)</code></td><td>인자를 받지 않으며 전달된 값은 무시된다. 성공/실패 관계없이 실행</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Promise 생성</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delay.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function delay(ms: number) {
+  return new Promise((resolve, reject) =&gt; {
+    setTimeout(() =&gt; {
+      resolve(ms);
+    }, ms);
+  });
+}
+
+console.log("h");
+delay(1000).then(() =&gt; console.log("after delay"));</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이미 표준에 있다</p>
+      <p><code>delay</code> 는 Node 코어에 이미 있다. <code>import { setTimeout } from "timers/promises"</code>
+        로 가져오면 <code>await setTimeout(1000)</code> 처럼 바로 쓸 수 있고,
+        <code>AbortSignal</code> 을 받아 취소도 지원한다(<a href="#item-43">11-3</a>).</p>
+    </div>
+  </div>
+
+  <h4>Promise화(promisification)</h4>
+  <ul>
+    <li>콜백 기반 함수의 <b>특성을 알고 있다면</b>(콜백이 마지막 인자, 에러가 첫 인자)
+      Promise 를 반환하는 동일한 함수로 기계적으로 변환할 수 있다.</li>
+    <li>아래는 원리를 보여주는 예시이며, 실제로는 <code>util</code> 의 <code>promisify</code> 를 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">promisify.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">import { randomBytes } from "crypto";
+
+function promisify(callbackBasedApi: any) {
+  return function promisified(...args: any[]) {
+    // 새로운 Promise 를 생성하고 반환함
+    return new Promise((resolve, reject) =&gt; {
+      // 콜백 함수는 항상 마지막 인자라는 규칙을 이용해
+      // resolve / reject 로 연결한다
+      const newArgs = [
+        ...args,
+        (err: unknown, result: any) =&gt; {
+          if (err) {
+            return reject(err);
+          }
+
+          resolve(result);
+        },
+      ];
+
+      callbackBasedApi(...newArgs);
+    });
+  };
+}
+
+const randomBytesPromisified = promisify(randomBytes);
+
+randomBytesPromisified(10).then((bytes) =&gt; {
+  console.log(bytes);
+});</code></pre>
+  </div>
+
+  <p><a href="#item-11">3-1</a>의 두 가지 규칙("콜백은 맨 마지막, 에러는 맨 처음")이
+    <b>기계적 변환을 가능하게 만든 전제</b>였다는 것이 여기서 드러난다. 규칙이 규칙이었던 이유다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">요즘 쓰는 방법 <span class="badge b-blue">보강</span></p>
+      <p>대부분의 코어 모듈은 이미 Promise 버전을 별도 네임스페이스로 제공한다 —
+        <code>fs/promises</code>, <code>timers/promises</code>, <code>stream/promises</code>, <code>dns/promises</code>.
+        <code>util.promisify</code> 는 이제 <b>서드파티 콜백 API 를 감쌀 때</b> 주로 쓴다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Promise = 비동기 결과를 담은 <b>값</b>. 저장/전달/재사용이 가능해진다</li>
+      <li>상태는 pending → fulfilled/rejected 로 한 번만 전이하고 되돌릴 수 없다</li>
+      <li>조합자 4종: <code>all</code>(전부 성공) / <code>allSettled</code>(전부 대기) / <code>race</code>(첫 결정) / <code>any</code>(첫 성공)</li>
+      <li>promisify 가 기계적으로 가능한 이유는 콜백 규칙이 통일되어 있기 때문</li>
+      <li>실무에서는 <code>fs/promises</code> 같은 코어의 Promise 네임스페이스를 먼저 찾는다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-18" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-2</div>
+    <h3>async / await</h3>
+    <p class="item-tagline">동기처럼 보이게 만드는 문법이지만, 동기처럼 동작한다고 착각하는 순간 함정이 시작된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>await</code> 는 <b>차단하는 것처럼 보이게</b> 할 뿐이다.
+    실제로는 함수 실행이 <b>보류되고 제어권이 이벤트 루프로 돌아간다.</b>
+    이 사실을 잊으면 <code>forEach</code> 함정과 <code>return await</code> 함정에 그대로 빠진다.
+  </div>
+
+  <h4>async 함수와 await 표현</h4>
+  <ul>
+    <li><code>async</code> 함수는 <b>항상 Promise 를 반환</b>한다.</li>
+    <li><code>await</code> 표현을 만나면 함수의 실행이 보류되고 상태가 저장되며 제어가 이벤트 루프로 반환된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delay.ts</span>
+      <span class="code-tag bad">await 가 없다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">async function delay(ms: number) {
+  return setTimeout(() =&gt; {
+    console.log(`after ${ms}ms`);
+  }, ms);
+}
+
+console.log("Hello");
+delay(1000);
+console.log("World");
+
+/**
+ * output
+ *
+ * Hello
+ * World
+ * after 1000ms
+ */</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이 예제가 보여주는 것 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 이 코드는 <code>async</code> 를 붙였지만 <b><code>await</code> 를 쓰지 않았고,
+        <code>setTimeout</code> 은 Promise 를 반환하지 않는다.</b>
+        따라서 <code>delay(1000)</code> 은 <code>Timeout</code> 객체로 즉시 이행되는 Promise 를 돌려줄 뿐,
+        "기다리는" 동작을 전혀 보여주지 못한다.
+        실제로 기다리게 하려면 <a href="#item-17">5-1</a>의 <code>delay</code> 처럼
+        <code>new Promise</code> 로 감싸고 호출부에서 <code>await</code> 해야 한다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delay-fixed.ts</span>
+      <span class="code-tag good">실제로 기다린다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function delay(ms: number) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+async function main() {
+  console.log("Hello");
+  await delay(1000);
+  console.log("World");   // 1초 뒤에 출력된다
+}
+
+main();</code></pre>
+  </div>
+
+  <h4>async/await 에서의 예외 처리</h4>
+  <ul>
+    <li>기존에는 <code>then().catch()</code> 방식으로 에러를 처리했다.</li>
+    <li><code>async/await</code> 에서는 <b><code>try/catch</code> 문</b>으로 처리한다.
+      동기 코드와 비동기 코드가 같은 에러 처리 문법을 쓰게 된 것이 가장 큰 실용적 이득이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">try-catch.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">async function playingWithErrors(throwSyncError: boolean) {
+  try {
+    if (throwSyncError) {
+      throw new Error("Sync error");
+    }
+  } catch (err) {
+    console.log("Caught an error:", err);
+  } finally {
+    console.log("done");
+  }
+}
+
+playingWithErrors(false);</code></pre>
+  </div>
+
+  <p><a href="#item-11">3-1</a>에서 "콜백 안의 예외는 바깥 <code>try/catch</code> 가 못 잡는다"고 했던 문제가
+    <code>await</code> 로는 해결된다. <code>await</code> 지점에서 함수 실행이 <b>재개</b>되므로
+    스택이 논리적으로 이어지기 때문이다.</p>
+
+  <h5>return vs return await 함정</h5>
+  <ul>
+    <li><code>async</code> 함수 안에서 <code>return await</code> 를 붙이지 않으면
+      <b>거부된 Promise 가 로컬 <code>try/catch</code> 를 그냥 지나쳐</b> 호출자에게 전파된다.</li>
+    <li>해당 함수 안에서 에러를 잡고 싶다면 반드시 <code>return await</code> 를 써야 한다.</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">catch 를 통과한다</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">async function f() {
+  try {
+    return delayError(10);   // await 없음
+  } catch (err) {
+    return "caught inside";
+  }
+}
+// → 호출자에게 rejected 전파</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">여기서 잡힌다</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">async function f() {
+  try {
+    return await delayError(10);
+  } catch (err) {
+    return "caught inside";
+  }
+}
+// → "caught inside" 로 이행</code></pre>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ node return-await.mjs
+withAwait -&gt; caught inside
+withoutAwait rejected -&gt; boom</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 이런 차이가 나는가</p>
+      <p><code>return promise</code> 는 Promise 를 <b>그대로 넘겨주고 함수를 즉시 떠난다</b>.
+        떠나 버렸으니 <code>try</code> 블록은 이미 끝났고, 나중에 그 Promise 가 거부돼도 잡을 <code>catch</code> 가 없다.
+        <code>return await promise</code> 는 <b>함수 안에서 결과를 기다렸다가</b> 반환하므로,
+        거부되면 <code>await</code> 지점에서 예외가 던져져 <code>catch</code> 에 걸린다.</p>
+      <p>바꿔 말하면 <code>try/catch</code> 밖에서라면 <code>return await</code> 는 불필요한 마이크로태스크 한 번일 뿐이다.
+        <b><code>try</code> 블록 안에서만</b> 의미가 있다. Node v24.17.0 에서 실행해 위 출력을 확인했다.</p>
+    </div>
+  </div>
+
+  <h4>안티패턴 — 순차 실행을 위한 Array.forEach with async/await</h4>
+  <ul>
+    <li>아래 코드에서 <code>getLinkLength</code> 는 <b>이벤트 루프의 동일한 라운드에서</b> 전부 호출된다.</li>
+    <li>모두 병렬로 시작되고, <code>forEach</code> 는 완료를 기다리지 않고 즉시 다음 줄로 넘어간다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">foreach-antipattern.ts</span>
+      <span class="code-tag bad">순차가 아니다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">links.forEach(async (link) =&gt; {
+  const length = await getLinkLength(link);
+  console.log(length);
+});</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">두 가지가 동시에 깨진다</p>
+      <p><b>(1) 순서가 보장되지 않는다</b> — 전부 동시에 출발하므로 먼저 끝난 것부터 로그가 찍힌다.</p>
+      <p><b>(2) 에러가 유실된다</b> — <code>forEach</code> 는 콜백의 반환값(Promise)을 버린다.
+        따라서 안에서 발생한 거부는 아무도 처리하지 않고 <code>unhandledRejection</code> 이 된다.</p>
+    </div>
+  </div>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">순차가 필요하면</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">for (const link of links) {
+  const length = await getLinkLength(link);
+  console.log(length);
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">병렬이 목적이면</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const lengths = await Promise.all(
+  links.map((link) =&gt; getLinkLength(link))
+);
+lengths.forEach((l) =&gt; console.log(l));</code></pre>
+    </div>
+  </div>
+
+  <h4>병렬 실행</h4>
+  <ul>
+    <li>가능하면 <code>Promise.all()</code> 로 구현하는 것을 권장한다.</li>
+    <li>일반적인 반복문에서 <code>await</code> 를 쓰면 하나가 실패해도 <b>바로 멈추지 않는다</b>
+      (이미 출발한 작업들은 계속 진행된다).</li>
+    <li><code>Promise.all()</code> 은 하나라도 실패하면 즉시 거부를 반환하므로 <b>빠르게 상태를 알 수 있다</b>.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">동시성을 제한하고 싶다면 <span class="badge b-blue">보강</span></p>
+      <p><code>Promise.all(items.map(fn))</code> 은 <b>동시성 제한이 없다.</b>
+        항목이 1만 개면 요청 1만 개가 동시에 나간다 —
+        <a href="#item-15">4-2</a>에서 경고한 바로 그 상황이다.
+        표준에는 제한 기능이 없으므로 <code>p-map</code> / <code>p-limit</code> 의
+        <code>concurrency</code> 옵션을 쓰거나 <code>TaskQueue</code> 를 직접 짠다.</p>
+    </div>
+  </div>
+
+  <h4>무한 재귀 프로미스 해결</h4>
+  <p>아래 함수는 <b>무한한 프로미스 체인</b>을 만들고 메모리 누수를 일으킨다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">leaking-loop.ts</span>
+      <span class="code-tag bad">체인이 끝없이 자란다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">function delay(ms: number) {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+}
+
+function leakingLoop(): Promise&lt;void&gt; {
+  return delay(1).then(() =&gt; {
+    console.log(`Tick ${Date.now()}`);
+    return leakingLoop();      // ← 반환된 프로미스가 다음 프로미스에 의존
+  });
+}
+
+leakingLoop();</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P1["promise 1"] -->|"해결은 promise 2 에 달림"| P2["promise 2"]
+  P2 -->|"해결은 promise 3 에 달림"| P3["promise 3"]
+  P3 -->|"..."| PN["promise N"]
+  PN -.->|"끝나지 않으므로 아무도 해제되지 않음"| P1
+      </pre>
+    </div>
+    <div class="figure-cap"><b>루프가 아니라 계속 길어지는 사슬이다</b> — 각 프로미스는 다음 프로미스가 결정돼야 해결되므로,
+      가장 오래된 프로미스조차 끝까지 살아 있다. 반복 횟수에 비례해 메모리가 단조 증가한다.</div>
+  </div>
+
+  <h5>프로미스 체인 끊기</h5>
+  <ul>
+    <li><code>leakingLoop</code> 가 반환한 프로미스가 <b>다음 <code>leakingLoop</code> 에 의존하지 않게</b> 만들면 된다.</li>
+    <li>이전 코드에서 <code>return</code> 문을 제거하면, GC 가 동작해 메모리가 오르내리는 톱니 모양이 된다.</li>
+    <li>다만 근본적인 동작이 바뀐다. 각 프로미스의 연결이 끊어져 <b>재귀 깊은 곳의 에러를 전파하지 못한다</b>.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">non-leaking-loop.ts</span>
+      <span class="code-tag good">메모리는 잡히지만 에러 전파를 잃는다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">return delay(1).then(() =&gt; {
+  console.log(`Tick ${Date.now()}`);
+  leakingLoop();     // return 을 뺀다
+});</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">둘 다 얻는 방법 <span class="badge b-blue">보강</span></p>
+      <p>메모리와 에러 전파를 모두 지키려면 재귀 대신 <code>while</code> 루프 + <code>await</code> 를 쓴다.
+        <code>async</code> 함수의 <code>await</code> 는 스택을 쌓지 않고 <b>같은 함수 프레임을 재개</b>하므로
+        반복 횟수와 무관하게 메모리가 일정하고, 예외는 그대로 바깥으로 던져진다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">async function loop() {
+  while (true) {
+    await delay(1);
+    console.log(`Tick ${Date.now()}`);
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>async</code> 함수는 항상 Promise 를 반환하고, <code>await</code> 는 차단이 아니라 <b>보류 후 재개</b>다</li>
+      <li>에러는 <code>try/catch</code> 로. 단 <code>try</code> 안에서 반환할 땐 <code>return await</code> 여야 잡힌다</li>
+      <li><code>forEach(async ...)</code> 는 순차도 아니고 에러도 유실한다 → <code>for...of</code> 또는 <code>Promise.all</code></li>
+      <li><code>Promise.all</code> 은 빠른 실패를 주지만 동시성 제한은 없다</li>
+      <li>재귀 프로미스 체인은 메모리를 먹는다 → <code>while</code> + <code>await</code> 가 정답</li>
+    </ul>
+  </div>
+</article>

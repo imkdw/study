@@ -1,0 +1,692 @@
+<article class="item" id="item-11-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-1</div>
+    <h3>비공개 메소드 단위 테스트</h3>
+    <p class="item-tagline">비공개 메소드가 테스트하고 싶어질 만큼 복잡하다면, 그건 클래스가 하나 빠졌다는 뜻이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    비공개 메소드를 테스트하는 것 자체가 나쁜 게 아니라, <b>비공개 메소드가 구현 세부 사항의 프록시</b>이기 때문에 나쁘다.
+  </div>
+
+  <h4>비공개 메소드 테스트와 테스트 취약성</h4>
+
+  <p>단위 테스트를 하려고 비공개 메소드를 노출하는 것은 <b>식별할 수 있는 동작만 테스트한다</b>는 원칙을 위반한다. 노출하는 순간 테스트가 구현 세부 사항과 결합되고 리팩터링 내성이 떨어진다.</p>
+
+  <p>비공개 메소드는 직접 테스트하는 대신, 그것을 포함하는 <b>식별할 수 있는 동작을 통해 간접적으로</b> 테스트한다.</p>
+
+  <h4>비공개 메소드와 불필요한 커버리지</h4>
+
+  <p>때로는 비공개 메소드가 너무 복잡해서, 식별할 수 있는 동작만으로는 충분한 커버리지를 얻을 수 없는 경우가 있다. 식별할 수 있는 동작에 이미 합리적인 커버리지가 있다고 가정하면, 아래 둘 중 하나가 원인이다.</p>
+
+  <h5>죽은 코드</h5>
+  <p>테스트에서 벗어난 코드가 어디에서도 사용되지 않는다면, 리팩터링 후에 남은 <b>관계없는 코드</b>일 수 있다. 이런 죽은 코드는 삭제한다.</p>
+
+  <h5>추상화가 누락됨</h5>
+  <p>비공개 메소드가 너무 복잡하다면 별도의 클래스로 도출해야 한다는 신호다. <b>추상화가 빠져 있다</b>는 징후다.</p>
+
+  <h4>예제 — 복잡한 비공개 메소드를 별도의 클래스로 도출하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">order.ts</span>
+      <span class="code-tag bad">복잡한 비공개 메소드</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Order {
+  private customer: Customer;
+  private products: Product[];
+
+  generateDescription(): string {
+    return `
+      구매자 정보 : ${this.customer.getName()}
+      구매 상품 개수 : ${this.products.length}
+      총 가격 : ${this.getPrice()}
+    `;
+  }
+
+  // 이 안에 계산 로직 전체가 들어 있다
+  private getPrice(): number {
+    const basePrice = /* 상품 가격 합산 */ 0;
+    const discounts = /* 고객 등급별 할인 */ 0;
+    const taxes = /* 상품별 세금 */ 0;
+    return basePrice - discounts + taxes;
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">order.ts</span>
+      <span class="code-tag good">별도 클래스로 도출</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Order {
+  private customer: Customer;
+  private products: Product[];
+
+  generateDescription(): string {
+    const calc = new PriceCalculator();
+
+    return `
+      구매자 정보 : ${this.customer.getName()}
+      구매 상품 개수 : ${this.products.length}
+      총 가격 : ${calc.calculate(this.customer, this.products)}
+    `;
+  }
+}
+
+class PriceCalculator {
+  calculate(customer: Customer, products: Product[]): number {
+    const basePrice = /* 상품 가격 합산 */ 0;
+    const discounts = /* 고객 등급별 할인 */ 0;
+    const taxes = /* 상품별 세금 */ 0;
+    return basePrice - discounts + taxes;
+  }
+}</code></pre>
+  </div>
+
+  <p>이제 <code>Order</code> 와 별개로 <code>PriceCalculator</code> 를 테스트할 수 있고, 순수 계산이므로 <a href="#item-6-1">출력 기반</a> 단위 테스트를 쓸 수 있다.</p>
+
+  <h4>비공개 메소드 테스트가 타당한 경우</h4>
+
+  <p>규칙에도 예외가 있다. 식별할 수 있는 동작을 공개하고 세부 구현을 비공개로 두는 것은 API 가 잘 설계됐다는 근거다. 그러니 <b>비공개 메소드를 테스트하는 것 자체가 나쁜 게 아니라, 비공개 메소드가 구현 세부 사항의 프록시이기 때문에</b> 나쁜 것이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>공개 여부</th><th>식별할 수 있는 동작</th><th>구현 세부 사항</th></tr></thead>
+      <tbody>
+        <tr><td><b>공개</b></td><td class="t-center t-ok">좋음</td><td class="t-center t-no">나쁨</td></tr>
+        <tr><td><b>비공개</b></td><td class="t-center">해당 없음</td><td class="t-center t-ok">좋음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트를 위해 비공개 메소드를 노출하지 않는다.</li>
+      <li>커버리지가 안 나온다면 <b>죽은 코드</b>이거나 <b>추상화가 빠진</b> 것이다.</li>
+      <li>복잡한 비공개 메소드는 별도 클래스로 도출해 출력 기반으로 테스트한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-2</div>
+    <h3>비공개 상태 노출</h3>
+    <p class="item-tagline">테스트는 제품 코드와 정확히 같은 방식으로 SUT 과 상호작용해야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    테스트에는 <b>특별한 권한이 없다.</b> 클라이언트가 볼 수 없는 것은 테스트도 봐서는 안 된다.
+  </div>
+
+  <p>단위 테스트 목적으로만 비공개 상태를 노출하는 것은 안티패턴이다. 이 지침은 <a href="#item-11-1">비공개 메소드 지침</a>과 같다. 비공개로 지켜야 하는 상태를 노출하지 말고, 식별할 수 있는 동작만 테스트한다.</p>
+
+  <h4>예제</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">enum CustomerStatus {
+  Regular,
+  Preferred,
+}
+
+class Customer {
+  private status: CustomerStatus = CustomerStatus.Regular;
+
+  promote() {
+    this.status = CustomerStatus.Preferred; // 사이드 이펙트는 비공개 필드
+  }
+
+  getDiscount() {
+    return this.status === CustomerStatus.Preferred ? 0.05 : 0;
+  }
+}</code></pre>
+  </div>
+
+  <p><code>promote()</code> 의 사이드 이펙트는 <code>status</code> 의 변경인데, 비공개 필드라 직접 확인할 수 없다. 여기서 테스트를 위해 이 필드를 공개하는 순간 안티패턴이 된다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">대신 클라이언트가 보는 결과로 검증한다</p>
+      <p>승격의 결과로 고객이 받는 <b>할인율</b>을 확인한다. 새로 생성된 고객은 할인율이 없고, 승격하면 5% 할인이 적용된다는 두 사실이 곧 식별할 수 있는 동작이다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer.spec.ts</span>
+      <span class="code-tag good">동작으로 검증</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("regular_customer_has_no_discount", () =&gt; {
+  const sut = new Customer();
+
+  const discount = sut.getDiscount();
+
+  expect(discount).toBe(0);
+});
+
+it("preferred_customer_has_discount", () =&gt; {
+  const sut = new Customer();
+  sut.promote();
+
+  const discount = sut.getDiscount();
+
+  expect(discount).toBe(0.05);
+});</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트를 위해 비공개 상태를 공개하지 않는다.</li>
+      <li>테스트는 제품 코드와 <b>같은 방식으로</b> SUT 과 상호작용한다.</li>
+      <li>상태 대신 그 상태가 만들어내는 <b>클라이언트가 보는 결과</b>를 검증한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-3</div>
+    <h3>테스트로 유출된 도메인 지식</h3>
+    <p class="item-tagline">기대 결과는 계산하지 말고 하드코딩한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    테스트가 알고리즘을 다시 구현하는 순간, 제품 코드가 틀려도 테스트가 <b>똑같이 틀린 답</b>을 기대하게 된다.
+  </div>
+
+  <p>도메인 지식을 테스트로 유출하는 것도 흔한 안티패턴이다. 보통 복잡한 알고리즘을 다루는 테스트에서 발생한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">calculator.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Calculator {
+  static add(value1: number, value2: number): number {
+    return value1 + value2;
+  }
+}</code></pre>
+  </div>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">알고리즘 유출</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">it("adding_two_numbers", () =&gt; {
+  const value1 = 1;
+  const value2 = 3;
+  // 제품 코드의 알고리즘을 복사했다
+  const expected = value1 + value2;
+
+  const sut = Calculator.add(value1, value2);
+
+  expect(sut).toBe(expected);
+});</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">결과를 하드코딩</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">it.each([
+  [1, 3, 4],
+  [11, 33, 44],
+  [100, 500, 600],
+])("adding_two_numbers", (value1, value2, expected) =&gt; {
+  const sut = Calculator.add(value1, value2);
+
+  expect(sut).toBe(expected);
+});</code></pre>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">유출된 테스트가 놓치는 것</p>
+      <p>제품 코드의 <code>+</code> 를 <code>*</code> 로 바꾸면, 왼쪽 테스트도 <code>expected</code> 를 똑같이 바꿔야 통과한다. 다시 말해 <b>제품 코드와 테스트가 같이 틀려도 초록불</b>이 뜬다. 회귀 방지가 0 이다.</p>
+    </div>
+  </div>
+
+  <p>직관적으로 보이지 않을 수 있지만, 테스트를 작성할 때는 특정 구현을 암시하지 않고 <b>예상 결과를 하드코딩</b>하는 것이 좋다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트에서 제품 코드의 알고리즘을 다시 계산하지 않는다.</li>
+      <li>기대 결과는 하드코딩하고, 케이스가 여럿이면 매개변수화한다.</li>
+      <li>유출된 테스트는 제품 코드와 함께 틀려도 통과한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-4</div>
+    <h3>코드 오염</h3>
+    <p class="item-tagline">테스트만을 위한 코드를 제품 코드에 남기지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    코드 오염의 진짜 비용은 한 줄의 <code>if</code> 가 아니라, <b>테스트 코드와 제품 코드가 섞여 유지비가 늘어나는 것</b>이다.
+  </div>
+
+  <p>코드 오염은 테스트를 위해 필요한 코드를 제품 코드에 추가하는 것을 말한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.ts</span>
+      <span class="code-tag bad">불린 스위치가 있는 로거</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Logger {
+  constructor(private readonly isTestEnv: boolean) {}
+
+  log(text: string) {
+    if (this.isTestEnv) {
+      return; // 테스트를 위한 분기가 제품 코드에 남았다
+    }
+
+    // text logging...
+  }
+}
+
+it("some_test", () =&gt; {
+  const logger = new Logger(true); // 테스트 환경 표시
+  const controller = new Controller();
+  controller.someMethod(logger);
+});</code></pre>
+  </div>
+
+  <p>이 분기는 <b>제품 코드가 자기가 테스트 중인지 알아야 한다</b>는 뜻이고, 그런 지식이 코드베이스 곳곳에 퍼지기 시작한다. 해결책은 테스트 코드를 제품 코드에서 완전히 분리하는 것이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">logger.ts</span>
+      <span class="code-tag good">별도 구현으로 분리</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface ILogger {
+  log(text: string): void;
+}
+
+class Logger implements ILogger {
+  log(text: string) {
+    // text logging...
+  }
+}
+
+// 테스트 코드에만 존재한다
+class FakeLogger implements ILogger {
+  log(text: string): void {
+    // do nothing
+  }
+}
+
+it("some_test", () =&gt; {
+  const logger = new FakeLogger();
+  const controller = new Controller();
+  controller.someMethod(logger);
+});</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>코드 오염 = 테스트를 위한 코드가 제품 코드에 들어가는 것.</li>
+      <li>제품 코드가 "테스트 중인지" 를 알면 안 된다.</li>
+      <li>인터페이스를 두고 <b>페이크 구현은 테스트 코드 쪽에</b> 둔다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-5</div>
+    <h3>구체 클래스를 목으로 처리하기</h3>
+    <p class="item-tagline">클래스 일부만 목으로 덮고 싶어지는 순간, 그 클래스는 두 가지 일을 하고 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    부분 목이 필요하다는 것은 <b>단일 책임 원칙 위반</b>의 신호다. 목으로 덮지 말고 클래스를 쪼갠다.
+  </div>
+
+  <p>구체 클래스를 목으로 처리하면 본래 클래스의 일부 기능을 보존할 수 있어 때때로 유용해 보인다. 하지만 이 대안에는 중대한 단점이 있다.</p>
+
+  <h4>예제 — 통계 계산 클래스</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">statistics-calculator.ts</span>
+      <span class="code-tag bad">두 가지 책임</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class StatisticsCalculator {
+  calculate(customerId: number): { totalWeight: number; totalCost: number } {
+    const records = this.getDeliveries(customerId);
+    const totalWeight = records.reduce((acc, cur) =&gt; acc + cur.weight, 0);
+    const totalCost = records.reduce((acc, cur) =&gt; acc + cur.cost, 0);
+    return { totalWeight, totalCost };
+  }
+
+  getDeliveries(customerId: number): DeliveryRecord[] {
+    // 프로세스 외부 의존성을 호출해 배달 목록을 조회한다
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer-controller.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class CustomerController {
+  constructor(private readonly calculator: StatisticsCalculator) {}
+
+  getStatistics(customerId: number): string {
+    const { totalCost, totalWeight } = this.calculator.calculate(customerId);
+
+    return `
+      총 비용 : ${totalCost}
+      총 무게 : ${totalWeight}
+    `;
+  }
+}</code></pre>
+  </div>
+
+  <p>이 컨트롤러를 테스트할 때 딜레마가 생긴다.</p>
+
+  <ul>
+    <li><code>StatisticsCalculator</code> 가 <b>비관리 프로세스 외부 의존성</b>을 쓰므로 실제 인스턴스를 넣을 수 없다.</li>
+    <li>동시에 <code>StatisticsCalculator</code> 는 <b>중요한 계산 로직</b>을 담고 있어 통째로 교체하고 싶지도 않다.</li>
+  </ul>
+
+  <h4>흔히 택하는 해법 — 부분 목</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer-controller.spec.ts</span>
+      <span class="code-tag bad">단일 책임 위반의 증거</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("customer_with_no_delivery", () =&gt; {
+  const calculator = new StatisticsCalculator();
+  // getDeliveries 만 덮어쓰고 calculate 는 그대로 쓴다
+  jest.spyOn(calculator, "getDeliveries").mockReturnValue([]);
+
+  const sut = new CustomerController(calculator);
+
+  const result = sut.getStatistics(1);
+
+  expect(result).toBe(`
+      총 비용 : 0
+      총 무게 : 0
+    `);
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 예제는 <code>TestStatisticsCalculator</code> 를 정의해놓고 정작 <code>new CustomerController(stub)</code> 에 <b>정의되지 않은 <code>stub</code></b> 을 넘긴다. 위처럼 <code>jest.spyOn</code> 으로 인스턴스의 메소드 하나만 덮어쓰는 편이 부분 목의 의도를 더 정확히 보여준다.</p>
+    </div>
+  </div>
+
+  <p>클래스의 일부만 대체하고 나머지는 그대로 쓸 수 있어 편해 보이지만, <b>일부 기능을 지키려고 클래스를 목으로 처리하는 것은 단일 책임 원칙 위반의 증거</b>다.</p>
+
+  <h4>책임에 따른 클래스 분리하기</h4>
+
+  <p><code>StatisticsCalculator</code> 는 <b>비관리 의존성과 통신하는 책임</b>과 <b>통계를 계산하는 책임</b>이라는, 서로 관련 없는 두 가지가 결합돼 있다. 이를 분리한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delivery-gateway.ts</span>
+      <span class="code-tag good">책임 분리</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface IDeliveryGateway {
+  getDeliveries(customerId: number): DeliveryRecord[];
+}
+
+class DeliveryGateway implements IDeliveryGateway {
+  getDeliveries(customerId: number): DeliveryRecord[] {
+    // 프로세스 외부 의존성 호출
+    return [];
+  }
+}
+
+class StatisticsCalculator {
+  calculate(records: DeliveryRecord[]) {
+    const totalWeight = records.reduce((acc, cur) =&gt; acc + cur.weight, 0);
+    const totalCost = records.reduce((acc, cur) =&gt; acc + cur.cost, 0);
+    return { totalWeight, totalCost };
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">customer-controller.spec.ts</span>
+      <span class="code-tag good">험블 객체 패턴</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class CustomerController {
+  constructor(
+    private readonly calculator: StatisticsCalculator,
+    private readonly gateway: IDeliveryGateway
+  ) {}
+
+  getStatistics(customerId: number): string {
+    const records = this.gateway.getDeliveries(customerId);
+    const { totalCost, totalWeight } = this.calculator.calculate(records);
+
+    return `
+      총 비용 : ${totalCost}
+      총 무게 : ${totalWeight}
+    `;
+  }
+}
+
+it("customer_with_no_delivery", () =&gt; {
+  const stub: jest.Mocked&lt;IDeliveryGateway&gt; = {
+    getDeliveries: jest.fn().mockReturnValue([]),
+  };
+  const calculator = new StatisticsCalculator();
+  const sut = new CustomerController(calculator, stub);
+
+  const result = sut.getStatistics(1);
+
+  expect(result).toBe(`
+      총 비용 : 0
+      총 무게 : 0
+    `);
+});</code></pre>
+  </div>
+
+  <p>이 리팩터링은 <a href="#item-7-1">험블 객체 패턴</a>의 또 다른 사례다. 이제 비관리 의존성과의 통신은 <code>DeliveryGateway</code> 가, 통계 계산은 <code>StatisticsCalculator</code> 가 담당한다. 각자 자기 방식으로 테스트할 수 있게 됐다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>구체 클래스의 일부만 목으로 덮고 싶다면 그 클래스가 두 가지 일을 하고 있는 것이다.</li>
+      <li>부분 목은 단일 책임 원칙 위반의 <b>증상</b>이지 해결책이 아니다.</li>
+      <li>외부 통신 책임과 계산 책임을 분리하면 부분 목이 필요 없어진다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-11-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">11-6</div>
+    <h3>시간 처리하기</h3>
+    <p class="item-tagline">시간은 서비스로 주입하지 말고 값으로 주입한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>앰비언트 컨텍스트로서의 시간은 안티패턴이다.</b> 명시적 의존성으로 주입하되, 서비스보다는 <b>값</b>이 낫다.
+  </div>
+
+  <p>많은 앱이 현재 날짜와 시간에 접근해야 한다. 하지만 시간에 따라 달라지는 기능을 테스트하면 <a href="#item-4-1">거짓 양성</a>이 발생할 수 있다. 어제 통과한 테스트가 오늘 실패하는 식이다.</p>
+
+  <h4>앰비언트 컨텍스트로서의 시간</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">date-time-server.ts</span>
+      <span class="code-tag bad">안티패턴</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class DateTimeServer {
+  private static func: () =&gt; Date;
+
+  static init(func: () =&gt; Date) {
+    this.func = func;
+  }
+
+  static get now(): Date {
+    return this.func();
+  }
+}
+
+// 운영 환경
+DateTimeServer.init(() =&gt; new Date());
+
+// 테스트 환경
+DateTimeServer.init(() =&gt; new Date("2020-01-01"));</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">로거 때와 같은 안티패턴이다</p>
+      <p>의존성이 숨어 있고, 변경하기 어려우며, 테스트가 더 어려워진다. 게다가 <b>정적 필드는 테스트 간 공유 의존성</b>을 만들어 그 테스트들을 통합 테스트 영역으로 밀어낸다. 앞선 테스트가 설정한 시간이 다음 테스트에 새어 나가기 때문이다.</p>
+    </div>
+  </div>
+
+  <h4>명시적 의존성으로서의 시간</h4>
+
+  <p>앰비언트 컨텍스트보다는 <b>서비스</b> 또는 <b>일반 값</b>으로 시간 의존성을 명시적으로 주입하는 편이 낫다. 그리고 둘 중에서는 <b>값</b> 쪽이 더 좋다.</p>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">서비스로 주입</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">interface IDateTimeServer {
+  now(): Date;
+}
+
+class DateTimeServer implements IDateTimeServer {
+  now(): Date {
+    return new Date();
+  }
+}
+
+class InquiryController {
+  constructor(
+    private readonly dateTimeServer: IDateTimeServer
+  ) {}
+
+  approveInquiry(id: number) {
+    const inquiry = getById(id);
+    inquiry.approve(this.dateTimeServer.now());
+    saveInquiry(inquiry);
+  }
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">값으로 주입</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">class Inquiry {
+  // 도메인 모델은 값만 받는다
+  approve(now: Date) {
+    // ...
+  }
+}
+
+class InquiryController {
+  constructor(
+    private readonly dateTimeServer: IDateTimeServer
+  ) {}
+
+  approveInquiry(id: number) {
+    const inquiry = getById(id);
+    // 컨트롤러가 값으로 바꿔 넘긴다
+    inquiry.approve(this.dateTimeServer.now());
+    saveInquiry(inquiry);
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">왜 값이 더 나은가</p>
+      <p>도메인 모델에 시간을 <b>값으로</b> 넘기면 협력자가 하나 줄어든다. <a href="#item-7-1">7-1</a> 의 사분면에서 도메인 모델은 협력자가 적을수록 좋고, 시간이 값이 되는 순간 그 메소드는 <a href="#item-6-3">수학적 함수</a>가 된다. 시간을 읽는 일은 셸(컨트롤러)의 책임이다.</p>
+    </div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">가짜 타이머라는 또 다른 선택지 <span class="badge b-purple">최신 반영</span></p>
+      <p>주입이 불가능한 레거시 코드에는 테스트 프레임워크의 가짜 타이머를 쓸 수 있다. Jest 는 <code>jest.useFakeTimers()</code> 로 타이머를 가짜로 바꾸고, <b>모던 가짜 타이머에서만 동작하는</b> <code>jest.setSystemTime(new Date("2020-01-01"))</code> 로 시스템 시각을 고정할 수 있다. 다만 이는 어디까지나 <b>차선책</b>이다. 코드를 고칠 수 있다면 시간을 값으로 주입하는 쪽이 언제나 낫다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">inquiry.spec.ts</span>
+      <span class="code-tag good">값 주입 방식의 테스트</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("approved_inquiry_records_the_approval_time", () =&gt; {
+  const sut = new Inquiry();
+  const now = new Date("2020-01-01T00:00:00Z");
+
+  sut.approve(now);
+
+  expect(sut.approvedAt).toEqual(now);
+});</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>시간을 앰비언트 컨텍스트(정적 필드)로 두면 공유 의존성이 생겨 테스트가 오염된다.</li>
+      <li>명시적으로 주입하되, 도메인 모델에는 <b>값</b>으로 넘긴다.</li>
+      <li>시간을 읽는 책임은 컨트롤러(가변 셸)에 둔다.</li>
+      <li>고칠 수 없는 코드에는 <code>jest.setSystemTime</code> 같은 가짜 타이머가 차선책이다.</li>
+    </ul>
+  </div>
+</article>

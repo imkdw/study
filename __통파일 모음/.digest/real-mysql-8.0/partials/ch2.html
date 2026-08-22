@@ -1,0 +1,161 @@
+<article class="item" id="item-2-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-4</div>
+    <h3>서버 설정</h3>
+    <p class="item-tagline">MySQL의 동작은 570여 개의 시스템 변수가 결정한다. 어디에 적히고 언제 반영되는지가 첫 관문이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    시스템 변수는 <b>범위(글로벌/세션)</b> 와 <b>변경 시점(동적/정적)</b> 두 축으로 나뉜다. 8.0의 <code>SET PERSIST</code> 는 이 중 "지금 반영"과 "재시작 후에도 유지"를 한 번에 해결한 명령이다.
+  </div>
+
+  <h4>설정 파일은 하나뿐이다</h4>
+  <p>MySQL 서버는 <b>단 하나의 설정 파일</b>만 사용한다. 유닉스 계열은 <code>my.cnf</code>, 윈도우는 <code>my.ini</code> 다. 정해진 여러 디렉터리를 순서대로 탐색하다가 <b>처음 발견한 파일</b>을 쓴다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ mysqld --verbose --help | grep my.cnf
+/etc/my.cnf /etc/mysql/my.cnf /usr/local/mysql/etc/my.cnf ~/.my.cnf
+                      my.cnf, $MYSQL_TCP_PORT, /etc/services, built-in default</code></pre>
+  </div>
+
+  <p>탐색 순서가 곧 우선순위다. <code>/etc/my.cnf</code> 가 있으면 <code>~/.my.cnf</code> 는 쳐다보지도 않는다는 뜻이라, "설정을 바꿨는데 안 먹는다"의 절반은 여기서 나온다.</p>
+
+  <h4>설정 파일 구성</h4>
+  <p>하나의 파일 안에 여러 프로그램의 설정을 담을 수 있고, <b>실행 프로그램 이름이 그대로 그룹명</b>이 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">my.cnf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">[mysqld]
+port = 3306
+
+[mysql]
+default-character-set = utf8mb4</code></pre>
+  </div>
+
+  <p><code>[mysqld]</code> 는 서버 데몬이, <code>[mysql]</code> 은 CLI 클라이언트가 읽는다. 서버 설정을 <code>[mysql]</code> 밑에 적어두면 아무 일도 일어나지 않는다.</p>
+
+  <h4>시스템 변수의 특징</h4>
+  <p>메모리 크기, 작동 방식 초기화, 사용자 제어 같은 값들이 전부 시스템 변수로 관리된다. <code>SHOW VARIABLES</code> / <code>SHOW GLOBAL VARIABLES</code> 로 확인할 수 있다.</p>
+
+  <p>매뉴얼의 시스템 변수 표는 다음 다섯 가지 속성을 갖는다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>속성</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>Cmd-Line</code></td><td>명령행 인자로 값을 바꿀 수 있는가</td></tr>
+        <tr><td><code>Option File</code></td><td>설정 파일로 제어할 수 있는가</td></tr>
+        <tr><td><code>System Var</code></td><td>시스템 변수인가</td></tr>
+        <tr><td><code>Var Scope</code></td><td>적용 범위 — 글로벌인가 세션당인가</td></tr>
+        <tr><td><code>Dynamic</code></td><td>동적인가 정적인가 (재시작 필요 여부)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>글로벌 변수와 세션 변수</h4>
+
+  <h5>글로벌 변수</h5>
+  <ul>
+    <li>서버 인스턴스 <b>전체</b>에 영향을 미친다.</li>
+    <li>주로 MySQL 서버 자체에 관련된 설정이다. (버퍼 풀 크기, 로그 파일 경로 등)</li>
+  </ul>
+
+  <h5>세션 변수</h5>
+  <ul>
+    <li>클라이언트가 접속할 때 부여되는 옵션의 <b>기본값</b>을 제어한다.</li>
+    <li>커넥션별로 다른 값을 지정할 수 있다.</li>
+    <li>이미 연결된 커넥션의 세션 변수를 <b>서버 쪽에서 바꿀 수는 없다.</b></li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["SET GLOBAL"] --> B["글로벌 값 변경 (이후 새 커넥션에 적용)"]
+  C["SET SESSION"] --> D["현재 커넥션에만 적용 (연결 끊기면 소멸)"]
+  E["SET PERSIST"] --> B
+  E --> F["mysqld-auto.cnf 에 기록 (재시작 후에도 유지)"]
+  G["SET PERSIST_ONLY"] --> F
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 SET 이지만 도달 범위가 다르다</b> — <code>PERSIST</code> 만이 "지금 반영"과 "재시작 후 유지"를 동시에 만족한다.</div>
+  </div>
+
+  <h4>정적 변수와 동적 변수</h4>
+  <ul>
+    <li>서버가 기동 중인 상태에서 변경할 수 있느냐로 <b>동적/정적</b>이 갈린다.</li>
+    <li>정적 변수는 <code>my.cnf</code> 를 고쳐도 <b>재시작하기 전까지 반영되지 않는다.</b></li>
+    <li><code>%...%</code> 패턴으로 변수명을 검색할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW GLOBAL VARIABLES LIKE '%max%';</code></pre>
+  </div>
+
+  <p><code>SET</code> 으로 바꾼 값은 영속성이 없다. 현재 커넥션(또는 글로벌 메모리)에서만 유효하고 재시작하면 사라진다.</p>
+
+  <h4>SET PERSIST</h4>
+  <p>서버의 최대 커넥션 수를 급히 늘려야 하는 상황을 떠올려 보자. <code>SET GLOBAL</code> 로 바꾸면 즉시 반영되지만, 설정 파일에 따로 적어두지 않으면 <b>재부팅하는 순간 초기값으로 돌아간다.</b> 이 이중 작업을 8.0의 <code>SET PERSIST</code> 가 없앴다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag good">권장</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 즉시 반영 + 재시작 후에도 유지
+SET PERSIST max_connections = 5000;
+
+-- 설정 파일에만 기록 (정적 변수도 가능, 반영은 재시작 후)
+SET PERSIST_ONLY innodb_page_size = 32768;</code></pre>
+  </div>
+
+  <ul>
+    <li>영속화된 값은 <code>my.cnf</code> 가 아니라 <b>데이터 디렉터리의 <code>mysqld-auto.cnf</code></b> 라는 별도 파일에 저장된다.</li>
+    <li><code>SET PERSIST_ONLY</code> 는 정적 변수도 받아준다. 지금 반영은 안 되지만 파일에는 남는다.</li>
+    <li>변경 이력은 <code>performance_schema.variables_info</code> 뷰에서 확인할 수 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p><code>mysqld-auto.cnf</code> 는 <code>my.cnf</code> 보다 <b>나중에</b> 읽힌다. 즉 같은 변수가 양쪽에 있으면 <code>mysqld-auto.cnf</code> 쪽이 이긴다. <code>my.cnf</code> 를 아무리 고쳐도 값이 안 바뀐다면 예전에 누군가 <code>SET PERSIST</code> 를 쓴 것이다.</p>
+    </div>
+  </div>
+
+  <h4>RESET PERSIST</h4>
+  <p><code>SET PERSIST</code> / <code>SET PERSIST_ONLY</code> 로 영속화한 변수를 되돌리는 명령이다. 파일을 직접 손대는 것보다 명령으로 처리하는 편이 장애를 예방한다 — 손으로 편집하다 문법이 깨지면 서버가 아예 뜨지 않는다.</p>
+
+  <h4>my.cnf 파일</h4>
+  <ul>
+    <li>8.0의 시스템 변수는 대략 <b>570개</b> 수준이다.</li>
+    <li>인스턴스 스펙에 따라 <b>오히려 성능을 떨어뜨리는</b> 설정도 있다. 남의 <code>my.cnf</code> 를 그대로 복사하는 것이 위험한 이유다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>설정 파일은 <b>하나만</b> 쓰인다 — 탐색 경로 중 처음 찾은 파일이 전부다.</li>
+      <li>변수는 <b>글로벌/세션</b>(범위) × <b>동적/정적</b>(변경 시점)의 조합으로 이해한다.</li>
+      <li><code>SET</code> 은 휘발성, <code>SET PERSIST</code> 는 즉시 반영 + 영속, <code>SET PERSIST_ONLY</code> 는 영속만.</li>
+      <li>영속화된 값은 <code>mysqld-auto.cnf</code> 에 쌓이고 <code>my.cnf</code> 를 덮어쓴다. 되돌릴 땐 <code>RESET PERSIST</code>.</li>
+    </ul>
+  </div>
+</article>

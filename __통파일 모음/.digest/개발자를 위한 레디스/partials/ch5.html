@@ -1,0 +1,330 @@
+<article class="item" id="item-5-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-1</div>
+    <h3>레디스와 캐시</h3>
+    <p class="item-tagline">캐시를 넣는 일은 쉽다. 어려운 것은 <b>언제 지우고, 어긋나면 어떻게 할지</b> 정하는 일이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    캐시는 원본의 복사본이다. 그래서 캐시 설계는 전부 두 질문으로 환원된다 — <b>언제 비울 것인가</b>(TTL/이빅션), <b>원본이 바뀌면 어떻게 할 것인가</b>(쓰기 전략).
+  </div>
+
+  <h4>캐시</h4>
+  <ul>
+    <li>데이터의 원본보다 빠르고 효율적으로 접근할 수 있는 임시 데이터 저장소</li>
+    <li>원본을 가져오는 것보다 빠르므로 작업 대기시간을 줄일 수 있다</li>
+  </ul>
+
+  <h4>캐시로서의 레디스</h4>
+  <ul>
+    <li>사용이 매우 간단하다</li>
+    <li>데이터를 검색하고 반환하는 속도가 매우 빠르다</li>
+    <li>평균 읽기/쓰기 지연은 1ms 수준이고, 초당 수백만 건의 작업이 가능하다</li>
+    <li>센티널 또는 클러스터를 통해 가용성도 확보할 수 있다</li>
+  </ul>
+
+  <h4>캐싱 전략</h4>
+  <p>레디스를 캐시로 쓸 때 <b>어디에 배치하느냐</b>가 성능에 큰 영향을 미친다.</p>
+
+  <h5>읽기 전략 — look aside</h5>
+  <ul>
+    <li>데이터를 읽어갈 때 주로 사용하며 가장 일반적인 방법이다 (cache-aside 라고도 부른다)</li>
+    <li>읽을 때 캐시에 있는지 먼저 확인하고, 있으면 그 데이터를 반환한다</li>
+    <li>캐시에 없으면 원본 DB 에서 읽어 오고, 그 값을 레디스에 저장한다</li>
+    <li>장점은 레디스에 문제가 생겨도 원본 DB 가 살아 있으면 데이터를 가져올 수 있다는 것
+      <ul><li>다만 모든 요청이 DB 로 향하면 그쪽에 부하가 몰릴 수 있다</li></ul>
+    </li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["애플리케이션 요청"] --> B{"캐시에 있는가"}
+  B -->|"HIT"| C["캐시 값 반환"]
+  B -->|"MISS"| D["원본 DB 조회"]
+  D --> E["레디스에 저장 + TTL"]
+  E --> F["값 반환"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>look aside 는 캐시를 애플리케이션이 관리한다</b> — 레디스는 조회 경로에 끼어들지 않고 옆에 서 있을 뿐이다. 그래서 레디스가 죽어도 서비스는 (느려질 뿐) 계속 돌아간다.</div>
+  </div>
+
+  <h5>캐시 워밍</h5>
+  <ul>
+    <li>최초 애플리케이션 로딩 시 레디스에는 데이터가 없어서 모든 요청이 DB 로 향한다</li>
+    <li>이때 부트스트래핑 단계에서 DB 데이터를 레디스에 미리 올려 두는 것을 <b>캐시 워밍</b>이라 한다</li>
+  </ul>
+
+  <h5>쓰기 전략과 캐시의 일관성</h5>
+  <ul>
+    <li>캐시는 DB 에 저장된 데이터를 복사해 온 값이다</li>
+    <li>업데이트 시 원본 DB 만 바뀌면 캐시와 불일치가 발생한다</li>
+  </ul>
+
+  <h5>write through</h5>
+  <ul>
+    <li>DB 데이터를 업데이트할 때마다 레디스도 함께 업데이트하는 전략</li>
+    <li>항상 최신 데이터를 유지하지만 매번 두 곳을 써야 한다</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>실무에서 가장 많이 쓰이는 쓰기 전략은 사실 <b>write invalidate</b> 다 — DB 를 갱신한 뒤 캐시를 <i>갱신하지 않고 삭제</i>하고, 다음 읽기에서 자연스럽게 채워지게 둔다. 두 저장소에 같은 값을 쓰는 write through 는 갱신 순서가 엇갈리면 오래된 값이 캐시에 남을 수 있지만, 삭제는 순서가 엇갈려도 최악의 결과가 "캐시 미스 한 번"이라 안전하다.</p>
+    </div>
+  </div>
+
+  <h4>만료시간</h4>
+  <p>레디스의 TTL 은 데이터를 얼마나 오래 저장할지에 대한 시간이며 초 단위로 표현한다.</p>
+
+  <h5>만료된 데이터의 삭제 방식</h5>
+  <ul>
+    <li><b>passive 방식</b>
+      <ul>
+        <li>특정 키에 접근했을 때 그 데이터가 만료됐다면 그때 삭제한다</li>
+        <li>하지만 사용자가 다시는 접근하지 않을 수도 있어 이 방법만으로는 충분하지 않다</li>
+      </ul>
+    </li>
+    <li><b>active 방식</b>
+      <ul>
+        <li>TTL 이 설정된 키 중 20개를 랜덤으로 뽑아, 만료된 키는 메모리에서 삭제한다</li>
+        <li>25% 이상의 키가 삭제됐다면 다시 20개의 키를 랜덤하게 뽑아 확인한다</li>
+        <li>25% 미만이면 그 주기를 끝내고 다음 주기를 기다린다</li>
+        <li>위 과정을 1초에 10번씩 수행한다</li>
+      </ul>
+    </li>
+    <li>공통적으로, 최악의 경우 전체 사용량의 25% 정도는 이미 만료됐지만 아직 지워지지 않은 키일 수 있다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">그래서 "TTL 이 지났으니 메모리도 줄었을 것"이 아니다</p>
+      <p>만료 시각이 지나도 삭제는 <b>나중에</b> 일어난다. 메모리 그래프가 TTL 만료 시점에 곧바로 떨어지지 않는 것은 정상이며, 반대로 대량의 키가 동시에 만료되도록 설계하면 그 순간 active 사이클이 길어져 지연이 튄다. 만료 시각을 조금씩 흩뿌리는 편이 안전하다.</p>
+    </div>
+  </div>
+
+  <h4>메모리 관리와 maxmemory-policy 설정</h4>
+  <ul>
+    <li>너무 많은 데이터가 저장되면 메모리가 가득 찰 수 있다</li>
+    <li>최대 메모리 사용량과, 가득 찼을 때 어떤 기준으로 내부 데이터를 지울지 정할 수 있다</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>정책</th><th>대상</th><th>기준</th><th>언제 쓰나</th></tr></thead>
+      <tbody>
+        <tr><td><code>noeviction</code></td><td class="t-center">-</td><td>삭제하지 않고 에러 반환</td><td>기본값. 데이터 관리 책임을 앱이 진다</td></tr>
+        <tr><td><code>volatile-lru</code></td><td>TTL 있는 키</td><td>가장 오래 안 쓰인 것</td><td>지워지면 안 되는 키가 섞여 있을 때</td></tr>
+        <tr><td><code>allkeys-lru</code></td><td>모든 키</td><td>가장 오래 안 쓰인 것</td><td class="t-ok">캐시 용도라면 우선 이것</td></tr>
+        <tr><td><code>volatile-lfu</code></td><td>TTL 있는 키</td><td>가장 덜 쓰인 것</td><td>접근 빈도 편차가 클 때</td></tr>
+        <tr><td><code>allkeys-lfu</code></td><td>모든 키</td><td>가장 덜 쓰인 것</td><td>인기 키가 뚜렷할 때</td></tr>
+        <tr><td><code>volatile-random</code></td><td>TTL 있는 키</td><td>무작위</td><td>고르는 부하도 아까울 때</td></tr>
+        <tr><td><code>allkeys-random</code></td><td>모든 키</td><td>무작위</td><td>접근 패턴이 균일할 때</td></tr>
+        <tr><td><code>volatile-ttl</code></td><td>TTL 있는 키</td><td>만료가 가장 임박한 것</td><td>수명이 명확히 설계돼 있을 때</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>noeviction</h5>
+  <ul>
+    <li>기본값으로, 데이터가 가득 차더라도 자동으로 삭제하지 않는다</li>
+    <li>메모리가 가득 차면 더 이상 저장할 수 없다는 에러를 반환한다</li>
+    <li>애플리케이션 에러로 이어질 수 있어 캐시 용도로는 권장하지 않는다</li>
+    <li>데이터 관리 책임을 앱이 지겠다는 의미이며, 내부 판단으로 데이터를 지우는 것이 위험할 때 쓴다</li>
+  </ul>
+
+  <h5>LRU eviction</h5>
+  <ul>
+    <li>가득 찬 경우 <b>가장 오래 사용되지 않은</b> 데이터부터 삭제하는 정책</li>
+    <li><code>volatile-lru</code>
+      <ul>
+        <li>만료시간이 설정된 키만 삭제 대상으로 삼는다</li>
+        <li>만료되면 안 되는 데이터(TTL 미적용)가 섞여 있을 때 적합하다</li>
+        <li>단점은 모든 키에 만료시간이 없다면 <code>noeviction</code> 과 똑같이 동작한다는 것</li>
+      </ul>
+    </li>
+    <li><code>allkeys-lru</code>
+      <ul>
+        <li>캐시로 쓸 때 잘 모르겠다면 이 방식을 권장한다</li>
+        <li>모든 키를 LRU 로 삭제하므로 적어도 메모리 부족 장애는 막을 수 있다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>LFU eviction</h5>
+  <ul>
+    <li>가득 찼을 때 <b>가장 자주 사용되지 않은</b> 데이터부터 삭제하는 정책</li>
+    <li>키 접근 패턴에 따라 우선순위가 유동적으로 바뀐다</li>
+    <li><code>volatile-lfu</code> : 만료시간이 설정된 키만 대상. 마찬가지로 대상이 없으면 저장 실패로 이어질 수 있다</li>
+    <li><code>allkeys-lfu</code> : 모든 키에 LFU 를 적용</li>
+  </ul>
+
+  <h5>random eviction</h5>
+  <ul>
+    <li>저장된 키를 랜덤으로 골라 삭제하는 방식</li>
+    <li>어떤 키를 지울지 계산하지 않아도 되어 부하가 덜하다</li>
+    <li>대신 곧 쓰일 데이터를 지울 수도 있으니 주의해야 한다</li>
+    <li><code>volatile-random</code> : 만료시간이 설정된 키만 대상</li>
+    <li><code>allkeys-random</code> : 모든 키를 대상</li>
+    <li><code>volatile-ttl</code> : 만료시간이 가장 가까운 키부터 삭제</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">volatile-* 정책의 함정</p>
+      <p><code>volatile-</code> 로 시작하는 정책은 <b>TTL 이 걸린 키가 하나도 없으면 지울 대상이 없어</b> <code>noeviction</code> 과 같아진다. 즉 메모리가 차는 순간 쓰기가 전부 실패한다. TTL 을 붙이는 규칙이 코드 전반에 확실히 자리 잡았을 때만 선택해야 한다.</p>
+    </div>
+  </div>
+
+  <h4>캐시 스탬피드 현상</h4>
+  <ul>
+    <li>모든 키에 TTL 을 설정하는 것을 권장하지만, 일부 환경에서는 스탬피드가 발생할 수 있다</li>
+    <li>N개의 애플리케이션이 같은 데이터를 보는 상황을 가정하면
+      <ul>
+        <li>특정 키가 만료되는 순간 N개의 요청이 동시에 DB 로 무거운 읽기를 날린다</li>
+        <li>그리고 레디스에는 같은 값이 N번 갱신된다</li>
+      </ul>
+    </li>
+    <li>이 현상은 DB 에 부하를 주고 서비스 장애로도 이어질 수 있다</li>
+  </ul>
+
+  <h5>적절한 만료시간 설정</h5>
+  <ul>
+    <li>가장 간단한 방법은 만료시간을 너무 짧게 잡지 않는 것</li>
+    <li>앱에서 반복적으로 여러 번 써야 하는 데이터라면 만료시간을 길게 두는 편이 좋다</li>
+  </ul>
+
+  <h5>선 계산</h5>
+  <p>실제로 키가 만료되기 전에 미리 갱신해 두는 방법이다.</p>
+
+  <h5>PER 알고리즘</h5>
+  <p>캐시가 만료되기 전에 언제 DB 에서 데이터를 다시 읽어야 하는지 계산하는 알고리즘이다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">PER (probabilistic early recomputation)</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">currentTime - (timeToCompute * beta * log(rand())) &gt; expiry</code></pre>
+  </div>
+
+  <p>각 항의 의미는 이렇다. <code>timeToCompute</code> 는 값을 다시 만드는 데 걸린 시간이라 <b>비싼 값일수록 일찍</b> 갱신되고, <code>log(rand())</code> 는 항상 음수인 난수라 클라이언트마다 갱신 시점이 <b>제각기 흩어진다</b>. <code>beta</code> 는 그 정도를 조절하는 계수(기본 1)다. 결과적으로 만료 직전에 딱 한 클라이언트만 먼저 갱신에 나서게 된다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>look aside 는 캐시를 앱이 관리하는 방식이라 레디스가 죽어도 서비스가 이어진다. 대신 캐시 워밍이 필요하다.</li>
+      <li>만료는 접근 시(passive)와 초당 10회의 샘플링(active) 두 갈래로 일어난다. 그래서 만료 시각과 메모리 반환 시점은 다르다.</li>
+      <li>캐시 용도라면 <code>allkeys-lru</code> 가 무난한 기본값이다. <code>volatile-*</code> 는 TTL 이 없으면 <code>noeviction</code> 과 같아진다.</li>
+      <li>스탬피드는 TTL 을 넉넉히, 흩뿌려서, 필요하면 PER 로 미리 갱신해 막는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-2</div>
+    <h3>세션 스토어로서 레디스</h3>
+    <p class="item-tagline">캐시는 지워져도 되지만 세션은 지워지면 사용자가 로그아웃된다. 같은 레디스라도 운영 기준이 달라진다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    캐시는 DB 의 <b>부분집합</b>이라 잃어도 복구되지만, 세션은 레디스에만 있는 <b>원본</b>이다. 백업/복제 정책부터 다르게 가져가야 한다.
+  </div>
+
+  <h4>세션이란</h4>
+  <ul>
+    <li>서비스를 사용하는 클라이언트의 상태 정보
+      <ul>
+        <li>현재 로그인된 클라이언트, 어떤 활동을 하는지 등을 저장한다</li>
+        <li>예: 장바구니 정보, 최근 본 아이템</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>세션 스토어가 왜 필요할까</h4>
+  <ul>
+    <li>최근에는 부하 분산을 위해 여러 대의 인스턴스를 구동하는 아키텍처가 많이 쓰인다</li>
+    <li>단일 서버가 세션을 들고 있으면 여러 서버에서 동일한 세션을 다룰 수 없다</li>
+    <li>DB 로 세션을 관리할 수도 있지만 처리 속도가 느리고 부하가 높다</li>
+    <li>레디스의 hash 자료구조는 세션 데이터를 저장하기에 좋다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; hset usersession:1 name dongwoo ip 1:1:1:1 hits 1
+(integer) 3
+127.0.0.1:6379&gt; hincrby usersession:1 hits 1
+(integer) 2
+127.0.0.1:6379&gt; hgetall usersession:1
+1) "name"
+2) "dongwoo"
+3) "ip"
+4) "1:1:1:1"
+5) "hits"
+6) "2"</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>hincryby</code> 는 <code>HINCRBY</code> 의 오타다. 또한 예제에 쓰인 <code>HMSET</code> 은 <b>Redis 4.0 부터 deprecated</b> 이며 <code>HSET</code> 이 이미 여러 필드를 한 번에 받으므로 위와 같이 <code>HSET</code> 으로 쓰면 된다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">세션에는 TTL 을 반드시 <span class="badge b-blue">보강</span></p>
+      <p>세션 키는 로그아웃 없이 브라우저를 닫으면 영원히 남는다. <code>EXPIRE usersession:1 1800</code> 처럼 만료를 걸고, 활동이 있을 때마다 갱신하는 것이 일반적이다. 이때 hash 의 필드를 갱신해도 <b>키의 TTL 은 초기화되지 않으므로</b> 별도로 <code>EXPIRE</code> 를 다시 호출해야 한다.</p>
+    </div>
+  </div>
+
+  <h4>캐시와 세션의 차이</h4>
+  <ul>
+    <li>둘은 비슷해 보이지만 데이터를 읽고 쓰는 패턴이 다르다</li>
+    <li>캐시는 DB 의 <b>서브셋</b>으로 동작한다</li>
+    <li>세션은 DB 에는 없고 레디스에서 단독으로 동작한다
+      <ul>
+        <li>유저가 로그아웃할 때 데이터를 DB 에 저장할지 등은 정책에 따라 다르다</li>
+        <li>데이터가 손실될 수도 있으니 더 신중한 운영이 필요하다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>캐시</th><th>세션</th></tr></thead>
+      <tbody>
+        <tr><td>원본의 위치</td><td>DB</td><td>레디스 자신</td></tr>
+        <tr><td>유실 시 결과</td><td>느려짐 (다시 채워짐)</td><td class="t-no">데이터 소실 / 로그아웃</td></tr>
+        <tr><td>이빅션 정책</td><td><code>allkeys-lru</code> 무방</td><td class="t-no"><code>allkeys-*</code> 위험</td></tr>
+        <tr><td>백업</td><td>안 해도 됨</td><td class="t-ok">RDB/AOF 권장</td></tr>
+        <tr><td>읽기/쓰기 비율</td><td>읽기가 압도적</td><td>쓰기도 잦음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">캐시와 세션을 같은 인스턴스에 담지 않는다</p>
+      <p>캐시용으로 <code>allkeys-lru</code> 를 걸어 둔 인스턴스에 세션을 함께 넣으면, 메모리가 찼을 때 <b>세션이 이빅션 대상</b>이 되어 사용자가 이유 없이 로그아웃된다. 인스턴스를 분리하거나, 최소한 논리 DB 를 나누고 정책을 다르게 가져가야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>여러 인스턴스가 상태를 공유해야 하므로 세션은 외부 저장소로 빼야 하고, hash 가 그 그릇으로 알맞다.</li>
+      <li><code>HSET</code> 은 다중 필드를 받으므로 <code>HMSET</code> 은 쓸 필요가 없다(4.0 이후 deprecated).</li>
+      <li>세션은 레디스가 원본이다. 이빅션 정책/백업/복제를 캐시와 다르게 설계하고, 가능하면 인스턴스를 분리한다.</li>
+    </ul>
+  </div>
+</article>

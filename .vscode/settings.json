@@ -48,5 +48,6 @@
     "walreceiver",
     "walsender"
   ],
-  "discord.enabled": true
+  "discord.enabled": true,
+  "liveServer.settings.port": 5503
 }

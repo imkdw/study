@@ -1,0 +1,649 @@
+<article class="item" id="item-10-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-1</div>
+    <h3>레디스 클러스터와 확장성</h3>
+    <p class="item-tagline">싱글 스레드라는 설계가 만든 천장. 위로 못 올리면 옆으로 늘려야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    레디스는 커맨드를 싱글 스레드로 처리하므로 <b>CPU 코어를 늘려도 처리량이 비례해 늘지 않는다</b>. 그래서 확장의 정답은 대개 스케일 아웃, 즉 클러스터다.
+  </div>
+
+  <h4>스케일 업 vs 스케일 아웃</h4>
+
+  <h5>스케일 업</h5>
+  <ul>
+    <li>서버 하드웨어 사양을 올리는 방법. CPU/RAM 등을 높여 처리량을 올린다</li>
+    <li>서버 자체의 능력을 올리므로 <b>수직 확장</b>이라 부른다</li>
+    <li>간단하지만 비용 문제와 사양의 한계가 있다</li>
+  </ul>
+
+  <h5>스케일 아웃</h5>
+  <ul>
+    <li>장비를 추가해 시스템을 확장하는 방법</li>
+    <li>기존 서버의 업그레이드에는 한계가 있다</li>
+    <li>비슷한 서버를 여러 대 배치해 용량과 처리량을 높인다</li>
+    <li>대수가 늘어나므로 <b>수평 확장</b>이라 부른다</li>
+    <li>분산 처리에 대한 로직이 추가로 필요하다</li>
+  </ul>
+
+  <h4>레디스에서의 확장성</h4>
+  <ul>
+    <li>운영 중에 이빅션(eviction)이 자주 발생하면 스케일 업을 고려할 수 있다</li>
+    <li>이빅션은 <code>maxmemory</code> 가 꽉 찬 상태에서 데이터를 더 넣으려 할 때 발생한다</li>
+    <li>다만 레디스는 커맨드를 싱글 스레드로 처리하므로 CPU 가 좋아도 전부 활용하지 못한다</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">"싱글 스레드"의 정확한 범위 <span class="badge b-blue">보강</span></p>
+      <p>싱글 스레드인 것은 <b>커맨드를 실행하는 부분</b>이다. 레디스는 이미 여러 스레드를 쓴다 — <code>UNLINK</code> 의 지연 해제, <code>BGSAVE</code> 의 fork 프로세스, 그리고 6.0 부터는 <code>io-threads</code> 로 네트워크 소켓 읽기/쓰기를 여러 스레드에 나눌 수 있다. 다만 명령 실행 자체는 여전히 하나의 스레드가 순서대로 처리하므로, <b>O(N) 커맨드 하나가 전체를 멈추는</b> 성질은 그대로다.</p>
+    </div>
+  </div>
+
+  <h4>레디스 클러스터의 기능</h4>
+  <p>클러스터 모드로 사용하면 애플리케이션 아키텍처를 바꾸지 않고도 레디스를 확장할 수 있다.</p>
+
+  <h5>데이터 샤딩</h5>
+  <ul>
+    <li>여러 서버 간에 데이터를 분할하는 것을 <b>샤딩</b>이라 한다</li>
+    <li>클러스터 기능을 쓰면 마스터를 최대 1000개 규모까지 확장할 수 있다</li>
+    <li>샤딩과 관련된 모든 처리는 레디스 내부에서 이뤄지고 별도의 아키텍처가 필요하지 않다</li>
+    <li>데이터는 키를 기준으로 샤딩되고, 하나의 키는 항상 하나의 마스터에 매핑된다</li>
+    <li>클라이언트가 다른 노드에 접근하면 자동으로 리디렉션해 준다</li>
+    <li>노드 구성이 바뀌지 않는 한 키-노드 매핑이 클라이언트에 캐싱되어 성능이 개선된다</li>
+  </ul>
+
+  <h5>고가용성</h5>
+  <ul>
+    <li>최소 3대의 마스터와 그 복제본을 갖도록 구성하는 것이 일반적이며, 각 노드는 서로를 모니터링한다</li>
+    <li>장애 발생 시 외부 개입 없이 자동으로 페일오버가 진행되므로 가용성이 올라간다</li>
+    <li>마스터에 연결된 복제본 수를 파악해 잉여 복제본을 필요한 노드로 옮기는 <b>마이그레이션</b>도 수행한다</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">센티널과 클러스터의 결정적 차이</p>
+      <p>센티널은 감시를 <b>외부 프로세스</b>가 하지만, 클러스터는 <b>레디스 노드끼리 서로</b> 감시하고 투표한다. 그래서 클러스터에는 별도의 센티널 인스턴스가 필요 없다. 대신 투표권을 가진 것은 마스터뿐이므로 마스터가 최소 3대여야 과반수가 성립한다.</p>
+    </div>
+  </div>
+
+  <h5>클러스터 버스</h5>
+  <ul>
+    <li>클러스터 내부 노드는 <b>클러스터 버스</b>라는 독립적인 통신 채널을 사용한다</li>
+    <li>모든 노드는 다른 노드의 연결을 받기 위해 추가 TCP 포트를 연다</li>
+    <li>따로 지정하지 않으면 기본 포트에 <b>+10000</b> 한 값이 된다. 6379 라면 16379</li>
+    <li><b>full-mesh</b> 토폴로지라 모든 노드가 N-1 개의 다른 노드와 TCP 연결을 맺는다</li>
+    <li>한 노드로 헬스체크를 시도하고 응답이 이상하면 다른 노드로 시도하는 방식이다</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">방화벽에서 가장 자주 빠뜨리는 포트</p>
+      <p>클러스터가 붙지 않는 문제의 대부분은 <b>16379 포트가 막혀 있어서</b>다. 6379 만 열어 두면 클라이언트는 붙지만 노드끼리 서로를 발견하지 못한다. 두 포트를 모두 열어야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>커맨드 실행이 싱글 스레드이므로 스케일 업에는 천장이 있다. 확장은 대개 클러스터로 한다.</li>
+      <li>클러스터는 샤딩과 고가용성을 함께 제공하며, 별도의 감시 프로세스 없이 노드끼리 감시한다.</li>
+      <li>노드 간 통신에는 <b>포트 + 10000</b> 의 클러스터 버스 포트가 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-2</div>
+    <h3>레디스 클러스터 동작 방법</h3>
+    <p class="item-tagline">키를 노드에 직접 붙이지 않고 <b>16384개의 슬롯</b>을 한 겹 끼워 넣은 이유.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    키는 노드가 아니라 <b>슬롯</b>에 속하고, 슬롯이 노드에 배정된다. 이 한 겹 덕분에 노드 추가/삭제가 "슬롯을 옮기는 일"로 단순해진다.
+  </div>
+
+  <h4>해시 슬롯을 이용한 데이터 샤딩</h4>
+  <ul>
+    <li>클러스터에서 모든 데이터는 해시 슬롯에 담긴다</li>
+    <li>총 <b>16384개</b>의 해시 슬롯이 있고, 마스터가 3개라면 하나당 약 16384/3 개씩 나눠 가진다
+      <ul><li>0 ~ 5460, 5461 ~ 10922, 10923 ~ 16383</li></ul>
+    </li>
+    <li>입력되는 모든 키는 하나의 해시 슬롯에 저장된다
+      <ul><li>키를 <b>CRC16</b> 으로 계산한 값을 16384 로 나눈 나머지가 슬롯 번호가 된다</li></ul>
+    </li>
+    <li>해시 슬롯은 마스터 사이에서 자유롭게 이동할 수 있고, 이 성질 덕분에 마스터 추가/삭제가 매우 단순하다</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 215" width="620" role="img" aria-label="키가 CRC16 해시를 거쳐 슬롯 번호가 되고 그 슬롯을 담당하는 마스터에 저장되는 흐름">
+        <rect x="18" y="70" width="112" height="44" rx="9" class="dg-fill-soft"/>
+        <rect x="18" y="70" width="112" height="44" rx="9" class="dg-stroke" fill="none"/>
+        <text x="74" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">user:1000</text>
+
+        <path d="M136 92 L176 92" class="dg-stroke" fill="none" stroke-width="1.6"/>
+        <path d="M170 86 L180 92 L170 98 Z" fill="var(--text-muted)"/>
+
+        <rect x="184" y="70" width="150" height="44" rx="9" class="dg-fill-soft"/>
+        <rect x="184" y="70" width="150" height="44" rx="9" class="dg-stroke" fill="none"/>
+        <text x="259" y="90" class="dg-text dg-mono" font-size="12" text-anchor="middle">CRC16(key)</text>
+        <text x="259" y="106" class="dg-text dg-mono" font-size="12" text-anchor="middle">mod 16384</text>
+
+        <path d="M340 92 L380 92" class="dg-stroke" fill="none" stroke-width="1.6"/>
+        <path d="M374 86 L384 92 L374 98 Z" fill="var(--text-muted)"/>
+
+        <rect x="388" y="70" width="100" height="44" rx="9" class="dg-fill-bg"/>
+        <rect x="388" y="70" width="100" height="44" rx="9" class="dg-stroke" fill="none" stroke-width="2"/>
+        <text x="438" y="97" class="dg-accent dg-mono" font-size="14" text-anchor="middle" font-weight="700">슬롯 1649</text>
+
+        <path d="M494 92 L534 92" class="dg-stroke" fill="none" stroke-width="1.6"/>
+        <path d="M528 86 L538 92 L528 98 Z" fill="var(--text-muted)"/>
+
+        <rect x="540" y="70" width="66" height="44" rx="9" class="dg-fill-soft"/>
+        <rect x="540" y="70" width="66" height="44" rx="9" class="dg-stroke" fill="none"/>
+        <text x="573" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">노드 A</text>
+
+        <text x="74" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">키</text>
+        <text x="259" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">해시 계산</text>
+        <text x="438" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">고정된 좌표</text>
+        <text x="573" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">담당 노드 (바뀔 수 있음)</text>
+
+        <text x="310" y="185" class="dg-text-sub" font-size="12" text-anchor="middle">A 0~5460 / B 5461~10922 / C 10923~16383</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>키와 노드 사이에 슬롯이라는 고정 좌표가 있다</b> — 키에서 슬롯까지는 순수한 계산이라 언제 어디서 해도 같은 답이 나오고, 슬롯에서 노드까지만 구성에 따라 바뀐다. 노드를 추가한다는 것은 곧 슬롯 구간을 넘겨받는다는 뜻이다.</div>
+  </div>
+
+  <h4>해시태그</h4>
+  <ul>
+    <li>클러스터에서는 여러 키를 한 번에 다루는 <b>다중 키 커맨드</b>를 그냥 쓸 수 없다
+      <ul><li><code>MGET user1:name user2:name</code> 같은 커맨드</li></ul>
+    </li>
+    <li>해시태그를 쓰면 가능해진다
+      <ul>
+        <li>키에 중괄호를 넣으면 전체가 아니라 <b>중괄호 사이의 값</b>으로만 해시한다</li>
+        <li><code>user:{123}:profile</code>, <code>user:{123}:settings</code></li>
+        <li>두 키는 중괄호 안이 같은 <code>123</code> 이므로 같은 해시 슬롯에 저장되는 것이 보장된다</li>
+      </ul>
+    </li>
+    <li>다중 키 커맨드를 쓰려면 해시태그가 필요하지만, 하나의 슬롯에 데이터가 몰릴 수 있으니 키 분배 모니터링이 필요할 수 있다</li>
+  </ul>
+
+  <h5>해시태그가 적용되는 예시</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>키</th><th>실제로 해시되는 값</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td><code>{user1000}.followers</code></td><td><code>user1000</code></td><td>정상적인 해시태그</td></tr>
+        <tr><td><code>user{}id</code></td><td><code>user{}id</code></td><td>중괄호 사이가 비어서 무시된다</td></tr>
+        <tr><td><code>user{{name}}id</code></td><td><code>{name</code></td><td>첫 여는 괄호 이후 <b>첫 닫는 괄호</b>까지</td></tr>
+        <tr><td><code>user{name}{id}</code></td><td><code>name</code></td><td>첫 번째 쌍만 적용된다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>자동 재구성</h4>
+  <ul>
+    <li>센티널과 마찬가지로 복제와 페일오버를 통해 고가용성을 확보한다</li>
+    <li>센티널은 별도의 인스턴스가 있지만, 클러스터는 <b>레디스끼리 감시</b>한다는 차이가 있다</li>
+  </ul>
+
+  <h5>자동 페일오버</h5>
+  <ul>
+    <li>프로세스
+      <ul>
+        <li>마스터 A 에 장애가 나면 복제본 AA 가 다른 마스터 노드들에게 페일오버 승인 투표를 요청한다</li>
+        <li>다른 마스터들은 A 가 비정상이라고 보면 투표할 수 있고, 과반수가 동의하면 AA 가 마스터로 승격된다</li>
+        <li>AA 마저 장애가 나면 데이터 정합성을 위해 클러스터 전체 상태가 <code>fail</code> 로 바뀐다</li>
+      </ul>
+    </li>
+    <li>가용성이 중요하다면 아무 마스터에나 복제본을 하나 더 붙여 두고 <b>자동 복제본 마이그레이션</b>이 작동하게 하는 것을 권장한다</li>
+  </ul>
+
+  <h5>자동 복제본 마이그레이션</h5>
+  <ul>
+    <li>A/AA, B/BB, C/CC/CCC 구성을 가정한다</li>
+    <li>A 가 다운되어 AA 가 승격되면, 복제본이 없어진 AA 를 위해 <b>CCC 가 AA 의 복제본으로 옮겨 온다</b>. 이를 자동 복제본 마이그레이션이라 한다</li>
+    <li>설정으로 제어할 수 있다
+      <ul>
+        <li><code>cluster-allow-replica-migration</code> : 자동 마이그레이션 수행 여부 (기본값 yes)</li>
+        <li><code>cluster-migration-barrier</code> : 복제본을 넘겨줄 때 <b>원래 마스터에 최소 몇 개를 남겨야 하는지</b> (기본값 1)
+          <ul><li>2 로 지정하면 위 상황에서 CCC 는 옮겨 가지 않는다. C 에 복제본이 2개 남아야 하기 때문이다</li></ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>키 → CRC16 mod 16384 → 슬롯 → 노드. 중간의 슬롯 계층이 노드 증감을 단순한 슬롯 이동으로 만든다.</li>
+      <li>다중 키 커맨드는 같은 슬롯에서만 가능하다. 해시태그 <code>{...}</code> 로 슬롯을 묶되 쏠림을 감시해야 한다.</li>
+      <li>페일오버는 마스터들의 과반수 투표로 승인된다. 복제본 없는 마스터가 생기면 잉여 복제본이 자동으로 옮겨 간다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-3</div>
+    <h3>레디스 클러스터 실행하기</h3>
+    <p class="item-tagline">마스터 3 + 복제본 3. 그리고 <code>-c</code> 플래그 하나가 만드는 차이.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    클러스터에서는 아무 노드에나 요청해도 되는 게 아니다. 슬롯을 담당하지 않는 노드는 <code>MOVED</code> 로 <b>다른 노드를 가리킬 뿐</b>이며, 그 리디렉션을 따라가는 것은 클라이언트의 몫이다.
+  </div>
+
+  <ul>
+    <li>일반적으로 마스터 3개, 각각의 복제본 3개, 총 6개로 구성한다</li>
+  </ul>
+
+  <h4>클러스터 초기화</h4>
+
+  <h5>클러스터 활성화</h5>
+  <p><code>redis.conf</code> 에서 클러스터 사용 여부를 지정한다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis.conf</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">cluster-enabled yes</code></pre>
+  </div>
+
+  <h5>클러스터 생성</h5>
+  <p>각 레디스의 IP/PORT 를 나열하고 마스터당 복제본 개수를 지정한다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster create [host:port ...] --cluster-replicas 1</code></pre>
+  </div>
+
+  <h4>클러스터 상태 확인하기</h4>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli cluster nodes</code></pre>
+  </div>
+
+  <h4>redis-cli 를 이용한 클러스터 접근과 리디렉션</h4>
+  <ul>
+    <li>클러스터 모드에서는 키를 저장할 수 있는 노드가 정해져 있어 해당 노드로 요청해야 한다</li>
+    <li>이 불편함 때문에 Jedis, Redisson 등 대부분의 클라이언트가 클러스터 모드 기능을 제공한다</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">일반 접속</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">$ redis-cli
+&gt; set user:1 true
+(error) MOVED 10778 192.168.0.10:6379</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">-c 옵션</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">$ redis-cli -c
+&gt; set user:1 true
+-&gt; Redirect to Slot [12923] @ 192.168.0.22:6379
+OK</code></pre>
+    </div>
+  </div>
+
+  <p><code>-c</code> 는 서버가 리디렉션을 대신해 준다는 뜻이 아니다. <b>redis-cli 가 <code>MOVED</code> 응답을 읽고 스스로 다시 접속</b>하는 것이다. 애플리케이션에서 클러스터 지원 클라이언트를 써야 하는 이유가 같다.</p>
+
+  <h4>페일오버 테스트</h4>
+
+  <h5>커맨드를 이용한 페일오버 (수동)</h5>
+  <ul>
+    <li>복제본 노드에서 <code>CLUSTER FAILOVER</code> 를 실행해 페일오버를 일으킬 수 있다</li>
+    <li>수동 페일오버 동안 기존 마스터에 연결된 클라이언트는 잠시 블로킹된다</li>
+  </ul>
+
+  <p>대신 이 방식은 <b>데이터 유실이 없다</b>. 복제본이 마스터를 따라잡을 때까지 기다렸다가 역할을 교환하기 때문이다. 계획된 점검이나 버전 업그레이드에 쓰는 방법이다.</p>
+
+  <h5>마스터를 중지시켜서 페일오버 (자동)</h5>
+  <ul>
+    <li>직접 마스터를 다운시켜 페일오버가 잘 일어나는지 확인할 수 있다</li>
+    <li>복제본은 <code>redis.conf</code> 의 <code>cluster-node-timeout</code> 동안 마스터의 응답이 없으면 비정상으로 판단한다 (기본값 15000ms)</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli -h &lt;master-ip&gt; -p &lt;master-port&gt; shutdown</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>cluster-enabled yes</code> 후 <code>redis-cli --cluster create ... --cluster-replicas 1</code> 로 6노드 구성을 만든다.</li>
+      <li><code>MOVED</code> 를 따라가는 것은 클라이언트다. <code>redis-cli -c</code> 나 클러스터 지원 라이브러리가 필요하다.</li>
+      <li>계획된 전환은 <code>CLUSTER FAILOVER</code>(무손실), 장애 감지 기준은 <code>cluster-node-timeout</code>(기본 15초).</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-4</div>
+    <h3>레디스 클러스터 운영하기</h3>
+    <p class="item-tagline">노드를 넣고 빼는 일은 결국 <b>슬롯을 넘기고 받는 일</b>이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    마스터는 <b>슬롯이 비어 있을 때만</b> 뺄 수 있다. 그래서 노드 제거의 실체는 리샤딩이고, 리샤딩이 끝난 뒤에야 제거 커맨드가 통한다.
+  </div>
+
+  <h4>클러스터 리샤딩</h4>
+  <ul>
+    <li>마스터가 가진 해시 슬롯 중 일부를 다른 마스터로 옮기는 작업이다</li>
+    <li><code>redis-cli</code> 로 리샤딩과 결과 확인이 가능하다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster reshard &lt;ip&gt; &lt;port&gt;
+
+redis-cli --cluster check &lt;ip&gt; &lt;port&gt;</code></pre>
+  </div>
+
+  <h4>클러스터 리샤딩 — 간단 버전</h4>
+  <ul>
+    <li>리샤딩이 잦거나 자동화하고 싶을 때, 대화형 입력 없이 바로 슬롯을 옮길 수 있다</li>
+    <li>단점은 즉시 실행되므로 중간에 취소하거나 확인하기 어렵다는 것</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster reshard &lt;ip&gt; &lt;port&gt; --cluster-from &lt;node-id&gt;</code></pre>
+  </div>
+
+  <h4>클러스터 확장 — 신규 노드 추가</h4>
+  <ul>
+    <li>확장을 위한 마스터 추가 또는 가용성을 위한 복제본 추가가 여기 해당한다</li>
+    <li>두 경우 모두 <b>추가하려는 레디스에는 아무 데이터도 없어야 한다</b>. 비어 있지 않으면 에러가 난다</li>
+  </ul>
+
+  <h5>마스터로 추가하기</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster add-node &lt;신규 노드 ip:port&gt; &lt;기존 노드 ip:port&gt;</code></pre>
+  </div>
+
+  <p>마스터로 추가하면 <b>슬롯이 0개인 마스터</b>가 된다. 실제로 데이터를 받으려면 이어서 리샤딩으로 슬롯을 넘겨줘야 한다.</p>
+
+  <h5>복제본으로 추가하기</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster add-node &lt;신규 노드 ip:port&gt; &lt;기존 노드 ip:port&gt; --cluster-slave &lt;기존 마스터 ID&gt;</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 <code>add-noe</code>, <code>del-noe</code> 는 각각 <code>add-node</code>, <code>del-node</code> 의 오타다.</p>
+    </div>
+  </div>
+
+  <h4>노드 제거하기</h4>
+  <ul>
+    <li>첫 번째 인자에는 <b>기존 클러스터에 속한 아무 노드</b>의 정보를 넣는다</li>
+    <li>마스터는 데이터가 없을 때만 제거할 수 있다
+      <ul>
+        <li>즉 리샤딩으로 모든 해시 슬롯을 다른 마스터로 옮겨야 한다</li>
+        <li>또는 수동 페일오버로 역할을 복제본으로 바꾼 뒤 제거할 수도 있다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster del-node &lt;기존 노드 ip:port&gt; &lt;삭제할 노드 ID&gt;</code></pre>
+  </div>
+
+  <h5>CLUSTER FORGET</h5>
+  <ul>
+    <li>노드를 제거하면 다른 노드들에게도 그 노드가 사라졌다고 알려야 한다</li>
+    <li>커맨드를 전파하고 나면 <b>60초 동안</b>은 그 노드 정보로 다시 연결을 시도하지 않는다</li>
+    <li>클러스터의 노드들은 가십 프로토콜로 새 노드를 탐지하고 자동으로 연결하기 때문에, 이 유예가 없으면 방금 지운 노드를 곧바로 다시 알게 된다</li>
+  </ul>
+
+  <h5>CLUSTER RESET</h5>
+  <ul>
+    <li>제거될 노드에서 수행하는 커맨드로 두 가지 옵션이 있으며 기본값은 <code>SOFT</code> 다</li>
+    <li><code>del-node</code> 도중에도 자동으로 실행되지만, 특정 노드를 다른 역할로 재사용하려 할 때도 쓸 수 있다</li>
+  </ul>
+
+  <h5>SOFT</h5>
+  <ul>
+    <li>복제본이었다면 마스터로 전환되고 모든 데이터가 삭제된다</li>
+    <li>마스터인데 저장된 키가 있으면 리셋이 중단된다</li>
+    <li>해시 슬롯을 가지고 있었다면 모두 해제되고, 진행 중이던 페일오버 상태도 초기화된다</li>
+    <li>클러스터 내 다른 노드에 대한 정보도 초기화되어 기존 클러스터 구성원을 더 이상 알지 못한다</li>
+  </ul>
+
+  <h5>HARD</h5>
+  <ul>
+    <li>SOFT 의 과정을 모두 수행하고 다음이 추가된다</li>
+    <li><code>currentEpoch</code>, <code>configEpoch</code>, <code>lastVoteEpoch</code> 가 0 으로 초기화된다</li>
+    <li>해당 노드의 ID 가 새로운 임의 ID 로 바뀐다</li>
+  </ul>
+
+  <h4>레디스 클러스터로의 데이터 마이그레이션</h4>
+  <ul>
+    <li>싱글 또는 센티널로 운영 중인 레디스를 클러스터로 옮길 때 <code>redis-cli</code> 로 처리할 수 있다</li>
+    <li>기존 앱에서 다중 키 커맨드를 쓰지 않았다면 커넥션 변경 외에 문제가 없고, 썼다면 해시태그를 쓰도록 앱을 수정해야 한다</li>
+    <li>마이그레이션을 시작할 때는 기존 서비스의 커넥션을 모두 정리하고 하는 편이 안전하다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">redis-cli --cluster import &lt;클러스터에 합류할 노드 ip:port&gt; --cluster-from &lt;데이터를 가져올 노드 ip:port&gt; --cluster-copy</code></pre>
+  </div>
+
+  <h4>복제본을 통한 읽기 성능 향상</h4>
+  <ul>
+    <li>클러스터는 기본적으로 <b>슬롯을 담당하는 마스터</b>에서만 데이터를 읽는다</li>
+    <li>복제본에서 읽고 싶다면 <code>READONLY</code> 를 보내 그 커넥션이 복제본에서 직접 읽도록 만든다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">redis-cli</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">127.0.0.1:6379&gt; readonly
+OK</code></pre>
+  </div>
+
+  <p><code>READONLY</code> 는 <b>커넥션 단위 설정</b>이라 연결이 끊기면 사라진다. 되돌리려면 <code>READWRITE</code> 를 보낸다. 복제는 비동기이므로 이 경로로 읽으면 아주 최신 데이터는 아닐 수 있다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>노드 추가는 <code>add-node</code>, 제거는 <code>del-node</code>. 추가되는 노드는 반드시 비어 있어야 한다.</li>
+      <li>마스터를 빼려면 먼저 리샤딩으로 슬롯을 모두 넘겨야 한다. 새로 넣은 마스터도 리샤딩 전에는 슬롯이 0개다.</li>
+      <li><code>CLUSTER FORGET</code> 의 60초 유예는 가십으로 다시 발견되는 것을 막기 위한 장치다.</li>
+      <li>복제본 읽기는 커넥션마다 <code>READONLY</code> 를 보내야 하고, 그 대가로 약간 오래된 데이터를 감수한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-10-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">10-5</div>
+    <h3>레디스 클러스터 동작 방법 (2)</h3>
+    <p class="item-tagline">하트비트와 가십, MOVED 와 ASK, PFAIL 과 FAIL. 클러스터 내부의 언어들.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>MOVED</code> 는 "앞으로 <b>계속</b> 저기로 가라", <code>ASK</code> 는 "<b>이번만</b> 저기로 가라"다. 이 한 글자 차이가 슬롯 이동 중에도 서비스가 멈추지 않게 한다.
+  </div>
+
+  <h4>하트비트 패킷</h4>
+  <ul>
+    <li>노드끼리 서로의 정상 여부를 확인하기 위해 PING/PONG 을 주고받는 패킷이다</li>
+    <li>일반적으로 클러스터가 주고받는 유형의 패킷에 <b>가십 섹션</b>이 덧붙은 형태다</li>
+  </ul>
+
+  <h5>패킷 헤더의 구성</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td>노드 ID</td><td>발신 노드의 식별자</td></tr>
+        <tr><td>현재 Epoch / 구성 Epoch</td><td>분산 환경에서 일관성을 유지하기 위한 버전 정보</td></tr>
+        <tr><td>노드 Flag</td><td>마스터인지 복제본인지</td></tr>
+        <tr><td>비트맵</td><td>마스터가 담당하는 해시 슬롯의 비트맵. 복제본이면 마스터의 정보를 담는다</td></tr>
+        <tr><td>TCP 포트</td><td>발신 노드의 클라이언트용 포트</td></tr>
+        <tr><td>클러스터 포트</td><td>노드 간 통신용 포트</td></tr>
+        <tr><td>클러스터 상태</td><td>발신 노드가 보기에 클러스터가 down 인지 ok 인지</td></tr>
+        <tr><td>마스터 노드 ID</td><td>복제본인 경우 자신의 마스터 ID</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>해시 슬롯 구성이 전파되는 방법</h4>
+  <p>클러스터의 중요한 기능 중 하나는 커맨드에 사용된 키의 해시 슬롯이 어디에 있는지 정확히 파악하고 알려 주는 것이다.</p>
+
+  <ul>
+    <li><b>하트비트 패킷</b> : PING/PONG 을 주고받을 때 자신이 담당하는 해시 슬롯 정보를 패킷에 실어 보낸다</li>
+    <li><b>업데이트 메시지</b>
+      <ul>
+        <li>하트비트 패킷에는 발신 노드의 구성 Epoch 가 들어 있다</li>
+        <li>패킷을 보낸 노드의 Epoch 가 낡았다면, 받은 노드가 최신 구성 정보를 담은 업데이트 메시지를 보내 해시 슬롯 구성을 갱신하게 한다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>노드 핸드셰이크</h4>
+  <ul>
+    <li>한 노드가 클러스터에 합류하려면 <code>CLUSTER MEET</code> 를 보낸다</li>
+    <li>그 노드를 모르던 노드들은 새로운 연결을 맺는다</li>
+    <li>클러스터는 full-mesh 구조이므로 <code>CLUSTER MEET</code> 에는 방향성이 없고, 굳이 응답을 되돌려 보낼 필요도 없다</li>
+  </ul>
+
+  <h4>클러스터 라이브 재구성</h4>
+  <ul>
+    <li>클러스터가 동작하는 중에도 마스터를 추가하거나 삭제할 수 있다</li>
+    <li>내부적으로는 <code>CLUSTER SETSLOT 8 MIGRATING B</code> 같은 커맨드가 오간다</li>
+    <li>인스턴스 간에 키를 옮기는 <code>MIGRATE</code> 는 원자적으로 동작하므로 경쟁 상태가 생기지 않는다</li>
+    <li>이동이 완료되면 OK 신호를 보내고 원본 데이터는 삭제된다</li>
+  </ul>
+
+  <h4>리디렉션</h4>
+  <p>레디스 클러스터가 반환하는 리디렉션은 두 종류다.</p>
+
+  <h5>MOVED</h5>
+  <ul>
+    <li>"요청한 해시 슬롯은 저 노드에 있으니, <b>앞으로 이 키에 대한 요청은 저 노드로</b> 보내라"는 뜻이다</li>
+    <li>노드는 키가 어떤 해시 슬롯에 속하는지 계산하고 그 슬롯의 담당 마스터를 찾는다</li>
+    <li>자신이 담당이면 바로 응답하고, 다른 노드가 담당이면 <code>MOVED</code> 를 반환한다</li>
+    <li>클라이언트는 이 응답을 받으면 <b>자신의 슬롯 맵을 갱신</b>한다</li>
+  </ul>
+
+  <h5>ASK</h5>
+  <ul>
+    <li>"지금 요청한 것은 저 노드에 있다. 하지만 <b>다음 요청은 일단 나에게</b> 보내라"는 뜻이다</li>
+    <li>해시 슬롯이 이동하는 <b>도중에만</b> 발생한다</li>
+    <li>클라이언트는 지정된 노드로 쿼리를 재전송하되, 이후 같은 키에 대한 요청은 원래 노드로 다시 보내고 <b>슬롯 맵은 갱신하지 않는다</b></li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  Q["클라이언트 요청"] --> N["슬롯 담당 노드"]
+  N -->|"슬롯이 이 노드에 있다"| OK["정상 응답"]
+  N -->|"슬롯이 다른 노드로 옮겨졌다"| MV["MOVED 슬롯 노드주소<br>슬롯 맵 갱신 후 재요청"]
+  N -->|"슬롯 이동이 진행 중이다"| AS["ASK 슬롯 노드주소<br>이번 요청만 그쪽으로"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>슬롯 이동 중에는 키가 두 노드에 걸쳐 있다</b> — 이미 옮겨 간 키는 <code>ASK</code>, 아직 남은 키는 그 자리에서 응답된다. 이동이 끝나고 구성이 확정되면 그때부터 <code>MOVED</code> 로 바뀌어 클라이언트의 슬롯 맵이 갱신된다.</div>
+  </div>
+
+  <h4>장애 감지와 페일오버</h4>
+  <p>클러스터 내부에서 어떤 노드가 다른 노드에 접근할 수 없다고 감지하면 상태를 바꾼다.</p>
+
+  <h5>PFAIL (Possible Failure) 플래그</h5>
+  <ul>
+    <li>일부 노드에서 접근이 불가능하지만 아직 확실하지 않은 상태다</li>
+    <li><code>NODE_TIMEOUT</code> 이상 도달하지 못하면 PFAIL 로 플래깅한다
+      <ul><li>이때 마스터인지 복제본인지는 상관없다</li></ul>
+    </li>
+    <li>따라서 노드 간 왕복 시간보다 <code>NODE_TIMEOUT</code> 값이 충분히 커야 한다</li>
+    <li>PING 이후 <code>NODE_TIMEOUT</code> 의 절반이 지나도 PONG 이 없으면 다시 PING 을 보내는 방식으로 안정성을 높인다</li>
+  </ul>
+
+  <h5>FAIL 플래그</h5>
+  <ul>
+    <li>실제로 페일오버를 진행하려면 FAIL 플래그여야 한다</li>
+    <li>PFAIL 로 플래깅된 뒤, 하트비트 패킷을 통해 <b>다른 노드들도 그 노드를 PFAIL 또는 FAIL 로 보고 있다</b>는 정보가 모이면 FAIL 로 승격시킨다</li>
+  </ul>
+
+  <h4>복제본 선출</h4>
+  <ul>
+    <li>다음 조건에서 복제본이 직접 페일오버를 시도한다
+      <ul>
+        <li>마스터가 FAIL 상태</li>
+        <li>그 마스터가 1개 이상의 해시 슬롯을 담당하고 있음</li>
+        <li>마스터와의 복제가 끊긴 지 너무 오래되지 않았음</li>
+      </ul>
+    </li>
+    <li>복제본은 마스터가 되기 위해 자신의 Epoch 를 1 증가시키고 마스터들에게 투표를 요청한다</li>
+  </ul>
+
+  <h5>내부에서 발생하는 과정</h5>
+  <ul>
+    <li>복제본이 클러스터 내 모든 마스터에게 <code>FAILOVER_AUTH_REQUEST</code> 패킷으로 투표를 요청한다</li>
+    <li>마스터는 <code>FAILOVER_AUTH_ACK</code> 패킷으로 동의를 알린다</li>
+    <li>마스터들은 동시에 여러 복제본이 승격되는 것을 막기 위해 <code>NODE_TIMEOUT * 2</code> 동안 같은 마스터에 대한 다른 투표를 하지 않는다
+      <ul><li>Epoch 값이 낡은 노드에서 온 응답은 무시해서 걸러 낸다</li></ul>
+    </li>
+    <li>가장 많은 ACK 를 받은 복제본이 승격된다
+      <ul>
+        <li><code>NODE_TIMEOUT * 2</code> 안에 과반수 마스터의 응답이 오지 않으면 페일오버는 취소된다</li>
+        <li><code>NODE_TIMEOUT * 4</code> 만큼 지연된 뒤 새로운 투표를 다시 시도할 수 있다</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>마스터가 FAIL 이 된 이후</h5>
+  <p>곧바로 투표를 시작하지 않고 짧은 지연을 둔다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">복제본의 투표 시작 지연</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash">DELAY = 500ms + 랜덤 지연(0~500ms) + SLAVE_RANK * 1000ms</code></pre>
+  </div>
+
+  <p>세 항의 역할이 각각 다르다. 고정 500ms 는 FAIL 상태가 클러스터 전체에 퍼질 시간을 벌고, 랜덤 지연은 여러 복제본이 동시에 나서는 것을 흩뜨리며, <code>SLAVE_RANK</code> 는 <b>복제 데이터가 뒤처진 복제본일수록 늦게</b> 나서게 만든다. 결과적으로 가장 최신 데이터를 가진 복제본이 먼저 투표를 시작하게 된다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>노드들은 하트비트 + 가십으로 서로의 상태와 슬롯 구성을 주고받는다. 낡은 Epoch 는 업데이트 메시지로 교정된다.</li>
+      <li><code>MOVED</code> 는 영구적 재지정(슬롯 맵 갱신), <code>ASK</code> 는 이동 중의 일회성 우회(맵 유지).</li>
+      <li>PFAIL 은 혼자만의 의심, FAIL 은 다수의 확인. FAIL 이어야 페일오버가 시작된다.</li>
+      <li>승격 지연 공식의 <code>SLAVE_RANK</code> 항이 최신 데이터를 가진 복제본을 먼저 나서게 만든다.</li>
+    </ul>
+  </div>
+</article>

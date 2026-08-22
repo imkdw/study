@@ -1,0 +1,390 @@
+<article class="item" id="item-14-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-1</div>
+    <h3>스토어드 프로그램 장단점</h3>
+    <p class="item-tagline">DB 안에서 절차적 처리를 할 수 있다는 것과, <b>해야 한다는 것</b>은 다른 이야기다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    스토어드 프로그램의 이득은 <b>보안</b>과 <b>네트워크 왕복 절감</b>이고, 대가는 <b>낮은 처리 성능</b>과 <b>코드의 조각화</b>다.
+  </div>
+
+  <h4>스토어드 프로그램이란</h4>
+  <ul>
+    <li>MySQL 내부에서 <b>절차적인 처리</b>를 하기 위해 쓴다.</li>
+    <li>스토어드 프로시저, 스토어드 함수, 트리거 등을 모두 아우르는 명칭이다.</li>
+  </ul>
+
+  <h4>장점</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>장점</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>데이터베이스 보안 향상</td>
+          <td>자체 보안 설정 기능이 있어 <b>프로그램 단위로 실행 권한</b>을 줄 수 있다. 특정 테이블 읽기·쓰기, 특정 컬럼 등 세밀한 제어가 가능하다</td>
+        </tr>
+        <tr>
+          <td>기능의 추상화</td>
+          <td>여러 애플리케이션에서 같은 로직을 각자 구현하지 않고 <b>공통으로 호출</b>할 수 있다</td>
+        </tr>
+        <tr>
+          <td>네트워크 소요 시간 절감</td>
+          <td>애플리케이션과 DB 사이의 왕복이 줄어든다. 데이터가 많고 호출이 잦으면 네트워크가 부하를 받는데, <b>스토어드는 한 번만 왕복</b>하면 된다</td>
+        </tr>
+        <tr>
+          <td>절차적 기능 구현</td>
+          <td>SQL에는 <code>IF</code>, <code>WHEN</code> 같은 절차적 구성이 없어 보통 애플리케이션에서 처리한다. <b>DB를 관리하는 조직이 분리</b>되어 있다면 스토어드를 호출하는 식으로도 개발할 수 있다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>단점</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>단점</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>낮은 처리 성능</td>
+          <td>DB의 목적은 절차적 처리가 아니라 프로그래밍 언어보다 성능이 떨어진다. 게다가 MySQL의 스토어드 프로그램은 <b>실행할 때마다 코드가 파싱</b>된다</td>
+        </tr>
+        <tr>
+          <td>애플리케이션 코드의 조각화</td>
+          <td>로직이 분산되면 <b>설치·배포가 복잡</b>해지고 유지보수도 어려워진다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">"실행할 때마다 파싱된다" 의 무게 <span class="badge b-blue">보강</span></p>
+      <p>다른 DBMS는 스토어드 프로그램을 <b>컴파일해 캐싱</b>하지만 MySQL은 그렇지 않다. 이 한 가지 차이 때문에, 다른 DBMS에서 통하던 "무거운 로직은 DB로 내리자" 라는 전략이 MySQL에서는 잘 통하지 않는다. MySQL의 스토어드는 <b>성능 최적화 수단이 아니라 보안·추상화 수단</b>으로 보는 편이 정확하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>스토어드 프로그램 = 프로시저 + 함수 + 트리거 + 이벤트.</li>
+      <li>얻는 것 — <b>권한 세분화, 추상화, 네트워크 왕복 절감</b>.</li>
+      <li>치르는 것 — <b>매 실행마다 파싱</b>, 그리고 로직이 코드베이스 밖으로 흩어지는 것.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-2</div>
+    <h3>스토어드 프로그램의 문법</h3>
+    <p class="item-tagline">프로시저 · 함수 · 트리거 · 이벤트 네 가지의 <b>선언 방법과 호출 방법</b>.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>프로시저는 <code>CALL</code> 로만</b>, <b>함수는 SQL 안에서만</b> 실행된다. 이 하나가 둘을 가르는 가장 큰 차이다.
+  </div>
+
+  <h4>공통 구조</h4>
+  <ul>
+    <li><b>헤더(정의부)</b> — 이름과 입출력 값을 명시한다. 보안이나 작동 방식 관련 옵션도 여기에 쓴다.</li>
+    <li><b>본문(바디)</b> — 실제 실행할 내용을 작성한다.</li>
+  </ul>
+
+  <h4>스토어드 프로시저</h4>
+  <ul>
+    <li>서로 데이터를 주고받아야 하는 <b>여러 쿼리를 하나의 그룹으로 묶어</b> 독립적으로 실행하기 위해 쓴다.</li>
+    <li>배치 프로그램에서 <b>첫 쿼리의 결과로 두 번째 쿼리를 실행</b>해야 할 때가 대표적이다.</li>
+    <li>반드시 독립적으로 호출해야 하며 <code>SELECT</code>, <code>UPDATE</code> 같은 SQL 문장에서 <b>참조할 수 없다.</b></li>
+  </ul>
+
+  <h5>생성 및 삭제</h5>
+  <ul>
+    <li>기본적으로 <b>반환값이 없다.</b> 즉 <code>RETURN</code> 절을 쓸 수 없다.</li>
+    <li>파라미터는 세 가지다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>종류</th><th>용도</th></tr></thead>
+      <tbody>
+        <tr><td><code>IN</code></td><td>입력 전용. 내부에서는 <b>읽기 전용</b></td></tr>
+        <tr><td><code>OUT</code></td><td>출력 전용. 실행이 끝나면 <b>외부 호출자로 값을 전달</b>하는 용도로만</td></tr>
+        <tr><td><code>INOUT</code></td><td>입력과 출력 <b>양쪽</b>으로 사용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>본문을 변경하려면 <b>삭제 후 다시 만드는 방법밖에 없다.</b></li>
+    <li><code>ALTER PROCEDURE</code> 는 <b>보안 및 작동 방식 관련 특성</b>을 바꿀 때만 쓸 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE PROCEDURE sp_sum (IN p1 INTEGER, IN p2 INTEGER, OUT p3 INTEGER)
+BEGIN
+  SET p3 = p1 + p2;
+END;</code></pre>
+  </div>
+
+  <h5>실행</h5>
+  <ul>
+    <li>프로시저와 함수의 <b>가장 큰 차이가 실행 방법</b>이다.</li>
+    <li>프로시저는 SQL 문 안에서 쓸 수 없고 항상 <b><code>CALL</code></b> 로 실행해야 한다.</li>
+    <li><code>OUT</code>, <code>INOUT</code> 파라미터에는 <b>세션 변수</b>를 써야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SET @result := 0;
+SELECT @result;              -- 0
+
+CALL sp_sum(1, 2, @result);
+SELECT @result;              -- 3</code></pre>
+  </div>
+
+  <h5>커서 반환</h5>
+  <ul>
+    <li>커서를 <b>파라미터로 전달받거나 반환할 수는 없다.</b></li>
+    <li>다만 프로시저 안에서 <b>커서를 열지 않거나 SELECT 결과를 Fetch 하지 않으면</b> 그 결과가 클라이언트로 바로 전송된다.</li>
+    <li>이 성질을 <b>디버깅 용도</b>로 자주 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">결과를 그대로 클라이언트로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE PROCEDURE sp_selectEmployees (IN in_empno INTEGER)
+BEGIN
+  SELECT * FROM employees WHERE emp_no = in_empno;
+END;
+
+CALL sp_selectEmployees(10001);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">디버깅 메시지 출력</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE PROCEDURE sp_sum (IN p1 INTEGER, IN p2 INTEGER, OUT p3 INTEGER)
+BEGIN
+  SELECT '&gt; Stored procedure started' AS debug_message;
+  SELECT CONCAT('&gt; p1 : ', p1) AS debug_message;
+  SELECT CONCAT('&gt; p2 : ', p2) AS debug_message;
+  SET p3 = p1 + p2;
+  SELECT '&gt; Stored procedure complete' AS debug_message;
+END;</code></pre>
+  </div>
+
+  <h5>딕셔너리</h5>
+  <p><code>information_schema.ROUTINES</code> 뷰로 <b>정보 조회만</b> 가능하다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT routine_schema, routine_name, routine_type
+FROM information_schema.ROUTINES
+WHERE routine_schema='realmysql';</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ROUTINE_SCHEMA</th><th>ROUTINE_NAME</th><th>ROUTINE_TYPE</th></tr></thead>
+      <tbody>
+        <tr><td>realmysql</td><td>convert3857To4326</td><td>FUNCTION</td></tr>
+        <tr><td>realmysql</td><td>distanceInSphere</td><td>FUNCTION</td></tr>
+        <tr><td>realmysql</td><td>sf_emp_count</td><td>FUNCTION</td></tr>
+        <tr><td>realmysql</td><td>sp_remove_user</td><td>PROCEDURE</td></tr>
+        <tr><td>realmysql</td><td>sp_selectEmployees</td><td>PROCEDURE</td></tr>
+        <tr><td>realmysql</td><td>sp_updateemployeehiredate</td><td>PROCEDURE</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>스토어드 함수</h4>
+  <ul>
+    <li>하나의 SQL 문장으로 작성할 수 없는 기능을 <b>SQL의 일부로</b> 구현해야 할 때 쓴다.</li>
+    <li>8.0 이후로는 <b>레터럴 조인이나 윈도우 함수</b>가 이 역할을 대신할 수 있다.</li>
+    <li>독립적으로 쓸 수 있는 상황이라면 <b>프로시저 쪽이 낫다.</b> 함수의 장점은 <b>SQL의 일부로 쓸 수 있다는 것뿐</b>이다.</li>
+  </ul>
+
+  <h5>생성 및 삭제</h5>
+  <ul>
+    <li><code>CREATE FUNCTION</code> 으로 만든다.</li>
+    <li>모든 파라미터가 <b>읽기 전용</b>이라 <code>IN</code>/<code>OUT</code> 을 명시할 수 없다.</li>
+    <li>본문에 반드시 <b><code>RETURNS</code> 로 반환 타입</b>을 명시해야 한다.</li>
+    <li>본문에서 커서나 <code>SELECT</code> 를 써도 되지만 <b>화면에 출력할 수는 없다</b> (프로시저와 다른 점).</li>
+    <li>프로시저와 마찬가지로 <code>ALTER</code> 로 본문을 바꿀 수 없다. <b><code>DROP</code> → <code>CREATE</code></b> 가 필요하다.</li>
+    <li>쓸 수 없는 것들
+      <ul>
+        <li><code>PREPARE</code> + <code>EXECUTE</code> 를 이용한 프리페어드 스테이트먼트</li>
+        <li>명시적·묵시적 <code>ROLLBACK</code> / <code>COMMIT</code> 을 유발하는 SQL</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE FUNCTION sf_sum(p1 INTEGER, p2 INTEGER)
+  RETURNS INTEGER
+BEGIN
+  DECLARE p3 INTEGER DEFAULT 0;
+  SET p3 = p1 + p2;
+  RETURN p3;
+END;</code></pre>
+  </div>
+
+  <h5>실행</h5>
+  <p><code>CALL</code> 로는 실행할 수 없고 <b><code>SELECT</code> 안에서</b> 호출한다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT sf_sum(1, 2) AS sum;   -- 3</code></pre>
+  </div>
+
+  <h4>트리거</h4>
+  <ul>
+    <li>테이블의 레코드가 변경되거나 저장될 때 <b>미리 정의해 둔 작업을 자동 실행</b>하는 기능이다.</li>
+    <li>데이터 변화가 생길 때 다른 작업을 기동시키는 <b>방아쇠</b> 역할이다.</li>
+    <li><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> 에 적용할 수 있고 유효성 검사, 복사·백업 등에 쓴다.</li>
+    <li>프로시저나 함수보다 <b>필요성이 떨어지는 편</b>이고, <b>테이블에 대해서만</b> 만들 수 있다.</li>
+  </ul>
+
+  <h5>복제 포맷에 따른 동작 차이</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>바이너리 로그 포맷</th><th>소스 서버</th><th>레플리카 서버</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ROW</code></td>
+          <td>트리거가 실행되고, 그로 인한 <b>변경 결과가 바이너리 로그에 기록</b>된다</td>
+          <td>트리거를 <b>따로 기동하지 않는다</b> — 이미 결과가 넘어오므로 실행한 것과 같은 효과</td>
+        </tr>
+        <tr>
+          <td><code>STATEMENT</code></td>
+          <td>트리거에 의한 데이터 변경은 <b>기록하지 않는다</b></td>
+          <td>레플리카가 <b>트리거를 직접 실행</b>한다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>생성</h5>
+  <ul>
+    <li><code>CREATE TRIGGER</code> 로 만든다.</li>
+    <li>트리거가 실행될 <b>이벤트(사건)</b> 와 <b>시점(변경 전/후)</b> 을 명시한다.</li>
+    <li><code>FOR EACH ROW</code> 로 <b>개별 레코드 단위</b> 실행을 지정한다.</li>
+    <li><code>DROP</code>, <code>TRUNCATE</code> 에서는 <b>이벤트가 발생하지 않는다.</b></li>
+    <li><code>OLD</code>, <code>NEW</code> 키워드로 각각 <b>변경 전/후</b> 값을 참조한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TRIGGER on_delete BEFORE DELETE ON employees
+  FOR EACH ROW
+BEGIN
+  DELETE FROM salaries WHERE emp_no = OLD.emp_no;
+END;</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>TRUNCATE</code> 는 트리거를 부르지 않는다</p>
+      <p>위 예시처럼 트리거로 연관 데이터를 정리하고 있다면, 누군가 <code>DELETE</code> 대신 <code>TRUNCATE</code> 를 쓰는 순간 <b><code>salaries</code> 에 고아 레코드가 남는다.</b> 트리거를 데이터 정합성의 유일한 보증 수단으로 삼기 어려운 이유다.</p>
+    </div>
+  </div>
+
+  <h5>실행과 딕셔너리</h5>
+  <ul>
+    <li>명시적으로 호출할 수 없다. <b>등록된 테이블의 레코드를 실제로 수정</b>해야 동작한다.</li>
+    <li>정보는 <code>information_schema.TRIGGERS</code> 뷰로 조회만 할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT trigger_schema, trigger_name, event_manipulation,
+       action_timing, action_statement
+FROM information_schema.TRIGGERS
+WHERE trigger_schema='employees';</code></pre>
+  </div>
+
+  <h4>이벤트</h4>
+  <ul>
+    <li>주어진 시각에 스토어드 프로그램을 실행하는 <b>스케줄러</b> 기능이다.</li>
+    <li>스케줄링 전담 스레드가 <b>활성화되어 있어야</b> 이벤트가 실행된다.
+      <ul><li><code>event_scheduler</code> 를 <code>ON</code> 또는 <code>1</code> 로 설정한다.</li></ul>
+    </li>
+  </ul>
+
+  <h5>생성</h5>
+  <ul>
+    <li>반복 실행 여부에 따라 <b>일회성</b>과 <b>반복성</b>으로 나뉜다.</li>
+    <li>일회성은 <code>ON SCHEDULE AT</code> 으로 설정하며, <b>정확한 시각이나 상대적 시각</b>을 쓸 수 있다.</li>
+    <li>단일 SQL만 실행한다면 <code>BEGIN ... END</code> 가 필요 없다.</li>
+    <li><code>ON COMPLETION</code> 으로 완료된 이벤트의 삭제 여부를 지정한다.
+      <ul><li>기본은 삭제. <code>ON COMPLETION PRESERVE</code> 를 붙이면 남는다.</li></ul>
+    </li>
+    <li>기본적으로 <b>소스 서버에서는 enable, 레플리카에서는 disable</b> 된다.
+      <ul><li>레플리카가 소스로 승격될 때는 <b>이벤트를 수동으로 활성화</b>해야 한다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE EVENT onetime_job
+  ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 HOUR
+DO
+  INSERT INTO daily_rank_log VALUES (NOW(), 'Done');</code></pre>
+  </div>
+
+  <h5>실행 확인과 딕셔너리</h5>
+  <ul>
+    <li>테스트를 위해 <b>강제로 실행시킬 수는 없다.</b></li>
+    <li>스케줄링 정보와 최근 실행 시각은 <code>information_schema.EVENTS</code> 에서 확인한다.
+      <ul><li>단, <b>마지막 실행 정보만</b> 남으므로 전체 로그가 필요하면 <b>별도 테이블</b>을 만들어야 한다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">페일오버 시 잊기 쉬운 것</p>
+      <p>레플리카에서는 이벤트가 <code>SLAVESIDE_DISABLED</code> 상태로 들어온다. 장애로 레플리카를 소스로 승격시켰다면 <b>배치성 이벤트가 전부 멈춘 상태</b>라는 뜻이다. 승격 절차 체크리스트에 <b>이벤트 활성화</b>를 반드시 넣어 두어야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>프로시저</b> — <code>CALL</code> 로만 실행, 반환값 없음, <code>IN</code>/<code>OUT</code>/<code>INOUT</code> 파라미터.</li>
+      <li><b>함수</b> — SQL 안에서만 실행, <code>RETURNS</code> 필수, 파라미터는 전부 읽기 전용.</li>
+      <li>둘 다 본문 변경은 <b><code>DROP</code> → <code>CREATE</code></b> 뿐이다.</li>
+      <li><b>트리거</b> — <code>OLD</code>/<code>NEW</code>, <code>FOR EACH ROW</code>. <code>TRUNCATE</code>/<code>DROP</code> 에서는 <b>동작하지 않는다.</b></li>
+      <li><b>이벤트</b> — <code>event_scheduler</code> 가 켜져 있어야 하고, <b>레플리카에서는 비활성</b>이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-3</div>
+    <h3>본문 작성 — 패스한 절</h3>
+    <p class="item-tagline">노트에서 건너뛴 절.</p>
+  </header>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 절은 학습하지 않았다</p>
+      <p>노트에 <b>"스토어드 프로그램 본문 작성"</b> 이라는 제목만 남아 있고 내용은 비어 있다 (같은 챕터의 빈 파일 하나가 이 자리에 해당한다). 다루었을 내용은 <b>변수 선언(<code>DECLARE</code>) · 제어문(<code>IF</code>, <code>CASE</code>, <code>WHILE</code>) · 커서 · 핸들러와 컨디션</b> 이다.</p>
+    </div>
+  </div>
+</article>

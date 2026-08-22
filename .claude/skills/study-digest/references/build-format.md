@@ -1,13 +1,28 @@
 # 빌드 디렉터리 규약
 
+산출물과 빌드 중간물은 **전부 통파일 모음(vault)** 안에서만 만든다.
+원본 스터디 폴더에는 아무것도 쓰지 않는다 (읽기 전용).
+
 ```
-<대상 폴더>/.digest/
-  meta.json
-  partials/
-    ch1.html
-    ch2.html
-    ...
+/Users/imkdw/study/__통파일 모음/        ← VAULT
+  index.html                            ← 표지. build-index.mjs 가 생성
+  <슬러그>.html                          ← 산출물 학습자료
+  .digest/<슬러그>/                      ← 이 자료의 빌드 디렉터리 = $DIGEST
+      meta.json
+      plan.json
+      house-rules.md
+      partials/
+        ch1.html
+        ch2.html
+        ...
+      reports/
+        ch1.md
+        ...
 ```
+
+`<슬러그>` 는 산출물 파일명이자 빌드 디렉터리명이다. 기본은 대상 스터디 폴더명 그대로 쓰고,
+공백/대소문자가 지저분하면 kebab-case 로 다듬는다 (예: `real mysql 8.0` → `real-mysql-8.0`).
+**이미 `.digest/` 에 같은 슬러그가 있으면 그 이름을 그대로 재사용한다.**
 
 어셈블러는 `meta.json` 으로 **사이드바 / 표지 / 챕터 헤더**를 만들고,
 `partials/*.html` 은 **아이템 본문만** 담는다. 챕터 헤더를 partial 에 또 쓰면 중복된다.
@@ -72,7 +87,15 @@
 ## 실행
 
 ```bash
-node .claude/skills/study-digest/assets/assemble.mjs "<대상>/.digest" "<대상>/out.html"
+VAULT="/Users/imkdw/study/__통파일 모음"
+node /Users/imkdw/study/.claude/skills/study-digest/assets/assemble.mjs \
+  "$VAULT/.digest/<슬러그>" "$VAULT/<슬러그>.html"
 ```
 
 종료 코드 2 = 경고 있음(빌드는 됨). meta 와 partial 의 id 집합/순서를 맞춰라.
+
+어셈블 후에는 표지를 다시 만든다. `.digest/*/meta.json` 을 훑어 `index.html` 을 새로 쓴다.
+
+```bash
+node /Users/imkdw/study/.claude/skills/study-digest/assets/build-index.mjs "$VAULT"
+```

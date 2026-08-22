@@ -1,0 +1,160 @@
+{
+  "title": "Node.js 디자인 패턴 바이블",
+  "subtitle": "13챕터 51편 / 학습 정리본",
+  "mark": "N",
+  "eyebrow": "STUDY DIGEST",
+  "description": "Node.js 디자인 패턴 바이블 학습 정리본. 리액터 패턴과 이벤트 루프, 모듈 시스템, 콜백/Promise/async·await 제어 흐름, 스트림, 생성자/구조적/행위 디자인 패턴, 확장성과 메시징까지 51편의 노트를 한 권으로 엮었습니다.",
+  "lead": "공부하며 남긴 노트 51편을 한 권으로 엮었습니다. 원문의 흐름과 코드는 그대로 두고, 글로만 설명된 구조는 <b>도해로 다시 그렸으며</b>, 책 출간 이후 바뀐 API는 <b>Node.js 22 / 24 기준</b>으로 덧붙였습니다.",
+  "coverNote": "<div class=\"callout warn\"><div class=\"ic\">!</div><div><p class=\"callout-title\">읽기 전에</p><p>원본 노트 중 일부는 집필이 중단된 상태입니다(4-3 비동기 라이브러리, 8-4 어댑터 패턴 등). 해당 아이템은 내용을 지어내지 않고 <b>미완성이라는 사실을 명시</b>한 뒤, 검증 가능한 최소한의 뼈대만 보강해 두었습니다.</p></div></div>",
+  "footer": "Mario Casciaro / Luciano Mammino, <b>Node.js Design Patterns (3rd Edition)</b> 을 읽고 남긴 개인 학습 노트를 정리한 문서입니다. 검증은 Node.js 공식 문서 / MDN / 로컬 런타임(Node v24.17.0) 실행 기준.",
+  "stats": [
+    { "val": "51", "unit": "편", "label": "아이템" },
+    { "val": "13", "unit": "개", "label": "챕터" },
+    { "val": "43", "unit": "개", "label": "새로 그린 도해" },
+    { "val": "22+", "label": "반영한 Node 버전" }
+  ],
+  "chapters": [
+    {
+      "id": "ch1", "short": "CH 1", "navTitle": "Node.js 플랫폼",
+      "title": "Node.js 플랫폼", "file": "ch1.html",
+      "lead": "Node.js가 <b>왜 이렇게 생겼는지</b>를 설명하는 챕터입니다. 경량 모듈이라는 문화, 논 블로킹 I/O라는 기술, 리액터 패턴이라는 설계가 어떻게 한 줄로 이어지는지 보고 나면 나머지 12개 챕터가 전부 이 위에 서 있다는 걸 알게 됩니다.",
+      "items": [
+        { "id": "item-1", "idx": "1-1", "title": "Node.js 철학", "keywords": "small core small modules 경량 코어 경량 모듈 SRP 단일 진입점 npm 종속성 지옥 dependency hell" },
+        { "id": "item-2", "idx": "1-2", "title": "Node.js는 어떻게 작동할까", "keywords": "blocking non-blocking busy waiting 이벤트 디멀티플렉서 event demultiplexer reactor 리액터 이벤트 루프 libuv v8 epoll kqueue IOCP" },
+        { "id": "item-3", "idx": "1-3", "title": "Node.js의 자바스크립트", "keywords": "DOM window global process fs net http WASM 네이티브 애드온 engines LTS" }
+      ]
+    },
+    {
+      "id": "ch2", "short": "CH 2", "navTitle": "모듈 시스템",
+      "title": "모듈 시스템", "file": "ch2.html",
+      "lead": "CJS와 ESM은 문법만 다른 게 아니라 <b>모듈을 언제 평가하느냐</b>가 다릅니다. CJS는 실행하면서 그래프를 그리고, ESM은 그래프를 다 그린 뒤에 실행합니다. 순환 종속성에서 두 시스템이 정반대의 결과를 내는 이유가 전부 여기서 나옵니다.",
+      "items": [
+        { "id": "item-4", "idx": "2-1", "title": "모듈의 필요성", "keywords": "module 정보 은닉 information hiding 재사용 종속성 관리 네임스페이스" },
+        { "id": "item-5", "idx": "2-2", "title": "자바스크립트와 노드에서의 모듈 시스템", "keywords": "CJS CommonJS ESM ES Module 레거시 마이그레이션" },
+        { "id": "item-6", "idx": "2-3", "title": "모듈 시스템과 패턴", "keywords": "revealing module pattern 노출식 모듈 IIFE 즉시 실행 함수 전역 스코프 오염" },
+        { "id": "item-7", "idx": "2-4", "title": "CJS 모듈", "keywords": "require module.exports exports wrapper 모듈 래퍼 resolve 알고리즘 node_modules 캐시 순환 종속성 circular dependency 동기" },
+        { "id": "item-8", "idx": "2-5", "title": "모듈 정의 패턴", "keywords": "named exports substack pattern 함수 내보내기 클래스 내보내기 인스턴스 내보내기 monkey patching 몽키패치" },
+        { "id": "item-9", "idx": "2-6", "title": "ESM 모듈", "keywords": "import export default 트리쉐이킹 tree shaking mjs type module 동적 import 라이브 바인딩 live binding 파싱 인스턴스화 평가" },
+        { "id": "item-10", "idx": "2-7", "title": "ESM과 CJS의 차이점과 상호 운용", "keywords": "use strict __dirname __filename import.meta.url this interop createRequire require esm" }
+      ]
+    },
+    {
+      "id": "ch3", "short": "CH 3", "navTitle": "콜백과 이벤트",
+      "title": "콜백과 이벤트", "file": "ch3.html",
+      "lead": "Node.js의 비동기 세계에는 딱 두 개의 원시 도구가 있습니다. <b>한 번 끝나는 일에는 콜백, 여러 번 일어나는 일에는 이벤트.</b> 그리고 두 도구 모두 같은 함정을 공유합니다 — 같은 함수가 어떨 땐 동기, 어떨 땐 비동기로 동작하는 순간 앱이 조용히 망가진다는 것.",
+      "items": [
+        { "id": "item-11", "idx": "3-1", "title": "콜백 패턴", "keywords": "CPS continuation passing style 연속 전달 방식 Zalgo process.nextTick setImmediate error-first 오류 우선 uncaughtException fail-fast 클로저" },
+        { "id": "item-12", "idx": "3-2", "title": "관찰자 패턴", "keywords": "observer EventEmitter on once off removeListener emit error 이벤트 메모리 누수 maxListeners" },
+        { "id": "item-13", "idx": "3-9", "title": "연습문제 — FindRegex와 Ticker", "keywords": "exercise 연습문제 FindRegex ticker setInterval 에러 전파" }
+      ]
+    },
+    {
+      "id": "ch4", "short": "CH 4", "navTitle": "콜백 비동기 제어 흐름",
+      "title": "콜백을 사용한 비동기 제어 흐름 패턴", "file": "ch4.html",
+      "lead": "콜백만으로 <b>순차 실행 / 병렬 실행 / 제한된 병렬 실행</b>을 손으로 짜 보는 챕터입니다. Promise가 무엇을 대신 해주는지 이해하려면 한 번은 직접 짜 봐야 합니다.",
+      "items": [
+        { "id": "item-14", "idx": "4-1", "title": "비동기 프로그래밍의 어려움", "keywords": "callback hell 콜백 지옥 중첩 익명 함수 가독성" },
+        { "id": "item-15", "idx": "4-2", "title": "콜백 모범 사례와 제어 흐름 패턴", "keywords": "early return 빠른 반환 순차 실행 순차 반복 병렬 실행 race condition 경쟁 상태 제한된 병렬 concurrency TaskQueue" },
+        { "id": "item-16", "idx": "4-3", "title": "비동기 라이브러리", "keywords": "async library p-limit 미완성 노트" }
+      ]
+    },
+    {
+      "id": "ch5", "short": "CH 5", "navTitle": "Promise와 async/await",
+      "title": "Promise 그리고 async/await 비동기 제어 흐름 패턴", "file": "ch5.html",
+      "lead": "Promise는 콜백의 문법 설탕이 아니라 <b>비동기 결과를 값으로 만든 것</b>입니다. 값이 되었기 때문에 저장하고, 합치고, 캐싱할 수 있게 됩니다. 11장의 일괄 처리/캐싱 레시피가 전부 이 성질 하나에서 나옵니다.",
+      "items": [
+        { "id": "item-17", "idx": "5-1", "title": "Promise", "keywords": "pending fulfilled rejected settled thenable Promise/A+ all allSettled race any promisify 프로미스화" },
+        { "id": "item-18", "idx": "5-2", "title": "async / await", "keywords": "async await try catch return await forEach 안티패턴 병렬 실행 무한 재귀 메모리 누수 프로미스 체인" }
+      ]
+    },
+    {
+      "id": "ch6", "short": "CH 6", "navTitle": "스트림 코딩",
+      "title": "스트림 코딩", "file": "ch6.html",
+      "lead": "스트림의 진짜 가치는 메모리 절약이 아니라 <b>조립성</b>입니다. Readable / Writable / Duplex / Transform 네 개의 부품과 pipe 하나로 압축, 암호화, 파싱, 집계를 레고처럼 갈아 끼울 수 있게 됩니다.",
+      "items": [
+        { "id": "item-19", "idx": "6-1", "title": "스트림의 중요성 발견", "keywords": "buffering streaming 버퍼링 스트리밍 gzip 공간 효율 시간 효율 조립성 composability MAX_LENGTH" },
+        { "id": "item-20", "idx": "6-2", "title": "스트림 시작하기", "keywords": "Readable Writable Duplex Transform PassThrough flowing non-flowing objectMode backpressure 배압 drain highWaterMark _read _write _transform _flush pipeline lazystream" },
+        { "id": "item-21", "idx": "6-3", "title": "스트림을 사용한 비동기 제어 흐름 패턴", "keywords": "순차 실행 병렬 실행 unordered parallel limited parallel parallel-transform concatFiles" },
+        { "id": "item-22", "idx": "6-4", "title": "파이핑 패턴", "keywords": "combine 결합 pumpify 분기 fork tee 병합 merge multistream 멀티플렉싱 디멀티플렉싱 multiplexing 패킷" }
+      ]
+    },
+    {
+      "id": "ch7", "short": "CH 7", "navTitle": "생성자 디자인 패턴",
+      "title": "생성자 디자인 패턴", "file": "ch7.html",
+      "lead": "객체를 <b>어떻게 만들 것인가</b>에 대한 패턴 묶음입니다. 자바스크립트에서는 클로저와 일급 함수 덕분에 GoF 원문보다 훨씬 가벼운 형태로 구현되고, 여기에 Node 고유의 <b>공개 생성자</b>가 하나 더 붙습니다.",
+      "items": [
+        { "id": "item-23", "idx": "7-1", "title": "팩토리", "keywords": "factory 객체 생성 분리 캡슐화 클로저 덕타이핑 duck typing 프로파일러" },
+        { "id": "item-24", "idx": "7-2", "title": "빌더", "keywords": "builder fluent interface 메서드 체이닝 객체 리터럴 매개변수 URL" },
+        { "id": "item-25", "idx": "7-3", "title": "공개 생성자", "keywords": "revealing constructor executor 불변성 immutable Buffer Promise 생성자" },
+        { "id": "item-26", "idx": "7-4", "title": "싱글톤", "keywords": "singleton 모듈 캐시 인스턴스 내보내기 globalThis 패키지 중복" },
+        { "id": "item-27", "idx": "7-5", "title": "모듈 와이어링", "keywords": "wiring 싱글톤 종속성 DI dependency injection 인젝터 디커플링 종속성 그래프" },
+        { "id": "item-28", "idx": "7-9", "title": "연습문제 — 색상 콘솔과 Request 빌더", "keywords": "exercise 연습문제 chalk ColorConsole RequestBuilder 변경 방지 큐" }
+      ]
+    },
+    {
+      "id": "ch8", "short": "CH 8", "navTitle": "구조적 설계 패턴",
+      "title": "구조적 설계 패턴", "file": "ch8.html",
+      "lead": "이미 있는 객체를 <b>감싸서</b> 무언가를 바꾸는 패턴들입니다. 프록시/데코레이터/어댑터는 구현이 거의 같고 <b>의도만 다릅니다</b>. 그 경계를 말로 정리해 두면 코드 리뷰에서 이름 싸움을 하지 않게 됩니다.",
+      "items": [
+        { "id": "item-29", "idx": "8-1", "title": "프록시", "keywords": "proxy surrogate 서로게이트 컴포지션 객체 확장 augmentation Proxy 트랩 get set has 옵저버" },
+        { "id": "item-30", "idx": "8-2", "title": "데코레이터", "keywords": "decorator 컴포지션 객체 확장 Proxy 동적 확장" },
+        { "id": "item-31", "idx": "8-3", "title": "프록시와 데코레이터 사이의 경계", "keywords": "proxy vs decorator 의도 접근 제어 기능 추가" },
+        { "id": "item-32", "idx": "8-4", "title": "어댑터 패턴", "keywords": "adapter 인터페이스 변환 미완성 노트" }
+      ]
+    },
+    {
+      "id": "ch9", "short": "CH 9", "navTitle": "행위 디자인 패턴",
+      "title": "행위 디자인 패턴", "file": "ch9.html",
+      "lead": "컴포넌트들이 <b>어떻게 협력할 것인가</b>에 대한 패턴 묶음입니다. 전략/상태/템플릿은 한 축(무엇을 언제 바꾸는가)에서 갈라지고, 반복자/미들웨어/명령은 각각 순회 · 파이프라인 · 호출을 객체로 만든 것입니다.",
+      "items": [
+        { "id": "item-33", "idx": "9-1", "title": "전략 패턴", "keywords": "strategy 컨텍스트 교체 가능 알고리즘 ini json Config" },
+        { "id": "item-34", "idx": "9-2", "title": "상태 패턴", "keywords": "state 상태 전이 전략 패턴 변형 failsafe socket queue" },
+        { "id": "item-35", "idx": "9-3", "title": "템플릿 패턴", "keywords": "template method 추상 클래스 스켈레톤 훅 컴파일 타임" },
+        { "id": "item-36", "idx": "9-4", "title": "반복자", "keywords": "iterator iterable protocol Symbol.iterator generator 제네레이터 yield next done value for-of" },
+        { "id": "item-37", "idx": "9-5", "title": "미들웨어", "keywords": "middleware express 인터셉터 필터 책임 사슬 chain of responsibility use next 파이프라인" },
+        { "id": "item-38", "idx": "9-6", "title": "명령", "keywords": "command 작업 패턴 task 클로저 bind undo 실행 취소 직렬화 큐" }
+      ]
+    },
+    {
+      "id": "ch10", "short": "CH 10", "navTitle": "범용 자바스크립트",
+      "title": "웹앱을 위한 범용 자바스크립트", "file": "ch10.html",
+      "lead": "같은 언어라고 같은 환경은 아닙니다. 브라우저와 Node 사이에서 코드를 공유하려면 <b>번들러</b>가 무엇을 하는지, 그리고 플랫폼 차이를 <b>어디서</b> 흡수할지를 정해야 합니다.",
+      "items": [
+        { "id": "item-39", "idx": "10-1", "title": "브라우저와 코드 공유", "keywords": "universal javascript 번들러 bundler webpack rollup 종속성 해결 패킹 트리쉐이킹 코드 축소 minify" },
+        { "id": "item-40", "idx": "10-2", "title": "크로스 플랫폼 개발의 기초", "keywords": "런타임 코드 분기 빌드 타임 분기 DefinePlugin 모듈 스와핑 전략 템플릿 어댑터 프록시" }
+      ]
+    },
+    {
+      "id": "ch11", "short": "CH 11", "navTitle": "고급 레시피",
+      "title": "고급 레시피", "file": "ch11.html",
+      "lead": "지금까지의 패턴을 <b>실제로 자주 만나는 네 가지 문제</b>에 적용해 봅니다. 비동기 초기화, 요청 중복 제거, 취소, 그리고 CPU 바운드 작업 — 전부 프로덕션에서 한 번씩은 밟는 지뢰입니다.",
+      "items": [
+        { "id": "item-41", "idx": "11-1", "title": "비동기적으로 초기화되는 컴포넌트 다루기", "keywords": "async initialization 로컬 초기화 확인 지연 시작 delayed startup 사전 초기화 큐 pre-initialization queue 상태 패턴" },
+        { "id": "item-42", "idx": "11-2", "title": "비동기식 요청 일괄 처리 및 캐싱", "keywords": "batching caching 일괄 처리 캐싱 in-flight 중복 제거 TTL LRU Redis Memcached 캐시 무효화" },
+        { "id": "item-43", "idx": "11-3", "title": "비동기 작업 취소", "keywords": "cancellation 취소 CancelError 래핑 제네레이터 AbortController AbortSignal" },
+        { "id": "item-44", "idx": "11-4", "title": "CPU 바운드 작업 실행", "keywords": "cpu bound 이벤트 루프 블로킹 setImmediate 인터리빙 child_process fork worker_threads 프로세스 풀" }
+      ]
+    },
+    {
+      "id": "ch12", "short": "CH 12", "navTitle": "확장성과 아키텍처",
+      "title": "확장성과 아키텍처 패턴", "file": "ch12.html",
+      "lead": "단일 스레드라는 제약은 <b>수평 확장을 기본값으로</b> 만듭니다. 확장성 3차원(복제 / 분해 / 분할)이라는 좌표계를 잡고, 클러스터 · 로드밸런싱 · 마이크로서비스를 그 위에 올려놓습니다.",
+      "items": [
+        { "id": "item-45", "idx": "12-1", "title": "애플리케이션 확장 소개", "keywords": "scale cube 확장성 3차원 X축 복제 Y축 기능 분해 Z축 데이터 파티셔닝 샤딩" },
+        { "id": "item-46", "idx": "12-2", "title": "복제 및 로드밸런싱", "keywords": "cluster isPrimary fork 라운드로빈 round-robin 탄력성 무중단 배포 zero downtime SIGUSR2 스티키 세션 sticky session 역방향 프록시 nginx 서비스 레지스트리 컨테이너 kubernetes" },
+        { "id": "item-47", "idx": "12-3", "title": "복잡한 애플리케이션 분해", "keywords": "monolith 모놀리식 microservice 마이크로서비스 API 프록시 게이트웨이 오케스트레이션 God 객체 메시지 브로커" }
+      ]
+    },
+    {
+      "id": "ch13", "short": "CH 13", "navTitle": "메시징과 통합 패턴",
+      "title": "메시징과 통합 패턴", "file": "ch13.html",
+      "lead": "시스템을 <b>쪼갠 다음</b>에는 다시 이어야 합니다. 단방향인가 요청/응답인가, 큐인가 스트림인가, 브로커를 둘 것인가 P2P인가 — 메시징 설계는 이 세 개의 선택으로 거의 다 결정됩니다.",
+      "items": [
+        { "id": "item-48", "idx": "13-1", "title": "메시징 시스템의 기초", "keywords": "단방향 요청 응답 명령 메시지 이벤트 메시지 문서 메시지 동기 비동기 큐 queue 스트림 stream 피어 투 피어 브로커 MQTT STOMP AMQP" },
+        { "id": "item-49", "idx": "13-2", "title": "발행/구독 패턴", "keywords": "pub sub publish subscribe 분산 옵저버 메시지 큐 AMQP RabbitMQ 스트림 Kafka 오프셋 durable" },
+        { "id": "item-50", "idx": "13-3", "title": "작업 배포 패턴", "keywords": "task distribution 경쟁 소비자 competing consumers 분할 정복 파이프라인 미완성 노트" },
+        { "id": "item-51", "idx": "13-4", "title": "요청/응답 패턴", "keywords": "request reply correlation id 상관 식별자 반환 주소 return address 미완성 노트" }
+      ]
+    }
+  ]
+}

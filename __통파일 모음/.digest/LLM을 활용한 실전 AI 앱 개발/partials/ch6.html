@@ -1,0 +1,374 @@
+<article class="item" id="item-6-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-1</div>
+    <h3>Text2SQL 데이터셋</h3>
+    <p class="item-tagline">SQL 을 생성하려면 스키마와 요청, 두 가지가 프롬프트에 있어야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    Text2SQL 데이터셋의 최소 구성은 <b>DDL(어떤 데이터가 있는가) + 질문(무엇을 뽑고 싶은가) + 정답 SQL</b> 세 쌍이다.
+  </div>
+
+  <h4>SQL 을 생성하기 위한 데이터셋</h4>
+  <ul>
+    <li><b>데이터베이스 정보</b> — 어떤 데이터가 있는지 알려주는 테이블과 컬럼 정보(DDL)</li>
+    <li><b>요청사항</b> — 어떤 데이터를 추출하고 싶은지를 나타낸 자연어 질문</li>
+  </ul>
+
+  <p>모델은 스키마를 모르면 컬럼 이름을 지어낸다. 그래서 Text2SQL 에서는 <b>DDL 을 프롬프트에 함께 넣는 것</b>이 사실상 필수다. 이 구조는 다음 절의 프롬프트 설계로 그대로 이어진다.</p>
+
+  <h4>한국어 데이터셋</h4>
+  <p>AI 허브에서 구축한 <b>자연어 기반 질의(NL2SQL) 검색 생성 데이터</b>가 있다. 다만 노트를 작성한 시점 기준으로 <b>사용이 불가능한 상태</b>였다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">대안으로 쓸 수 있는 것 <span class="badge b-blue">보강</span></p>
+      <p>다음 절부터 실습에 쓰는 <code>shangrilar/ko_text2sql</code> 은 이 책을 위해 공개된 한국어 Text2SQL 데이터셋이다. 영어권에서 표준으로 쓰이는 것은 <b>Spider</b>(다중 테이블/조인 포함, 학교 간 도메인 분리)와 <b>WikiSQL</b>(단일 테이블, 단순 쿼리)이며, 난이도와 목적이 다르므로 벤치마크를 인용할 때 어느 쪽인지 구분해서 봐야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Text2SQL 데이터셋 = DDL + 자연어 질문 + 정답 SQL.</li>
+      <li>스키마 정보 없이는 모델이 컬럼을 지어내므로 DDL 을 프롬프트에 넣는다.</li>
+      <li>한국어 공개 데이터가 부족한 영역이며, 실습에서는 <code>shangrilar/ko_text2sql</code> 을 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-2</div>
+    <h3>성능 평가 파이프라인 준비하기</h3>
+    <p class="item-tagline">학습보다 평가가 먼저다 — 개선됐는지 모르면 학습할 이유가 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    SQL 은 <b>문자열이 달라도 같은 결과</b>일 수 있다. 그래서 정답 문자열 일치가 아니라 <b>GPT-4 에게 "두 SQL 이 같은 일을 하는가"를 묻는 방식</b>으로 평가한다.
+  </div>
+
+  <h4>평가 데이터셋</h4>
+  <p>실습에는 허깅페이스의 <a href="https://huggingface.co/datasets/shangrilar/ko_text2sql">shangrilar/ko_text2sql</a> 데이터셋의 <code>test</code> 스플릿을 쓴다.</p>
+
+  <h4>SQL 생성 프롬프트</h4>
+  <p>LLM 이 SQL 을 생성하게 하려면 <b>지시사항 + 데이터(DDL) + 질문</b>을 한 프롬프트에 담아야 한다. <code>query</code> 인자가 비어 있으면 추론용 프롬프트, 채워져 있으면 학습용 프롬프트가 되는 구조다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">prompt.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">def make_prompt(ddl, question, query=''):
+    prompt = f"""
+    당신은 SQL을 생성하는 SQL 봇입니다.
+    DDL의 테이블을 활용한 Question을 해결할 수 있는 SQL 쿼리를 생성하세요.
+
+    ### DDL:
+    {ddl}
+
+    ### Question:
+    {question}
+
+    ### SQL:
+    {query}
+
+    """
+    return prompt</code></pre>
+  </div>
+
+  <h5>완성된 프롬프트 예시</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">prompt.txt</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code>당신은 SQL을 생성하는 SQL 봇입니다.
+DDL의 테이블을 활용한 Question을 해결할 수 있는 SQL 쿼리를 생성하세요.
+
+### DDL:
+create table messages (
+    "message_id" SERIAL PRIMARY KEY,
+    "conversation_id" INT NOT NULL,
+    "sender_id" INT NOT NULL,
+    "content" TEXT,
+    "timestamp" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    "read" BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY ("conversation_id") REFERENCES conversations (conversation_id)
+    FOREIGN KEY ("sender_id") REFERENCES users("user_id")
+)
+
+### Question:
+messages 테이블에서 모든 데이터를 조회해 줘
+
+### SQL:
+select * from messages</code></pre>
+  </div>
+
+  <h4>GPT-4 평가 프롬프트와 코드 준비</h4>
+  <p>평가는 <b>정답 SQL(<code>gt_sql</code>)과 생성 SQL(<code>gen_sql</code>) 이 같은 일을 하는지</b>를 GPT-4 에게 묻는 방식이다. 답을 <code>{"resolve_yn": "yes"|"no"}</code> 형태의 JSON 으로 강제해 후처리를 단순하게 만든다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">make_requests.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import json
+import pandas as pd
+from pathlib import Path
+
+def make_requests_for_gpt_evaluation(df, filename, dir='requests'):
+    if not Path(dir).exists():
+        Path(dir).mkdir(parents=True)
+
+    prompts = []
+    for idx, row in df.iterrows():
+        prompts.append(
+            """Based on below DDL and Question, evaluate gen_sql can resolve Question. """
+            """If gen_sql and gt_sql do equal job, return "yes" else return "no". """
+            """Output JSON Format: {"resolve_yn": ""}""" + f"""
+
+DDL: {row['context']}
+Question: {row['question']}
+gt_sql: {row['answer']}
+gen_sql: {row['gen_sql']}"""
+        )
+
+    jobs = [
+        {
+            "model": "gpt-4-turbo-preview",
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": prompt}],
+        }
+        for prompt in prompts
+    ]
+
+    with open(Path(dir, filename), "w") as f:
+        for job in jobs:
+            f.write(json.dumps(job) + "\n")</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">왜 문자열 비교로는 안 되나 <span class="badge b-blue">보강</span></p>
+      <p><code>SELECT * FROM messages</code> 와 <code>select message_id, conversation_id, ... from messages</code> 는 같은 결과를 내지만 문자열은 전혀 다르다. 컬럼 순서, 별칭, 조인 방식, 대소문자까지 자유도가 커서 <b>정확 일치(exact match)로는 성능이 실제보다 낮게 측정된다</b>. 대안은 두 가지다 — 실제 DB 에 두 쿼리를 실행해 결과 집합을 비교하는 <b>execution accuracy</b>, 또는 여기처럼 <b>LLM 을 심판으로 쓰는 방식</b>. 후자가 DB 구축 없이 쓸 수 있어 실습에 적합하다.</p>
+    </div>
+  </div>
+
+  <h4>비동기 요청 실행</h4>
+  <p>평가 데이터가 적으면 순차 호출로도 되지만, 데이터셋이 크면 <b>요청 수 제한(rate limit)</b> 에 걸린다. OpenAI 의 <code>openai-cookbook</code> 이 제공하는 병렬 처리 스크립트를 쓴다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">export OPENAI_API_KEY="자신의 OpenAI API 키 입력"
+
+python api_request_parallel_processor.py \
+  --requests_filepath {요청 파일 경로} \
+  --save_filepath {생성할 결과 파일 경로} \
+  --request_url https://api.openai.com/v1/chat/completions \
+  --max_requests_per_minute 300 \
+  --max_tokens_per_minute 100000 \
+  --token_encoding_name cl100k_base \
+  --max_attempts 5 \
+  --logging_level 20</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에서는 이 명령이 <code>```python</code> 블록 안에 <code>os.environ[...]</code> 파이썬 코드와 섞여 있었다. 아래쪽 <code>python api_request_parallel_processor.py \ ...</code> 는 <b>셸 명령</b>이므로 파이썬 셀에서 그대로 실행되지 않는다. 위와 같이 셸에서 실행하거나, 노트북이라면 <code>!python ...</code> 으로 앞에 느낌표를 붙여야 한다.</p>
+    </div>
+  </div>
+
+  <h4>결과 변환 — jsonl → csv</h4>
+  <p>병렬 처리기는 결과를 <code>[요청, 응답]</code> 쌍의 JSONL 로 떨군다. 분석하기 좋게 데이터프레임으로 펴준다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">to_csv.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">def change_jsonl_to_csv(input_file, output_file,
+                        prompt_column="prompt", response_column="response"):
+    prompts = []
+    responses = []
+    with open(input_file, 'r') as json_file:
+        for data in json_file:
+            prompts.append(json.loads(data)[0]['messages'][0]['content'])
+            responses.append(json.loads(data)[1]['choices'][0]['message']['content'])
+
+    df = pd.DataFrame({prompt_column: prompts, response_column: responses})
+    df.to_csv(output_file, index=False)
+    return df</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  D["평가 데이터셋<br>DDL / 질문 / 정답 SQL"] --> M["대상 모델 추론"]
+  M --> G["gen_sql"]
+  G --> R["요청 JSONL 생성"]
+  D --> R
+  R --> P["병렬 처리기<br>rate limit 제어"]
+  P --> J["응답 JSONL"]
+  J --> C["CSV 변환"]
+  C --> S["resolve_yn 비율 = 정확도"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>평가 파이프라인은 한 번 만들면 모델만 갈아끼우며 재사용한다</b> — 기초 모델과 미세 조정 모델을 같은 자로 재기 위한 장치다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>SQL 은 문자열 일치로 평가할 수 없다. <b>같은 일을 하는가</b>를 물어야 한다.</li>
+      <li>프롬프트는 <b>지시사항 + DDL + 질문</b> 구조이며, <code>query</code> 를 채우면 학습용으로도 쓴다.</li>
+      <li>GPT-4 심판에게 <code>response_format: json_object</code> 를 강제해 파싱을 단순화한다.</li>
+      <li>데이터가 많으면 rate limit 때문에 병렬 처리기가 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-3</div>
+    <h3>미세 조정 수행하기 — 기초 모델 평가</h3>
+    <p class="item-tagline">미세 조정 전에 반드시 baseline 을 재둔다. 비교 대상이 없으면 개선도 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>4비트 양자화로 6B 모델을 소비자용 GPU 에 올려</b> 미세 조정 전 성능을 먼저 측정한다. 이 숫자가 이후 모든 개선의 기준선이 된다.
+  </div>
+
+  <h4>기초 모델 평가하기</h4>
+  <p>7B 이하 한국어 사전 학습 모델 중 성능이 좋은 <code>beomi/Yi-Ko-6B</code> 를 쓴다. <code>load_in_4bit=True</code> 로 4비트 양자화해 올리고, 연산은 <code>float16</code> 으로 수행한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">baseline.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import torch
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+
+def make_inference_pipeline(model_id):
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        device_map="auto",
+        load_in_4bit=True,                    # 4비트 양자화로 적재
+        bnb_4bit_compute_dtype=torch.float16, # 연산은 fp16 으로
+    )
+    return pipeline("text-generation", model=model, tokenizer=tokenizer)
+
+model_id = 'beomi/Yi-Ko-6B'
+hf_pipe = make_inference_pipeline(model_id)
+
+example = """당신은 SQL을 생성하는 SQL 봇입니다. DDL의 테이블을 활용한 Question을 해결할 수 있는 SQL 쿼리를 생성하세요.
+
+### DDL:
+CREATE TABLE players (
+  player_id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  date_joined DATETIME NOT NULL,
+  last_login DATETIME
+);
+
+### Question:
+사용자 이름에 'admin'이 포함되어 있는 계정의 수를 알려주세요.
+
+### SQL:
+"""
+
+hf_pipe(example, do_sample=False,
+        return_full_text=False, max_length=512, truncation=True)</code></pre>
+  </div>
+
+  <h5>출력</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">output</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT COUNT(*) FROM players WHERE username LIKE '%admin%';
+
+### SQL 봇:
+SELECT COUNT(*) FROM players WHERE username LIKE '%admin%';
+
+### SQL 봇의 결과:
+SELECT COUNT(*) FROM players WHERE username LIKE '%admin%'; (생략)</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">여기서 읽어야 할 것</p>
+      <p>첫 줄의 SQL <b>자체는 정확하다</b>. 문제는 그 뒤다 — 모델이 멈추지 않고 <code>### SQL 봇:</code> 같은 형식을 스스로 이어서 생성한다. <b>기초 모델은 언어와 SQL 은 알지만 "어디서 멈춰야 하는지"를 모른다.</b> 이것이 4장에서 본 정렬의 부재이고, 미세 조정이 해결해야 할 문제다. 실제 평가 때는 이 뒷부분을 잘라내는 후처리가 필요하다.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>인자</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>do_sample=False</code></td><td>확률이 가장 높은 토큰만 고르는 그리디 디코딩. 평가에서는 재현성을 위해 끈다</td></tr>
+        <tr><td><code>return_full_text=False</code></td><td>입력 프롬프트를 빼고 생성된 부분만 반환</td></tr>
+        <tr><td><code>max_length=512</code></td><td>프롬프트 + 생성 토큰의 총 길이 상한</td></tr>
+        <tr><td><code>truncation=True</code></td><td>입력이 상한을 넘으면 잘라낸다</td></tr>
+        <tr><td><code>device_map="auto"</code></td><td>가용한 GPU/CPU 에 레이어를 자동 분배</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4비트 적재 방식이 바뀌었다 <span class="badge b-purple">최신 반영</span></p>
+      <p>최신 <code>transformers</code> 에서는 <code>load_in_4bit=True</code> / <code>bnb_4bit_compute_dtype=...</code> 를 <code>from_pretrained</code> 에 직접 넘기는 방식이 deprecated 되었고, <code>BitsAndBytesConfig</code> 객체로 묶어 <code>quantization_config=</code> 에 전달하는 방식이 권장된다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">권장</span><span class="code-spacer"></span></div>
+<pre><code class="language-python">from transformers import BitsAndBytesConfig
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_quant_type="nf4",       # 5장의 퀀타일 계열 양자화
+    bnb_4bit_use_double_quant=True,  # 양자화 상수까지 한 번 더 양자화
+)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id, device_map="auto", quantization_config=bnb_config
+)</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>미세 조정 전에 <b>기초 모델 성능을 먼저 측정</b>해 기준선을 만든다.</li>
+      <li>4비트 양자화(<code>load_in_4bit</code>)로 6B 모델을 작은 GPU 에 올린다. 연산 dtype 은 따로 지정한다.</li>
+      <li>기초 모델은 SQL 은 만들지만 <b>멈출 줄 모른다</b> — 정렬이 필요한 이유가 출력에 그대로 드러난다.</li>
+      <li>평가 시에는 <code>do_sample=False</code> 로 재현성을 확보한다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,1240 @@
+<article class="item" id="item-8-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-1</div>
+    <h3>디스크 읽기 방식</h3>
+    <p class="item-tagline">DB 성능은 결국 <b>디스크 I/O를 얼마나 줄이느냐</b>의 문제다. 인덱스 챕터가 여기서 시작하는 이유다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    같은 양의 데이터라도 <b>몇 번에 나눠 요청하느냐</b>가 비용을 결정한다. 인덱스가 하는 일이 바로 그 횟수를 줄이는 것이다.
+  </div>
+
+  <h4>디스크는 언제나 병목이다</h4>
+  <ul>
+    <li>데이터 저장 매체는 컴퓨터에서 가장 느린 부분이다.</li>
+    <li>데이터베이스의 성능은 <b>어떻게 디스크 I/O를 줄이느냐</b>가 관건일 때가 많다.</li>
+    <li>DB에서는 거의 항상 디스크 장치가 병목이 된다.</li>
+  </ul>
+
+  <h4>HDD vs SSD</h4>
+  <p>DB의 특성과 OLTP 워크로드를 생각하면 <b>SSD가 훨씬 좋은 선택</b>이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>구조</th><th>순차 I/O</th><th>랜덤 I/O</th></tr></thead>
+      <tbody>
+        <tr><td>HDD</td><td>기계식 — 내부 원판을 돌려 작동</td><td class="t-center">SSD보다 빠를 수도 있다</td><td class="t-center t-no">매우 느리다 (헤드 이동)</td></tr>
+        <tr><td>SSD</td><td>플래시 메모리. 전원이 없어도 데이터 유지</td><td class="t-center t-ok">빠르다</td><td class="t-center t-ok">HDD보다 훨씬 빠르다</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>SSD도 메모리보다는 느리다는 점은 잊지 말자 — 버퍼 풀이 여전히 필요한 이유다.</p>
+
+  <h4>랜덤 I/O vs 순차 I/O</h4>
+  <ul>
+    <li>디스크의 읽기/쓰기 시간은 <b>헤더를 읽고 쓸 위치로 옮기는 단계</b>에서 결정된다.</li>
+    <li>디스크 성능은 <b>헤더 이동 없이 얼마나 많은 데이터를 한 번에 처리하느냐</b>로 결정된다.</li>
+    <li>따라서 여러 번 나눠 요청하는 랜덤 I/O가 부하가 훨씬 크다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>N개의 페이지를 기록할 때</th></tr></thead>
+      <tbody>
+        <tr><td>순차 I/O</td><td class="t-ok">시스템 콜을 <b>1번</b> 요청</td></tr>
+        <tr><td>랜덤 I/O</td><td class="t-no">시스템 콜을 <b>N번</b> 요청</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 구도가 반복해서 나온다 <span class="badge b-blue">보강</span></p>
+      <p>InnoDB의 <a href="#item-4-2">리두 로그(순차)와 데이터 파일(랜덤)</a>, <a href="#item-9-3">MRR 최적화</a>, <a href="#item-9-2">read ahead</a> 는 전부 "랜덤 I/O를 순차 I/O로 바꾸거나 횟수를 줄인다"는 같은 아이디어의 변주다. 이 절을 이해하면 나머지가 자연스럽게 읽힌다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>DB의 병목은 거의 항상 디스크다. 튜닝은 <b>I/O 횟수 줄이기</b>로 수렴한다.</li>
+      <li>OLTP에는 SSD. 다만 SSD도 메모리보다는 느리다.</li>
+      <li>같은 N개 페이지라도 순차는 시스템 콜 1회, 랜덤은 N회.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-2</div>
+    <h3>인덱스</h3>
+    <p class="item-tagline">인덱스는 <b>쓰기를 팔아 읽기를 사는 거래</b>다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    인덱스는 컬럼 값을 <b>미리 정렬해 둔 키:값 쌍</b>이다. 정렬을 유지하는 비용이 쓰기 비용이고, 정렬 덕분에 읽기가 빨라진다.
+  </div>
+
+  <h4>인덱스가 하는 일</h4>
+  <ul>
+    <li>테이블의 모든 데이터를 뒤져서 원하는 값을 찾으려면 오래 걸린다.</li>
+    <li>DB는 <b>컬럼의 값</b>과 <b>그 레코드가 저장된 주소</b>를 키:값 쌍으로 저장해 둔다.</li>
+    <li>인덱스는 컬럼의 값을 주어진 순서대로 <b>미리 정렬해서</b> 저장한다.</li>
+    <li>즉 <b>저장(INSERT, UPDATE 등)의 성능을 희생하고 검색(SELECT)의 성능을 높이는</b> 기능이다.</li>
+  </ul>
+
+  <h4>인덱스 알고리즘</h4>
+  <p>대표적으로 B-Tree와 Hash 두 가지로 나뉜다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>알고리즘</th><th>인덱싱 방식</th><th>동등 비교</th><th>범위·부분 검색</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>B-Tree</td>
+          <td>컬럼 값을 <b>변형하지 않고</b> 원래 값으로 인덱싱</td>
+          <td class="t-center t-ok">가능</td>
+          <td class="t-center t-ok">가능 (정렬되어 있으므로)</td>
+        </tr>
+        <tr>
+          <td>Hash</td>
+          <td>컬럼 값의 <b>해시 값</b>으로 인덱싱</td>
+          <td class="t-center t-ok">매우 빠름</td>
+          <td class="t-center t-no">불가 (해시는 순서를 보존하지 않음)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>인덱스 = <b>정렬된 (컬럼 값 → 레코드 주소) 쌍</b>.</li>
+      <li>읽기를 얻는 대신 쓰기를 지불한다. 공짜 인덱스는 없다.</li>
+      <li>B-Tree는 원본 값을 보존해 범위 검색까지 되고, Hash는 동등 비교만 가능하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-3</div>
+    <h3>B-Tree 인덱스</h3>
+    <p class="item-tagline">Binary 가 아니라 <b>Balanced</b>. 전문 검색 같은 특수 요건이 아니라면 사실상 이것 하나면 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    인덱스 <b>키의 크기</b>가 한 페이지에 담기는 자식 노드 수를 정하고, 그것이 트리의 깊이를 정하고, 깊이가 곧 <b>랜덤 디스크 읽기 횟수</b>다.
+  </div>
+
+  <h4>구조 및 특성</h4>
+  <ul>
+    <li>B는 Binary가 아니라 <b>Balanced</b> 를 의미한다.</li>
+    <li>루트 노드 · 브랜치 노드 · 리프 노드로 이루어진 트리 구조다.</li>
+    <li>맨 끝의 <b>리프 노드는 항상 실제 레코드를 찾아가기 위한 주솟값</b>을 갖는다.</li>
+    <li>인덱스의 키 값은 항상 정렬을 유지하지만, <b>실제 레코드는 그렇지 않다.</b></li>
+    <li>컬럼의 원래 값을 변형하지 않는다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>엔진</th><th>리프 노드가 가진 값</th><th>레코드 접근</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>MyISAM</td>
+          <td><b>ROWID</b> — 추가된 순번 또는 데이터 파일 내 위치</td>
+          <td>ROWID로 데이터 파일에 <b>바로</b> 접근</td>
+        </tr>
+        <tr>
+          <td>InnoDB</td>
+          <td><b>기본키 값</b></td>
+          <td>기본키 인덱스(B-Tree)를 <b>한 번 더</b> 타서 레코드를 읽음</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>B-Tree 인덱스 키 추가 및 삭제</h4>
+
+  <h5>인덱스 키 추가</h5>
+  <ul>
+    <li>새 키가 추가되면 바로 저장될 수도 있지만, <b>적절한 위치를 찾아 재배치</b>해야 할 수도 있다.</li>
+    <li>리프 노드가 꽉 차서 저장이 불가능하면 <b>노드를 분리</b>해야 한다. 쓰기 비용이 상대적으로 큰 이유가 이것이다.</li>
+    <li>간단히 <b>읽기 비용이 1이면 쓰기 비용은 1.5</b> 정도로 생각하면 된다.</li>
+    <li>이 비용은 CPU나 RAM이 아니라 <b>디스크에서 인덱스를 읽어야 해서</b> 발생한다.</li>
+    <li>인덱스 키 추가는 <a href="#item-4-2">체인지 버퍼</a>로 지연 처리할 수 있다. 단 <b>기본키나 유니크 인덱스는 중복 체크가 필요해</b> 즉시 B-Tree에 반영되어야 한다.</li>
+  </ul>
+
+  <h5>인덱스 키 삭제</h5>
+  <ul>
+    <li>해당 키가 저장된 노드를 찾아 <b>삭제 마크만</b> 하면 끝난다.</li>
+    <li>삭제된 자리는 재사용하거나 그대로 방치할 수 있다.</li>
+    <li>InnoDB에서는 이 작업도 체인지 버퍼로 지연 처리할 수 있다.</li>
+  </ul>
+
+  <h5>인덱스 키 변경</h5>
+  <p>먼저 그 키 값을 삭제하고, 다시 새 키 값을 추가하는 방식으로 처리된다. 마찬가지로 지연 처리가 가능하다.</p>
+
+  <h5>인덱스 키 검색</h5>
+  <ul>
+    <li>위와 같은 추가 비용을 감수하면서까지 인덱스를 쓰는 이유는 <b>검색 성능</b> 때문이다.</li>
+    <li><code>SELECT</code> 외에 <code>UPDATE</code>, <code>DELETE</code> 의 <code>WHERE</code> 조건에서도 쓰인다.</li>
+    <li>B-Tree 인덱스는 <b>100% 일치(<code>=</code>)</b> 또는 <b>값의 앞부분이 일치</b>하는 경우에 사용할 수 있다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">인덱스 설계는 곧 잠금 설계다</p>
+      <p>넥스트 키 락이나 레코드 잠금은 <b>수행한 인덱스를 잠근 뒤</b> 테이블의 레코드를 잠그는 방식으로 동작한다. 인덱스를 잘못 설계하면 <b>테이블의 모든 레코드를 잠글 수 있다.</b> (→ <a href="#item-5-3">5-3 인덱스와 잠금</a>)</p>
+    </div>
+  </div>
+
+  <h4>B-Tree 인덱스 사용에 영향을 미치는 요소</h4>
+
+  <h5>인덱스 키 값의 크기</h5>
+  <ul>
+    <li>인덱스도 버퍼 풀처럼 <b>페이지 단위</b>로 관리되며, B-Tree의 자식 노드 개수는 가변적이다.</li>
+    <li>자식 노드의 개수는 <b>페이지 크기와 키 값의 크기</b>로 결정된다.</li>
+  </ul>
+
+  <p>페이지 크기가 기본값 16KB이고, 자식 노드 주소가 12바이트를 차지한다고 하자.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">자식 노드 개수 계산</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 인덱스 키가 16 바이트인 경우
+16 * 1024 / (16 + 12) = 585 개
+
+# 인덱스 키가 32 바이트인 경우
+16 * 1024 / (32 + 12) = 372 개</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 두 번째 계산이 "<b>페이지의 크기가 32KB라면</b> <code>16*1024/(32+12) = 1024</code> 로 자식노드를 372개" 라고 적혀 있다. 세 가지가 어긋나 있다 — ① 분자가 <code>16*1024</code> 그대로이므로 <b>페이지가 아니라 인덱스 키가 32바이트</b>인 경우다. ② <code>16*1024/44</code> 의 값은 1024가 아니라 <b>372</b> 다. ③ 결론인 372개는 맞다. 즉 <b>"인덱스 키가 32바이트라면 372개"</b> 가 맞는 문장이다. 이 문단의 요지는 <b>키 크기가 커질수록 한 페이지에 담기는 자식 수가 줄고, 그만큼 트리가 깊어져 디스크 접근이 늘어난다</b>는 것이다.</p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 520 180" width="520" role="img" aria-label="키 크기가 16바이트일 때와 32바이트일 때 한 페이지에 담기는 자식 노드 수 비교">
+        <text x="90" y="26" class="dg-text" font-size="12" text-anchor="middle">키 16 바이트</text>
+        <rect x="20" y="38" width="140" height="34" rx="6" class="dg-fill-soft"/>
+        <rect x="20" y="38" width="140" height="34" rx="6" class="dg-stroke" fill="none"/>
+        <text x="90" y="60" class="dg-text dg-mono" font-size="14" text-anchor="middle">585 개</text>
+        <text x="90" y="92" class="dg-text-sub" font-size="11" text-anchor="middle">16KB 페이지 1장 기준</text>
+
+        <text x="380" y="26" class="dg-text" font-size="12" text-anchor="middle">키 32 바이트</text>
+        <rect x="310" y="38" width="140" height="34" rx="6" class="dg-fill-bg"/>
+        <rect x="310" y="38" width="140" height="34" rx="6" class="dg-stroke" fill="none"/>
+        <text x="380" y="60" class="dg-text dg-mono" font-size="14" text-anchor="middle">372 개</text>
+        <text x="380" y="92" class="dg-text-sub" font-size="11" text-anchor="middle">16KB 페이지 1장 기준</text>
+
+        <text x="235" y="60" class="dg-text" font-size="15" text-anchor="middle">→</text>
+        <text x="260" y="132" class="dg-text" font-size="12" text-anchor="middle">한 페이지가 덮는 범위가 좁아진다 = 트리가 깊어진다</text>
+        <text x="260" y="152" class="dg-text-sub" font-size="11" text-anchor="middle">깊이 1단계 = 랜덤 디스크 읽기 1회</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>키가 두 배가 되면 팬아웃은 거의 절반이 된다</b> — 기본키를 짧게 유지해야 하는 가장 근본적인 이유.</div>
+  </div>
+
+  <h5>B-Tree의 깊이</h5>
+  <ul>
+    <li>깊이는 매우 중요하지만 <b>직접 제어할 방법이 없다.</b></li>
+    <li>깊이는 곧 <b>값을 찾을 때 몇 번이나 랜덤하게 디스크를 읽어야 하는지</b>와 직결된다.</li>
+    <li>가능하면 작게 만드는 것이 좋다는 점을 강조하기 위한 이야기이고, 실제로는 대용량 DB라도 <b>보통 5를 넘지 않는다.</b></li>
+  </ul>
+
+  <h5>선택도(기수성) — Selectivity / Cardinality</h5>
+  <ul>
+    <li>모든 인덱스 키 값 중 <b>유니크한 값의 수</b>를 의미한다.</li>
+    <li>값이 100개인데 유니크한 값이 10개라면 기수성은 10이다.</li>
+    <li>중복이 많을수록 기수성이 낮아지고 선택도도 떨어진다.</li>
+    <li>선택도가 높을수록 검색 대상이 줄어들어 빠르게 처리된다.</li>
+  </ul>
+
+  <h5>예시 — 총 10,000건, <code>country</code> 의 유니크 값 수만 다를 때</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM test WHERE country='KOREA' AND city='SEOUL';</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>CASE</th><th><code>country</code> 유니크 값</th><th>인덱스로 읽는 건수</th><th>버려지는 건수</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>10개</td><td>평균 1,000건</td><td class="t-no">999건이 헛수고</td></tr>
+        <tr><td>B</td><td>1,000개</td><td>평균 10건</td><td class="t-ok">9건만 헛수고</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>CASE A의 <code>country</code> 인덱스는 <b>비효율적</b>이다.</li>
+    <li>필요한 만큼의 레코드만 읽으면 좋겠지만, 현실적으로 모든 조건을 만족하는 인덱스를 만드는 것은 불가능하다.</li>
+  </ul>
+
+  <h5>읽어야 하는 레코드의 건수</h5>
+  <ul>
+    <li>인덱스를 거쳐 레코드를 읽는 것은 <b>테이블을 바로 읽는 것보다 건당 비용이 높다.</b>
+      <ul><li>옵티마이저는 인덱스를 타서 가져오는 쪽이 <b>약 4~5배 비싸다</b>고 예측한다.</li></ul>
+    </li>
+    <li>예를 들어 100만 건 중 50만 건을 읽어야 한다면, 전부 읽고 50만 건을 버릴지 인덱스로 50만 건만 읽을지 판단해야 한다.</li>
+    <li>인덱스로 읽어야 할 데이터가 전체 레코드의 <b>20~25%를 넘어가면</b>, 그냥 전부 읽고 필터링하는 편이 효율적이다.</li>
+    <li>이런 경우 옵티마이저는 <b>인덱스를 타지 않는다.</b> 결국 그 인덱스는 저장 공간만 낭비하는 셈이 된다.</li>
+  </ul>
+
+  <h4>B-Tree 인덱스를 통한 데이터 읽기</h4>
+  <p>인덱스 사용을 유도할지 말지 판단하려면 <b>어떤 방식으로 인덱스를 경유하는지</b>를 알아야 한다.</p>
+
+  <h5>인덱스 레인지 스캔</h5>
+  <ul>
+    <li>가장 대표적인 접근 방식이다.</li>
+    <li>검색해야 할 <b>인덱스의 범위가 정해져 있을 때</b> 사용한다.</li>
+    <li>루트 → 브랜치 → 리프까지 내려가야 <b>레코드 시작 지점</b>을 확인할 수 있다.</li>
+    <li>문제는 그 시작 지점부터 끝 지점까지 <b>레코드 한 건마다 랜덤 I/O가 발생</b>한다는 점이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM employees WHERE first_name BETWEEN 'Ebbe' AND 'Gad';</code></pre>
+  </div>
+
+  <ol class="steps">
+    <li><div class="step-title">인덱스 탐색 (Index Seek)</div><p>조건을 만족하는 값이 저장된 위치를 찾는다.</p></li>
+    <li><div class="step-title">인덱스 스캔 (Index Scan)</div><p>1번에서 찾은 위치부터 필요한 만큼 차례대로 읽는다.</p></li>
+    <li><div class="step-title">레코드 읽기 (선택적)</div><p>2번에서 얻은 레코드 주소로 데이터 페이지를 읽어 실제 레코드를 가져온다. <b>이 단계를 건너뛰는 것이 커버링 인덱스</b>다.</p></li>
+  </ol>
+
+  <h5>수행 횟수 확인하기</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW STATUS LIKE 'Handler_%';
++----------------------------+--------+
+| Variable_name              | Value  |
++----------------------------+--------+
+| Handler_read_first         | 5      |
+| Handler_read_key           | 139    |
+| Handler_read_last          | 0      |
+| Handler_read_next          | 16302  |
+| Handler_read_prev          | 0      |
+| Handler_read_rnd           | 0      |
+| Handler_read_rnd_next      | 300034 |
+| Handler_update             | 1      |
+| Handler_write              | 0      |
++----------------------------+--------+</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상태 변수</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>Handler_read_key</code></td><td><b>1단계(탐색)</b> 가 실행된 횟수</td></tr>
+        <tr><td><code>Handler_read_next</code></td><td>인덱스를 <b>정순</b>으로 읽은 레코드 건수 (2단계)</td></tr>
+        <tr><td><code>Handler_read_prev</code></td><td>인덱스를 <b>역순</b>으로 읽은 레코드 건수 (2단계, 주로 <code>ORDER BY ... DESC</code>)</td></tr>
+        <tr><td><code>Handler_read_first</code></td><td>인덱스의 <b>첫 번째</b> 엔트리를 읽은 횟수. 높으면 풀 인덱스 스캔이 많다는 신호</td></tr>
+        <tr><td><code>Handler_read_last</code></td><td>인덱스의 <b>마지막</b> 키를 읽은 횟수</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>인덱스 풀 스캔</h5>
+  <ul>
+    <li>인덱스를 <b>처음부터 끝까지</b> 다 읽는 방식이다.</li>
+    <li>대표적으로 조인 조건에 사용된 컬럼이 인덱스의 <b>첫 번째 컬럼이 아닐 때</b> 발생한다.
+      <ul><li>인덱스가 (A, B, C) 순인데 B나 C로 조인하는 경우다.</li></ul>
+    </li>
+    <li>일반적으로 인덱스는 테이블보다 작으므로, <b>인덱스만 읽으면 되는 경우</b>에는 효율적이다.</li>
+    <li>레코드까지 다 읽어야 한다면 <b>절대 이 방식으로 처리하면 안 된다.</b></li>
+    <li>레인지 스캔보다는 느리지만 테이블 풀 스캔보다는 낫다.</li>
+  </ul>
+
+  <h5>루스 인덱스 스캔</h5>
+  <ul>
+    <li>말 그대로 <b>느슨하게(듬성듬성)</b> 인덱스를 읽는 것이다.</li>
+    <li>스캔 도중 필요하지 않은 키 값은 <b>건너뛰고(SKIP)</b> 다음으로 넘어간다.</li>
+    <li>주로 <code>GROUP BY</code> 나 <code>MIN()</code> / <code>MAX()</code> 처리에 쓰인다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">INDEX(dept_no, emp_no) 가정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT dept_no, MIN(emp_no)
+FROM dept_emp
+WHERE dept_no BETWEEN 'd002' AND 'd004'
+GROUP BY dept_no;</code></pre>
+  </div>
+  <p><code>dept_no</code> 가 이미 정렬되어 있으므로, 각 <code>dept_no</code> 그룹의 <b>첫 <code>emp_no</code> 하나만</b> 읽고 다음 그룹으로 점프하면 된다.</p>
+
+  <h5>인덱스 스킵 스캔</h5>
+  <ul>
+    <li>루스 인덱스 스캔과 비슷하지만, <b><code>WHERE</code> 조건 검색에도 쓸 수 있도록</b> 범위가 넓어진 것이다.</li>
+    <li>선행 컬럼의 유니크 값이 많으면 오히려 더 느려질 수 있다.</li>
+    <li>쿼리가 <b>인덱스에 존재하는 컬럼만으로 처리 가능</b>해야 한다 (커버링 인덱스).</li>
+    <li>결국 <b>선행 컬럼의 유니크 값이 소수일 때만</b> 적용 가능한 최적화다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">skip-scan.sql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- gender + birth_date 복합 인덱스 생성
+ALTER TABLE employees ADD INDEX ix_gender_birthdate (gender, birth_date);
+
+-- 선행 컬럼 없음 → 스킵 스캔이 없다면 인덱스 사용 불가
+SELECT * FROM employees WHERE birth_date &gt;= '1965-02-01';
+
+-- 선행 컬럼 있음 → 정상적인 인덱스 사용
+SELECT * FROM employees WHERE gender='M' AND birth_date &gt;= '1965-02-01';</code></pre>
+  </div>
+  <p><code>gender</code> 는 값이 두 개(M/F)뿐이므로, 옵티마이저가 내부적으로 <code>gender='M'</code>, <code>gender='F'</code> 두 번의 레인지 스캔으로 바꿔 실행할 수 있다. 이것이 스킵 스캔이다.</p>
+
+  <h4>다중 컬럼(Multi-Column) 인덱스</h4>
+  <ul>
+    <li>실제 서비스용 DB에서는 2개 이상의 컬럼을 포함한 인덱스가 더 많이 쓰인다.</li>
+    <li>인덱스의 <b>두 번째 컬럼은 첫 번째 컬럼에 의존해서</b> 정렬된다.
+      <ul><li>즉 두 번째 컬럼의 정렬은 <b>첫 번째 컬럼이 같은 레코드들 안에서만</b> 의미가 있다.</li></ul>
+    </li>
+    <li>따라서 각 컬럼의 <b>순서가 상당히 중요하다.</b></li>
+  </ul>
+
+  <h4>B-Tree 인덱스의 정렬 및 스캔 방향</h4>
+
+  <h5>인덱스의 정렬</h5>
+  <ul>
+    <li>인덱스 키는 항상 오름차순 또는 내림차순으로 정렬되어 저장된다.</li>
+    <li>어느 방향으로 읽을지는 <b>옵티마이저가 실시간으로 만드는 실행 계획</b>에 따라 달라진다.</li>
+  </ul>
+
+  <h5>인덱스의 스캔 방향</h5>
+  <ul>
+    <li>인덱스는 <b>생성 시점</b>에 오름차순/내림차순이 결정된다.</li>
+    <li>하지만 <b>스캔 방향</b>은 쿼리가 그 인덱스를 읽는 방향에 따라 결정된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- 인덱스가 이미 정렬되어 있으므로 별도의 정렬 작업이 없다
+SELECT * FROM employees WHERE first_name &gt;= 'Anneke'
+ORDER BY first_name LIMIT 4;
+
+-- 인덱스를 역순으로 스캔하면서 처음 5개만 찾으면 된다
+SELECT * FROM employees
+ORDER BY first_name DESC LIMIT 5;</code></pre>
+  </div>
+
+  <h5>내림차순 인덱스</h5>
+  <p>2개 이상의 컬럼으로 구성된 복합 인덱스에서 <b>각 키의 정렬 방향이 섞여 있다면</b>, 내림차순 인덱스로만 해결할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE INDEX ix_a_b ON tbl (a ASC, b DESC);</code></pre>
+  </div>
+
+  <h5>뭐가 더 빠를까</h5>
+  <ul>
+    <li>단순히 역순으로 스캔하는 경우 약 <b>30% 정도 느리다.</b></li>
+    <li>이는 인덱스 구조 때문이다.
+      <ul>
+        <li>페이지 잠금이 정순 스캔에 적합한 구조다.</li>
+        <li>페이지 안의 인덱스 레코드가 <b>단방향으로만</b> 연결되어 있다.</li>
+      </ul>
+    </li>
+    <li>애플리케이션이 어떤 쿼리를 자주 쓰는지에 따라 인덱스의 방향도 정하면 좋다.</li>
+  </ul>
+
+  <h4>B-Tree 인덱스의 가용성과 효율성</h4>
+
+  <h5>비교 조건의 종류와 효율성</h5>
+  <ul>
+    <li>다중 컬럼 인덱스에서는 <b>컬럼의 순서와 비교 조건</b>에 따라 활용 형태가 달라진다.</li>
+    <li><b>작업 범위 결정 조건</b>은 많을수록 성능이 좋아지지만, <b>체크 조건</b>은 많다고 성능이 좋아지지 않는다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM dept_emp
+WHERE dept_no='d002' AND emp_no &gt;= 10114;</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>CASE</th><th>인덱스</th><th>처리 과정</th><th>5건을 찾을 때</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>A</td><td><code>(dept_no, emp_no)</code></td>
+          <td>시작점을 찾은 뒤 <code>dept_no</code> 가 <code>'d002'</code> 가 아닐 때까지 <b>쭉 스캔</b></td>
+          <td class="t-ok">비교 작업 5번</td>
+        </tr>
+        <tr>
+          <td>B</td><td><code>(emp_no, dept_no)</code></td>
+          <td><code>emp_no &gt;= 10114</code> 인 <b>모든 레코드</b>에 대해 <code>dept_no</code> 를 하나씩 비교</td>
+          <td class="t-no">그보다 훨씬 많은 비용</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>차이의 원인은 명확하다 — <b>동등 비교 조건이 선행 컬럼에 와야</b> 인덱스에서 연속된 구간을 잡을 수 있다.</p>
+
+  <h5>인덱스의 가용성</h5>
+  <ul>
+    <li>인덱스 키 값의 <b>정렬 특성</b>이 빠른 검색의 전제 조건이다.</li>
+    <li>다중 컬럼 인덱스에서 <b>왼쪽 컬럼의 값을 모르면</b> 레인지 스캔이 불가능하다.</li>
+    <li>이 조건은 <code>WHERE</code> 뿐 아니라 <code>ORDER BY</code>, <code>GROUP BY</code> 에도 똑같이 적용된다.</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">인덱스 사용 불가</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- 앞쪽에 와일드카드
+SELECT * FROM employees
+WHERE first_name LIKE '%mer';
+
+-- INDEX(dept_no, emp_no) 인데
+-- 선행 컬럼 dept_no 조건이 없다
+SELECT * FROM dept_emp
+WHERE emp_no &gt;= 10114;</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">인덱스 사용 가능</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- 뒤쪽 와일드카드는 OK
+SELECT * FROM employees
+WHERE first_name LIKE 'mer%';
+
+-- 선행 컬럼이 동등 비교로 고정됨
+SELECT * FROM dept_emp
+WHERE dept_no='d002' AND emp_no &gt;= 10114;</code></pre>
+    </div>
+  </div>
+
+  <h5>작업 범위 결정 조건으로 쓸 수 없는 조건들</h5>
+  <p>아래는 인덱스의 <b>작업 범위를 좁히는 데</b> 쓸 수 없는 조건들이다. 경우에 따라 체크 조건으로는 쓰일 수 있다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유형</th><th>예</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>NOT-EQUAL 비교</td>
+          <td><code>column &lt;&gt; 'N'</code> · <code>column NOT IN ('N1','N2')</code> · <code>column NOT BETWEEN 'N1' AND 'N2'</code> · <code>IS NOT NULL</code></td>
+        </tr>
+        <tr>
+          <td>앞쪽 LIKE</td>
+          <td><code>column LIKE '%승환'</code> · <code>column LIKE '_승환'</code> · <code>column LIKE '%승%'</code></td>
+        </tr>
+        <tr>
+          <td>컬럼이 함수·연산으로 변형됨</td>
+          <td><code>SUBSTRING(column,1,1) = 'X'</code> · <code>DAYOFMONTH(column) = 1</code></td>
+        </tr>
+        <tr>
+          <td>NOT-DETERMINISTIC 스토어드 함수 비교</td>
+          <td><code>column = deterministic_function()</code> 형태에서 함수가 비확정적일 때</td>
+        </tr>
+        <tr>
+          <td>데이터 타입 불일치 (컬럼 쪽 형변환 발생)</td>
+          <td><code>char_column = 10</code></td>
+        </tr>
+        <tr>
+          <td>문자열 콜레이션 불일치</td>
+          <td><code>utf8_bin_char_column = euckr_char_column</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>INDEX(col1, col2, col3) 일 때 정리</h5>
+  <ul>
+    <li><b>작업 범위 결정 조건으로 못 쓰는 경우</b>
+      <ul>
+        <li><code>col1</code> 에 대한 조건이 아예 없을 때</li>
+        <li><code>col1</code> 의 비교 조건이 위 표의 사용 불가 유형 중 하나일 때</li>
+      </ul>
+    </li>
+    <li><b>작업 범위 결정 조건으로 쓰는 경우</b>
+      <ul>
+        <li><code>col1</code> ~ <code>col(i-1)</code> 까지 동등 비교(<code>=</code> 또는 <code>IN</code>) 이고,</li>
+        <li><code>col(i)</code> 가 동등 비교(<code>=</code>, <code>IN</code>) · 부등호(<code>&gt;</code>, <code>&lt;</code>) · 뒷 LIKE(<code>LIKE '승환%'</code>) 중 하나일 때</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>B는 <b>Balanced</b>. InnoDB의 리프 노드는 <b>기본키 값</b>을 담고, MyISAM은 ROWID를 담는다.</li>
+      <li>인덱스 키가 클수록 팬아웃이 줄고 트리가 깊어진다 — <b>깊이 = 랜덤 디스크 읽기 횟수</b>.</li>
+      <li>읽을 데이터가 전체의 <b>20~25%</b> 를 넘으면 옵티마이저는 인덱스를 버린다.</li>
+      <li>접근 방식은 <b>레인지 스캔 · 풀 스캔 · 루스 스캔 · 스킵 스캔</b> 네 가지.</li>
+      <li>다중 컬럼 인덱스의 생명은 <b>순서</b>다. 동등 비교 컬럼을 앞에 두는 것이 원칙.</li>
+      <li>컬럼을 변형하거나(<code>SUBSTRING</code>), 타입이 다르거나, 앞쪽 LIKE면 <b>범위를 좁히는 데 못 쓴다.</b></li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-4</div>
+    <h3>R-Tree 인덱스</h3>
+    <p class="item-tagline">2차원 공간 데이터를 위한 인덱스. 핵심 개념은 <b>MBR</b> 하나다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    R-Tree는 도형 자체가 아니라 <b>도형을 감싸는 최소 사각형(MBR)</b> 을 인덱싱한다.
+  </div>
+
+  <h4>구조 및 특성</h4>
+  <ul>
+    <li>공간 인덱스는 R-Tree 알고리즘으로 <b>2차원 데이터</b>를 인덱싱하고 검색한다.</li>
+    <li><code>POINT</code>, <code>LINESTRING</code>, <code>POLYGON</code>, <code>GEOMETRY</code> 네 가지 유형이 있다.</li>
+    <li><code>GEOMETRY</code> 는 나머지 셋의 <b>슈퍼 타입</b>이라 어떤 객체든 저장할 수 있다.</li>
+    <li>단순히 X, Y 좌표만 있는 포인트 데이터도 도형이 될 수 있다.</li>
+  </ul>
+
+  <h5>MBR (Minimum Bounding Rectangle)</h5>
+  <ul>
+    <li>도형을 감싸는 <b>최소 크기의 사각형</b>을 뜻한다.</li>
+    <li>R-Tree의 노드에 저장되는 정보가 바로 이 MBR이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 420 170" width="420" role="img" aria-label="불규칙한 도형을 감싸는 최소 경계 사각형 MBR">
+        <rect x="90" y="30" width="160" height="100" rx="2" class="dg-stroke" fill="none" stroke-dasharray="5 4"/>
+        <path d="M110 110 L140 45 L180 70 L235 40 L240 120 L165 128 Z" class="dg-fill-soft"/>
+        <path d="M110 110 L140 45 L180 70 L235 40 L240 120 L165 128 Z" class="dg-stroke" fill="none"/>
+        <text x="290" y="55" class="dg-text dg-mono" font-size="12">MBR</text>
+        <text x="290" y="74" class="dg-text-sub" font-size="11">인덱스에 저장되는 것</text>
+        <text x="290" y="104" class="dg-text dg-mono" font-size="12">POLYGON</text>
+        <text x="290" y="123" class="dg-text-sub" font-size="11">실제 데이터</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>인덱스는 사각형만 본다</b> — 그래서 R-Tree 검색은 항상 "후보를 좁히고 정밀 판정"의 2단계다.</div>
+  </div>
+
+  <h4>R-Tree 인덱스의 용도</h4>
+  <ul>
+    <li>좌표 시스템에 기반한 정보에 주로 쓴다.</li>
+    <li>인덱스를 활용하려면 <code>ST_Contains()</code>, <code>ST_Within()</code> 같은 <b>공간 함수를 써야</b> 한다. 일반 비교 연산자로는 타지 않는다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>공간 인덱스 = R-Tree. 인덱싱 단위는 도형이 아니라 <b>MBR</b>.</li>
+      <li><code>GEOMETRY</code> 는 POINT / LINESTRING / POLYGON 의 슈퍼 타입.</li>
+      <li>인덱스를 타려면 <code>ST_Contains()</code>, <code>ST_Within()</code> 등 <b>전용 함수</b>가 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-5</div>
+    <h3>전문 검색 인덱스</h3>
+    <p class="item-tagline">어근 분석은 서구권 언어의 것이고, <b>한글에는 n-gram</b> 이 현실적이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    전문 검색 인덱스는 <b><code>MATCH ... AGAINST ...</code> 문법으로만</b> 탄다. <code>LIKE '%키워드%'</code> 로는 절대 쓰이지 않는다.
+  </div>
+
+  <h4>왜 B-Tree로는 안 되는가</h4>
+  <ul>
+    <li>전문 검색은 문서 <b>전체에 대한 분석과 검색</b>을 위한 인덱싱이다.</li>
+    <li>B-Tree 인덱스는 값의 <b>앞부분</b>만 매칭할 수 있으므로, 문서 중간의 단어를 찾는 데 쓸 수 없다.</li>
+  </ul>
+
+  <h4>인덱스 알고리즘</h4>
+  <p>본문에서 사용자가 검색할 키워드를 분석해, 빠른 검색이 가능한 형태로 인덱스를 만든다. 크게 <b>어근 분석</b>과 <b>n-gram</b> 으로 나뉜다.</p>
+
+  <h5>어근 분석 알고리즘</h5>
+
+  <h5>불용어 처리</h5>
+  <ul>
+    <li>검색에서 가치가 없는 단어를 필터링해 제거한다. (a, the, is 등)</li>
+    <li>DB가 제공하는 불용어 리스트를 쓰거나 직접 정의할 수 있다.</li>
+    <li>제공되는 목록은 <code>information_schema.innodb_ft_default_stopword</code> 에 있다.</li>
+  </ul>
+
+  <h5>어근 분석</h5>
+  <ul>
+    <li>검색어로 선정된 단어의 <b>원형(뿌리)</b> 을 찾는 작업이다.</li>
+    <li>언어별로 형태소 분석 방법이 완전히 다르며, 한국어는 <b>MeCab</b> 을 쓸 수 있다.</li>
+  </ul>
+
+  <h5>n-gram 알고리즘</h5>
+  <ul>
+    <li>형태소 분석은 매우 전문적인 영역이라 만족스러운 결과를 얻기까지 많은 노력과 시간이 든다.</li>
+    <li>n-gram은 <b>단순히 키워드를 검색해 내기 위한</b> 인덱싱 알고리즘이다.</li>
+    <li>본문을 몇 글자씩 잘라 인덱싱한다. 일반적으로 <b>2글자</b>로 자른다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">"To be or not to be" 의 bi-gram 토큰</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">To
+be
+or
+no   ← "not" 에서
+ot   ← "not" 에서
+to
+be
+...</code></pre>
+  </div>
+  <p>단어 경계를 무시하고 기계적으로 잘라 내기 때문에 <b>형태소 분석이 어려운 한글에 특히 유용</b>하다.</p>
+
+  <h4>불용어 변경 및 삭제</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>목적</th><th>방법</th></tr></thead>
+      <tbody>
+        <tr><td>불용어 삭제 (전역)</td><td><code>ft_stopword_file</code> 에 <b>빈 문자열</b>을 지정. <b>서버 재시작 필요</b></td></tr>
+        <tr><td>InnoDB 테이블 불용어 끄기</td><td><code>innodb_ft_enable_stopword = OFF</code>. MyISAM 등에는 여전히 적용됨</td></tr>
+        <tr><td>사용자 정의 불용어</td><td><code>ft_stopword_file='/data/my_stopwords.txt'</code></td></tr>
+        <tr><td>사용자 정의 불용어 (InnoDB)</td><td><b>테이블</b>을 불용어 목록으로 지정 가능</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag good">순서가 중요하다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 1) 불용어 테이블을 만들고 단어를 먼저 등록한다
+mysql&gt; CREATE TABLE my_stopword(value VARCHAR(30)) ENGINE=INNODB;
+mysql&gt; INSERT INTO my_stopword(value) VALUES('mysql');
+
+-- 2) 서버에 그 테이블을 알린다
+mysql&gt; SET GLOBAL innodb_ft_server_stopword_table='realmysql/my_stopword';
+
+-- 3) 그다음에 인덱스를 생성해야 적용된다
+mysql&gt; ALTER TABLE tb_bi_gram
+    -&gt; ADD FULLTEXT INDEX fx_title_body(title, body) WITH PARSER ngram;</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">단어 등록 → 인덱스 생성 순서</p>
+      <p>InnoDB에서 불용어 테이블을 쓸 때는 <b>단어를 먼저 등록하고 그다음에 인덱스를 생성</b>해야 한다. 이미 만들어진 인덱스에는 소급 적용되지 않는다.</p>
+    </div>
+  </div>
+
+  <h4>전문 검색 인덱스의 가용성</h4>
+  <p>다음 두 조건을 <b>모두</b> 만족해야 전문 검색 인덱스를 탄다.</p>
+  <ul>
+    <li>쿼리가 전문 검색 문법(<code>MATCH ... AGAINST ...</code>)을 사용할 것</li>
+    <li>테이블이 그 컬럼에 대해 전문 인덱스를 보유할 것</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">인덱스 미사용</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM tb_test
+WHERE doc_body LIKE '%디비%';</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">인덱스 사용</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM tb_test
+WHERE MATCH(doc_body)
+  AGAINST('디비' IN BOOLEAN MODE);</code></pre>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>전문 검색 인덱스는 <b>어근 분석</b>(서구권 / MeCab) 또는 <b>n-gram</b>(범용, 한글에 적합) 으로 토큰을 만든다.</li>
+      <li>불용어는 파일 또는 <b>InnoDB 테이블</b>로 정의한다. 단어 등록 → 인덱스 생성 순서를 지킨다.</li>
+      <li><code>MATCH ... AGAINST</code> 를 써야만 탄다. <code>LIKE</code> 로는 절대 안 된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-6</div>
+    <h3>함수 기반 인덱스</h3>
+    <p class="item-tagline">컬럼을 가공한 값에 인덱스를 걸어야 할 때. <b>가상 컬럼</b> 방식과 <b>함수</b> 방식 두 가지가 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    함수 기반 인덱스는 <b>조건절에 그 표현식이 그대로 등장해야만</b> 탄다. 표현식이 조금이라도 다르면 소용없다.
+  </div>
+
+  <h4>두 가지 방식</h4>
+  <ul>
+    <li>컬럼의 값을 변형해서 만들어진 값에 인덱스를 걸어야 할 때 쓴다.</li>
+    <li><b>가상 컬럼 사용</b> 방식과 <b>함수 직접 사용</b> 방식이 있다.</li>
+    <li>인덱싱할 값을 계산하는 과정만 다를 뿐, <b>나머지는 B-Tree와 완전히 동일</b>하다.</li>
+  </ul>
+
+  <h4>가상 컬럼을 이용한 인덱스</h4>
+  <p>가상 컬럼은 테이블에 새 컬럼을 추가하는 것과 같은 효과라, <b>실제 테이블 구조가 변경된다</b>는 단점이 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; DESC user;
++------------+-------------+------+-----+---------+-------+
+| Field      | Type        | Null | Key | Default | Extra |
++------------+-------------+------+-----+---------+-------+
+| user_id    | int         | NO   | PRI | NULL    |       |
+| first_name | varchar(10) | YES  |     | NULL    |       |
+| last_name  | varchar(10) | YES  |     | NULL    |       |
++------------+-------------+------+-----+---------+-------+
+
+mysql&gt; ALTER TABLE user
+    -&gt; ADD full_name VARCHAR(30) AS (CONCAT(first_name, ' ', last_name)) VIRTUAL,
+    -&gt; ADD INDEX ix_fullname(full_name);
+Query OK, 0 rows affected (0.02 sec)
+
+mysql&gt; DESC user;
++------------+-------------+------+-----+---------+-------------------+
+| Field      | Type        | Null | Key | Default | Extra             |
++------------+-------------+------+-----+---------+-------------------+
+| user_id    | int         | NO   | PRI | NULL    |                   |
+| first_name | varchar(10) | YES  |     | NULL    |                   |
+| last_name  | varchar(10) | YES  |     | NULL    |                   |
+| full_name  | varchar(30) | YES  | MUL | NULL    | VIRTUAL GENERATED |
++------------+-------------+------+-----+---------+-------------------+</code></pre>
+  </div>
+
+  <h4>함수를 이용한 인덱스</h4>
+  <ul>
+    <li>테이블 구조를 <b>변경하지 않고</b> 계산된 결괏값의 검색을 빠르게 만든다.</li>
+    <li>단, <b>조건절에 그 표현식이 그대로 등장해야</b> 인덱스를 탄다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; CREATE TABLE home (
+    -&gt;   id INT,
+    -&gt;   address VARCHAR(255),
+    -&gt;   number VARCHAR(255),
+    -&gt;   INDEX ix_home_address_number ((CONCAT(address, ' ', number)))
+    -&gt; );
+Query OK, 0 rows affected (0.03 sec)</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">인덱스 사용</span>
+      <span class="code-tag good">key = ix_home_address_number</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; EXPLAIN SELECT * FROM home
+    -&gt; WHERE CONCAT(address, ' ', number)='HOME123';
++----+------+------------------------+------------------------+---------+-------+------+-------+
+| id | type | possible_keys          | key                    | key_len | ref   | rows | Extra |
++----+------+------------------------+------------------------+---------+-------+------+-------+
+|  1 | ref  | ix_home_address_number | ix_home_address_number | 2047    | const |    1 | NULL  |
++----+------+------------------------+------------------------+---------+-------+------+-------+</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">인덱스 미사용</span>
+      <span class="code-tag bad">type = ALL</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; EXPLAIN SELECT * FROM home
+    -&gt; WHERE address="asd" AND number="asd";
++----+------+---------------+------+---------+------+------+-------------+
+| id | type | possible_keys | key  | key_len | ref  | rows | Extra       |
++----+------+---------------+------+---------+------+------+-------------+
+|  1 | ALL  | NULL          | NULL | NULL    | NULL |    1 | Using where |
++----+------+---------------+------+---------+------+------+-------------+</code></pre>
+  </div>
+
+  <p>같은 두 컬럼을 참조하지만, 인덱스가 걸린 것은 <code>CONCAT(address, ' ', number)</code> 라는 <b>표현식</b> 이지 두 컬럼 각각이 아니다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>가상 컬럼 방식은 <b>테이블 구조가 바뀌고</b>, 함수 방식은 바뀌지 않는다.</li>
+      <li>인덱스가 걸리는 대상은 <b>표현식 그 자체</b>다. 조건절에 동일한 표현식이 나와야 탄다.</li>
+      <li>계산 방식만 다를 뿐 내부적으로는 평범한 B-Tree 인덱스다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-7</div>
+    <h3>멀티 밸류 인덱스</h3>
+    <p class="item-tagline">레코드 하나가 <b>여러 개의 키 값</b>을 갖는 인덱스. JSON 배열을 위해 도입되었다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    멀티 밸류 인덱스는 <b>세 개의 함수</b>(<code>MEMBER OF</code>, <code>JSON_CONTAINS</code>, <code>JSON_OVERLAPS</code>)로만 탄다.
+  </div>
+
+  <h4>왜 필요해졌나</h4>
+  <ul>
+    <li>일반적인 RDBMS에서 레코드 하나가 여러 키 값을 갖는 것은 <b>정규화를 위배</b>하는 형태다.</li>
+    <li>그러나 JSON 타입을 지원하기 시작하면서 이런 요건이 실제로 생겼다.</li>
+    <li>인덱스를 탈 수 있는 함수는 세 가지뿐이다 — <code>MEMBER OF()</code>, <code>JSON_CONTAINS()</code>, <code>JSON_OVERLAPS()</code>.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; CREATE TABLE user (
+    -&gt;   id INT AUTO_INCREMENT PRIMARY KEY,
+    -&gt;   first_name VARCHAR(255),
+    -&gt;   last_name VARCHAR(255),
+    -&gt;   credit_info JSON,
+    -&gt;   INDEX mx_creditscores (
+    -&gt;     (CAST(credit_info-&gt;'$.credit_scores' AS UNSIGNED ARRAY))
+    -&gt;   )
+    -&gt; );
+Query OK, 0 rows affected (0.01 sec)
+
+mysql&gt; INSERT INTO user VALUES
+    -&gt; (1, 'Kim', 'Dongwoo', '{"credit_scores": [360, 123, 123]}');
+Query OK, 1 row affected (0.01 sec)</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-tag good">key = mx_creditscores</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT * FROM user
+    -&gt; WHERE 360 MEMBER OF (credit_info-&gt;'$.credit_scores');
++----+------------+-----------+------------------------------------+
+| id | first_name | last_name | credit_info                        |
++----+------------+-----------+------------------------------------+
+|  1 | Kim        | Dongwoo   | {"credit_scores": [360, 123, 123]} |
++----+------------+-----------+------------------------------------+
+
+mysql&gt; EXPLAIN SELECT * FROM user
+    -&gt; WHERE 360 MEMBER OF (credit_info-&gt;'$.credit_scores');
++----+------+-----------------+-----------------+---------+-------+------+-------------+
+| id | type | possible_keys   | key             | key_len | ref   | rows | Extra       |
++----+------+-----------------+-----------------+---------+-------+------+-------------+
+|  1 | ref  | mx_creditscores | mx_creditscores | 9       | const |    1 | Using where |
++----+------+-----------------+-----------------+---------+-------+------+-------------+</code></pre>
+  </div>
+
+  <p><code>CAST(... AS UNSIGNED ARRAY)</code> 가 핵심이다. 이 <code>ARRAY</code> 키워드가 "이 인덱스는 레코드 하나당 여러 엔트리를 만든다"는 선언이다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>레코드 1건 → 인덱스 엔트리 N개. JSON 배열 검색을 위한 인덱스다.</li>
+      <li>선언은 <code>CAST(expr AS &lt;type&gt; ARRAY)</code> 형태.</li>
+      <li><code>MEMBER OF</code> · <code>JSON_CONTAINS</code> · <code>JSON_OVERLAPS</code> 세 가지에서만 사용된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-8" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-8</div>
+    <h3>클러스터링 인덱스</h3>
+    <p class="item-tagline">InnoDB에서 <b>기본키는 인덱스가 아니라 테이블 그 자체</b>다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    모든 세컨더리 인덱스가 <b>기본키 값을 품고 있다.</b> 그래서 기본키 크기가 커지면 <b>모든 인덱스가 같이 커진다.</b>
+  </div>
+
+  <h4>클러스터링 인덱스란</h4>
+  <ul>
+    <li>테이블의 <b>프라이머리 키에 대해서만</b> 적용되는 개념이다.</li>
+    <li>레코드를 비슷한 값끼리 묶어서 저장하는 형태이며, <b>InnoDB에서만</b> 지원한다.
+      <ul><li>즉 <b>기본키 값에 의해 저장 위치가 결정</b>된다.</li></ul>
+    </li>
+    <li>다른 값으로도 클러스터링할 수 있지만, <b>기본키로 만들어진 것만</b> 클러스터링 인덱스/테이블이라고 부른다.</li>
+    <li>클러스터링 테이블의 인덱스 리프 노드에는 <b>모든 컬럼</b>이 저장된다. 인덱스 자체가 곧 테이블이다.</li>
+  </ul>
+
+  <h5>기본키가 없을 때는?</h5>
+  <p>InnoDB는 다음 순서로 클러스터링 키를 정한다.</p>
+  <ol class="steps">
+    <li><div class="step-title">NOT NULL 유니크 인덱스 중 첫 번째</div><p>이것이 있으면 클러스터링 키로 채택한다.</p></li>
+    <li><div class="step-title">내부 자동 증가 컬럼 생성</div><p>자동으로 증가하는 유니크한 값을 <b>내부적으로</b> 만들어 클러스터링 키로 쓴다. 이 값은 <b>볼 수도 없고</b> 쿼리 결과에도 영향을 주지 않는다.</p></li>
+  </ol>
+  <p>그러니 가능하면 <b>기본키를 직접 만들어</b> 클러스터링의 혜택을 누리는 편이 낫다.</p>
+
+  <h4>세컨더리 인덱스에 미치는 영향</h4>
+  <ul>
+    <li>InnoDB의 모든 세컨더리 인덱스는 <b>레코드 주소가 아니라 기본키 값</b>을 저장한다.</li>
+    <li>따라서 세컨더리 인덱스로 검색하면, 먼저 <b>기본키 값을 얻고</b> → <b>기본키 인덱스를 다시 검색해</b> 최종 레코드를 가져온다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["세컨더리 인덱스 (first_name = 'Georgi')"] -->|"emp_no = 10001 획득"| B["기본키 인덱스 (클러스터링 테이블)"]
+  B --> C["레코드 전체 반환"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세컨더리 인덱스 검색은 항상 두 번의 트리 탐색이다</b> — 다만 필요한 컬럼이 세컨더리 인덱스 안에 다 있으면 두 번째는 생략된다(커버링 인덱스).</div>
+  </div>
+
+  <h4>장점과 단점</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td class="t-ok">장점</td><td>기본키 및 기본키 <b>범위 검색이 매우 빠르다</b></td></tr>
+        <tr><td class="t-ok">장점</td><td>모든 세컨더리 인덱스가 기본키를 갖고 있어 <b>커버링 인덱스</b>로 처리되는 경우가 많다</td></tr>
+        <tr><td class="t-no">단점</td><td>클러스터링 키가 크면 <b>전체 인덱스 크기가 커진다</b></td></tr>
+        <tr><td class="t-no">단점</td><td>세컨더리 인덱스 검색 시 <b>기본키를 한 번 더 검색</b>해야 해서 느리다</td></tr>
+        <tr><td class="t-no">단점</td><td>데이터 삽입 시 기본키가 저장 위치를 결정하므로 <b>삽입 성능이 느리다</b></td></tr>
+        <tr><td class="t-no">단점</td><td>기본키를 변경하면 <b>삭제 후 재삽입</b>이 필요하다 (다만 흔한 일은 아니다)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>클러스터링 테이블 사용 시 주의사항</h4>
+
+  <h5>클러스터링 인덱스 키의 크기</h5>
+  <p>세컨더리 인덱스는 <b>항상 기본키 값을 갖는다.</b> 한 테이블에 세컨더리 인덱스가 4~5개 생긴다고 가정해 보자.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기본키 크기</th><th>레코드당 증가하는 인덱스 크기</th><th>100만 건 저장 시 증가량</th></tr></thead>
+      <tbody>
+        <tr><td>10 바이트</td><td>10 × 5 = <b>50 바이트</b></td><td>50 × 1,000,000 ≈ <b>47MB</b></td></tr>
+        <tr><td>50 바이트</td><td>50 × 5 = <b>250 바이트</b></td><td>250 × 1,000,000 ≈ <b>238MB</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>기본키를 40바이트 늘렸을 뿐인데 인덱스가 <b>5배</b> 커진다. 이 크기는 그대로 버퍼 풀 점유량이 된다.</p>
+
+  <h5>기본키는 AUTO_INCREMENT 보다 업무적인 컬럼으로 (가능한 경우)</h5>
+  <ul>
+    <li>기본키로 단일 또는 범위 조회를 하면 매우 빠르게 처리된다.</li>
+    <li>기본키는 그 의미만큼 중요한 역할을 하기 때문에 대부분의 검색에서 자주 쓰인다.</li>
+    <li>키의 값이 조금 커지더라도, <b>업무적으로 그 레코드를 대표할 수 있다면</b> 그 컬럼을 기본키로 삼는 편이 좋다.</li>
+  </ul>
+
+  <h5>기본키는 반드시 명시하기</h5>
+  <ul>
+    <li>가능하면 <code>AUTO_INCREMENT</code> 라도 명시해서 기본키를 만드는 것을 권장한다.</li>
+    <li>안 만들면 <b>내부적으로 생성하는 것은 똑같지만</b> 우리가 아무 이득도 볼 수 없다.</li>
+    <li>또한 ROW 기반 복제와 InnoDB Cluster는 <b>모든 테이블이 기본키를 갖는 것을 사실상 요구</b>한다. 기본키가 없으면 레플리카가 변경할 레코드를 찾기 위해 풀 스캔을 하게 된다.</li>
+  </ul>
+
+  <h5>AUTO_INCREMENT 를 인조 식별자로 쓰는 경우</h5>
+  <ul>
+    <li>기본키가 길더라도 <b>세컨더리 인덱스가 필요 없다면</b> 그대로 기본키로 써도 된다.</li>
+    <li>기본키를 대체하려고 인위적으로 추가한 키를 <b>인조 식별자(surrogate key)</b> 라고 한다.</li>
+    <li>로그 테이블처럼 <b>삽입만 일어나는</b> 테이블에서는 <code>AUTO_INCREMENT</code> 기본키가 성능에 도움이 된다 — 항상 트리의 오른쪽 끝에만 추가되므로 페이지 분할이 최소화된다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>InnoDB에서 기본키 인덱스의 리프 노드 = <b>레코드 전체</b>. 인덱스가 곧 테이블이다.</li>
+      <li>세컨더리 인덱스는 <b>기본키 값</b>을 담으므로, 기본키 크기가 모든 인덱스 크기를 좌우한다.</li>
+      <li>기본키를 안 만들어도 InnoDB가 만든다 — 다만 <b>우리는 쓸 수 없는</b> 키가 된다.</li>
+      <li>단조 증가하는 인조 식별자는 <b>삽입 성능</b>에, 업무적 기본키는 <b>조회·커버링</b>에 유리하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-9" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-9</div>
+    <h3>유니크 인덱스</h3>
+    <p class="item-tagline">유니크 인덱스가 일반 인덱스보다 <b>읽기가 빠르다는 것은 오해</b>다. 다만 쓰기는 확실히 느리다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    유니크 인덱스는 <b>중복 체크 때문에 체인지 버퍼를 쓸 수 없다.</b> 이것이 쓰기가 느린 진짜 이유다.
+  </div>
+
+  <h4>유니크는 인덱스인가 제약인가</h4>
+  <ul>
+    <li>유니크는 사실 인덱스라기보다 <b>제약조건</b>에 가깝다.</li>
+    <li>MySQL에서는 <b>인덱스 없이 유니크 제약조건만 만드는 것이 불가능</b>하다.</li>
+  </ul>
+
+  <h4>유니크 인덱스 vs 일반 세컨더리 인덱스</h4>
+
+  <h5>인덱스 읽기 — 차이가 거의 없다</h5>
+  <ul>
+    <li>대부분이 유니크 인덱스가 빠르다고 생각하지만 <b>틀렸다.</b>
+      <ul>
+        <li>유니크는 1건만 읽으면 되고, 일반 인덱스는 한 건 더 읽어야 하므로 느리다고 생각한다.</li>
+        <li>하지만 그 <b>한 건 더 읽는 비교 작업은 디스크가 아니라 CPU</b> 에서 이루어져 차이가 미미하다.</li>
+      </ul>
+    </li>
+    <li>결국 <b>읽어야 할 레코드 건수가 비슷하다면 성능 차이는 없다.</b></li>
+  </ul>
+
+  <h5>인덱스 쓰기 — 확실히 느리다</h5>
+  <ul>
+    <li>유니크 인덱스는 <b>중복 값이 있는지 확인하는 단계</b>가 하나 더 필요하다.</li>
+    <li>중복 체크 시 <b>읽기 락</b>, 쓰기 시 <b>쓰기 락</b>을 설정하는데, 이 과정에서 데드락이 빈번하게 발생한다.</li>
+    <li>원래 인덱스 키 저장은 체인지 버퍼로 백그라운드에서 처리할 수 있지만, <b>중복 체크가 반드시 필요하므로 버퍼링 자체가 불가능</b>하다.</li>
+    <li>이런 이유로 유니크 인덱스는 일반 세컨더리 인덱스보다 <b>변경 작업이 느리다.</b></li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["INSERT 발생"] --> B{"유니크 인덱스인가?"}
+  B -->|"아니오"| C["체인지 버퍼에 기록 후 즉시 응답"]
+  C --> D["백그라운드에서 병합"]
+  B -->|"예"| E["인덱스 페이지를 디스크에서 읽음"]
+  E --> F["중복 여부 확인"]
+  F --> G["B-Tree 에 즉시 반영"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>유니크 인덱스는 지연시킬 수 없다</b> — 중복 여부는 지금 답해야 하는 질문이기 때문이다.</div>
+  </div>
+
+  <h4>사용 시 주의사항</h4>
+  <ul>
+    <li>정말 필요하다면 유니크 인덱스를 만드는 것은 당연하다.</li>
+    <li>그러나 <b>불필요하게 유니크 인덱스를 만드는 것은 좋지 않다.</b></li>
+    <li>유니크 제약을 건 컬럼에는 <b>자동으로 인덱스가 생성</b>되며, 개별로 만든 인덱스와 동일한 역할을 한다. 즉 <b>같은 컬럼에 유니크 인덱스와 일반 인덱스를 둘 다 만들 이유가 없다.</b></li>
+    <li>유일성이 보장되어야 하는 컬럼에는 유니크를, 그렇지 않다면 <b>세컨더리 인덱스</b>를 고려하자.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>읽기 성능은 일반 인덱스와 <b>사실상 동일</b>하다. 차이는 CPU 비교 몇 번뿐.</li>
+      <li>쓰기는 <b>중복 체크 때문에 체인지 버퍼를 못 써</b> 확실히 느리고, 데드락 위험도 있다.</li>
+      <li>유니크 제약은 <b>인덱스를 자동으로 만든다.</b> 같은 컬럼에 인덱스를 또 만들지 말 것.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-10" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-10</div>
+    <h3>외래키</h3>
+    <p class="item-tagline">외래키의 진짜 비용은 무결성이 아니라 <b>잠금이 다른 테이블로 전파되는 것</b>이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>쓰기 잠금이 걸릴 때만</b> 경합이 발생하고, <b>외래키와 무관한 컬럼의 변경은 경합을 만들지 않는다.</b> 이 두 가지가 외래키 잠금의 전부다.
+  </div>
+
+  <h4>외래키의 두 가지 특징</h4>
+  <ul>
+    <li>외래키 제약이 설정되면 <b>연관 테이블의 컬럼에 인덱스까지 자동 생성</b>된다.</li>
+    <li>중요한 두 가지 특징
+      <ul>
+        <li>테이블의 <b>변경(쓰기 잠금)</b> 이 발생하는 경우에만 잠금 경합이 발생한다.</li>
+        <li>외래키와 <b>연관되지 않은 컬럼의 변경</b>은 최대한 잠금 경합을 발생시키지 않는다.</li>
+      </ul>
+    </li>
+    <li>외래키를 물리적으로 생성한다면 <b>잠금 경합까지 고려해 모델링</b>해야 한다.</li>
+    <li>잠금이 다른 테이블로 확장되면 그만큼 전체적인 동시 처리 성능이 낮아진다.</li>
+  </ul>
+
+  <h4>자식 테이블의 변경이 대기하는 경우</h4>
+  <p>자식 테이블의 외래키 컬럼을 변경하려면 <b>부모 테이블의 해당 레코드를 확인</b>해야 한다. 그 레코드에 쓰기 잠금이 걸려 있으면 끝날 때까지 기다린다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>작업번호</th><th>커넥션 1</th><th>커넥션 2</th></tr></thead>
+      <tbody>
+        <tr><td class="t-center">1</td><td><code>BEGIN;</code></td><td></td></tr>
+        <tr><td class="t-center">2</td><td><code>UPDATE tb_parent SET fd='2' WHERE id=2</code></td><td></td></tr>
+        <tr><td class="t-center">3</td><td></td><td><code>BEGIN;</code></td></tr>
+        <tr><td class="t-center">4</td><td></td><td><code>UPDATE tb_child SET pid=2 WHERE id=100</code> <span class="badge b-red">대기</span></td></tr>
+        <tr><td class="t-center">5</td><td><code>ROLLBACK</code></td><td></td></tr>
+        <tr><td class="t-center">6</td><td></td><td class="t-ok">QUERY OK</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>부모 테이블의 변경이 대기하는 경우</h4>
+  <p>반대 방향도 성립한다. 자식 레코드에 쓰기 잠금이 걸린 상태에서 부모를 삭제하려 하면 기다린다. <code>ON DELETE CASCADE</code> 때문에 <b>부모 삭제가 곧 자식 삭제</b>이기 때문이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>작업번호</th><th>커넥션 1</th><th>커넥션 2</th></tr></thead>
+      <tbody>
+        <tr><td class="t-center">1</td><td><code>BEGIN;</code></td><td></td></tr>
+        <tr><td class="t-center">2</td><td><code>UPDATE tb_child SET fd='100' WHERE id=100</code></td><td></td></tr>
+        <tr><td class="t-center">3</td><td></td><td><code>BEGIN;</code></td></tr>
+        <tr><td class="t-center">4</td><td></td><td><code>DELETE FROM tb_parent WHERE id=1</code> <span class="badge b-red">대기</span></td></tr>
+        <tr><td class="t-center">5</td><td><code>ROLLBACK</code></td><td></td></tr>
+        <tr><td class="t-center">6</td><td></td><td class="t-ok">QUERY OK</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">그래서 실무에서는 <span class="badge b-blue">보강</span></p>
+      <p>많은 서비스가 <b>모델링에는 외래키를 그리되 물리적으로는 걸지 않는다.</b> 무결성은 애플리케이션이 보장하고, DB는 잠금 전파를 피하는 선택이다. 다만 데이터 정합성 사고가 났을 때 <b>DB가 잡아 주지 않는다</b>는 대가를 감수하는 결정이라는 점은 분명히 인식하고 있어야 한다. (→ <a href="#item-11-4">11-4 JOIN과 외래키</a>)</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>외래키를 만들면 <b>인덱스가 따라 생긴다.</b></li>
+      <li>잠금 경합은 <b>쓰기</b>일 때만, 그리고 <b>외래키 관련 컬럼</b>일 때만 발생한다.</li>
+      <li>양방향으로 대기가 생긴다 — 자식 변경은 부모 확인을, 부모 삭제는 자식 CASCADE를 기다린다.</li>
+      <li>물리 외래키는 <b>잠금 전파까지 포함해</b> 결정할 문제다.</li>
+    </ul>
+  </div>
+</article>

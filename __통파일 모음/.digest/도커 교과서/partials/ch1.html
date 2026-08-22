@@ -1,0 +1,180 @@
+<article class="item" id="item-1-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 1-1</div>
+    <h3>컨테이너가 IT 세상을 점령한 이유</h3>
+    <p class="item-tagline">IaaS 의 이식성과 PaaS 의 운영비 절감, 둘 중 하나를 고르지 않아도 되게 만든 것이 컨테이너다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    도커는 <b>앱을 패키징하는 방식</b>을 표준화한다. 그 표준 하나로 클라우드 이주, 레거시 현대화, 신규 개발, CI 파이프라인이 전부 같은 도구를 쓰게 된다.
+  </div>
+
+  <h4>도커란</h4>
+  <ul>
+    <li>도커는 <b>컨테이너</b>라는 경량 단위로 애플리케이션을 실행하는 플랫폼이다.</li>
+    <li>최근에는 소프트웨어 산업에서 개발과 운영 양쪽 모두에 반드시 익혀야 하는 핵심 기술로 인식되고 있다.</li>
+  </ul>
+
+  <p>
+    앱을 개발하고 빌드하고 배포하는 과정은 규모가 커질수록 까다로워진다. 도커를 쓰면
+    이 과정이 명령어 한 줄로 압축된다.
+  </p>
+
+  <h4>가상 머신과 무엇이 다른가</h4>
+
+  <p>
+    컨테이너를 이해하는 가장 빠른 길은 가상 머신과 나란히 놓고 보는 것이다.
+    둘 다 "호스트명, IP, 디스크를 독립적으로 갖는 격리된 실행 환경"을 제공한다는 목적은 같다.
+    다른 것은 <b>격리를 만들어 내는 층</b>이다.
+  </p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 300" width="640" role="img" aria-label="가상 머신은 하이퍼바이저 위에 게스트 OS 를 각각 올리고, 컨테이너는 도커를 통해 호스트 OS 커널을 공유한다">
+        <!-- VM side -->
+        <rect x="8" y="8" width="300" height="284" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="158" y="30" class="dg-text" font-size="13" font-weight="700" text-anchor="middle">가상 머신</text>
+
+        <rect x="26" y="44" width="122" height="96" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="87" y="62" class="dg-text-sub" font-size="10" text-anchor="middle">VM 1</text>
+        <rect x="38" y="70" width="98" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="87" y="87" class="dg-text dg-mono" font-size="11" text-anchor="middle">APP 1</text>
+        <rect x="38" y="102" width="98" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="87" y="119" class="dg-text dg-mono" font-size="11" text-anchor="middle">Guest OS</text>
+
+        <rect x="168" y="44" width="122" height="96" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="229" y="62" class="dg-text-sub" font-size="10" text-anchor="middle">VM 2</text>
+        <rect x="180" y="70" width="98" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="229" y="87" class="dg-text dg-mono" font-size="11" text-anchor="middle">APP 2</text>
+        <rect x="180" y="102" width="98" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="229" y="119" class="dg-text dg-mono" font-size="11" text-anchor="middle">Guest OS</text>
+
+        <rect x="26" y="164" width="264" height="34" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="158" y="186" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="middle">Hypervisor</text>
+
+        <rect x="26" y="212" width="264" height="30" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="158" y="232" class="dg-text dg-mono" font-size="11" text-anchor="middle">Host OS</text>
+        <rect x="26" y="252" width="264" height="28" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="158" y="271" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">Hardware</text>
+
+        <!-- Container side -->
+        <rect x="332" y="8" width="300" height="284" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="482" y="30" class="dg-text" font-size="13" font-weight="700" text-anchor="middle">컨테이너</text>
+
+        <rect x="350" y="44" width="122" height="96" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="411" y="62" class="dg-text-sub" font-size="10" text-anchor="middle">Container 1</text>
+        <rect x="362" y="70" width="98" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="411" y="87" class="dg-text dg-mono" font-size="11" text-anchor="middle">APP 1</text>
+        <text x="411" y="120" class="dg-text-sub" font-size="10" text-anchor="middle">게스트 OS 없음</text>
+
+        <rect x="492" y="44" width="122" height="96" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="553" y="62" class="dg-text-sub" font-size="10" text-anchor="middle">Container 2</text>
+        <rect x="504" y="70" width="98" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="553" y="87" class="dg-text dg-mono" font-size="11" text-anchor="middle">APP 2</text>
+        <text x="553" y="120" class="dg-text-sub" font-size="10" text-anchor="middle">게스트 OS 없음</text>
+
+        <rect x="350" y="164" width="264" height="34" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="482" y="186" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="middle">Docker</text>
+
+        <rect x="350" y="212" width="264" height="30" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="482" y="232" class="dg-text dg-mono" font-size="11" text-anchor="middle">Host OS (커널 공유)</text>
+        <rect x="350" y="252" width="264" height="28" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="482" y="271" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle">Hardware</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>컨테이너는 게스트 OS 한 겹을 통째로 걷어낸다</b> — 둘 다 호스트명 / IP / 디스크를 독립적으로 갖지만,
+      VM 은 그것을 위해 OS 를 하나 더 부팅하고 컨테이너는 호스트 커널을 공유한다. 여기서 기동 속도와 밀도 차이가 나온다.
+    </div>
+  </div>
+
+  <h4>클라우드 환경으로 이주하기</h4>
+  <p>
+    기존 온프레미스 환경에서 클라우드로의 이주는 거의 모든 조직의 최우선 관심사다.
+    장비실에서 전문 인력이 직접 관리하던 일을 구글 / MS / 아마존에 맡길 수 있게 됐기 때문이다.
+    도커 이전의 이주 경로는 두 갈래였다.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>방식</th><th>앱 컴포넌트가 사는 곳</th><th>얻는 것</th><th>잃는 것</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>IaaS</b><br><span class="badge">Infrastructure as a Service</span></td>
+          <td>가상 머신</td>
+          <td class="t-ok">특정 클라우드에 종속되지 않음</td>
+          <td class="t-no">VM 을 그대로 옮기므로 운영비가 많이 나옴</td>
+        </tr>
+        <tr>
+          <td><b>PaaS</b><br><span class="badge">Platform as a Service</span></td>
+          <td>클라우드의 매니지드 서비스</td>
+          <td class="t-ok">운영비 절감</td>
+          <td class="t-no">특정 클라우드에 종속되어 이식성 하락</td>
+        </tr>
+        <tr>
+          <td><b>Docker</b><br><span class="badge b-green">권장</span></td>
+          <td>컨테이너</td>
+          <td class="t-ok">IaaS 의 독립성 + PaaS 의 운영비 절감</td>
+          <td class="t-no">컨테이너용 스크립트 작성 등 초기 비용이 든다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>레거시 애플리케이션 현대화하기</h4>
+  <ul>
+    <li>기존에 자주 쓰던 <b>모놀리식</b> 방식으로는 도커와 클라우드 플랫폼의 진가가 발휘되기 어렵다.</li>
+    <li>도커로 이주하는 과정은 앱의 낡은 설계를 탈바꿈하는 첫걸음이다.</li>
+    <li>컴포넌트를 컨테이너 단위로 쪼개서 배포하면 <b>외부에 공개되지 않은 네트워크</b>를 통해 통신할 수 있다.</li>
+    <li>덕분에 기능별로 빠른 배포 주기를 가져가는 등 MSA 의 장점을 누릴 수 있다.</li>
+  </ul>
+
+  <h4>클라우드 환경에 적합한 새로운 앱 개발하기</h4>
+  <ul>
+    <li>분산 앱이든 모놀리식 앱이든 도커를 쓰면 어디서든 배포하고 운영할 수 있다.</li>
+    <li>여러 개의 프로그래밍 언어로 각 분야에 알맞은 API 를 구성할 수 있다.</li>
+    <li>모든 컴포넌트는 공통적으로 <code>Dockerfile</code> 로 패키징되고 <code>Docker Compose</code> 형태로 전체 앱이 정의된다.</li>
+    <li>다시 말해 컴포넌트별로 별도의 개발 도구를 갖추지 않아도 도커 하나로 전부 가능하다는 뜻이다.</li>
+  </ul>
+
+  <h4>기술 혁신 — 서버리스와 그 너머</h4>
+  <ul>
+    <li>현대 IT 기술을 주도하는 요소 중 하나는 <b>일관성</b>이다.</li>
+    <li>개발팀은 모든 프로젝트에서 같은 도구 / 프로세스 / 런타임을 쓰고 싶어 하는데, 도커를 통해 그게 가능해진다.</li>
+    <li>컨테이너 도입 이후 마주할 가장 흥미로운 기술 혁신은 <b>서버리스 함수</b>다.</li>
+    <li>서버리스도 결국 컨테이너 기술이다. 함수 코드를 작성해 서비스에 푸시하면 서비스가 코드를 빌드하고 패키징한다.</li>
+    <li>단점은 아직 개방형 표준이 없어서 이식성이 떨어진다는 점이다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>
+        "서버리스에 개방형 표준이 없다"는 서술은 지금도 상당 부분 유효하지만, 그사이 컨테이너 이미지를 그대로
+        서버리스로 굴리는 경로가 표준화됐다. AWS Lambda 의 컨테이너 이미지 지원, Google Cloud Run,
+        Azure Container Apps 가 모두 OCI 이미지를 입력으로 받는다. 즉 <b>이식성의 단위가 함수 코드에서
+        이미지로 옮겨 오면서</b> 종속 위험이 예전보다는 줄었다.
+      </p>
+    </div>
+  </div>
+
+  <h4>데브옵스(DevOps) 도입하기</h4>
+  <ul>
+    <li>기민한 소프트웨어 유지보수를 위해 앱의 전체 라이프사이클을 담당하는 전담 팀을 뜻한다.</li>
+    <li>이름 그대로 <b>개발(Dev) + 운영(Ops)</b> 을 합친 개념이다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컨테이너는 게스트 OS 한 겹을 걷어내고 호스트 커널을 공유한다. VM 과 같은 격리를 훨씬 싸게 얻는 방법이다.</li>
+      <li>클라우드 이주에서 IaaS 는 이식성을, PaaS 는 운영비를 챙긴다. 도커는 그 사이에서 둘 다 챙기는 선택지다.</li>
+      <li>도커의 진짜 이점은 성능이 아니라 <b>일관성</b>이다. 개발 / CI / 운영이 전부 같은 이미지, 같은 명령어를 쓴다.</li>
+      <li>모놀리식을 그대로 컨테이너에 넣는 것만으로도 현대화의 첫 단추는 꿴 셈이다.</li>
+    </ul>
+  </div>
+</article>

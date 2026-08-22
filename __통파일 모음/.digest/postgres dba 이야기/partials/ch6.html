@@ -1,0 +1,477 @@
+<article class="item" id="item-6-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-1</div>
+    <h3>논리 백업과 복구</h3>
+    <p class="item-tagline"><code>pg_dump</code>는 복구 도구가 아니라 <b>보관과 이행</b> 도구다. 그 전제를 잡고 옵션을 고른다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    논리 백업은 <b>백업 시점</b>으로만 돌아간다. 장애 시점까지 되돌리는 완전 복구는 아카이브 WAL을 쓰는 물리 백업만 할 수 있다.
+  </div>
+
+  <h4>논리 백업과 복구</h4>
+  <ul>
+    <li>논리 백업은 물리 백업과 달리 <b>완전한 복구 기능을 제공하지 않는다.</b></li>
+    <li>물리 백업은 아카이브 파일을 써서 장애 시점까지 복구하지만 논리 백업은 그렇지 않다.</li>
+    <li>논리 백업은 백업 시점의 데이터를 복원하는 용도이며, 복구보다는 <b>데이터 보관 및 이행</b> 목적으로 활용된다.</li>
+  </ul>
+
+  <h4><code>pg_dumpall</code>을 이용한 백업</h4>
+  <ul>
+    <li>DB 클러스터 내 모든 DB와 관련 정보를 한꺼번에 백업한다.</li>
+    <li>DB가 여럿일 때 편하지만 <b>압축과 병렬 백업을 지원하지 않는다</b>는 단점이 있다.</li>
+    <li>보통 논리 복제 구성 시 클러스터 내 모든 형상 정보와 Role 정보를 백업하는 데 쓴다.</li>
+  </ul>
+
+  <h5>DB 생성 스크립트 백업</h5>
+  <ul>
+    <li>오브젝트 생성 스크립트만 백업할 때는 <code>-s</code> 옵션을 쓴다. 데이터는 빠지고 스크립트만 남는다.</li>
+    <li>롤 정보만 따로 백업하려면 <code>-r</code> 옵션을 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 백업하기
+postgres@dff5953eda06:~$ pg_dumpall -s -f database_cluter.sql
+
+# 백업된 내용(일부)
+postgres@dff5953eda06:~$ cat database_cluter.sql
+--
+-- PostgreSQL database cluster dump
+--
+
+\restrict 20oNDqKWrhn61x3x1nCkPCObKk4v5UQzkhz8CqPVqdwGcPTtUfLo0gBC6t1aRuI
+
+SET default_transaction_read_only = off;
+
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+
+--
+-- Roles
+--
+
+CREATE ROLE postgres;
+ALTER ROLE postgres WITH SUPERUSER INHERIT CREATEROLE CREATEDB LOGIN REPLICATION BYPASSRLS PASSWORD 'SCRAM-SHA-256$4096:cO+li3tJ6XS31V/66AKoxA==$Y17MutUr7UT5I3kWenXkTK4GNJhP3AZTt25tSDgroUM=:6tx6NXtNi6FCEkK6vSg/cNoQkQJGpoQ9D3n1ofVgwH4=';</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이 파일은 비밀번호 해시를 담고 있다</p>
+      <p><code>pg_dumpall</code>의 롤 덤프에는 위처럼 <code>SCRAM-SHA-256</code> 해시가 그대로 들어간다. 오프라인 크래킹의 대상이 되므로 <b>일반 백업 파일과 같은 취급을 하면 안 된다.</b> 권한을 좁히고 저장 위치를 분리한다.</p>
+    </div>
+  </div>
+
+  <h5>DB 클러스터 형상 복원</h5>
+  <ul>
+    <li>백업 파일로 클러스터 전체 형상을 복원할 때는 <code>psql</code>을 사용한다.</li>
+    <li>롤만 백업받은 경우도 마찬가지로 <code>psql</code>로 진행한다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 복원하기
+postgres@dff5953eda06:~$ psql -f database_cluster.sql
+SET
+SET
+SET
+psql:database_cluster.sql:16: ERROR:  role "postgres" already exists
+ALTER ROLE
+You are now connected to database "template1" as user "postgres".
+SET
+SET
+SET
+SET
+SET
+SET
+ set_config</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">plain 복원은 에러가 나도 멈추지 않는다 <span class="badge b-blue">보강</span></p>
+      <p>위 출력의 <code>ERROR: role "postgres" already exists</code>를 지나쳐 계속 진행된 것을 보라. <code>psql</code>은 기본적으로 에러를 만나도 다음 문장을 실행한다. 복원 도중 어디까지 성공했는지 알 수 없게 되므로, 진짜 복원이라면 <code>psql -v ON_ERROR_STOP=1 --single-transaction</code>로 <b>전부 성공 아니면 전부 롤백</b>을 강제하는 편이 안전하다.</p>
+    </div>
+  </div>
+
+  <h4><code>pg_dump</code>를 이용한 백업</h4>
+  <ul>
+    <li>개발 환경 DB 백업이나 DB/스키마 단위 이행 업무에 자주 쓴다.</li>
+    <li>사용 범위가 넓고 빈도도 높아 다양한 실무 상황에 맞는 옵션을 제공한다.</li>
+    <li>압축과 병렬 처리도 지원하므로 대용량 백업에도 유용하다.</li>
+  </ul>
+
+  <h5>Format 옵션</h5>
+  <p><code>-F</code> 옵션으로 파일 포맷을 지정하며 기본값은 <code>p(plain)</code>이다. <code>p</code>, <code>c(custom)</code>, <code>d(directory)</code>, <code>t(tar)</code> 네 가지를 지원한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>포맷</th><th>압축</th><th>부분 복구</th><th>병렬(<code>-j</code>)</th><th>쓰임</th></tr></thead>
+      <tbody>
+        <tr><td><code>p</code> plain</td><td class="t-center">전체 파일 단위만</td><td class="t-center t-no">✗</td><td class="t-center t-no">✗</td><td>스크립트 백업 / <code>psql</code>로 복원</td></tr>
+        <tr><td><code>c</code> custom</td><td class="t-center t-ok">✓</td><td class="t-center t-ok">✓</td><td class="t-center t-no">✗</td><td>단일 파일. 관리가 편하다</td></tr>
+        <tr><td><code>d</code> directory</td><td class="t-center t-ok">✓</td><td class="t-center t-ok">✓</td><td class="t-center t-ok">✓</td><td>여러 파일로 분할. 백업 속도가 빠르다</td></tr>
+        <tr><td><code>t</code> tar</td><td class="t-center t-no">✗</td><td class="t-center t-ok">✓</td><td class="t-center t-no">✗</td><td>압축이 안 돼 활용도가 낮다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b><code>p(plain)</code></b> &mdash; 부분 복구를 지원하지 않아 복구 목적의 백업에는 거의 쓰지 않는다. 대신 DB나 스키마 단위의 오브젝트 생성 스크립트를 백업하는 용도로 활용한다. <code>svcdb</code>의 <code>svc</code> 스키마에 포함된 모든 오브젝트의 생성 스크립트를 백업한다면 이렇게 쓴다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">pg_dump -Fp -d svcdb -n svc -s -f svc_schema.sql</code></pre>
+  </div>
+
+  <p><b><code>c(custom)</code> / <code>d(directory)</code></b> &mdash; 압축과 부분 복구를 모두 지원해 개발 DB 데이터 백업에 자주 쓴다. <code>c</code>는 하나의 파일로, <code>d</code>는 여러 파일로 분할 저장된다. <b>백업 속도가 중요하면 <code>d</code>, 관리 편의가 중요하면 <code>c</code></b>가 일반적인 선택이다.</p>
+
+  <p><b><code>t(tar)</code></b> &mdash; TAR 파일로 묶어 저장하지만 압축을 지원하지 않아 활용도가 낮다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">plain도 압축은 된다 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 plain이 &ldquo;압축과 부분 복구를 지원하지 않는다&rdquo;고 되어 있으나, 공식 문서는 <i>&ldquo;For plain text output, setting a nonzero compression level causes the entire output file to be compressed&rdquo;</i>라고 서술한다. 즉 <b>파일 전체를 통째로 압축하는 것은 가능</b>하고(기본값이 무압축일 뿐), 다만 테이블 단위로 골라 꺼내는 <b>부분 복구가 불가능</b>한 것이 plain의 진짜 한계다. 압축이 아예 안 되는 포맷은 <code>tar</code>다.</p>
+    </div>
+  </div>
+
+  <h5>압축 옵션</h5>
+  <ul>
+    <li><code>-Z</code> 옵션으로 압축 방식을 지정한다.</li>
+    <li>gzip &mdash; 레벨이 높아질수록 파일 크기는 줄지만 압축 시간이 오래 걸린다.</li>
+    <li>lz4 &mdash; 16 버전부터 사용할 수 있다.</li>
+    <li>어떤 조합이 좋은지는 시스템 환경과 데이터 특성에 따라 달라지므로 직접 테스트해서 찾아야 한다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">zstd도 있다 <span class="badge b-purple">최신 반영</span></p>
+      <p>PostgreSQL 16부터 <code>-Z</code>가 받는 값은 <code>gzip</code>, <code>lz4</code>, <code>zstd</code>, <code>none</code> 네 가지다. 노트에는 zstd가 빠져 있는데, 압축률과 속도의 균형이 가장 좋아 대용량 덤프에서 실질적인 기본 선택지가 되는 경우가 많다. <code>-Z zstd:long</code>으로 long 모드를 켜면 메모리를 더 쓰는 대신 압축률이 더 올라간다. 형식은 <code>-Z &lt;method&gt;:&lt;level&gt;</code>이다.</p>
+    </div>
+  </div>
+
+  <h5>병렬 처리 옵션</h5>
+  <ul>
+    <li><code>-j</code> 옵션을 사용하며, <b><code>d(directory)</code> 포맷일 때만</b> 가능하다. 여러 프로세스가 동시에 데이터를 쓸 수 있는 유일한 포맷이기 때문이다.</li>
+    <li>병렬로 데이터를 백업하는 워커 프로세스 개수를 지정하는데, 적정값은 CPU 코어나 디스크 I/O에 따라 달라진다.</li>
+    <li>이것도 직접 테스트해서 적절한 값을 찾는 편이 좋다.</li>
+  </ul>
+
+  <h4><code>psql</code>과 <code>pg_restore</code>를 이용한 복원</h4>
+  <h5>스키마 형상을 타 DB에 적용하기</h5>
+  <p>개발 단계에서는 테이블 구조가 수시로 바뀌고, 현 시점의 스키마를 다른 DB에 반영할 일이 생긴다. 여러 방법이 있지만 아래가 효율이 좋다.</p>
+  <ol class="steps">
+    <li>
+      <div class="step-title">개발 DB에서 스키마 형상 백업</div>
+      <div class="code"><div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">pg_dump -Fp -n svc -s -f svc_schema.sql</code></pre></div>
+    </li>
+    <li>
+      <div class="step-title">이행 대상 DB에서 기존 스키마 제거</div>
+      <div class="code"><div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">psql -d svcdb_mig</code></pre></div>
+    </li>
+    <li>
+      <div class="step-title">백업한 스키마를 psql로 적용</div>
+      <div class="code"><div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-bash">psql -d svcdb_mig -f svc_schema.sql</code></pre></div>
+    </li>
+  </ol>
+
+  <h5>스키마 형상 및 데이터를 함께 적용하기</h5>
+  <ul>
+    <li>절차는 거의 동일하지만 데이터가 포함되므로 <code>-Fc</code> 또는 <code>-Fd</code>로 백업하는 편이 유리하다.</li>
+    <li><code>-Fc</code>로 백업한 파일은 <b>바이너리 포맷</b>이므로 복원 시 <code>pg_restore</code>를 써야 한다.</li>
+    <li>백업 파일이 크거나 오브젝트 수가 많으면 <code>-j</code> 병렬 처리로 속도를 높일 수 있다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 스키마 형상 및 데이터를 함께 백업
+pg_dump -Fc -Z1 -n svc -f svc_schema_data.custom
+
+# 대상 DB의 기존 스키마 삭제
+psql -d svc
+
+# custom 포맷은 pg_restore 로 복원
+pg_restore -d svcdb_mig -v svc_schema_data.custom
+
+# 오브젝트가 많다면 병렬로
+pg_restore -d svcdb_mig -v -j &lt;worker&gt; svc_schema_data.custom</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>-j</code>는 백업과 복원에서 조건이 다르다 <span class="badge b-blue">보강</span></p>
+      <p>백업(<code>pg_dump -j</code>)은 <code>directory</code> 포맷에서만 되지만, <b>복원(<code>pg_restore -j</code>)은 <code>custom</code>과 <code>directory</code> 양쪽에서 동작한다.</b> 그래서 <code>-Fc</code>로 한 덩어리로 백업해두고 복원만 병렬로 돌리는 조합이 실무에서 꽤 유용하다.</p>
+    </div>
+  </div>
+
+  <h4><code>pg_restore</code>를 이용한 복구</h4>
+  <h5>특정 테이블 복구</h5>
+  <ul>
+    <li>일 단위로 DB 전체를 custom 포맷으로 백업한다고 가정한다.
+      <ul><li><code>pg_dump -Fc -Z1 -f svcdb_full_20251104.custom</code></li></ul>
+    </li>
+    <li><code>t1</code> 테이블만 복구해야 한다면 이렇게 한다.
+      <ul><li><code>pg_restore -d svcdb -v -n svc -t t1 svcdb_full_20251104.custom</code></li></ul>
+    </li>
+    <li>데이터가 잘못된 경우는 전부 지우고 복구하면 되는데, <code>pg_restore</code>는 기본적으로 <b>테이블 생성 → 데이터 입력</b> 순서로 동작하므로 테이블이 이미 있으면 에러가 난다. 이때 <code>-a</code>(데이터만) 옵션을 활용한다.</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">테이블 단위 복구에서 <code>-c</code>는 위험하다</p>
+      <p><code>pg_restore -c</code>는 기존 테이블을 <code>DROP</code>하고 다시 만드는 방식으로 동작한다. 그런데 <b>기존에 설정된 제약조건, 인덱스, PK는 복구되지 않는다.</b> 테이블 단위 복구 작업에서 <code>-c</code> 사용은 신중해야 한다. 데이터만 되돌리는 것이 목적이라면 <code>-a</code>가 맞다.</p>
+    </div>
+  </div>
+
+  <h4>COPY</h4>
+  <ul>
+    <li><code>COPY</code> 명령으로 테이블 단위 데이터 추출 및 적재가 가능하다.</li>
+    <li>이 명령어의 가장 큰 장점은 <b>유연한 데이터 추출</b>이다.</li>
+  </ul>
+
+  <h5><code>COPY</code>와 <code>\copy</code>의 차이</h5>
+  <ul>
+    <li><code>psql</code>로 접속한 상태에서 <code>\copy</code> 또는 <code>COPY</code>로 실행한다.</li>
+    <li>일반적으로는 유저가 접근할 수 있는 경로의 파일을 읽고 쓸 수 있고 별도 권한 설정이 불필요한 <code>\copy</code>를 쓴다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">둘의 차이는 &ldquo;누구의 파일 시스템인가&rdquo;다 <span class="badge b-blue">보강</span></p>
+      <p><code>COPY</code>는 <b>서버</b>가 서버의 파일을 읽고 쓴다. 그래서 슈퍼유저나 <code>pg_read_server_files</code> 같은 롤이 필요하다. <code>\copy</code>는 <b>psql 클라이언트</b>가 로컬 파일을 읽어 프로토콜로 흘려보내므로 별도 권한이 필요 없다. 원격에서 붙어 작업한다면 사실상 <code>\copy</code>가 유일한 선택지다. 이 차이가 <a href="#item-7-7">7-7</a>에서 <code>bytes_total</code>이 <code>COPY</code>에서만 보이는 이유이기도 하다.</p>
+    </div>
+  </div>
+
+  <h5>데이터 추출 및 적재</h5>
+  <ul>
+    <li>구분자는 <b>한 글자만</b> 지정할 수 있다.</li>
+    <li>덤프 파일의 컬럼 구성을 쉽게 확인하려면 <code>header</code> 옵션을 함께 쓰는 편이 좋다.</li>
+    <li>구분자는 헥사 코드로도 지정할 수 있다. 탭 문자는 <code>E'\x09'</code>처럼 표기한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">구분자가 값 안에 들어 있어도 안전하다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 테이블 생성
+postgres=# create table svc.t1 ( c1 integer, c2 varchar(10), c3 varchar(10), c4 integer );
+
+-- 데이터 생성, 값 안에 구분자 | 가 들어 있다
+postgres=# insert into svc.t1 values (1, 'A|B', 'C|D', 1);
+postgres=# select * from svc.t1;
+ c1 | c2  | c3  | c4
+----+-----+-----+----
+  1 | A|B | C|D |  1
+
+-- \copy를 통해서 t1.csv로 추출한다. 이 때 구분자는 | 이다
+postgres=# \copy svc.t1 to 't1.csv' with (format csv, delimiter '|', header);
+
+-- 백업이 된 모습 (값이 큰따옴표로 감싸졌다)
+postgres=# \! cat t1.csv;
+c1|c2|c3|c4
+1|"A|B"|"C|D"|1
+
+-- csv -> table 복원을 위해 동일한 구조를 가진 테이블 생성
+postgres=# create table svc.t1_bak ( c1 integer, c2 varchar(10), c3 varchar(10), c4 integer );
+
+-- t1.csv -> svc.t1_bak 테이블로 복원
+postgres=# \copy svc.t1_bak from 't1.csv' with (format csv, delimiter '|', header);
+
+-- 복원된 모습
+postgres=# select * from svc.t1_bak;
+ c1 | c2  | c3  | c4
+----+-----+-----+----
+  1 | A|B | C|D |  1</code></pre>
+  </div>
+
+  <h5>쿼리 결과 추출 기능</h5>
+  <ul>
+    <li>테이블 전체가 아닌 특정 쿼리 결과를 추출하는 기능도 제공한다.</li>
+    <li>정제된 데이터를 외부로 내보낼 때 유용하지만, <code>COPY</code>는 <b>반드시 한 줄로 입력해야 한다</b>는 제약이 있다.</li>
+    <li>쿼리문이 길다면 View를 만들고 그 뷰로 추출하는 편이 효율적이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 2건의 데이터가 존재함
+postgres=# select * from svc.t1;
+ c1 | c2  | c3  | c4
+----+-----+-----+----
+  1 | A|B | C|D |  1
+  2 | A|B | C|D |  2
+
+-- 쿼리 결과를 csv로 추출
+postgres=# \copy (select * from svc.t1 where c1 = 1) to './query_result.csv' with (format csv, delimiter '|', header);
+
+-- 추출된 모습
+postgres=# \! cat query_result.csv
+c1|c2|c3|c4
+1|"A|B"|"C|D"|1</code></pre>
+  </div>
+
+  <h5>에러 처리 기능</h5>
+  <ul>
+    <li>PostgreSQL 17부터 <code>COPY</code>에 에러 처리 기능이 추가되어 덤프 파일 안에서 에러를 유발하는 레코드를 식별하고 무시할 수 있다.</li>
+    <li><code>on_error ignore</code> &mdash; 오류가 발생한 레코드는 생략한다.</li>
+    <li><code>log_verbosity</code> &mdash; 오류 발생 라인을 로그로 출력한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag good">17+</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# \copy svc.t1 from './asis_t1.csv' with (on_error ignore, log_verbosity verbose, format csv, delimiter '|', header);</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>논리 백업은 백업 시점까지만 되돌린다. 완전 복구는 물리 백업의 영역이다.</li>
+      <li>포맷 선택은 <b>속도면 <code>-Fd</code>, 관리면 <code>-Fc</code>, 스크립트면 <code>-Fp</code></b>. tar는 압축이 안 돼 잘 쓰지 않는다.</li>
+      <li><code>pg_dump -j</code>는 directory 전용이지만 <code>pg_restore -j</code>는 custom에서도 동작한다.</li>
+      <li>테이블 단위 복구에서 <code>-c</code>는 인덱스와 제약을 날린다. 데이터만 되돌릴 땐 <code>-a</code>.</li>
+      <li><code>COPY</code>는 서버 파일, <code>\copy</code>는 클라이언트 파일. 17부터 <code>on_error ignore</code>로 불량 레코드를 넘길 수 있다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-6-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">6-2</div>
+    <h3>물리 백업과 복구</h3>
+    <p class="item-tagline">완전 복구의 조건은 &ldquo;백업 + 그 이후 <b>모든</b> WAL&rdquo;이다. 백업 전략은 이 한 줄에서 파생된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    17부터 <code>pg_basebackup</code>이 <b>블록 단위 증분 백업</b>을 지원한다. 파일 단위 증분만 가능했던 <code>pgBackRest</code>와의 우열이 이 지점에서 갈린다.
+  </div>
+
+  <h4>물리 백업과 복구</h4>
+  <ul>
+    <li>물리 백업은 DB 클러스터를 구성하는 <b>파일 단위</b>의 백업이다.</li>
+    <li>DB 가동 중에 수행하는 온라인 백업과, 종료하고 수행하는 오프라인 백업으로 구분된다.</li>
+    <li>가장 큰 장점은 <b>장애 시점까지의 완벽한 복구</b>를 지원한다는 점이다.</li>
+    <li>유저 실수로 데이터가 삭제되어도 손실 직전 시점까지 복구할 수 있는 <b>시점 복구(PITR)</b> 기능도 함께 제공한다.</li>
+  </ul>
+
+  <h5>명령어</h5>
+  <ul>
+    <li><code>pg_basebackup</code> 또는 <code>pg_backup_start()</code>, <code>pg_backup_stop()</code> 함수로 수행할 수 있다.</li>
+    <li>가장 강력한 백업/복구 기능을 제공하는 도구는 <code>pgBackRest</code>다.</li>
+  </ul>
+
+  <h4>백업 및 복구 개요</h4>
+  <ul>
+    <li>복구의 목표는 트랜잭션 유실이 없는 <b>완벽한 복구</b>를 실현하는 데 있다.</li>
+    <li>이를 위해서는 단순히 백업을 수행하는 것뿐 아니라 백업 주기, 보관 기간 등 백업 전반의 전략을 사전에 마련하는 것이 중요하다.</li>
+  </ul>
+
+  <h5>일반적인 백업 유형</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유형</th><th>백업 대상</th><th>복구에 필요한 세트</th></tr></thead>
+      <tbody>
+        <tr><td>전체 백업</td><td>클러스터 내 모든 파일</td><td>마지막 전체 백업 + 이후 WAL</td></tr>
+        <tr><td>증분 백업</td><td><b>마지막 증분 백업</b> 이후 변경분</td><td>마지막 전체 백업 + <b>모든</b> 증분 백업 + 이후 WAL</td></tr>
+        <tr><td>차등 백업</td><td><b>마지막 전체 백업</b> 이후 변경분</td><td>마지막 전체 백업 + 마지막 차등 백업 + 이후 WAL</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>완벽한 복구를 위한 백업 데이터 세트</h5>
+  <ul>
+    <li>완벽한 복구를 위해서는 <b>장애 시점까지 생성된 모든 WAL 파일</b>이 필요하다.</li>
+    <li>증분 백업을 수행한 경우, 마지막 전체 백업 + 모든 증분 백업 + 마지막 증분 이후의 WAL이 필요하다.</li>
+    <li>차등 백업을 수행한 경우, 마지막 전체 백업 + 마지막 차등 백업 + 그 시점 이후의 WAL이 필요하다.</li>
+    <li>증분은 백업 속도가 빠르지만, 전체 백업 주기가 길수록 복구 대상이 많아져 복구 시간이 늘어날 수 있다.</li>
+    <li>차등은 전체 백업 이후의 변경분만 담으므로, 일반적으로 <b>복구 속도 측면에서는 차등이 유리하다</b>.</li>
+  </ul>
+
+  <h5>백업 주기</h5>
+  <ul>
+    <li>복구 시간 관점에서는 <b>전체 백업을 매일</b> 수행하는 것이 가장 이상적이다.</li>
+    <li>매일 전체 백업이 가능한 환경이라면 전체 백업만으로 운영하는 것이 가장 효율적이다.</li>
+    <li>어렵다면 전체 백업은 주 1회, 차등/증분 백업을 매일 수행하는 방식이 일반적이다.</li>
+  </ul>
+
+  <h5>백업 파일 보관 기간</h5>
+  <ul>
+    <li>백업 파일을 장기간 보관할 필요는 없지만, 여러 상황을 고려해 기간을 길게 잡는 경우가 많다.</li>
+    <li>만약 1주일 전 상태로 되돌려야 한다면 그 시점의 백업 파일이 반드시 있어야 한다.</li>
+    <li>이런 이유로 일반적으로 <b>1주 ~ 1달</b> 범위에서 보관 기간을 설정한다.</li>
+  </ul>
+
+  <h4>백업 툴 선정</h4>
+  <ul>
+    <li>버전 16까지는 <code>pgBackRest</code>를 쓰는 것이 모든 면에서 유리하다.</li>
+    <li>하지만 <b>17부터는 <code>pg_basebackup</code>이 증분 백업을 지원</b>하므로 상황에 맞게 고르면 된다.</li>
+    <li><code>pgBackRest</code>도 증분 백업을 제공하지만 이는 <b>변경된 파일 단위</b>의 증분이다.
+      <ul><li>1GB 파일에서 1바이트만 바뀌어도 1GB를 다시 백업해야 한다.</li></ul>
+    </li>
+    <li><code>pg_basebackup</code>의 증분 백업은 <b>변경된 블록 단위</b>로 동작하므로 백업 시간과 용량을 모두 줄일 수 있다.</li>
+    <li>증분 백업 방식을 제외한 모든 항목은 <code>pgBackRest</code>가 우수하다.</li>
+    <li><b>델타 복구</b>가 특히 중요하다. PostgreSQL은 데이터 파일 중 하나라도 손실되면 전체를 복구해야 하는데, 델타 복구를 쓰면 손상된 파일만 복원하고 진행할 수 있다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">17 증분 백업은 <code>summarize_wal</code>이 켜져 있어야 한다 <span class="badge b-purple">최신 반영</span></p>
+      <p>PostgreSQL 17 릴리스 노트의 <i>&ldquo;Add support for incremental file system backup&rdquo;</i>이 이 기능이다. 다만 그냥 <code>--incremental</code>만 붙인다고 되는 것은 아니고, 서버에서 <b><code>summarize_wal = on</code></b>으로 WAL 서머라이저를 켜둬야 어떤 블록이 바뀌었는지 추적할 수 있다. 그리고 복원할 때는 <code>pg_basebackup</code>이 아니라 <b><code>pg_combinebackup</code></b>으로 전체 백업과 증분들을 하나로 합쳐야 한다는 점이 기존 흐름과 다르다.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">도구 이름 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에 한 차례 <code>pgRestBack</code>으로 적힌 부분이 있는데 <code>pgBackRest</code>가 맞다. 검색할 때 헷갈리기 쉬운 이름이다.</p>
+    </div>
+  </div>
+
+  <h4>pgBackRest 설치 및 환경 파일 설정</h4>
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">원문 범위</p>
+      <p>노트는 여기서 &ldquo;이후 실제 복구 과정은 생략&rdquo;으로 끝난다. 이 문서도 확인되지 않은 내용을 채워 넣지 않고 원문의 범위를 그대로 따른다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>완전 복구 = 백업 세트 + 그 이후 <b>모든</b> WAL. 하나라도 빠지면 그 지점까지밖에 못 간다.</li>
+      <li>복구 속도는 차등이, 백업 속도는 증분이 유리하다. 가능하면 매일 전체 백업이 가장 낫다.</li>
+      <li>16까지는 <code>pgBackRest</code>, 17부터는 블록 단위 증분이 필요하면 <code>pg_basebackup</code>도 후보가 된다.</li>
+      <li>17 증분 백업은 <code>summarize_wal = on</code> + 복원 시 <code>pg_combinebackup</code>이 짝이다.</li>
+    </ul>
+  </div>
+</article>

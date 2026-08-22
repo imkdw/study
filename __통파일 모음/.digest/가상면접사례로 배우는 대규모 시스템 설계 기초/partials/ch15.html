@@ -1,0 +1,442 @@
+<article class="item" id="item-55" data-spy>
+  <header class="item-head">
+    <div class="item-num">15-1</div>
+    <h3>요구사항과 개략적 설계안</h3>
+    <p class="item-tagline">단일 서버에서 시작해 샤딩을 거쳐 S3로. 1장의 압축판이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    구글 드라이브 설계의 진짜 주제는 저장이 아니라 <b>동기화</b>다. 파일을 어디에 두느냐보다, 여러 단말이 같은 파일을 어떻게 같게 유지하느냐가 어렵다.
+  </div>
+
+  <h4>요구사항</h4>
+  <ul>
+    <li>파일 업로드, 다운로드</li>
+    <li>여러 단말에 파일 동기화</li>
+    <li>파일 갱신 이력 조회</li>
+    <li>파일 공유</li>
+    <li>파일 편집, 삭제, 공유되었을 때 알림 표시</li>
+  </ul>
+
+  <h4>비기능적 요구사항</h4>
+  <ul>
+    <li><b>안정성</b> — 데이터 손실이 발생하면 안 된다.</li>
+    <li><b>빠른 동기화 속도</b> — 파일 동기화에 시간이 너무 오래 걸리면 안 된다.</li>
+    <li><b>네트워크 대역폭</b> — 최대한 적게 쓴다.</li>
+    <li><b>규모 확장성</b> — 아주 많은 양의 트래픽도 처리할 수 있어야 한다.</li>
+    <li><b>높은 가용성</b> — 일부 서버에 장애가 나거나 느려지거나 네트워크가 끊겨도 계속 사용할 수 있어야 한다.</li>
+  </ul>
+
+  <h4>개략적 추정치</h4>
+  <ul>
+    <li>가입자는 5,000만 명, DAU는 1,000만 명</li>
+    <li>모든 사용자에게 10GB의 무료 저장 공간 제공</li>
+    <li>매일 각 사용자가 평균 2개의 파일을 업로드하며, 파일 평균 크기는 500KB</li>
+    <li>읽기 : 쓰기 비율은 1:1</li>
+    <li>필요한 저장 공간 총량 = 5,000만 × 10GB = <b>500PB</b></li>
+    <li>업로드 API QPS = 1,000만 × 2회 ÷ 24시간 ÷ 3600초 ≈ <b>240회</b></li>
+    <li>최대 QPS = 240 × 2 = <b>480회</b></li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">QPS는 낮은데 저장소는 500PB <span class="badge b-blue">보강</span></p>
+      <p>초당 480회는 서버 몇 대면 충분한 수준이다. 즉 이 시스템의 어려움은 <b>요청 처리량이 아니라 데이터 양과 동기화</b>에 있다. 4장(초당 수만 요청)이나 13장(48,000 QPS)과 정반대 성격의 문제라는 점을 알고 읽으면 설계 의도가 잘 보인다.</p>
+    </div>
+  </div>
+
+  <h4>개략적 설계안</h4>
+  <ul>
+    <li>처음부터 거대한 시스템 대신 단일 서버에서 시작한다.</li>
+    <li>파일 업로드/다운로드를 처리할 웹 서버</li>
+    <li>사용자 데이터, 로그인 정보, 파일 정보 등 메타데이터를 저장할 DB</li>
+    <li>파일을 저장할 저장 공간. 파일 저장을 위해 1TB의 공간을 쓴다.</li>
+  </ul>
+
+  <h5>저장 공간의 구조</h5>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  D1["drive/<br>└ user1<br>└ user2<br>└ user3"] -->|"expand"| D2["drive/<br>└ user1<br>&nbsp;&nbsp;└ recipes/<br>&nbsp;&nbsp;&nbsp;&nbsp;└ chicken.txt<br>└ user2<br>&nbsp;&nbsp;└ football.avi<br>&nbsp;&nbsp;└ sports.txt"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>사용자별 디렉터리 아래에 그대로 파일 시스템을 흉내 낸다</b> — 초기 설계에서는 실제 디스크의 디렉터리 구조를 그대로 쓴다.</div>
+  </div>
+
+  <h4>API 설계</h4>
+
+  <h5>파일 업로드 API</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">POST /files/upload?uploadType=resumable</span><span class="code-spacer"></span></div>
+<pre><code class="language-bash"># 단순 업로드      : 파일 크기가 작을 때
+# 이어 올리기      : 파일이 크고 네트워크 문제로 중단될 가능성이 높을 때
+#   인자 : uploadType=resumable, data=데이터</code></pre>
+  </div>
+  <ol class="steps">
+    <li><div class="step-title">이어 올리기 URL을 받기 위한 최초 요청을 보낸다</div></li>
+    <li><div class="step-title">데이터를 업로드하며 상태를 모니터링한다</div></li>
+    <li><div class="step-title">장애가 나면 발생 시점부터 업로드를 재시작한다</div></li>
+  </ol>
+
+  <h5>파일 다운로드 API</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">POST /files/download</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">{ "path": "path/to/file" }</code></pre>
+  </div>
+
+  <h5>파일 갱신 히스토리 API</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">POST /files/list_revisions</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">{
+  "path": "path/to/file",
+  "limit": 10
+}</code></pre>
+  </div>
+
+  <h4>한 대 서버의 제약 극복</h4>
+  <ul>
+    <li>1TB 서버의 용량이 가득 찼다고 하자.</li>
+    <li>가장 먼저 떠오르는 해결책은 데이터를 샤딩하는 것이다.</li>
+  </ul>
+
+  <h5>샤딩</h5>
+  <ul>
+    <li>샤딩 키로 저장되는 서버를 분산한다. 예를 들어 <code>user_id % 4</code>로 서버 4대에 나눈다.</li>
+    <li>하지만 여전히 장애로 인한 가용성 문제가 남는다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  R["user_id % 4<br>(서버 개수로 샤딩키 지정)"] --> S1[("서버 1")]
+  R --> S2[("서버 2")]
+  R --> S3[("서버 3")]
+  R --> S4[("서버 4")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>1-10과 5-1이 다시 등장한다</b> — <code>% 4</code>는 서버 대수가 바뀌면 대규모 재배치를 일으킨다. 그래서 결국 관리형 저장소로 넘어간다.</div>
+  </div>
+
+  <h5>AWS S3</h5>
+  <ul>
+    <li>S3는 아마존이 제공하는 객체 저장소 서비스로, 업계 최고 수준의 규모 확장성, 가용성, 보안을 제공한다.</li>
+    <li>넷플릭스나 에어비앤비 같은 기업들도 저장 공간으로 S3를 쓴다.</li>
+    <li>동일 지역이나 여러 지역(region)에서의 다중화도 지원한다.</li>
+    <li>S3의 버킷은 파일 시스템의 폴더와 비슷하다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph SAME["같은 지역 안에서의 다중화"]
+    A1["버킷 A<br>(지역 A)"] --> B1["버킷 B"]
+    A1 --> C1["버킷 C"]
+    A1 --> D1["버킷 D"]
+  end
+  subgraph CROSS["다른 지역으로의 다중화"]
+    A2["버킷 A<br>(지역 A)"] --> R2["지역 B<br>버킷 B / C / D"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 지역 다중화는 장비 장애를, 지역 간 다중화는 리전 장애를 막는다</b> — 1-7 데이터 센터 이중화를 관리형 서비스가 대신 해 주는 셈이다.</div>
+  </div>
+
+  <h5>최종 데이터베이스와 저장 공간 구조</h5>
+  <ul>
+    <li>데이터베이스와 파일 저장 시스템을 분리해 SPOF를 피한다.</li>
+    <li>S3를 써서 가용성과 무손실을 보장한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  W["Web / App"] --> LB["로드밸런서"]
+  LB --> API["API 서버"]
+  API --> MDB[("메타데이터 데이터베이스")]
+  API --> FS[("파일 저장소 (S3)")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>메타데이터와 파일 본체가 갈라진다</b> — 파일은 크고 변하지 않으며, 메타데이터는 작고 자주 바뀐다. 성격이 다르므로 저장소도 다르다.</div>
+  </div>
+
+  <h4>동기화 충돌</h4>
+  <ul>
+    <li>두 명 이상의 사용자가 같은 파일이나 폴더를 동시에 업데이트하면 동기화 충돌이 발생한다.</li>
+    <li>해결 전략은 <b>먼저 처리되는 것을 성공으로 보고, 나중에 처리되는 것을 충돌로 표시</b>하는 것이다.</li>
+    <li>결국 충돌 난 파일에 대해 두 파일을 하나로 합칠지, 둘 중 하나로 대체할지 사용자가 정해야 한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant U1 as 유저 1
+  participant S as 시스템
+  participant U2 as 유저 2
+  U1->>S: 동시에 파일 갱신
+  U2->>S: 동시에 파일 갱신
+  S-->>U1: 유저 1 의 갱신을 먼저 처리 — 동기화 완료
+  S-->>U2: 유저 2 에게는 충돌 발생 통보
+      </pre>
+    </div>
+    <div class="figure-cap"><b>충돌을 시스템이 해소하지 않고 사용자에게 알린다</b> — 6장 벡터 시계와 같은 태도다. 어느 쪽이 옳은지는 기계가 판단할 수 없다.</div>
+  </div>
+
+  <h4>개략적 설계안</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["유저의 단말"] --> BS["블록 저장소 서버"]
+  U --> LB["로드밸런서"]
+  U -.->|"롱 폴링"| NS["알림 서비스"]
+  NS --> BQ[["오프라인 사용자 백업 큐"]]
+  BS --> CLOUD[("클라우드 저장소")]
+  CLOUD --> COLD[("아카이빙 저장소")]
+  CLOUD --> LB
+  LB --> API["API 서버"]
+  API --> MC[("메타데이터 캐시")]
+  API --> MDB[("메타데이터 DB")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>15장의 전체 지도</b> — 파일 본체는 블록 저장소 서버를 거쳐 클라우드로, 메타데이터는 API 서버를 거쳐 DB로, 변경 통보는 알림 서비스를 거쳐 다른 단말로 간다.</div>
+  </div>
+
+  <h5>블록 저장소 서버 (Block Server)</h5>
+  <ul>
+    <li>파일 블록을 클라우드 저장소에 업로드하는 서버다.</li>
+    <li>파일을 여러 블록으로 나눠 저장하고, 각 블록에는 고유한 해시값이 부여된다.</li>
+    <li>해시값은 메타데이터 DB에 저장된다.</li>
+    <li>원본 파일을 재구성하려면 블록들을 원래 순서대로 합쳐야 한다.</li>
+  </ul>
+
+  <h5>아카이빙 저장소 (Cold Storage)</h5>
+  <ul><li>오랫동안 쓰이지 않은 비활성 데이터를 저장하기 위한 시스템이다.</li></ul>
+
+  <h5>메타데이터 데이터베이스</h5>
+  <ul>
+    <li>사용자, 파일, 블록, 버전 등 메타데이터 정보를 저장한다.</li>
+    <li>실제 파일은 클라우드에 두고, 이 DB는 오직 메타데이터만 관리한다.</li>
+  </ul>
+
+  <h5>메타데이터 캐시</h5>
+  <ul><li>성능을 높이기 위해 자주 쓰는 메타데이터를 캐시한다.</li></ul>
+
+  <h5>오프라인 사용자 백업 큐 (Offline Backup Queue)</h5>
+  <ul>
+    <li>클라이언트가 접속 중이 아니라 파일의 최신 상태를 확인할 수 없을 때, 그 정보를 이 큐에 넣는다.</li>
+    <li>큐에 쌓인 정보로 클라이언트가 나중에 접속했을 때 동기화가 이루어진다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>500PB 저장소에 480 QPS — 처리량이 아니라 데이터 양과 동기화가 문제다.</li>
+      <li>업로드는 이어 올리기(resumable)를 지원해야 한다.</li>
+      <li>샤딩 대신 S3 같은 관리형 객체 저장소로 가는 것이 실용적 선택이다.</li>
+      <li>동기화 충돌은 선착순으로 처리하고, 해소는 사용자에게 맡긴다.</li>
+      <li>파일은 블록 저장소, 메타데이터는 DB, 변경 통보는 알림 서비스로 삼분한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-56" data-spy>
+  <header class="item-head">
+    <div class="item-num">15-2</div>
+    <h3>상세 설계</h3>
+    <p class="item-tagline">블록으로 쪼개면 델타 동기화 / 압축 / 중복 제거가 한꺼번에 가능해진다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>파일을 블록으로 쪼개는 결정 하나</b>에서 이 장의 최적화가 모두 파생된다. 바뀐 블록만 보내고(델타), 블록 단위로 압축하고, 같은 블록은 한 번만 저장한다(중복 제거).
+  </div>
+
+  <h4>블록 저장소 서버</h4>
+  <ul>
+    <li>큰 파일을 업데이트할 때 전체 파일을 보내면 대역폭을 많이 잡아먹는다.</li>
+    <li>이를 최적화하는 방법은 두 가지다 — 델타 동기화와 압축.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  F["파일"] -->|"분할"| B1["블록 1"]
+  F --> B2["블록 2"]
+  F --> BN["블록 N"]
+  B1 -->|"압축"| C1["압축 결과"] -->|"암호화"| E1["암호화 결과"] --> CLOUD[("클라우드 저장소")]
+  B2 --> C2["압축 결과"] --> E2["암호화 결과"] --> CLOUD
+  BN --> CN["압축 결과"] --> EN["암호화 결과"] --> CLOUD
+      </pre>
+    </div>
+    <div class="figure-cap"><b>분할 → 압축 → 암호화 → 업로드</b> — 각 블록이 독립적으로 이 파이프라인을 타므로 병렬 처리가 가능하고, 실패해도 그 블록만 다시 하면 된다.</div>
+  </div>
+
+  <h5>델타 동기화 (Delta Sync)</h5>
+  <ul>
+    <li>파일이 수정되면 전체 파일 대신 수정이 일어난 블록만 동기화한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 190" width="560" role="img" aria-label="네 블록 중 두 개만 변경되어 전송되는 델타 동기화">
+        <rect x="40" y="55" width="90" height="40" rx="5" class="dg-fill-soft dg-stroke"/>
+        <text x="85" y="80" class="dg-text dg-mono" font-size="12" text-anchor="middle">블록 1</text>
+
+        <rect x="140" y="55" width="90" height="40" rx="5" fill="var(--accent)" opacity="0.35" class="dg-stroke"/>
+        <text x="185" y="80" class="dg-text dg-mono" font-size="12" text-anchor="middle" fill="var(--accent)">블록 2</text>
+
+        <rect x="40" y="110" width="90" height="40" rx="5" fill="var(--accent)" opacity="0.35" class="dg-stroke"/>
+        <text x="85" y="135" class="dg-text dg-mono" font-size="12" text-anchor="middle" fill="var(--accent)">블록 3</text>
+
+        <rect x="140" y="110" width="90" height="40" rx="5" class="dg-fill-soft dg-stroke"/>
+        <text x="185" y="135" class="dg-text dg-mono" font-size="12" text-anchor="middle">블록 4</text>
+
+        <path d="M235 65 C 320 45, 380 60, 420 78" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arrD)"/>
+        <path d="M135 140 C 240 175, 380 145, 425 118" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arrD)"/>
+        <defs>
+          <marker id="arrD" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0 L8,3.5 L0,7 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+
+        <text x="480" y="88" class="dg-text" font-size="13" text-anchor="middle">클라우드</text>
+        <text x="480" y="108" class="dg-text" font-size="13" text-anchor="middle">저장소</text>
+
+        <text x="300" y="30" class="dg-text dg-mono" font-size="12" text-anchor="middle" fill="var(--accent)">수정된 블록만 전송</text>
+        <text x="135" y="176" class="dg-text-sub" font-size="11" text-anchor="middle">블록 1 / 4 는 그대로 → 보내지 않는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>1GB 파일에서 한 줄만 고쳤다면 몇 KB만 나간다</b> — 비기능 요구사항 "네트워크 대역폭을 최대한 적게"의 직접적인 답이다.</div>
+  </div>
+
+  <h5>압축 (Compression)</h5>
+  <ul>
+    <li>블록 단위로 압축해 데이터 크기를 아낀다.</li>
+    <li>압축 알고리즘은 파일 종류에 따라 달리 고른다. 텍스트에는 gzip/bzip2, 이미지나 동영상에는 별도 알고리즘이 낫다.</li>
+  </ul>
+
+  <h4>높은 일관성 요구사항</h4>
+  <ul>
+    <li>강한 일관성(strong consistency) 모델을 기본으로 지원해야 한다. 같은 파일이 단말이나 사용자에 따라 다르게 보이면 안 되기 때문이다.</li>
+    <li>메모리 캐시는 기본적으로 결과적 일관성(eventual consistency)을 지원하므로, 강한 일관성을 위해서는 —
+      <ul>
+        <li>캐시의 사본과 DB의 원본이 일치해야 한다.</li>
+        <li>DB의 원본에 변경이 생기면 캐시의 사본을 무효화해야 한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>업로드 절차</h4>
+
+  <h5>파일 메타데이터 추가</h5>
+  <ol class="steps">
+    <li><div class="step-title">클라이언트 1이 새 파일의 메타데이터 추가 요청을 보낸다</div></li>
+    <li><div class="step-title">새 파일의 메타데이터를 DB에 저장하고 업로드 상태를 대기중(PENDING)으로 바꾼다</div></li>
+    <li><div class="step-title">새 파일이 추가되었음을 알림 서비스에 통지한다</div></li>
+    <li><div class="step-title">알림 서비스가 관련 클라이언트(클라이언트 2)에게 통보한다</div></li>
+  </ol>
+
+  <h5>파일을 클라우드 저장소에 업로드</h5>
+  <ol class="steps">
+    <li><div class="step-title">클라이언트 1이 파일을 블록 저장소 서버에 업로드한다</div></li>
+    <li><div class="step-title">블록 저장소 서버가 파일을 블록 단위로 분할 / 압축 / 암호화한 뒤 클라우드 저장소에 올린다</div></li>
+    <li><div class="step-title">업로드가 끝나면 클라우드 스토리지가 완료 콜백을 호출한다</div><p>이 콜백은 API 서버로 전송된다.</p></li>
+    <li><div class="step-title">메타데이터 DB의 파일 상태를 완료로 변경한다</div></li>
+    <li><div class="step-title">알림 서비스에 업로드 완료를 통지하고, 알림 서비스가 클라이언트 2에게 통보한다</div></li>
+  </ol>
+
+  <h4>다운로드 절차</h4>
+  <ul>
+    <li>클라이언트 A가 접속 중일 때 다른 클라이언트가 파일을 변경하면, 알림 서비스가 클라이언트 A에게 "파일 변경이 발생했으니 새 버전을 가져가라"고 알린다.</li>
+    <li>클라이언트 A가 네트워크에 연결된 상태가 아니면 데이터는 캐시에 보관된다. 이후 상태가 바뀌면 그때 새 버전을 가져간다.</li>
+  </ul>
+
+  <h4>알림 서비스</h4>
+  <ul>
+    <li>파일의 일관성 유지를 위해, 변경이 발생하면 알림으로 다른 클라이언트에게 사실을 통보한다.</li>
+    <li>알림은 롱 폴링이나 웹소켓으로 전송된다.</li>
+  </ul>
+
+  <h5>저장소 시스템에는 왜 롱 폴링이 적합한가</h5>
+  <ul>
+    <li>채팅 서비스와 달리 <b>양방향 알림이 필요하지 않다</b>.</li>
+    <li>서버는 파일이 변경된 사실을 클라이언트에게 알려 줘야 하지만, 그 반대는 필요 없다.</li>
+    <li>각 클라이언트는 알림 서버와 롱 폴링 연결을 유지하다가 변경사항이 생기면 그 연결을 끊는다.</li>
+    <li>이후 반드시 메타데이터 서버에 연결해 파일의 최신 내역을 다운로드해야 한다.</li>
+    <li>다운로드가 끝났거나 폴링 타임아웃이 나면 즉시 새 요청을 보내 롱 폴링 연결을 복원하고 유지한다.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">12장과 정반대의 결론</p>
+      <p>채팅에서는 웹소켓이 정답이었지만 여기서는 롱 폴링이 낫다. 차이는 <b>클라이언트가 서버에 실시간으로 말을 걸 필요가 있느냐</b>다. 채팅은 있고 파일 동기화는 없다. 같은 기술 비교라도 문맥이 결론을 바꾼다는 좋은 예다.</p>
+    </div>
+  </div>
+
+  <h4>저장소 공간 절약</h4>
+  <ul>
+    <li>저장소 시스템은 갱신 이력을 보존하고 안정성을 보장하기 위해 여러 버전을 관리해야 한다.</li>
+    <li>단순히 변경된 버전을 계속 업로드하면 금방 저장 공간이 부족해진다.</li>
+  </ul>
+
+  <h5>중복 제거 (de-dupe)</h5>
+  <ul>
+    <li>중복된 파일 블록을 계정 차원에서 제거한다.</li>
+    <li>두 블록이 같은 블록인지는 해시값을 비교해 판단한다.</li>
+  </ul>
+
+  <h5>지능적 백업 전략 도입</h5>
+  <ul>
+    <li><b>한도 설정</b> — 보관할 파일 버전 개수에 상한을 두고, 초과하면 가장 오래된 버전부터 제거한다.</li>
+    <li><b>중요한 버전만 보관</b> — 불필요한 버전과 사본이 만들어지는 것을 피하려면 그중 중요한 것만 골라내야 한다.</li>
+    <li><b>아카이빙 저장소 사용</b> — 몇 달 또는 수년간 이용되지 않은 데이터는 아카이빙 저장소로 옮긴다. S3 Glacier 같은 아카이빙 저장소는 S3보다 이용료가 훨씬 저렴하다.</li>
+  </ul>
+
+  <h4>장애 처리</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>장애 대상</th><th>대응</th></tr></thead>
+      <tbody>
+        <tr><td>로드밸런서</td><td>부(secondary) 로드밸런서가 트래픽을 이어받는다. 로드밸런서끼리는 박동 신호를 주기적으로 주고받아 상태를 감시한다.</td></tr>
+        <tr><td>블록 저장소 서버</td><td>다른 서버가 작업을 이어받는다.</td></tr>
+        <tr><td>클라우드 저장소</td><td>S3 버킷을 여러 리전에 배치해 두고, 한 지역에 장애가 나면 다른 지역에서 가져온다.</td></tr>
+        <tr><td>API 서버</td><td>무상태이므로, 로드밸런서가 장애 서버로 트래픽이 가지 않도록 격리한다.</td></tr>
+        <tr><td>메타데이터 캐시</td><td>캐시 서버도 다중화한다. 다른 캐시 서버에서 데이터를 가져오고 장애 서버는 새 서버로 교체한다.</td></tr>
+        <tr><td>메타데이터 DB (주)</td><td>부 서버 중 하나를 주 서버로 승격하고, 부 서버를 새로 하나 추가한다.</td></tr>
+        <tr><td>메타데이터 DB (부)</td><td>다른 부 서버가 읽기를 처리하도록 페일오버하고, 그동안 새 부 서버를 추가한다.</td></tr>
+        <tr><td>알림 서비스</td><td>롱 폴링 연결을 유지해야 한다. 드롭박스 기준 한 대가 100만 개 이상의 커넥션을 처리한다.</td></tr>
+        <tr><td>오프라인 사용자 백업 큐</td><td>큐도 이중화한다. 장애 시 구독 중인 클라이언트들이 백업 큐로 구독 관계를 재설정해야 한다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">알림 서비스 페일오버는 느리다 <span class="badge b-blue">보강</span></p>
+      <p>100만 개의 롱 폴링 연결을 <b>유지</b>하는 것은 어렵지 않지만, 장애가 나서 그 100만 개가 <b>동시에 다른 서버로 재연결</b>하는 것은 다른 문제다. 순간적으로 100만 건의 연결 요청이 몰리므로 페일오버가 상대적으로 느려진다. 실무에서는 클라이언트가 재연결할 때 무작위 지연(jitter)을 주어 이 몰림을 흩뜨린다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>블록 분할 하나가 델타 동기화 / 압축 / 중복 제거를 전부 가능하게 한다.</li>
+      <li>강한 일관성을 위해 DB 변경 시 캐시 사본을 무효화한다.</li>
+      <li>업로드는 메타데이터 먼저(PENDING) → 파일 업로드 → 상태 완료 순서.</li>
+      <li>알림은 단방향이므로 웹소켓이 아니라 롱 폴링이 적합하다.</li>
+      <li>공간 절약은 중복 제거 + 버전 상한 + 아카이빙 저장소.</li>
+    </ul>
+  </div>
+</article>

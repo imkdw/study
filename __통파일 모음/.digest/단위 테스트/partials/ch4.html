@@ -1,0 +1,560 @@
+<article class="item" id="item-4-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-1</div>
+    <h3>좋은 단위 테스트의 4대 요소</h3>
+    <p class="item-tagline">회귀 방지, 리팩터링 내성, 빠른 피드백, 유지 보수성.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    거짓 양성을 줄이는 방법은 하나뿐이다. <b>테스트를 구현 세부 사항에서 떼어내는 것.</b> 최종 사용자에게 의미 있는 결과만 확인한다.
+  </div>
+
+  <p>어떤 자동화된 테스트든 아래 네 가지 특성으로 분석할 수 있다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>요소</th><th>묻는 것</th></tr></thead>
+      <tbody>
+        <tr><td><b>회귀 방지</b></td><td>이 테스트가 버그를 잡아낼 수 있는가</td></tr>
+        <tr><td><b>리팩터링 내성</b></td><td>동작이 그대로일 때 이 테스트가 조용히 있어 주는가</td></tr>
+        <tr><td><b>빠른 피드백</b></td><td>얼마나 빨리 알려주는가</td></tr>
+        <tr><td><b>유지 보수성</b></td><td>이해하고 실행하기 얼마나 어려운가</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>회귀 방지</h4>
+
+  <p>회귀는 소프트웨어 버그로, 코드를 수정한 후 기능이 의도한 대로 작동하지 않는 경우다. 개발자의 삶에서 불행한 사실 하나는 <b>코드가 자산이 아니라 책임</b>이라는 점이다. 코드베이스가 커질수록 잠재적인 버그에 더 많이 노출된다.</p>
+
+  <p>회귀 방지 지표를 극대화하려면 테스트가 가능한 한 <b>많은 코드를 실행</b>하는 것을 목표로 해야 한다. 다만 그 코드가 비즈니스적으로 중요한 로직일 때만 유효하다. 단순한 코드를 테스트하는 것은 가치가 거의 없다.</p>
+
+  <h4>리팩터링 내성</h4>
+
+  <p><b>거짓 양성(false positive)</b> 은 허위 경보다. 실제로는 기능이 의도한 대로 작동하는데 테스트가 실패하는 상황을 말한다. 일반적으로 코드를 리팩터링할 때, 즉 <b>구현을 수정하지만 식별할 수 있는 동작은 유지</b>할 때 발생한다.</p>
+
+  <p>단위 테스트의 목표는 프로젝트 성장을 지속 가능하게 하는 것이고, 그 메커니즘은 <b>회귀 없이 주기적으로 리팩터링하고 새 기능을 추가할 수 있는 것</b>이다. 리팩터링 내성이 그 메커니즘의 전제 조건이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>테스트가 있을 때</th><th>거짓 양성이 잦을 때</th></tr></thead>
+      <tbody>
+        <tr><td>기존 기능이 고장 나면 배포 전에 조기 경고를 받는다</td><td>타당한 이유 없이 실패하는 경험이 쌓인다</td></tr>
+        <tr><td>변경이 회귀로 이어지지 않는다는 확신을 얻는다</td><td>실패에 익숙해져 <b>타당한 실패도 무시</b>하기 시작한다</td></tr>
+        <tr><td>확신이 있으니 리팩터링을 계속하게 된다</td><td>신뢰가 무너지고, 회귀를 피하려 코드 변경을 최소화한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>거짓 양성의 원인</h4>
+
+  <p>거짓 양성의 수는 <b>테스트 구성 방식</b>과 직접적인 관련이 있다. 테스트가 SUT 의 구현 세부 사항과 많이 결합될수록 허위 경보가 늘어난다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">거짓 양성을 줄이는 유일한 방법</p>
+      <p>구현 세부 사항에서 테스트를 <b>분리</b>하는 것뿐이다. 테스트는 최종 사용자의 관점에서 SUT 를 검증해야 하고, 최종 사용자에게 의미 있는 결과만 확인해야 한다.</p>
+    </div>
+  </div>
+
+  <h5>예제 — 하위 렌더러 구성을 검증하는 테스트</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">message-renderer.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class Message {
+  constructor(
+    public header: string,
+    public body: string,
+    public footer: string
+  ) {}
+}
+
+interface IRenderer {
+  render(message: Message): string;
+}
+
+/** MessageRenderer 는 여러 개의 하위 렌더링 클래스를 가지고 있다 */
+class MessageRenderer implements IRenderer {
+  readonly subRenderers: IRenderer[];
+
+  constructor() {
+    this.subRenderers = [
+      new HeaderRenderer(),
+      new BodyRenderer(),
+      new FooterRenderer(),
+    ];
+  }
+
+  render(message: Message): string {
+    return this.subRenderers
+      .map((renderer) =&gt; renderer.render(message))
+      .join("");
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">message-renderer.spec.ts</span>
+      <span class="code-tag bad">구현에 결합됨</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("messageRenderer_uses_correct_sub_renderers", () =&gt; {
+  const sut = new MessageRenderer();
+
+  const renderers = sut.subRenderers;
+
+  expect(renderers).toHaveLength(3);
+  expect(renderers[0]).toBeInstanceOf(HeaderRenderer);
+  expect(renderers[1]).toBeInstanceOf(BodyRenderer);
+  expect(renderers[2]).toBeInstanceOf(FooterRenderer);
+});</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">이 테스트가 실패하는 순간</p>
+      <p>하위 렌더러의 <b>순서만 바꿔도</b> 최종 출력이 동일한 경우가 있는데, 이 테스트는 그때도 빨간불이 된다. 테스트가 알고리즘 자체를 복사해두었기 때문이다. <b>SUT 의 구현 세부 사항과 결합된 테스트는 리팩터링 내성이 없다.</b></p>
+    </div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  CLIENT["클라이언트"] --> S1
+  subgraph SUT["테스트 대상 시스템"]
+    S1["1단계"] --> S2["2단계"] --> S3["3단계"]
+  end
+  S3 --> CLIENT
+  S1 -.->|"검증"| T["테스트<br>모든 단계가 올바른가?"]
+  S2 -.->|"검증"| T
+  S3 -.->|"검증"| T
+      </pre>
+    </div>
+    <div class="figure-cap"><b>구현에 결합된 테스트</b> — 테스트가 내부 단계 하나하나를 들여다보므로, 단계를 재배치하는 리팩터링마다 함께 깨진다.</div>
+  </div>
+
+  <h4>구현 세부 사항 대신 최종 결과를 목표로 하기</h4>
+
+  <p>같은 <code>MessageRenderer</code> 를 <b>동작</b>으로 검증하면 이렇게 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">message-renderer.spec.ts</span>
+      <span class="code-tag good">동작을 검증</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("rendering_a_message", () =&gt; {
+  const sut = new MessageRenderer();
+  const message = new Message("h", "b", "f");
+
+  const html = sut.render(message);
+
+  expect(html).toBe(
+    "&lt;header&gt;h&lt;/header&gt;&lt;article&gt;b&lt;/article&gt;&lt;footer&gt;f&lt;/footer&gt;"
+  );
+});</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  CLIENT["클라이언트"] --> S1
+  subgraph SUT["테스트 대상 시스템"]
+    S1["1단계"] --> S2["2단계"] --> S3["3단계"]
+  end
+  S3 --> CLIENT
+  CLIENT -.->|"검증"| T["테스트<br>최종 결과가 맞는가?"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>최종 결과만 보는 테스트</b> — 내부 단계를 어떻게 바꾸든 클라이언트가 받는 결과가 같으면 테스트는 조용하다. 이것이 리팩터링 내성이다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>네 요소는 회귀 방지 / 리팩터링 내성 / 빠른 피드백 / 유지 보수성이다.</li>
+      <li>회귀 방지를 높이려면 <b>비즈니스적으로 중요한 코드를 많이</b> 실행해야 한다.</li>
+      <li>거짓 양성은 테스트가 구현 세부 사항과 결합된 만큼 늘어난다.</li>
+      <li>해법은 하나다. <b>최종 사용자 관점의 결과만</b> 검증한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-2</div>
+    <h3>첫 번째 특성과 두 번째 특성 간 본질적인 관계</h3>
+    <p class="item-tagline">회귀 방지는 신호를 키우고, 리팩터링 내성은 소음을 줄인다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>테스트 정확도 = 신호(발견된 버그 수) / 소음(허위 경보 수)</b>. 분자를 키우는 것이 회귀 방지, 분모를 줄이는 것이 리팩터링 내성이다.
+  </div>
+
+  <h4>회귀 방지와 리팩터링 내성 간의 관계</h4>
+
+  <p>테스트 결과와 실제 기능 상태를 교차하면 네 가지 경우가 나온다. 의학의 진단 검사와 같은 구조다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th></th><th>기능이 올바르게 작동</th><th>기능이 고장남</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>테스트 통과</b></td><td class="t-center t-ok">올바른 추론 (참 음성)</td><td class="t-center t-no">2종 오류 (거짓 음성)</td></tr>
+        <tr><td><b>테스트 실패</b></td><td class="t-center t-no">1종 오류 (거짓 양성)</td><td class="t-center t-ok">올바른 추론 (참 양성)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>회귀 방지가 없으면 <b>거짓 음성</b>(버그가 있는데 통과)이 늘어나고, 리팩터링 내성이 없으면 <b>거짓 양성</b>(멀쩡한데 실패)이 늘어난다.</p>
+
+  <h4>테스트 정확도 극대화</h4>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "테스트 정확도 = 소음 / 신호" 로 적혀 있는데 분자와 분모가 뒤집혔다. 정확도가 <b>높다</b>는 것은 신호가 크고 소음이 작다는 뜻이므로 <b>정확도 = 신호 / 소음</b> 이 맞다.</p>
+    </div>
+  </div>
+
+  <p>테스트의 정확도를 향상시키는 방법은 두 가지다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">신호를 증가시킨다</div><p>회귀를 더 잘 찾아내는 테스트로 개선한다. 곧 회귀 방지를 높이는 일이다.</p></li>
+    <li><div class="step-title">소음을 줄인다</div><p>허위 경보를 발생시키지 않는 테스트로 개선한다. 곧 리팩터링 내성을 높이는 일이다.</p></li>
+  </ol>
+
+  <h4>거짓 양성과 거짓 음성의 중요성 — 역학 관계</h4>
+
+  <p>둘의 무게는 프로젝트 시점에 따라 다르다.</p>
+
+  <ul>
+    <li><b>단기적으로</b> 거짓 양성은 거짓 음성만큼 나쁘지 않다. 프로젝트 시작 시점에 잘못된 경고를 받는 것은, 경고를 아예 못 받아서 버그가 운영 환경에 들어가는 위험에 비하면 별일이 아니다.</li>
+    <li><b>초기에는</b> 리팩터링이 그렇게 중요하지 않다. 코드가 아직 작기 때문이다.</li>
+    <li><b>시간이 지나면</b> 리팩터링이 점점 중요해지고, 동시에 테스트의 리팩터링 내성도 함께 중요해진다.</li>
+  </ul>
+
+  <p>따라서 중대형 프로젝트에서는 거짓 음성과 거짓 양성에 <b>똑같이 주의를 기울여야</b> 한다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>정확도 = 신호 / 소음. 회귀 방지가 분자를, 리팩터링 내성이 분모를 담당한다.</li>
+      <li>거짓 음성 = 2종 오류(버그를 놓침), 거짓 양성 = 1종 오류(허위 경보).</li>
+      <li>프로젝트 초기에는 거짓 음성이, 코드베이스가 커질수록 거짓 양성이 더 치명적이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-3</div>
+    <h3>세 번째, 네 번째 요소 빠른 피드백과 유지 보수성</h3>
+    <p class="item-tagline">테스트 코드는 제품 코드와 같은 등급의 시민이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    빠른 테스트는 피드백 루프를 줄여 <b>버그 수정 비용을 거의 0 으로</b> 만든다. 그리고 그 테스트를 유지하는 비용은 코드 라인 수와 외부 의존성 수에 비례한다.
+  </div>
+
+  <h4>빠른 피드백</h4>
+
+  <p>테스트가 빠를수록 더 많이, 더 자주 실행할 수 있다. 결함이 생기자마자 경고를 주므로 피드백 루프가 짧아지고, 버그를 수정하는 비용이 거의 0 에 수렴한다. 반대로 느린 테스트는 피드백을 늦추고 버그를 뒤늦게 드러낸다.</p>
+
+  <h4>유지 보수성</h4>
+
+  <p>유지 보수성은 두 가지로 나뉜다.</p>
+
+  <ul>
+    <li><b>이해하기 얼마나 어려운가</b> — 테스트 크기의 함수다. 코드 라인이 적을수록 읽기 쉽다.</li>
+    <li><b>실행하기 얼마나 어려운가</b> — 프로세스 외부 의존성의 함수다. 디비, 네트워크 같은 의존성을 상시 운영하는 데 시간이 든다.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">테스트 코드는 일급 시민이다</p>
+      <p>테스트 코드의 품질은 제품 코드만큼 중요하다. 테스트를 작성할 때 절차를 생략하면 안 된다. 이름 짓기, 중복 제거, 추상화 모두 제품 코드와 같은 기준을 적용한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>빠른 테스트 = 짧은 피드백 루프 = 낮은 수정 비용.</li>
+      <li>유지 보수성 = 테스트 크기 + 외부 의존성 운영 부담.</li>
+      <li>테스트 코드를 일급 시민으로 취급한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-4</div>
+    <h3>이상적인 테스트를 찾아서</h3>
+    <p class="item-tagline">네 요소는 덧셈이 아니라 곱셈이다. 하나가 0 이면 전체가 0 이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>리팩터링 내성과 유지 보수성은 챙기고, 회귀 방지와 빠른 피드백 사이에서 선택한다.</b> 이것이 현실에서 가능한 최선의 전략이다.
+  </div>
+
+  <p>테스트의 가치는 <code>회귀 방지 × 리팩터링 내성 × 빠른 피드백 × 유지 보수성</code> 으로 측정한다. 곱셈이므로 <b>넷 중 하나라도 0 이면 테스트의 가치는 0</b> 이다.</p>
+
+  <p>테스트 코드를 포함한 모든 코드는 책임이다. 최소 임계치를 높게 설정하고, 그 임계치를 충족하는 테스트만 남기는 것이 좋다.</p>
+
+  <h4>이상적인 테스트를 만들 수 있는가</h4>
+
+  <p>네 범주 모두에서 최대 점수를 받는 테스트는 현실적으로 불가능하다. 앞 세 요소는 서로 상호 배타적이라 <b>2개를 얻으면 나머지 1개를 희생</b>해야 한다. 그러니 목표는 최대화가 아니라, <b>어느 것도 크게 줄지 않는 지점</b>을 찾는 것이다.</p>
+
+  <h4>극단적인 사례 1 — E2E 테스트</h4>
+
+  <ul>
+    <li>모든 코드를 테스트하므로 <b>회귀 방지</b>를 훌륭하게 해낸다.</li>
+    <li>사용자 입장에서 기능이 어떻게 동작하는지만 보므로 구현 세부 사항이 최대한 제거된다. <b>리팩터링 내성</b>도 우수하다.</li>
+    <li>하지만 느리다. 모든 테스트를 E2E 로 만든 시스템에서 <b>빠른 피드백</b>을 받는 것은 불가능하다.</li>
+  </ul>
+
+  <h4>극단적인 사례 2 — 간단한 테스트</h4>
+
+  <p>E2E 와 정반대로 빠르게 실행되어 <b>빠른 피드백</b>을 주고, 거짓 양성 가능성도 낮아 <b>리팩터링 내성</b>이 우수하다. 하지만 기반 코드에 실수할 여지가 없을 만큼 간단해서 <b>회귀를 나타내지 않는다.</b></p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.spec.ts</span>
+      <span class="code-tag bad">동어 반복 테스트</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  constructor(private name: string) {}
+
+  getName(): string {
+    return this.name;
+  }
+}
+
+it("User", () =&gt; {
+  const name = "name";
+
+  const sut = new User("name");
+
+  expect(sut.getName()).toBe(name);
+});</code></pre>
+  </div>
+
+  <p>이런 테스트는 이름만 바꾼 <b>동어 반복 테스트(tautology test)</b> 를 낳는다. 항상 통과하거나 검증이 무의미하다.</p>
+
+  <h4>극단적인 사례 3 — 깨지기 쉬운 테스트</h4>
+
+  <p>실행이 빠르고 회귀를 잡을 가능성도 높지만 거짓 양성이 많은 테스트를 쓰기는 아주 쉽다. 이를 <b>깨지기 쉬운 테스트(brittle test)</b> 라고 부른다. 리팩터링을 견디지 못하고, 기능이 고장 났는지와 무관하게 빨간불이 된다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-repository.spec.ts</span>
+      <span class="code-tag bad">깨지기 쉬운 테스트</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserRepository {
+  private lastExecutedSqlStatement: string;
+
+  getById(id: number) {
+    // ...
+  }
+
+  getLastExecutedSqlStatement() {
+    return this.lastExecutedSqlStatement;
+  }
+}
+
+it("getById_executes_correct_SQL_code", () =&gt; {
+  const sut = new UserRepository();
+
+  const user = sut.getById(5);
+
+  expect(sut.getLastExecutedSqlStatement()).toBe(
+    "SELECT * FROM dbo.[User] WHERE UserID = 5"
+  );
+});</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">같은 결과를 내는 다른 SQL 들</p>
+      <p>아래 쿼리는 전부 같은 결과를 돌려주지만, 위 테스트는 전부 실패시킨다.</p>
+      <ul>
+        <li><code>SELECT * FROM dbo.[User] WHERE UserID = 5</code></li>
+        <li><code>SELECT * FROM dbo.User WHERE UserID = 5</code></li>
+        <li><code>SELECT UserId, Name, Email FROM dbo.User WHERE UserID = 5</code></li>
+      </ul>
+      <p>테스트가 SUT 의 구현 세부 사항에 결합되어 더 이상의 리팩터링을 막고 있다. 빠르고 회귀 방지도 훌륭하지만 <b>리팩터링 내성이 거의 없다.</b></p>
+    </div>
+  </div>
+
+  <h4>결론</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 530 380" width="530" role="img" aria-label="회귀 방지, 리팩터링 내성, 빠른 피드백 세 요소의 벤 다이어그램과 각 교집합에 놓이는 테스트 유형">
+        <circle cx="265" cy="140" r="98" fill="var(--yellow)" opacity=".2"/>
+        <circle cx="205" cy="248" r="98" class="venn-a"/>
+        <circle cx="325" cy="248" r="98" class="venn-b"/>
+        <circle cx="265" cy="140" r="98" fill="none" stroke="var(--yellow)" stroke-width="1.5"/>
+        <circle cx="205" cy="248" r="98" class="venn-a-s"/>
+        <circle cx="325" cy="248" r="98" class="venn-b-s"/>
+
+        <text x="265" y="72" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">리팩터링 내성</text>
+        <text x="128" y="306" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">회귀 방지</text>
+        <text x="402" y="306" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">빠른 피드백</text>
+
+        <text x="185" y="172" class="dg-text-sub" font-size="11" text-anchor="middle" font-weight="700">E2E 테스트</text>
+        <text x="185" y="188" class="dg-text-sub" font-size="10" text-anchor="middle">피드백 실패</text>
+
+        <text x="345" y="172" class="dg-text-sub" font-size="11" text-anchor="middle" font-weight="700">간단한 테스트</text>
+        <text x="345" y="188" class="dg-text-sub" font-size="10" text-anchor="middle">회귀 방지 없음</text>
+
+        <text x="265" y="296" class="dg-text-sub" font-size="11" text-anchor="middle" font-weight="700">깨지기 쉬운 테스트</text>
+        <text x="265" y="312" class="dg-text-sub" font-size="10" text-anchor="middle">리팩터링 내성 없음</text>
+
+        <text x="265" y="214" class="dg-accent" font-size="10.5" text-anchor="middle" font-weight="700">이상적</text>
+        <text x="265" y="228" class="dg-accent" font-size="10" text-anchor="middle">도달 불가</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>세 요소 중 둘만 고를 수 있다</b> — 세 교집합에는 각각 이름 붙은 실패 사례가 앉아 있고, 한가운데는 비어 있다.</div>
+  </div>
+
+  <p>네 번째 특성인 <b>유지 보수성</b>은 앞의 세 요소와 상호 배타적이지 않다. 다만 E2E 테스트는 외부 프로세스 의존성을 계속 운영해야 하므로 유지비 측면에서 별도로 더 비싸다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">현실에서의 전략</p>
+      <p>E2E 만 쓰거나 테스트가 상당히 빠르지 않은 한, <b>리팩터링 내성을 최대한 챙긴다.</b> 리팩터링 내성과 유지 보수성을 지키면서 회귀 방지와 빠른 피드백 중 하나를 고르는 것이 최선이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>테스트 가치 = 네 요소의 곱. 하나가 0 이면 전체가 0 이다.</li>
+      <li>E2E 는 피드백을, 간단한 테스트는 회귀 방지를, 깨지기 쉬운 테스트는 리팩터링 내성을 잃는다.</li>
+      <li>리팩터링 내성은 <b>타협 대상이 아니다.</b> 회귀 방지와 빠른 피드백 사이에서만 저울질한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-4-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">4-5</div>
+    <h3>대중적인 테스트 자동화 개념</h3>
+    <p class="item-tagline">테스트 피라미드와 블랙박스/화이트박스를 4대 요소로 다시 읽는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    피라미드의 어느 계층도 <b>리팩터링 내성만은 포기하지 않는다.</b> 계층 간에 저울질하는 것은 회귀 방지와 빠른 피드백뿐이다.
+  </div>
+
+  <h4>테스트 피라미드 분해</h4>
+
+  <p>테스트 스위트에서 테스트 유형 간 일정한 비율을 나타내는 개념이다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 520 310" width="520" role="img" aria-label="단위 테스트, 통합 테스트, E2E 테스트로 이루어진 테스트 피라미드">
+        <path d="M260 30 L430 250 L90 250 Z" class="dg-fill-soft dg-stroke" stroke-width="2" stroke-linejoin="round"/>
+        <line x1="206" y1="100" x2="314" y2="100" class="dg-stroke" stroke-width="1.6"/>
+        <line x1="148" y1="175" x2="372" y2="175" class="dg-stroke" stroke-width="1.6"/>
+
+        <text x="260" y="80" class="dg-text" font-size="13" text-anchor="middle" font-weight="700">E2E</text>
+        <text x="260" y="145" class="dg-text" font-size="13" text-anchor="middle" font-weight="700">통합 테스트</text>
+        <text x="260" y="220" class="dg-text" font-size="13" text-anchor="middle" font-weight="700">단위 테스트</text>
+
+        <line x1="466" y1="250" x2="466" y2="40" stroke="var(--accent)" stroke-width="1.6"/>
+        <path d="M462 48 L466 36 L470 48" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+        <text x="484" y="150" class="dg-accent" font-size="11.5" writing-mode="tb" letter-spacing="1">사용자 모방</text>
+
+        <line x1="90" y1="276" x2="430" y2="276" stroke="var(--accent)" stroke-width="1.6"/>
+        <path d="M98 272 L86 276 L98 280" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+        <path d="M422 272 L434 276 L422 280" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+        <text x="260" y="298" class="dg-accent" font-size="11.5" text-anchor="middle">테스트의 개수</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>가로는 개수, 세로는 실제 유저를 모방하는 정도</b> — 위로 갈수록 회귀 방지에 유리하고, 아래로 갈수록 실행 속도가 강조된다.</div>
+  </div>
+
+  <h4>항상 지켜지는 리팩터링 내성</h4>
+
+  <p>어느 계층도 리팩터링 내성을 포기하지 않는다. 모든 테스트는 거짓 양성을 최소화하는 것을 목표로 하며, 제품 코드로 직접 작업할 때도 마찬가지다. 테스트 개수는 <code>E2E &lt; 통합 &lt; 단위</code> 순으로 많아야 한다.</p>
+
+  <p>E2E 는 <b>가장 중요한 기능</b>에 적용하거나, 단위 / 통합과 동일한 수준으로 보호해야 할 때만 쓴다.</p>
+
+  <h5>앱의 성격에 따른 예외</h5>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>앱의 성격</th><th>피라미드 형태</th></tr></thead>
+      <tbody>
+        <tr><td>단순 CRUD 만 있는 앱</td><td>통합과 단위 테스트 개수가 거의 같아진다. 알고리즘이나 비즈니스 복잡도가 없으면 단위 테스트는 <b>간단한 테스트</b> 수준으로 빠르게 내려간다</td></tr>
+        <tr><td>외부 의존성(디비) 하나만 두는 API</td><td>유저 인터페이스가 없어 유지비가 크지 않으므로 <b>E2E 를 더 많이</b> 두는 편이 적합할 수 있다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>블랙박스 / 화이트박스 테스트 선택하기</h4>
+
+  <h5>블랙박스 테스트</h5>
+  <p>시스템 내부 구조를 몰라도 기능을 검증할 수 있는 방법이다. 앱이 <b>어떻게</b> 해야 하는지가 아니라 <b>무엇을</b> 해야 하는지를 중심으로 구축된다.</p>
+
+  <h5>화이트박스 테스트</h5>
+  <p>앱의 내부 작업을 검증한다. 요구 사항이나 명세가 아니라 <b>소스 코드에서 테스트가 파생</b>된다. 소스 코드 분석을 통해 외부 명세만으로는 놓칠 오류를 발견할 수 있지만, 특정 구현과 결합되어 테스트가 깨지기 쉽다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>종류</th><th>회귀 방지</th><th>리팩터링 내성</th></tr></thead>
+      <tbody>
+        <tr><td>화이트박스</td><td class="t-center t-ok">좋음</td><td class="t-center t-no">나쁨</td></tr>
+        <tr><td>블랙박스</td><td class="t-center t-no">나쁨</td><td class="t-center t-ok">좋음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>모든 테스트가 리팩터링 내성을 가져야 하므로, <b>기본값은 블랙박스</b>다. 시스템을 블랙박스로 바라보고 동작을 검증한다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">화이트박스가 쓸모 있는 자리 <span class="badge b-blue">보강</span></p>
+      <p>화이트박스 방식이 유용한 것은 <b>테스트를 쓸 때가 아니라 분석할 때</b>다. 커버리지 리포트로 어느 분기가 안 걸렸는지 확인하고, 그 분기를 <b>블랙박스 테스트로</b> 덮는 식으로 쓴다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>피라미드는 개수(가로) × 사용자 모방 정도(세로)의 관계다.</li>
+      <li>어느 계층도 리팩터링 내성은 포기하지 않는다.</li>
+      <li>CRUD 앱이나 UI 없는 API 는 피라미드가 납작해질 수 있다.</li>
+      <li>테스트 작성의 기본값은 블랙박스. 화이트박스는 커버리지 <b>분석</b>에만 쓴다.</li>
+    </ul>
+  </div>
+</article>

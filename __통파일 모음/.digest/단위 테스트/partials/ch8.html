@@ -1,0 +1,791 @@
+<article class="item" id="item-8-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-1</div>
+    <h3>통합 테스트는 무엇인가</h3>
+    <p class="item-tagline">단위 테스트가 도메인 모델을 맡으면, 통합 테스트는 컨트롤러를 맡는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>단위 테스트로는 가능한 한 많은 비즈니스 시나리오와 예외를, 통합 테스트로는 가장 긴 주요 흐름과 단위 테스트가 다루지 못하는 예외 상황을</b> 확인한다.
+  </div>
+
+  <h4>통합 테스트를 하는 이유</h4>
+
+  <p>단위 테스트에만 전적으로 의존하면 시스템이 전체적으로 잘 작동하는지 확신하기 어렵다. 각 부분이 디비나 메세지 버스 같은 외부 시스템과 <b>어떻게 통합되는지</b> 확인이 필요하다.</p>
+
+  <p>통합 테스트는 단위 테스트와 달리 <b>프로세스 외부 의존성과 도메인 모델을 연결하는 코드</b>를 확인한다. 컨트롤러 사분면에서 의존성을 모두 목으로 대체하면 단위 테스트로 만들 수도 있지만, 모든 의존성을 대체하는 것은 불가능하다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 540 330" width="540" role="img" aria-label="사분면에서 단위 테스트는 도메인 모델을, 통합 테스트는 컨트롤러를 담당함을 나타낸 도해">
+        <line x1="96" y1="34" x2="96" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <line x1="96" y1="278" x2="500" y2="278" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M92 42 L96 32 L100 42" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+        <path d="M492 274 L502 278 L492 282" fill="none" class="dg-stroke" stroke-width="2" stroke-linecap="round"/>
+
+        <rect x="118" y="52" width="340" height="208" class="dg-fill-soft dg-stroke" stroke-width="1.8"/>
+        <line x1="288" y1="52" x2="288" y2="260" class="dg-stroke" stroke-width="1.4"/>
+        <line x1="118" y1="156" x2="458" y2="156" class="dg-stroke" stroke-width="1.4"/>
+
+        <ellipse cx="203" cy="104" rx="72" ry="42" fill="none" stroke="var(--blue)" stroke-width="2"/>
+        <ellipse cx="373" cy="212" rx="66" ry="36" fill="none" stroke="var(--green)" stroke-width="2"/>
+
+        <text x="203" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">도메인 모델</text>
+        <text x="203" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">및 알고리즘</text>
+        <text x="373" y="98" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">지나치게</text>
+        <text x="373" y="118" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">복잡한 코드</text>
+        <text x="203" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">간단한 코드</text>
+        <text x="373" y="212" class="dg-text" font-size="12.5" text-anchor="middle" font-weight="700">컨트롤러</text>
+
+        <line x1="212" y1="62" x2="230" y2="40" stroke="var(--blue)" stroke-width="1.5"/>
+        <text x="252" y="34" fill="var(--blue)" class="dg-text" font-size="11.5" text-anchor="middle" font-weight="700">단위 테스트</text>
+
+        <line x1="439" y1="206" x2="472" y2="196" stroke="var(--green)" stroke-width="1.5"/>
+        <text x="480" y="186" fill="var(--green)" class="dg-text" font-size="11.5" text-anchor="middle" font-weight="700">통합 테스트</text>
+
+        <text x="52" y="146" class="dg-text-sub" font-size="11" text-anchor="middle">복잡도 및</text>
+        <text x="52" y="164" class="dg-text-sub" font-size="11" text-anchor="middle">도메인 유의성</text>
+        <text x="288" y="302" class="dg-text-sub" font-size="11.5" text-anchor="middle">협력자 수</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>모든 테스트는 두 사분면에만 초점을 둔다</b> — 간단한 코드는 테스트할 필요가 없고, 지나치게 복잡한 코드는 애초에 리팩터링으로 없애야 한다.</div>
+  </div>
+
+  <h4>다시 보는 테스트 피라미드</h4>
+
+  <p>단위와 통합 테스트의 비율을 유지하는 것이 중요하다. 통합 테스트는 더 많은 코드를 거치므로 회귀 방지가 단위보다 우수하고, 결합도도 낮으므로 리팩터링 내성도 높다. 대신 느리고 유지비가 비싸다.</p>
+
+  <h4>통합 테스트와 빠른 실패</h4>
+
+  <p>통합 테스트에서 프로세스 외부 의존성과의 상호작용을 모두 확인하려면 <b>가장 긴 주요 흐름</b>을 선택하는 것이 좋다. 모든 흐름을 한 번에 지나가는 시나리오가 없다면, 전부 커버하는 데 필요한 만큼만 통합 테스트를 추가한다.</p>
+
+  <h4>빠른 실패 원칙</h4>
+
+  <p>예기치 않은 오류가 발생하자마자 현재 연산을 중단하는 것을 말한다. 일반적으로 예외를 던져 연산을 끊는다. 이는 통합 테스트를 늘리는 대신 선택할 수 있는 <b>대안</b>이기도 하다.</p>
+
+  <ul>
+    <li><b>피드백 루프 단축</b> — 버그를 빨리 발견할수록 쉽게 해결된다. 운영 환경까지 넘어간 버그는 개발 중 발견된 버그보다 수정 비용이 훨씬 크다.</li>
+    <li><b>지속성 상태 보호</b> — 버그는 앱의 상태를 손상시킨다. 손상된 상태가 <b>디비에 들어가면</b> 고치기가 훨씬 어려워진다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>통합 테스트는 프로세스 외부 의존성과 도메인 모델을 <b>연결하는 코드</b>를 검증한다.</li>
+      <li>모든 테스트는 도메인 모델 사분면과 컨트롤러 사분면에만 초점을 둔다.</li>
+      <li>통합 테스트는 <b>가장 긴 주요 흐름</b>을 고른다.</li>
+      <li>빠른 실패 원칙은 피드백 루프를 줄이고 디비의 상태 오염을 막는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-2</div>
+    <h3>어떤 프로세스 외부 의존성을 직접 테스트할까</h3>
+    <p class="item-tagline">관리 의존성은 실제 인스턴스로, 비관리 의존성은 목으로.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    구분 기준은 하나다. <b>그 의존성과의 상호작용이 외부에서 보이는가.</b> 보이면 비관리(계약), 안 보이면 관리(구현 세부 사항)다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>정의</th><th>예</th><th>테스트에서</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>관리 의존성</b></td>
+          <td>앱을 통해서만 접근 가능하고, 상호작용이 외부 환경에서 보이지 않는다</td>
+          <td>앱 전용 디비</td>
+          <td class="t-center t-ok">실제 인스턴스 사용</td>
+        </tr>
+        <tr>
+          <td><b>비관리 의존성</b></td>
+          <td>상호작용을 외부에서 볼 수 있고, 다른 앱에 보이는 사이드 이펙트를 낸다</td>
+          <td>SMTP 서버, 메세지 버스</td>
+          <td class="t-center t-no">목으로 대체</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 300" width="560" role="img" aria-label="앱을 나타내는 육각형에서 관리 의존성인 앱 디비와 비관리 의존성인 SMTP 서비스로 나가는 관계">
+        <path d="M348 150 L310 214 L234 214 L196 150 L234 86 L310 86 Z" class="dg-fill-soft dg-stroke" stroke-width="2" stroke-linejoin="round"/>
+        <text x="272" y="155" class="dg-text" font-size="12" text-anchor="middle" font-weight="700">앱</text>
+
+        <line x1="140" y1="88" x2="216" y2="118" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M208 112 L219 119 L207 122" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="86" y="76" class="dg-text" font-size="11.5" text-anchor="middle">서드파티</text>
+        <text x="86" y="92" class="dg-text" font-size="11.5" text-anchor="middle">시스템</text>
+
+        <line x1="326" y1="112" x2="410" y2="80" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M402 76 L413 79 L404 87" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="470" y="66" class="dg-text" font-size="11.5" text-anchor="middle">앱 DB (관리)</text>
+        <text x="470" y="84" fill="var(--red)" class="dg-text" font-size="10.5" text-anchor="middle" font-weight="700">구현 세부 사항</text>
+
+        <line x1="226" y1="196" x2="150" y2="234" class="dg-stroke" stroke-width="1.6"/>
+        <path d="M158 226 L147 236 L160 237" fill="none" class="dg-stroke" stroke-width="1.6"/>
+        <text x="96" y="252" class="dg-text" font-size="11.5" text-anchor="middle">SMTP 서비스</text>
+        <text x="96" y="270" class="dg-text" font-size="11.5" text-anchor="middle">(비관리)</text>
+        <text x="96" y="288" fill="var(--red)" class="dg-text" font-size="10.5" text-anchor="middle" font-weight="700">식별 가능한 동작 (계약)</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>같은 "프로세스 외부" 라도 성격이 정반대다</b> — 관리 의존성과의 통신은 언제든 바꿀 수 있는 구현 세부 사항이지만, 비관리 의존성과의 통신은 외부와 맺은 계약이다.</div>
+  </div>
+
+  <p>관리 의존성의 실제 인스턴스를 쓰면 <b>외부 클라이언트 관점에서 최종 상태를 확인</b>할 수 있다. 또 컬럼 이름 변경이나 테이블 분리 같은 디비 리팩터링에도 테스트가 함께 따라와 준다.</p>
+
+  <h4>관리 의존성이면서 비관리 의존성인 프로세스 외부 의존성 다루기</h4>
+
+  <p>대표적인 예가 <b>다른 앱도 함께 쓰는 디비</b>다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  EXT["외부 앱"] --> UNMANAGED["비관리 테이블<br>테이블 A, 테이블 B"]
+  APP["해당 앱"] -->|"목으로 대체"| UNMANAGED
+  APP -->|"직접 테스트"| MANAGED["관리 테이블<br>테이블 C, 테이블 D"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>같은 디비 안에서도 테이블 단위로 성격이 갈린다</b> — 외부 앱이 보는 테이블만 비관리로 취급해 목으로 대체하고, 나머지는 실제로 테스트한다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">애초에 이 상황을 만들지 않는 것이 낫다</p>
+      <p>시스템 간 통합을 디비로 구현하면 시스템이 서로 결합되고 이후 개발이 복잡해진다. 가능하면 <b>API 나 메세지 버스</b>를 쓰는 것이 좋다. 이미 그렇게 되어 있다면, 다른 앱에서 보이는 테이블만 비관리 의존성으로 취급하고 <b>꼭 필요한 경우가 아니면 그 테이블과 상호작용하는 방식을 바꾸지 않는다.</b></p>
+    </div>
+  </div>
+
+  <h4>통합 테스트에서 실제 디비를 사용하지 못하는 경우</h4>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">디비를 모킹한 통합 테스트는 의미가 없다</p>
+      <p>디비를 테스트할 수 없다면 <b>통합 테스트를 아예 하지 말고</b> 도메인 모델 단위 테스트에만 집중하는 편이 낫다. 디비를 모킹하면 결국 컨트롤러의 메소드를 호출해 보는 정도밖에 되지 않는다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">실제 디비를 띄우는 현실적인 방법 <span class="badge b-blue">보강</span></p>
+      <p>"실제 디비를 못 쓴다" 는 제약은 요즘 상당 부분 해소됐다. <a href="https://node.testcontainers.org/">Testcontainers</a> 를 쓰면 테스트 실행 시점에 PostgreSQL / MySQL / MongoDB 같은 컨테이너를 <b>일회용으로</b> 띄우고 끝나면 정리한다. 개발자마다 별도 인스턴스를 두라는 <a href="#item-10-1">10-1</a> 의 요구도 이 방식으로 자연스럽게 충족된다. 다만 컨테이너 기동 시간이 붙으므로 <a href="#item-10-3">10-3</a> 의 지적대로 스위트 전체 실행 시간과 저울질해야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>관리 의존성 = 앱을 통해서만 접근. 실제 인스턴스를 쓴다.</li>
+      <li>비관리 의존성 = 상호작용이 외부에서 보임. 목으로 대체한다.</li>
+      <li>공유 디비는 <b>테이블 단위로</b> 두 성격을 나눠 다룬다.</li>
+      <li>실제 디비를 못 쓰면 통합 테스트를 포기하고 단위 테스트에 집중한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-3</div>
+    <h3>통합 테스트 예제</h3>
+    <p class="item-tagline">가장 긴 주요 흐름 하나를 골라 디비는 실제로, 메세지 버스는 목으로.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    통합 테스트와 E2E 의 차이는 하나뿐이다. <b>비관리 의존성을 목으로 대체하는가.</b>
+  </div>
+
+  <h4>테스트 대상 코드</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  constructor(
+    private readonly database: Database,
+    private readonly messageBus: IMessageBus
+  ) {}
+
+  changeEmail(userId: number, newEmail: string) {
+    const userData = this.database.getUserById(userId);
+    const user = UserFactory.create(userData);
+
+    const error = user.canChangeEmail();
+    if (error !== null) {
+      return error;
+    }
+
+    const companyData = this.database.getCompany();
+    const company = CompanyFactory.create(companyData);
+
+    user.changeEmail(newEmail, company);
+
+    this.database.saveCompany(company);
+    this.database.saveUser(user);
+    user.emailChangedEvents.forEach((event) =&gt; {
+      this.messageBus.sendEmailChangedMessage(event.userId, event.newEmail);
+    });
+
+    return "ok";
+  }
+}</code></pre>
+  </div>
+
+  <h4>테스트할 시나리오</h4>
+
+  <p>일반적인 지침은 <b>가장 긴 주요 흐름</b>과, 단위 테스트로는 수행할 수 없는 모든 예외 상황을 다루는 것이다. 여기서 가장 긴 흐름은 <b>기업 이메일에서 일반 이메일로 변경</b>하는 경우다.</p>
+
+  <ul>
+    <li>디비에서 유저와 회사가 모두 업데이트된다. 사용자는 유형과 이메일을, 회사는 직원 수를 바꾼다.</li>
+    <li>메세지 버스로 메세지를 보낸다.</li>
+  </ul>
+
+  <h4>디비와 메세지 버스 분류하기</h4>
+
+  <ul>
+    <li><b>디비</b> — 다른 앱이 접근할 수 없으므로 <b>관리 의존성</b>이다. 실제 인스턴스를 쓴다.</li>
+    <li><b>메세지 버스</b> — 다른 시스템과 통신하는 수단이므로 <b>비관리 의존성</b>이다. 목으로 대체한다.</li>
+  </ul>
+
+  <h4>E2E 테스트는 어떤가</h4>
+
+  <p>통합 테스트에서 비관리 의존성을 목으로 대체한다는 점만 빼면 둘은 거의 같다. E2E 는 <b>어떤 프로세스 외부 의존성도</b> 목으로 대체하지 않는다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  E2E["E2E 테스트"] --> APP["앱"]
+  APP --> BUS["메세지 버스<br>프로세스 외부"]
+  APP --> DB[("DB<br>프로세스 외부")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>E2E 는 앱을 밖에서만 두드린다</b> — 디비에 직접 연결하지 않고 모든 것을 API 를 통해 간접적으로 확인한다.</div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  IT["통합 테스트"] --> APP["앱"]
+  IT --> BUSMOCK["메세지 버스 목<br>비관리 의존성 대체"]
+  APP --> BUSMOCK
+  APP --> DB[("DB<br>프로세스 외부")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>통합 테스트는 앱과 같은 프로세스에서 실행된다</b> — 비관리 의존성만 목으로 바꾸고, 관리 의존성인 디비는 실제로 두드린다.</div>
+  </div>
+
+  <h4>테스트 작성</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.integration.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("changing_email_from_corporate_to_non_corporate", () =&gt; {
+  // 준비
+  const db = new Database();
+  const user = createUser("user@mycorp.com", UserType.EMPLOYEE, db);
+  createCompany("mycorp.com", 1, db);
+
+  const messageBusMock: jest.Mocked&lt;IMessageBus&gt; = {
+    sendEmailChangedMessage: jest.fn(),
+  };
+  const sut = new UserController(db, messageBusMock);
+
+  // 실행
+  const result = sut.changeEmail(user.userId, "new@gmail.com");
+
+  // 검증
+  expect(result).toBe("ok");
+
+  // 유저 상태 검증 — 디비에서 다시 읽어온다
+  const userFromDb = UserFactory.create(db.getUserById(user.userId));
+  expect(userFromDb.email).toBe("new@gmail.com");
+  expect(userFromDb.type).toBe(UserType.CUSTOMER);
+
+  // 회사 상태 검증
+  const companyFromDb = CompanyFactory.create(db.getCompany());
+  expect(companyFromDb.numberOfEmployees).toBe(0);
+
+  // 목 상호작용 검증
+  expect(messageBusMock.sendEmailChangedMessage).toHaveBeenCalledWith(
+    user.userId,
+    "new@gmail.com"
+  );
+  expect(messageBusMock.sendEmailChangedMessage).toHaveBeenCalledTimes(1);
+});</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>expect("new@gmail.com").toBe(userFromDb.email)</code> 처럼 기대값과 실제값이 뒤바뀐 검증문이 있다. 통과 여부는 같지만 <b>실패 메시지가 반대로 출력</b>되어 디버깅을 방해한다. <code>expect(실제값).toBe(기대값)</code> 순서를 지킨다.</p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">검증할 때 디비에서 다시 읽는 이유</p>
+      <p>준비 구절에서 만든 객체를 그대로 검증하면 <b>메모리 상태</b>만 확인하는 셈이다. 디비에서 새로 읽어와야 저장이 실제로 이뤄졌는지, 즉 <b>외부 클라이언트가 볼 최종 상태</b>가 맞는지 확인할 수 있다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>가장 긴 주요 흐름 하나로 모든 프로세스 외부 의존성을 지나간다.</li>
+      <li>디비 = 관리 = 실제 인스턴스, 메세지 버스 = 비관리 = 목.</li>
+      <li>E2E 와의 차이는 <b>비관리 의존성 대체 여부</b>뿐이다.</li>
+      <li>검증은 반드시 <b>디비에서 다시 읽어</b> 최종 상태를 확인한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-4</div>
+    <h3>의존성 추상화를 위한 인터페이스 사용</h3>
+    <p class="item-tagline">단일 구현을 위한 인터페이스는 추상화가 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    인터페이스를 도입할 유일하게 타당한 이유는 <b>비관리 의존성을 목으로 대체하기 위해서</b>다. 그 외에는 YAGNI 위반이다.
+  </div>
+
+  <h4>인터페이스와 느슨한 결합</h4>
+
+  <p>대부분의 개발자는 외부 의존성마다 인터페이스를 만든다. 흔히 드는 이유는 의존성을 추상화해 느슨한 결합을 달성하고, 기존 코드를 바꾸지 않고 기능을 추가해 OCP 를 지킨다는 것이다.</p>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">단일 구현을 위한 인터페이스는 추상화가 아니다</p>
+      <p><b>진정한 추상화는 발견하는 것이지 발명하는 것이 아니다.</b> 구현이 하나뿐인 인터페이스는 이미 존재하는 클래스의 시그니처를 한 번 더 적어놓은 것에 지나지 않는다.</p>
+    </div>
+  </div>
+
+  <h5>YAGNI 원칙 위배</h5>
+  <p>YAGNI(You Aren't Gonna Need It)는 <b>현재 필요하지 않은 기능에 시간을 들이지 말라</b>는 원칙이다. 지금 비즈니스 담당자에게 필요하지 않은 것에 시간을 쓰면 그건 낭비다. 처음부터 실제 필요에 따라 기능을 구현하는 편이 유리하다.</p>
+
+  <h4>프로세스 외부 의존성에 인터페이스를 쓰는 이유</h4>
+
+  <p>인터페이스가 없으면 테스트 대역을 만들 수 없고, 따라서 SUT 와 프로세스 외부 의존성 간 상호작용을 확인할 수 없다. 이것이 인터페이스를 도입할 <b>유일하게 타당한 이유</b>다. 그렇다면 결론은 하나다. <b>비관리 의존성에만 인터페이스를 쓴다.</b></p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-tag good">관리 의존성은 구체 타입 그대로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  constructor(
+    private readonly database: Database, // 관리 의존성 — 인터페이스 불필요
+    private readonly messageBus: IMessageBus // 비관리 의존성 — 목으로 대체
+  ) {}
+}</code></pre>
+  </div>
+
+  <h4>프로세스 내부 의존성을 위한 인터페이스 사용</h4>
+
+  <p>구현이 하나뿐인 도메인 클래스에 인터페이스를 도입하는 이유는 결국 <b>목으로 처리하기 위해서</b>다. 하지만 <a href="#item-5-3">5-3</a> 에서 봤듯 도메인 클래스 간 상호작용은 시스템 내부 통신, 즉 구현 세부 사항이므로 검증해서는 안 된다. 확인하는 순간 깨지기 쉬운 테스트가 되고 리팩터링 내성이 사라진다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>단일 구현 인터페이스는 추상화가 아니며 YAGNI 위반이다.</li>
+      <li>인터페이스의 유일한 정당한 이유는 <b>비관리 의존성 대체</b>다.</li>
+      <li>관리 의존성은 구체 타입 그대로 주입한다.</li>
+      <li>도메인 클래스에 인터페이스를 씌우면 내부 통신을 검증하게 되어 테스트가 깨진다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-5</div>
+    <h3>통합 테스트 모범 사례</h3>
+    <p class="item-tagline">경계를 긋고, 계층을 줄이고, 순환을 끊고, 실행 구절을 하나로.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    통합 테스트를 개선하는 네 가지 지침 중 셋은 <b>제품 코드를 고치는 일</b>이다. 테스트가 어려운 건 대개 테스트 탓이 아니다.
+  </div>
+
+  <h4>도메인 모델 경계 명시하기</h4>
+
+  <p>도메인 모델을 코드베이스에서 <b>명시적이고 잘 알려진 위치</b>에 둔다. 경계를 지정하면 그 부분을 더 잘 보여주고 설명할 수 있다. 모든 도메인 로직이 하나의 뚜렷한 우산 아래에 있고 여기저기 흩어져 있지 않다면, 세부 배치는 크게 중요하지 않다.</p>
+
+  <h4>계층 수 줄이기</h4>
+
+  <p>추상 계층이 너무 많으면 코드베이스를 탐색하기 어렵고, 간단한 연산조차 숨은 로직을 이해하기 힘들어진다. 지나친 추상화는 단위 테스트에도 통합 테스트에도 도움이 되지 않는다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">대부분의 백엔드 앱은 세 계층이면 충분하다</p>
+      <p><b>서비스 / 인프라 / 도메인.</b> 가능한 한 간접 계층을 적게 쓴다.</p>
+    </div>
+  </div>
+
+  <h4>순환 의존성 제거하기</h4>
+
+  <p>순환 의존성의 대표적인 예는 <b>콜백</b>이다. 순환 의존성은 코드를 읽고 이해하려 할 때 알아야 할 것이 많아 큰 부담이 된다. 인터페이스를 쓰면 컴파일 타임의 순환은 없어지지만 <b>런타임의 순환은 그대로</b>다.</p>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">순환 의존성</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">class CheckoutService {
+  checkout(orderId: number): void {
+    const service = new ReportGenerationService();
+    // 자기 자신을 넘겨준다
+    service.generateReport(orderId, this);
+  }
+}
+
+class ReportGenerationService {
+  generateReport(
+    orderId: number,
+    checkoutService: CheckoutService
+  ): void {
+    // 생성 완료 시 checkoutService 를 되부른다
+  }
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">값을 반환</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">class CheckoutService {
+  checkout(orderId: number): void {
+    const service = new ReportGenerationService();
+    // 콜백 대신 결과를 돌려받는다
+    const report = service.generateReport(orderId);
+    // ...
+  }
+}
+
+class ReportGenerationService {
+  generateReport(orderId: number): Report {
+    // ...
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트의 "순환 의존성 제거" 코드는 여전히 <code>generateReport(orderId, this)</code> 로 <code>this</code> 를 넘기고 있어 순환이 그대로 남는다. 핵심은 <b>콜백 대신 값을 반환</b>하는 것이므로 <code>this</code> 인자를 없애야 한다.</p>
+    </div>
+  </div>
+
+  <p>모든 순환 의존성을 제거할 수는 없다. 그래도 의존적인 클래스의 그래프를 가능한 한 작게 만들면 손상을 최소화할 수 있다.</p>
+
+  <h4>테스트에서 다중 실행 구절 사용</h4>
+
+  <p>두 개 이상의 준비 / 실행 / 검증 구절을 두는 것은 코드 악취다. 각 실행을 고유의 테스트로 추출해 나누는 게 좋다. 각 테스트가 <b>단일 동작 단위</b>에 초점을 맞추면 이해하기도, 수정하기도 쉬워진다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">통합 테스트에서의 예외 <span class="badge b-blue">보강</span></p>
+      <p>등록 → 로그인처럼 <b>순서 자체가 비싸고 필연적인</b> 흐름은 통합 테스트에서 예외적으로 묶기도 한다. 다만 이는 어쩔 수 없는 절충이지 권장 사항이 아니다. 묶을 때는 그 이유를 테스트 이름이나 주석에 남긴다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>도메인 모델을 명시적이고 잘 알려진 위치에 모은다.</li>
+      <li>백엔드는 서비스 / 인프라 / 도메인 세 계층으로 충분하다.</li>
+      <li>콜백 대신 값을 반환해 순환 의존성을 끊는다.</li>
+      <li>실행 구절은 하나. 통합 테스트에서만 예외적으로 묶는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-8-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">8-6</div>
+    <h3>로깅 기능을 테스트하는 방법</h3>
+    <p class="item-tagline">지원 로깅은 비즈니스 요구 사항이므로 테스트하고, 진단 로깅은 구현 세부 사항이므로 테스트하지 않는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    기준은 하나다. <b>그 로그를 개발자 말고 다른 사람이 보는가.</b> 본다면 테스트하고, 개발자만 본다면 언제든 지울 수 있는 구현 세부 사항이다.
+  </div>
+
+  <h4>로깅을 테스트해야 하는가</h4>
+
+  <p>로깅은 코드베이스 어디에서나 필요할 수 있는 <b>횡단 기능</b>이며, 텍스트 파일이나 디비 같은 프로세스 외부 의존성에 사이드 이펙트를 낸다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>종류</th><th>대상</th><th>성격</th><th>테스트</th></tr></thead>
+      <tbody>
+        <tr><td><b>지원 로깅</b></td><td>지원 담당자, 시스템 관리자</td><td>비즈니스 요구 사항</td><td class="t-center t-ok">한다</td></tr>
+        <tr><td><b>진단 로깅</b></td><td>개발자</td><td>언제든 수정 가능한 구현 세부 사항</td><td class="t-center t-no">하지 않는다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>로깅을 어떻게 테스트해야 하는가</h4>
+
+  <p>로깅에는 프로세스 외부 의존성이 있으므로, 그런 기능에 적용하던 규칙이 그대로 적용된다. 즉 앱과 로그 저장소 간 상호작용을 확인하려면 <b>목</b>을 쓴다.</p>
+
+  <h5>ILogger 위에 래퍼 도입하기</h5>
+
+  <p>지원 로깅은 비즈니스 요구 사항이므로 코드베이스에 그렇게 반영하는 것이 좋다. 내부적으로는 <code>ILogger</code> 를 쓰되, 비즈니스에 필요한 지원 로그를 명시적으로 나열하는 <code>DomainLogger</code> 를 만든다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  private userId: string;
+  private email: string;
+  private type: UserType;
+
+  private logger: ILogger;
+  private domainLogger: IDomainLogger;
+
+  changeEmail(newEmail: string, company: Company) {
+    this.logger.info(`changeEmail: ${this.userId}`); // 진단 로그
+
+    if (this.email === newEmail) {
+      return;
+    }
+
+    const newType = company.isEmailCorporate(newEmail)
+      ? UserType.EMPLOYEE
+      : UserType.CUSTOMER;
+
+    if (this.type !== newType) {
+      const delta = newType === UserType.EMPLOYEE ? 1 : -1;
+      company.changeNumberOfEmployees(delta);
+
+      // 지원 로그 — 도메인 언어로 표현된다
+      this.domainLogger.userTypeHasChanged(this.userId, this.type, newType);
+    }
+
+    this.email = newEmail;
+    this.type = newType;
+
+    this.logger.info(`changeEmail: done: ${this.userId}`); // 진단 로그
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">domain-logger.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface IDomainLogger {
+  userTypeHasChanged(
+    userId: string,
+    oldType: UserType,
+    newType: UserType
+  ): void;
+}
+
+class DomainLogger implements IDomainLogger {
+  constructor(private readonly logger: ILogger) {}
+
+  userTypeHasChanged(userId: string, oldType: UserType, newType: UserType) {
+    this.logger.info(`userTypeHasChanged: ${userId}: ${oldType} -&gt; ${newType}`);
+  }
+}</code></pre>
+  </div>
+
+  <p><code>DomainLogger</code> 는 <code>ILogger</code> 위에서 동작하며 <b>도메인 언어</b>로 로그 항목을 선언한다. 덕분에 지원 로깅이 무엇인지 이해하고 유지하기 쉬워진다.</p>
+
+  <h4>구조화된 로깅</h4>
+
+  <p><b>구조화된 로깅(structured logging)</b> 은 로그 데이터의 캡처와 렌더링을 분리하는 기술이다. 로그 저장소에 구조가 존재하며, 캡처한 데이터를 JSON, CSV 등으로 렌더링하도록 로깅 라이브러리에서 설정할 수 있다.</p>
+
+  <h4>지원 로깅과 진단 로깅을 위한 테스트</h4>
+
+  <p>위 코드에는 아직 문제가 있다. 도메인 안에 로거가 들어 있어서 <b>비즈니스 로직과 프로세스 외부 의존성과의 통신을 분리</b>해야 한다는 원칙을 위배한다. 해결책은 <a href="#item-7-4">7-4</a> 와 같다. 사용자 유형 변경을 추적하는 <b>도메인 이벤트</b>를 도입하는 것이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">지원 로그를 도메인 이벤트로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  private userId: string;
+  private email: string;
+  private type: UserType;
+
+  private logger: ILogger;
+  readonly domainEvents: DomainEvent[] = [];
+
+  changeEmail(newEmail: string, company: Company) {
+    this.logger.info(`changeEmail: ${this.userId}`);
+
+    if (this.email === newEmail) {
+      return;
+    }
+
+    const newType = company.isEmailCorporate(newEmail)
+      ? UserType.EMPLOYEE
+      : UserType.CUSTOMER;
+
+    if (this.type !== newType) {
+      const delta = newType === UserType.EMPLOYEE ? 1 : -1;
+      company.changeNumberOfEmployees(delta);
+
+      // 지원 로그를 도메인 이벤트로 대체
+      this.addDomainEvent(
+        new UserTypeChangedEvent(this.userId, this.type, newType)
+      );
+    }
+
+    this.email = newEmail;
+    this.type = newType;
+
+    this.logger.info(`changeEmail: done: ${this.userId}`);
+  }
+
+  private addDomainEvent(event: DomainEvent) {
+    this.domainEvents.push(event);
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class UserController {
+  constructor(
+    private readonly database: Database,
+    private readonly messageBus: IMessageBus,
+    private readonly eventDispatcher: EventDispatcher
+  ) {}
+
+  changeEmail(userId: number, newEmail: string) {
+    const userData = this.database.getUserById(userId);
+    const user = UserFactory.create(userData);
+
+    const error = user.canChangeEmail();
+    if (error !== null) {
+      return error;
+    }
+
+    const companyData = this.database.getCompany();
+    const company = CompanyFactory.create(companyData);
+
+    user.changeEmail(newEmail, company);
+
+    this.database.saveCompany(company);
+    this.database.saveUser(user);
+
+    // 도메인 이벤트를 외부 통신으로 변환
+    this.eventDispatcher.dispatch(user.domainEvents);
+
+    return "ok";
+  }
+}</code></pre>
+  </div>
+
+  <p>컨트롤러에서 곧바로 지원 로깅이 필요한 경우라면 도메인 이벤트까지 쓸 필요는 없다. 그리고 <b>진단 로깅은 개발자만을 위한 것이므로 굳이 테스트하지 않는다.</b></p>
+
+  <h4>로깅이 얼마나 많아야 충분할까</h4>
+
+  <p>과도한 로깅은 코드를 혼란스럽게 한다. 특히 도메인 모델에서 그렇다. 핵심은 <b>로그의 신호 대비 잡음 비율</b>이다. 로그가 많을수록 관련 정보를 찾기 어렵다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">도메인 모델에는 진단 로깅을 쓰지 않는다</p>
+      <p>대부분의 진단 로그는 컨트롤러로 옮길 수 있고, 디버깅을 위해 잠깐 넣은 로그는 <b>작업이 끝나면 바로 지운다.</b></p>
+    </div>
+  </div>
+
+  <h4>로거 인스턴스를 어떻게 전달하는가</h4>
+
+  <h5>앰비언트 컨텍스트 — 안티패턴</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag bad">안티패턴</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  private readonly logger: ILogger = LogManager.getLogger(User.name);
+
+  changeEmail(newEmail: string, company: Company) {
+    // ...
+  }
+}</code></pre>
+  </div>
+
+  <p>정적 필드에 <code>ILogger</code> 를 저장하는 방식이다. <b>의존성이 숨어 있고, 변경하기 어려우며, 테스트가 더 어려워진다.</b> 어떤 경우에도 앰비언트 컨텍스트는 해결책이 아니므로 근본 원인을 해결한다.</p>
+
+  <h5>로거를 주입하는 방법</h5>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user.ts</span>
+      <span class="code-tag good">명시적 주입</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">class User {
+  // 방법 1: 메소드 인수로 받는다
+  changeEmail(newEmail: string, company: Company, logger: ILogger) {
+    logger.info(`changeEmail: ${this.userId}`);
+
+    // ...
+
+    logger.info(`changeEmail: done: ${this.userId}`);
+  }
+}
+
+// 방법 2: 클래스 생성자로 받는다</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>지원 로깅은 비즈니스 요구 사항이라 테스트하고, 진단 로깅은 하지 않는다.</li>
+      <li><code>DomainLogger</code> 래퍼로 지원 로그를 도메인 언어로 선언한다.</li>
+      <li>더 나아가 지원 로그를 <b>도메인 이벤트</b>로 만들면 도메인이 외부 통신에서 자유로워진다.</li>
+      <li>로그의 신호 대비 잡음 비율을 관리하고, 앰비언트 컨텍스트 대신 명시적으로 주입한다.</li>
+    </ul>
+  </div>
+</article>

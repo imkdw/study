@@ -1,0 +1,511 @@
+<article class="item" id="item-13-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-1</div>
+    <h3>개요</h3>
+    <p class="item-tagline">논리적으로 하나, 물리적으로 여럿. 데이터가 많다고 해서 <b>무조건 이득은 아니다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    파티션은 <b>워킹셋(활발히 쓰이는 데이터)의 인덱스를 메모리에 담을 수 있게</b> 만드는 기술이다. 그것이 안 되면 파티션은 오버헤드만 남는다.
+  </div>
+
+  <h4>파티션이란</h4>
+  <ul>
+    <li>논리적으로는 하나지만 물리적으로는 <b>여러 개의 테이블로 분리</b>해 관리하는 기능이다.</li>
+    <li>주로 대용량 테이블을 <b>여러 개의 소규모 테이블로 분산</b>하는 목적으로 쓴다.</li>
+  </ul>
+
+  <h4>파티션을 쓰는 이유</h4>
+  <ul>
+    <li>데이터가 많다고 무조건 효율적이지는 않다.</li>
+    <li><b>인덱스 크기가 물리 메모리보다 훨씬 크거나</b>, 데이터 특성상 <b>자주 삭제가 필요한 경우</b>에 유용하다.</li>
+  </ul>
+
+  <h5>단일 INSERT 와 단일·범위 SELECT 의 빠른 처리</h5>
+  <ul>
+    <li>인덱스는 SELECT 만을 위한 것처럼 보이지만, <code>UPDATE</code>/<code>DELETE</code> 에서 <b>대상 레코드를 찾을 때도 필수</b>다.</li>
+    <li>인덱스의 <b>워킹셋</b>이 물리 메모리보다 크면 쿼리 처리가 상당히 느려진다.
+      <ul><li>워킹셋 = 활발하게 사용되는 데이터</li></ul>
+    </li>
+    <li>즉 파티션하지 않은 하나의 큰 테이블은 인덱스도 커지고, 그만큼 물리 메모리도 많이 필요해진다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 540 190" width="540" role="img" aria-label="단일 대형 테이블의 인덱스와 파티션된 테이블의 인덱스 중 최근 파티션만 메모리에 올라간 모습">
+        <text x="120" y="24" class="dg-text" font-size="12" text-anchor="middle">파티션 없음</text>
+        <rect x="30" y="36" width="180" height="80" rx="6" class="dg-fill-soft"/>
+        <rect x="30" y="36" width="180" height="80" rx="6" class="dg-stroke" fill="none"/>
+        <text x="120" y="72" class="dg-text" font-size="12" text-anchor="middle">인덱스 전체</text>
+        <text x="120" y="92" class="dg-text-sub" font-size="11" text-anchor="middle">메모리보다 크다</text>
+        <text x="120" y="140" class="dg-text-sub" font-size="11" text-anchor="middle">매 쿼리마다 디스크 읽기</text>
+
+        <text x="400" y="24" class="dg-text" font-size="12" text-anchor="middle">연도별 파티션</text>
+        <rect x="300" y="36" width="46" height="80" rx="5" class="dg-fill-bg"/>
+        <rect x="300" y="36" width="46" height="80" rx="5" class="dg-stroke" fill="none"/>
+        <text x="323" y="80" class="dg-text-sub" font-size="10" text-anchor="middle">2021</text>
+        <rect x="352" y="36" width="46" height="80" rx="5" class="dg-fill-bg"/>
+        <rect x="352" y="36" width="46" height="80" rx="5" class="dg-stroke" fill="none"/>
+        <text x="375" y="80" class="dg-text-sub" font-size="10" text-anchor="middle">2022</text>
+        <rect x="404" y="36" width="46" height="80" rx="5" class="dg-fill-bg"/>
+        <rect x="404" y="36" width="46" height="80" rx="5" class="dg-stroke" fill="none"/>
+        <text x="427" y="80" class="dg-text-sub" font-size="10" text-anchor="middle">2023</text>
+        <rect x="456" y="36" width="46" height="80" rx="5" class="dg-fill-soft"/>
+        <rect x="456" y="36" width="46" height="80" rx="5" class="dg-stroke" fill="none"/>
+        <text x="479" y="76" class="dg-text" font-size="10" text-anchor="middle">2024</text>
+        <text x="479" y="92" class="dg-text-sub" font-size="9" text-anchor="middle">워킹셋</text>
+        <text x="400" y="140" class="dg-text-sub" font-size="11" text-anchor="middle">최근 파티션의 인덱스만 메모리에 올리면 된다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>파티션의 이득은 "다뤄야 할 인덱스가 작아진다"에서 나온다</b> — 모든 파티션을 골고루 쓰는 워크로드에서는 이 이득이 없다.</div>
+  </div>
+
+  <h5>데이터의 물리적인 저장소 분리</h5>
+  <ul>
+    <li>데이터나 인덱스가 커지면 <b>백업과 관리가 어려워진다.</b></li>
+    <li>단, MySQL은 <b>파티션 단위로 인덱스를 만들거나 파티션마다 다른 인덱스를 갖는 형태는 지원하지 않는다.</b></li>
+  </ul>
+
+  <h5>이력 데이터의 효율적인 관리</h5>
+  <ul>
+    <li>로그 데이터는 수명이 매우 짧다. 기록되는 동시에, 일정 기간이 지나면 쓸모가 없어진다.</li>
+    <li>일반 테이블에서 대용량 데이터를 <code>DELETE</code> 하는 것은 <b>상당한 고부하 작업</b>이다.</li>
+    <li>파티션으로 쪼개 두면 <b>파티션 추가·삭제만으로</b> 간단히 관리할 수 있다.</li>
+  </ul>
+
+  <h4>MySQL 파티션의 내부 처리</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE tb_article (
+  id INT NOT NULL,
+  reg_date DATETIME NOT NULL,
+  PRIMARY KEY(id, reg_date)
+) PARTITION BY RANGE (YEAR(reg_date)) (
+  PARTITION p2009 VALUES LESS THAN (2010),
+  PARTITION p2010 VALUES LESS THAN (2011),
+  PARTITION p2011 VALUES LESS THAN (2012),
+  PARTITION p2012 VALUES LESS THAN (2013)
+);</code></pre>
+  </div>
+
+  <h5>INSERT</h5>
+  <ul>
+    <li>파티션 키인 <code>reg_date</code> 로 <b>파티션 표현식을 평가</b>한다.</li>
+    <li>그 결과로 저장될 파티션이 결정된다. <code>2011-03-09</code> 라면 <code>p2011</code> 에 저장된다.</li>
+  </ul>
+
+  <h5>UPDATE</h5>
+  <ul>
+    <li><code>WHERE</code> 에 <b>파티션 키가 있으면</b> 대상 레코드를 매우 빠르게 찾는다.</li>
+    <li>없으면 <b>모든 파티션을 검색</b>해야 한다.</li>
+    <li>파티션 키가 변경되지 않으면 일반 테이블과 같이 값만 바꾼다.</li>
+    <li>파티션 키가 변경되면 <b>기존 파티션에서 삭제 → 새 파티션 결정 → 저장</b> 순으로 처리된다.</li>
+  </ul>
+
+  <h5>SELECT</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>파티션 프루닝</th><th>인덱스</th><th>처리 방식</th><th>평가</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="t-ok">가능</td><td class="t-ok">사용</td>
+          <td>필요한 파티션의 인덱스만 레인지 스캔</td>
+          <td class="t-center t-ok">최선</td>
+        </tr>
+        <tr>
+          <td class="t-no">불가</td><td class="t-ok">사용</td>
+          <td>모든 파티션에 대해 인덱스 레인지 스캔 후 결과 병합</td>
+          <td class="t-center">파티션이 많으면 성능 저하</td>
+        </tr>
+        <tr>
+          <td class="t-ok">가능</td><td class="t-no">불가</td>
+          <td>대상 파티션만 풀 스캔</td>
+          <td class="t-center">보통</td>
+        </tr>
+        <tr>
+          <td class="t-no">불가</td><td class="t-no">불가</td>
+          <td>풀 테이블 스캔</td>
+          <td class="t-center t-no">피해야 한다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>파티션 테이블의 인덱스 스캔과 정렬</h5>
+  <ul>
+    <li>인덱스는 <b>파티션 단위로 생성</b>되고, 테이블 전체를 아우르는 통합 인덱스는 없다.</li>
+    <li>여러 파티션에 인덱스 스캔을 할 때는, 각 파티션에서 정렬된 순서로 읽으며 <b>우선순위 큐</b>에 담는다.</li>
+    <li>그 큐에서 필요한 순서대로 꺼내므로 <b>별도의 정렬 작업은 하지 않는다.</b></li>
+  </ul>
+
+  <h5>파티션 프루닝</h5>
+  <ul>
+    <li>최적화 단계에서 <b>필요한 파티션만 골라내고 나머지를 배제</b>하는 것이다.</li>
+    <li>실행 계획의 <code>partitions</code> 컬럼에서 접근한 파티션을 확인할 수 있다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>partitions</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>tb_article</td><td class="t-ok">p2010</td><td>index</td><td>PRIMARY</td><td>1</td><td><code>Using where; Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>파티션의 이득은 <b>인덱스 워킹셋 축소</b>와 <b>파티션 단위 삭제</b> 두 가지에서 나온다.</li>
+      <li>MySQL은 <b>파티션마다 다른 인덱스</b>를 가질 수 없다.</li>
+      <li>SELECT 성능은 <b>프루닝 가능 여부 × 인덱스 사용 여부</b> 네 조합으로 갈린다.</li>
+      <li>프루닝 결과는 실행 계획의 <code>partitions</code> 컬럼에서 확인한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-13-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-2</div>
+    <h3>주의사항</h3>
+    <p class="item-tagline">파티션 도입을 가장 자주 가로막는 제약 — <b>모든 유니크 인덱스가 파티션 키를 포함해야 한다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>AUTO_INCREMENT</code> 기본키 하나로 충분하던 테이블도, 파티션을 붙이는 순간 <b>기본키를 복합키로 바꿔야 한다.</b>
+  </div>
+
+  <h4>파티션 정의 읽기</h4>
+  <p><code>PARTITION BY RANGE(YEAR(reg_date))</code> 한 줄이 담고 있는 것.</p>
+  <ul>
+    <li>이 절이 있다면 그 테이블은 <b>레인지 파티션</b>을 쓴다는 뜻이다.</li>
+    <li>파티션 컬럼은 <code>reg_date</code> 이며, <code>YEAR</code> 내장 함수로 <b>연도만 추출해</b> 그 연도를 기준으로 범위 분할한다.</li>
+  </ul>
+
+  <h4>제약사항</h4>
+  <ul>
+    <li>파티션 테이블에서는 <b>외래키를 쓸 수 없고</b>, 임시 테이블도 쓸 수 없는 등 여러 제약이 있다.</li>
+    <li>가장 큰 영향을 주는 것은 <b>모든 유니크 인덱스에 파티션 키 컬럼이 포함되어야 한다</b>는 제약이다.
+      <ul><li>일반적으로 <code>AUTO_INCREMENT</code> 키 하나면 충분하지만, 파티션을 쓰려면 <b>파티션 키와의 복합키</b>로 만들어야 한다.</li></ul>
+    </li>
+    <li>파티션 표현식에는 산술 연산이나 일부 내장 함수를 쓸 수 있다. <b>프루닝이 실제로 잘 되는지 확인한 뒤</b> 애플리케이션에 적용하는 것이 좋다.</li>
+  </ul>
+
+  <h4>파티션과 유니크 키 (기본키 포함)</h4>
+  <p>종류와 무관하게 유니크 인덱스가 있다면, <b>파티션 키는 모든 유니크 인덱스의 일부 또는 전체 컬럼에 포함</b>되어야 한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">유니크 키가 파티션 키 fd1 을 포함한다</span>
+      <span class="code-tag good">허용</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">CREATE TABLE tb_partition (
+  fd1 INT NOT NULL,
+  fd2 INT NOT NULL,
+  fd3 INT NOT NULL,
+  UNIQUE KEY (fd1, fd2, fd3)
+) PARTITION BY HASH(fd1)
+PARTITIONS 4;</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">왜 이런 제약이 있을까</p>
+      <p>유니크 제약을 검사하려면 <b>모든 파티션을 뒤져야</b> 하는데, 파티션은 각자 독립된 인덱스를 갖는다. 파티션 키가 유니크 키에 포함되어 있으면 <b>어느 파티션을 봐야 하는지 즉시 계산</b>되므로, 그 파티션 하나만 검사하면 된다. 제약이 아니라 <b>파티션 구조가 성립하기 위한 조건</b>인 셈이다.</p>
+    </div>
+  </div>
+
+  <h4>파티션과 open_files_limit</h4>
+  <ul>
+    <li>MySQL은 테이블을 <b>파일 단위</b>로 관리하므로 동시에 열린 파일 수가 많아질 수 있다.</li>
+    <li>일반 테이블은 열린 파일이 2~3개지만, 파티션 테이블은 <b>(파티션 개수 × 2~3)</b> 이 된다.</li>
+    <li>파티션을 많이 쓴다면 <code>open_files_limit</code> 를 적절히 높여야 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>모든 유니크 인덱스에 파티션 키를 포함</b>해야 한다 — 기본키 설계를 바꿔야 하는 경우가 대부분이다.</li>
+      <li>파티션 테이블에는 <b>외래키를 쓸 수 없다.</b></li>
+      <li>파티션 수만큼 파일 핸들이 늘어나므로 <code>open_files_limit</code> 를 함께 조정한다.</li>
+      <li>파티션 표현식은 <b>프루닝이 실제로 되는지 검증하고</b> 적용한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-13-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">13-3</div>
+    <h3>MySQL 파티션의 종류</h3>
+    <p class="item-tagline">레인지 · 리스트 · 해시 · 키 네 가지. 그리고 재분배 비용을 줄이는 <b>리니어</b> 변형.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>레인지·리스트</b> 는 사람이 경계를 정하고, <b>해시·키</b> 는 서버가 정한다. 그래서 앞의 둘만 <b>파티션 단위 삭제</b>가 가능하다.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>종류</th><th>분할 기준</th><th>MAXVALUE</th><th>파티션 단위 삭제</th></tr></thead>
+      <tbody>
+        <tr><td>레인지</td><td>연속된 <b>범위</b></td><td class="t-center t-ok">가능</td><td class="t-center t-ok">가능</td></tr>
+        <tr><td>리스트</td><td>값의 <b>목록</b></td><td class="t-center t-no">불가</td><td class="t-center t-ok">가능</td></tr>
+        <tr><td>해시</td><td>사용자가 정한 표현식의 <b>MOD</b></td><td class="t-center t-no">불가</td><td class="t-center t-no">불가</td></tr>
+        <tr><td>키</td><td>서버가 <b>MD5 해시 + MOD</b></td><td class="t-center t-no">불가</td><td class="t-center t-no">불가</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>레인지 파티션</h4>
+  <ul>
+    <li>파티션 키의 <b>연속된 범위</b>로 파티션을 정의한다. 가장 일반적으로 쓰인다.</li>
+    <li><code>MAXVALUE</code> 키워드로 <b>명시되지 않은 범위</b>를 담는 파티션을 정의할 수 있다.</li>
+  </ul>
+
+  <h5>용도</h5>
+  <ul>
+    <li>대부분 <b>로그 저장용 테이블</b>에 쓴다.</li>
+    <li>날짜 기반으로 데이터가 누적되고 년/월/일 단위로 분석하거나 삭제할 때</li>
+    <li>범위 기반으로 나누거나 <b>파티션 키 위주의 검색</b>이 자주 발생할 때</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE range_partition_table (
+  id INT NOT NULL,
+  first_name VARCHAR(255),
+  last_name VARCHAR(255),
+  hired DATE NOT NULL DEFAULT '1970-01-01'
+) PARTITION BY RANGE(YEAR(hired)) (
+  PARTITION p0 VALUES LESS THAN (1991),
+  PARTITION p1 VALUES LESS THAN (1996),
+  PARTITION p2 VALUES LESS THAN (2001),
+  PARTITION p3 VALUES LESS THAN MAXVALUE
+);</code></pre>
+  </div>
+  <p><code>MAXVALUE</code> 가 없다면 2011년 레코드를 넣을 때 <b>에러가 발생</b>한다.</p>
+
+  <h5>파티션 추가</h5>
+  <ul>
+    <li><code>MAXVALUE</code> 파티션이 이미 있다면 단순 <code>ADD PARTITION</code> 이 아니라 <b><code>REORGANIZE PARTITION</code></b> 이 필요하다.</li>
+    <li><code>MAXVALUE</code> 에 들어 있던 레코드를 <b>함께 옮겨야</b> 해서, 값이 많으면 오래 걸린다.</li>
+    <li>그래서 레인지 파티션에서는 <b>미래에 쓸 파티션을 미리 2~3개 만들어 두는</b> 형태를 쓰기도 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER TABLE range_partition_table ADD PARTITION (
+  PARTITION p4 VALUES LESS THAN (2011)
+);</code></pre>
+  </div>
+
+  <h5>파티션 삭제</h5>
+  <ul>
+    <li><code>DROP PARTITION</code> 을 쓴다.</li>
+    <li>날짜 단위로 파티션된 테이블에서 <b>오래된 데이터를 삭제하는</b> 용도로 자주 쓰인다.</li>
+    <li>삭제는 <b>항상 오래된 순서대로만</b> 가능하고, 중간 파티션은 삭제할 수 없다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER TABLE range_partition_table DROP PARTITION p0;</code></pre>
+  </div>
+
+  <h5>파티션 분리와 병합</h5>
+  <p>둘 다 <code>REORGANIZE PARTITION</code> 을 쓰며, <b>재구성이 필요해 읽기 잠금(<code>LOCK=SHARED</code>)</b> 이 걸린다.</p>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">분리</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER TABLE range_partition_table
+  ALGORITHM=INPLACE, LOCK=SHARED,
+  REORGANIZE PARTITION p3 INTO (
+    PARTITION p3 VALUES LESS THAN (2011),
+    PARTITION p4 VALUES LESS THAN MAXVALUE
+  );</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">병합</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER TABLE range_partition_table
+  ALGORITHM=INPLACE, LOCK=SHARED,
+  REORGANIZE PARTITION p2, p3 INTO (
+    PARTITION p23 VALUES LESS THAN (2011)
+  );</code></pre>
+    </div>
+  </div>
+
+  <h4>리스트 파티션</h4>
+  <ul>
+    <li>파티션 키 값 <b>하나하나를 리스트로 나열</b>하는 방식이다.</li>
+    <li>레인지와 달리 <b><code>MAXVALUE</code> 를 쓸 수 없다.</b></li>
+  </ul>
+
+  <h5>용도</h5>
+  <ul>
+    <li>파티션 키가 <b>코드 값이나 카테고리처럼 고정적</b>일 때</li>
+    <li>키 값이 연속되지 않고 <b>정렬 순서와 무관하게</b> 나눠야 할 때</li>
+    <li>키 값 기준으로 레코드 건수가 균일하고, 검색 조건에 파티션 키가 자주 쓰일 때</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE list_part_table (
+  id INT NOT NULL,
+  name VARCHAR(30),
+  category_id INT NOT NULL
+) PARTITION BY LIST(category_id) (
+  PARTITION p_app    VALUES IN (3),
+  PARTITION p_pc     VALUES IN (1, 9),
+  PARTITION p_sports VALUES IN (2, 6, 7),
+  PARTITION p_etc    VALUES IN (4, 5, 8, NULL)
+);</code></pre>
+  </div>
+  <ul>
+    <li>파티션 키에 <code>NULL</code> 도 명시할 수 있다.</li>
+    <li>정수뿐 아니라 문자열도 파티션 키로 쓸 수 있다.</li>
+    <li>분리·병합은 <code>VALUES LESS THAN</code> 대신 <code>VALUES IN</code> 을 쓰는 것 외에 레인지와 차이가 없다.</li>
+  </ul>
+
+  <h4>해시 파티션</h4>
+  <ul>
+    <li>MySQL이 정의한 해시 함수로 저장될 파티션을 결정한다.
+      <ul><li>파티션 표현식의 결과값을 <b>파티션 개수로 나눈 나머지</b>로 결정한다.</li></ul>
+    </li>
+    <li>항상 <b>정수 타입 컬럼이나 정수를 반환하는 표현식</b>만 쓸 수 있다.</li>
+    <li>파티션 개수가 알고리즘에 직결되므로, 추가·삭제 시 <b>전체 레코드 재분배</b>가 필요하다.</li>
+  </ul>
+
+  <h5>용도</h5>
+  <ul>
+    <li>레인지나 리스트로 <b>데이터를 균등하게 나누기 어려울 때</b></li>
+    <li>모든 레코드의 사용 빈도가 비슷한데 테이블이 너무 커서 파티셔닝이 필요할 때</li>
+    <li>대표적인 예 — <b>회원 테이블</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE hash_part_table (
+  id INT NOT NULL,
+  first_name VARCHAR(30),
+  last_name VARCHAR(30),
+  hired DATE NOT NULL DEFAULT '1970-01-01'
+) PARTITION BY HASH(id) PARTITIONS 4;</code></pre>
+  </div>
+
+  <h5>분리와 병합</h5>
+  <ul>
+    <li>분리·병합 시 <b>모든 레코드의 재분배</b>가 필요하다.</li>
+    <li>파티션 개수가 바뀌는 것은 <b>해시 함수 자체를 바꾸는 것</b>이라 피할 수 없다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">추가</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 1개 추가, 이름 직접 지정
+ALTER TABLE hash_part_table ALGORITHM=INPLACE, LOCK=SHARED,
+  ADD PARTITION (PARTITION p5 ENGINE=InnoDB);
+
+-- 6개를 한 번에 추가, 이름은 자동
+ALTER TABLE hash_part_table ALGORITHM=INPLACE, LOCK=SHARED,
+  ADD PARTITION PARTITIONS 6;</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>작업</th><th>가능 여부</th></tr></thead>
+      <tbody>
+        <tr><td>파티션 단위 삭제</td><td class="t-no">불가 — 서버가 키를 가공해 분산한 것이라 특정 파티션만 지울 수 없다</td></tr>
+        <tr><td>특정 파티션 분할</td><td class="t-no">불가 — 테이블 전체의 파티션 수를 늘리는 것만 가능</td></tr>
+        <tr><td>2개 이상을 하나로 병합</td><td class="t-no">불가 — <b>개수를 줄이는 것</b>만 가능 (<code>COALESCE PARTITION</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER TABLE hash_part_table ALGORITHM=INPLACE, LOCK=SHARED,
+  COALESCE PARTITION 1;</code></pre>
+  </div>
+
+  <h4>키 파티션</h4>
+  <ul>
+    <li>해시 파티션은 <b>해시 값을 계산하는 방법을 사용자가 직접 지정</b>한다.</li>
+    <li>키 파티션은 그 계산과 <code>MOD</code> 까지 <b>전부 MySQL 서버가 처리</b>한다.</li>
+    <li>정수뿐 아니라 <b>대부분의 타입</b>을 파티션 키로 쓸 수 있다.</li>
+    <li>파티션 키 값의 <b>MD5 해시</b>를 계산하고 <code>MOD</code> 해서 분배한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">CREATE TABLE k1 (
+  id INT NOT NULL,
+  name VARCHAR(255),
+  PRIMARY KEY(id)
+) PARTITION BY KEY()
+  PARTITIONS 2;</code></pre>
+  </div>
+  <p><code>PARTITION BY KEY()</code> 처럼 비워 두면 <b>기본키를 자동으로</b> 쓴다. 직접 지정할 수도 있다.</p>
+
+  <h5>주의 및 특이사항</h5>
+  <ul>
+    <li>유니크 키를 파티션 키로 쓴다면 반드시 <b><code>NOT NULL</code></b> 이어야 한다.</li>
+    <li>해시 파티션보다 <b>레코드를 더 균등하게 분할</b>할 수 있어 효율이 좋다.</li>
+  </ul>
+
+  <h4>리니어 해시 / 리니어 키 파티션</h4>
+  <ul>
+    <li>해시·키 파티션 모두 추가·통합 시 <b>전체 재분배</b>가 필요하다는 단점이 있다.</li>
+    <li>이를 완화하려고 <b>리니어(Linear)</b> 알고리즘이 도입되었다.</li>
+    <li><b>2의 승수 알고리즘</b>을 써서 다른 파티션에 미치는 영향을 최소화한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph N["일반 해시"]
+    N1["파티션 4개 → 5개"] --> N2["전체 레코드 재분배"]
+  end
+  subgraph L["리니어 해시"]
+    L1["파티션 3개 → 4개"] --> L2["3번 파티션만 쪼개면 끝"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>리니어의 이득은 재구성 범위에 있다</b> — 파티션 조정이 잦은 테이블에서만 의미가 있다.</div>
+  </div>
+
+  <ul>
+    <li><b>파티션 추가</b> — 1,2,3 이 있는 상태에서 4를 추가하면 <b>3의 데이터만</b> 재구성되어 3과 4만 영향을 받는다.</li>
+    <li><b>파티션 통합</b> — 1,2,3,4 에서 4를 제거하면 <b>3의 데이터만</b> 재구성하면 된다.</li>
+    <li>재구성이 <b>빈번하다면</b> 리니어를, <b>거의 필요 없다면</b> 일반 파티션을 쓰는 것이 좋다.</li>
+  </ul>
+
+  <h4>파티션 테이블의 쿼리 성능</h4>
+  <ul>
+    <li>일부 파티션만 읽느냐 전체를 읽느냐에 따라 <b>성능이 크게 차이 난다.</b></li>
+    <li>불필요한 파티션을 모두 제외하고 <b>꼭 필요한 것만 골라내야</b> 성능이 좋다.</li>
+    <li>10개 파티션을 <b>모두 비슷하게 쓴다면 엄청난 오버헤드</b> 만 생긴다.</li>
+    <li>반드시 <b>파티션이 정말 필요한지 고민한 뒤</b> 적용하는 것을 권장한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>레인지</b> — 날짜 기반 로그 테이블의 정석. <code>MAXVALUE</code> 와 <code>DROP PARTITION</code> 이 핵심.</li>
+      <li><b>리스트</b> — 코드·카테고리처럼 값이 고정적일 때. <code>MAXVALUE</code> 없음.</li>
+      <li><b>해시 / 키</b> — 균등 분산이 목적. <b>파티션 단위 삭제가 불가</b>하고 개수 변경 시 전체 재분배.</li>
+      <li>재구성이 잦다면 <b>리니어</b> 변형으로 재분배 범위를 줄인다.</li>
+      <li>결국 <b>프루닝이 되지 않는 파티션은 오버헤드일 뿐</b>이다.</li>
+    </ul>
+  </div>
+</article>

@@ -1,0 +1,224 @@
+{
+  "title": "가상 면접 사례로 배우는 대규모 시스템 설계 기초",
+  "subtitle": "63개 주제 정리",
+  "mark": "SD",
+  "eyebrow": "STUDY DIGEST",
+  "description": "대규모 시스템 설계 면접의 16개 주제를 규모 확장성 기초부터 결제 시스템까지 한 권으로 정리한 학습 노트",
+  "lead": "단일 서버 한 대에서 시작해 <b>로드밸런서 / 캐시 / CDN / 샤딩</b>을 거쳐 트래픽을 나누는 법을 익히고, 그 위에 <b>처리율 제한기 / 안정 해시 / 키-값 저장소 / 채팅 / 뉴스 피드 / 유튜브 / 결제 시스템</b>을 얹어 본다. 설계 면접에서 반복해 등장하는 <em>같은 도구가 문제마다 어떻게 다르게 조합되는지</em>가 이 노트의 뼈대다.",
+  "coverNote": "<div class=\"callout tip\"><div class=\"ic\">i</div><div><p class=\"callout-title\">읽는 법</p><p>1~2장은 나머지 전부에서 재사용되는 <b>공통 부품 카탈로그</b>다. 3장(면접 공략)은 원본 노트가 비어 있어 이 정리본에는 포함하지 않았다. 4장부터는 각 장이 독립된 설계 문제라 관심 있는 장부터 바로 읽어도 된다.</p></div></div>",
+  "footer": "원본: 알렉스 쉬, 『가상 면접 사례로 배우는 대규모 시스템 설계 기초』 1/2권 학습 노트 — 손그림 다이어그램은 전부 재작도했고, 버전에 민감한 서술은 공식 문서로 검증했다.",
+  "stats": [
+    { "val": "63", "unit": "개", "label": "주제" },
+    { "val": "16", "unit": "개", "label": "챕터" },
+    { "val": "133", "unit": "장", "label": "재작도한 도해" }
+  ],
+  "chapters": [
+    {
+      "id": "ch1",
+      "short": "CH 1",
+      "navTitle": "사용자 수에 따른 규모 확장성",
+      "title": "사용자 수에 따른 규모 확장성",
+      "lead": "서버 한 대로 시작한 시스템이 사용자 수백만 명을 견디기까지, <b>무엇을 어떤 순서로 떼어내는가</b>. 이 장의 부품들은 이후 모든 장에서 그대로 다시 쓰인다.",
+      "items": [
+        { "id": "item-1", "idx": "1-1", "title": "단일 서버", "keywords": "monolith 모놀리식 DNS HTML JSON 올인원" },
+        { "id": "item-2", "idx": "1-2", "title": "데이터베이스", "keywords": "RDBMS NoSQL relational key-value graph column document join" },
+        { "id": "item-3", "idx": "1-3", "title": "수직적 규모 확장 vs 수평적 규모 확장", "keywords": "scale up scale out load balancer 로드밸런서 다중화 replication master slave" },
+        { "id": "item-4", "idx": "1-4", "title": "캐시", "keywords": "cache read-through TTL LRU LFU SPOF eviction 만료" },
+        { "id": "item-5", "idx": "1-5", "title": "콘텐츠 전송 네트워크(CDN)", "keywords": "CDN edge invalidation 무효화 오브젝트 버저닝 정적 콘텐츠" },
+        { "id": "item-6", "idx": "1-6", "title": "무상태 웹 계층", "keywords": "stateless stateful sticky session 스티키 세션 공유 저장소" },
+        { "id": "item-7", "idx": "1-7", "title": "데이터 센터", "keywords": "IDC geoDNS 지리적 라우팅 geo routing 이중화 데이터 동기화" },
+        { "id": "item-8", "idx": "1-8", "title": "메시지 큐", "keywords": "message queue producer consumer 비동기 느슨한 결합 decoupling" },
+        { "id": "item-9", "idx": "1-9", "title": "로그, 메트릭 그리고 자동화", "keywords": "logging metric observability CI CD 모니터링" },
+        { "id": "item-10", "idx": "1-10", "title": "데이터베이스의 규모 확장", "keywords": "sharding 샤딩 샤드 shard key 재샤딩 유명인사 문제 조인" },
+        { "id": "item-11", "idx": "1-11", "title": "백만 사용자 그리고 그 이상", "keywords": "checklist 정리 요약 확장 기법" }
+      ]
+    },
+    {
+      "id": "ch2",
+      "short": "CH 2",
+      "navTitle": "개략적인 규모 측정",
+      "title": "개략적인 규모 측정",
+      "lead": "설계 면접에서 계산기를 꺼낼 일은 없다. 필요한 건 <b>2의 제곱수 / 응답지연 / 가용성</b> 세 가지 감각과, 가정을 소리 내어 적는 습관이다.",
+      "items": [
+        { "id": "item-12", "idx": "2-1", "title": "개략적인 규모 측정이란", "keywords": "back of the envelope estimation 사고실험 추정" },
+        { "id": "item-13", "idx": "2-2", "title": "2의 제곱수", "keywords": "KB MB GB TB PB byte bit ASCII 2^10 2^20" },
+        { "id": "item-14", "idx": "2-3", "title": "모든 개발자가 알아야 하는 응답지연 값", "keywords": "latency numbers 메모리 디스크 압축 네트워크 왕복 RTT" },
+        { "id": "item-15", "idx": "2-4", "title": "가용성에 관계된 수치들", "keywords": "availability SLA 99.9 nines 고가용성 uptime" },
+        { "id": "item-16", "idx": "2-5", "title": "트위터 QPS와 저장소 요구량 추정", "keywords": "QPS DAU 저장소 추정 tweet media 5년" },
+        { "id": "item-17", "idx": "2-6", "title": "추정을 잘하는 팁", "keywords": "근사치 rounding 가정 단위 연습" }
+      ]
+    },
+    {
+      "id": "ch4",
+      "short": "CH 4",
+      "navTitle": "처리율 제한 장치의 설계",
+      "title": "처리율 제한 장치의 설계",
+      "lead": "\"초당 몇 번까지 허용할 것인가\"를 정확히 세는 일은 생각보다 어렵다. 알고리즘 다섯 개의 <b>메모리 / 정확도 / 버스트 허용치</b> 트레이드오프를 비교한다.",
+      "items": [
+        { "id": "item-18", "idx": "4-1", "title": "처리율 제한 장치란", "keywords": "rate limiter throttling DoS 429 자원 고갈 봇" },
+        { "id": "item-19", "idx": "4-2", "title": "문제 이해 및 설계 범위 확정", "keywords": "requirement 요구사항 분산 환경 메모리 예외 처리" },
+        { "id": "item-20", "idx": "4-3", "title": "처리율 제한 장치를 어디에 둘 것인가", "keywords": "client server middleware API Gateway 429 Too Many Requests" },
+        { "id": "item-21", "idx": "4-4", "title": "처리율 제한 알고리즘", "keywords": "token bucket leaky bucket fixed window sliding window log counter 누출 버킷 고정 윈도" },
+        { "id": "item-22", "idx": "4-5", "title": "개략적인 아키텍처", "keywords": "redis INCR EXPIRE counter 카운터 저장소" },
+        { "id": "item-23", "idx": "4-6", "title": "상세 설계", "keywords": "rule 규칙 race condition lua script sorted set 동기화 헤더 X-RateLimit" }
+      ]
+    },
+    {
+      "id": "ch5",
+      "short": "CH 5",
+      "navTitle": "안정 해시 설계",
+      "title": "안정 해시 설계",
+      "lead": "서버 한 대가 빠졌을 뿐인데 캐시 전체가 무너지는 이유, 그리고 <b>해시 링 위에 서버를 올려두면</b> 왜 그 사고가 사라지는지.",
+      "items": [
+        { "id": "item-24", "idx": "5-1", "title": "해시 키 재배치 문제", "keywords": "modulo hash mod N 캐시 미스 rehash 재배치" },
+        { "id": "item-25", "idx": "5-2", "title": "안정 해시", "keywords": "consistent hashing hash ring virtual node 가상 노드 SHA-1 파티션 k/n" }
+      ]
+    },
+    {
+      "id": "ch6",
+      "short": "CH 6",
+      "navTitle": "키-값 저장소 설계",
+      "title": "키-값 저장소 설계",
+      "lead": "CAP에서 무엇을 포기할지 고르는 순간부터 설계가 갈린다. <b>정족수 / 벡터 시계 / 가십 / 머클 트리</b>가 각각 어떤 실패를 막는 장치인지 짚는다.",
+      "items": [
+        { "id": "item-26", "idx": "6-1", "title": "키-값 저장소란", "keywords": "key value store DynamoDB Redis 고유 식별자 해시값" },
+        { "id": "item-27", "idx": "6-2", "title": "문제 이해 및 설계 범위", "keywords": "tradeoff 균형 읽기 쓰기 메모리" },
+        { "id": "item-28", "idx": "6-3", "title": "단일 서버 키-값 저장소", "keywords": "hash table 메모리 압축 디스크" },
+        { "id": "item-29", "idx": "6-4", "title": "분산 키-값 저장소", "keywords": "CAP CP AP CA 파티션 정족수 quorum W R N vector clock 벡터 시계 gossip merkle 임시 위탁 hinted handoff anti-entropy" },
+        { "id": "item-30", "idx": "6-5", "title": "시스템 아키텍처와 카산드라의 읽기/쓰기 경로", "keywords": "cassandra SSTable memtable commit log bloom filter LSM" }
+      ]
+    },
+    {
+      "id": "ch7",
+      "short": "CH 7",
+      "navTitle": "유일 ID 생성기 설계",
+      "title": "분산 시스템을 위한 유일 ID 생성기 설계",
+      "lead": "<code>auto_increment</code>가 통하지 않는 세계에서 <b>정렬 가능하고 64비트에 들어가는 ID</b>를 만드는 네 가지 방법과 각각의 대가.",
+      "items": [
+        { "id": "item-31", "idx": "7-1", "title": "auto_increment를 쓸 수 없는 이유", "keywords": "auto increment 분산 64bit 정렬 요구사항 10000 QPS" },
+        { "id": "item-32", "idx": "7-2", "title": "설계안 네 가지", "keywords": "multi master UUID UUIDv7 ticket server flickr snowflake 스노플레이크 NTP 시간 동기화" }
+      ]
+    },
+    {
+      "id": "ch8",
+      "short": "CH 8",
+      "navTitle": "URL 단축기 설계",
+      "title": "URL 단축기 설계",
+      "lead": "짧은 문자열 7자에 3,650억 개의 URL을 담는 문제. <b>해시 후 충돌 해소</b>와 <b>62진법 변환</b> 중 무엇을 고르느냐가 시스템 전체 구조를 바꾼다.",
+      "items": [
+        { "id": "item-33", "idx": "8-1", "title": "요구사항과 개략적 규모", "keywords": "tinyurl shorten redirect 1억 36.5TB 저장용량" },
+        { "id": "item-34", "idx": "8-2", "title": "API 설계와 301 vs 302", "keywords": "POST shorten GET redirect 301 302 permanent found 캐시 분석" },
+        { "id": "item-35", "idx": "8-3", "title": "단축 방법 설계", "keywords": "hash CRC32 MD5 base-62 진법 변환 충돌 해소 62^7 데이터 모델" }
+      ]
+    },
+    {
+      "id": "ch9",
+      "short": "CH 9",
+      "navTitle": "웹 크롤러 설계",
+      "title": "웹 크롤러 설계",
+      "lead": "월 10억 페이지를 긁으면서도 <b>예의를 지키고 / 무한 루프에 빠지지 않고 / 중복을 걸러내는</b> 방법. 미수집 URL 저장소가 이 장의 심장이다.",
+      "items": [
+        { "id": "item-36", "idx": "9-1", "title": "웹 크롤러의 쓰임새", "keywords": "search engine indexing web archiving mining monitoring googlebot 디지마크" },
+        { "id": "item-37", "idx": "9-2", "title": "크롤러의 규모와 개략적 설계안", "keywords": "QPS 30PB seed URL frontier HTML downloader DNS resolver content parser 중복 콘텐츠 블룸 필터" },
+        { "id": "item-38", "idx": "9-3", "title": "상세 설계", "keywords": "BFS DFS politeness 예의 우선순위 prioritizer freshness robots.txt spider trap 거미덫 분산 크롤링 DNS 캐시" }
+      ]
+    },
+    {
+      "id": "ch10",
+      "short": "CH 10",
+      "navTitle": "알림 시스템 설계",
+      "title": "알림 시스템 설계",
+      "lead": "APNs / FCM / SMS / 이메일을 하나의 파이프로 묶으면서, <b>알림은 절대 잃지 않되 웬만하면 중복도 없게</b> 만드는 설계.",
+      "items": [
+        { "id": "item-39", "idx": "10-1", "title": "설계 범위와 플랫폼별 알림 구조", "keywords": "APNs FCM device token payload provider Twilio Nexmo Sendgrid Mailchimp 연락처 수집" },
+        { "id": "item-40", "idx": "10-2", "title": "알림 전송 및 수신 절차", "keywords": "1차 설계안 SPOF 병목 메시지 큐 알림 서버 검증 오토스케일링" },
+        { "id": "item-41", "idx": "10-3", "title": "상세 설계", "keywords": "데이터 손실 중복 전송 dedupe 템플릿 전송률 제한 재시도 appKey appSecret 큐 모니터링 이벤트 추적" }
+      ]
+    },
+    {
+      "id": "ch11",
+      "short": "CH 11",
+      "navTitle": "뉴스 피드 시스템 설계",
+      "title": "뉴스 피드 시스템 설계",
+      "lead": "팬아웃을 <b>쓸 때 할 것이냐 읽을 때 할 것이냐</b>. 이 한 번의 선택이 핫키 문제와 응답 지연 사이의 저울을 결정한다.",
+      "items": [
+        { "id": "item-42", "idx": "11-1", "title": "문제 이해와 설계 방안", "keywords": "news feed DAU 5000 친구 시간 역순 API POST GET feed" },
+        { "id": "item-43", "idx": "11-2", "title": "상세 설계", "keywords": "fanout on write on read 핫키 hot key 그래프 DB 캐시 계층 소셜 그래프" }
+      ]
+    },
+    {
+      "id": "ch12",
+      "short": "CH 12",
+      "navTitle": "채팅 시스템 설계",
+      "title": "채팅 시스템 설계",
+      "lead": "폴링에서 웹소켓까지 올라오는 길, 그리고 <b>상태를 유지하는 서버</b>를 어떻게 확장하고 접속 상태를 어떻게 퍼뜨릴 것인가.",
+      "items": [
+        { "id": "item-44", "idx": "12-1", "title": "채팅 시스템 요구사항", "keywords": "1:1 group chat DAU 5000만 100명 텍스트 100000자 E2E" },
+        { "id": "item-45", "idx": "12-2", "title": "클라이언트와 채팅 서비스의 구조", "keywords": "polling long polling websocket handshake upgrade 라운드로빈 양방향" },
+        { "id": "item-46", "idx": "12-3", "title": "설계안", "keywords": "stateless stateful 무상태 상태 유지 제3자 서비스 푸시 알림 규모 확장성 동시 접속" },
+        { "id": "item-47", "idx": "12-4", "title": "채팅 시스템의 데이터베이스", "keywords": "채팅 이력 key value RDBMS message_id 복합키 channel_id 스노플레이크" },
+        { "id": "item-48", "idx": "12-5", "title": "상세 설계", "keywords": "service discovery zookeeper 메시지 동기화 큐 cur_max_msg_id 접속 상태 heartbeat 박동검사 pub sub" }
+      ]
+    },
+    {
+      "id": "ch13",
+      "short": "CH 13",
+      "navTitle": "검색어 자동완성 시스템",
+      "title": "검색어 자동완성 시스템",
+      "lead": "100ms 안에 답해야 하는 문제. <b>트라이를 캐싱하고, 갱신을 배치로 미루는</b> 순간 데이터베이스 질의는 사라진다.",
+      "items": [
+        { "id": "item-49", "idx": "13-1", "title": "요구사항과 규모 추정", "keywords": "autocomplete typeahead 100ms 연관성 정렬 QPS 48000 0.4GB" },
+        { "id": "item-50", "idx": "13-2", "title": "개략적인 설계안", "keywords": "데이터 수집 서비스 질의 서비스 frequency table LIKE prefix 병목" },
+        { "id": "item-51", "idx": "13-3", "title": "상세 설계", "keywords": "trie 트라이 접두어 prefix top k 캐싱 로그 취합 작업 서버 샤딩 브라우저 캐시 max-age 데이터 샘플링" }
+      ]
+    },
+    {
+      "id": "ch14",
+      "short": "CH 14",
+      "navTitle": "유튜브 설계",
+      "title": "유튜브 설계",
+      "lead": "비디오는 크고, 인코딩은 느리고, CDN은 비싸다. <b>DAG로 파이프라인을 추상화하고 GOP 단위로 쪼개</b> 이 세 문제를 동시에 공략한다.",
+      "items": [
+        { "id": "item-52", "idx": "14-1", "title": "요구사항과 개략적 규모", "keywords": "DAU 500만 150TB CloudFront CDN 비용 15만 달러" },
+        { "id": "item-53", "idx": "14-2", "title": "개략적 설계", "keywords": "BLOB storage 원본 저장소 transcoding 트랜스코딩 완료 큐 핸들러 메타데이터 캐시 스트리밍 MPEG-DASH HLS" },
+        { "id": "item-54", "idx": "14-3", "title": "상세 설계", "keywords": "비트레이트 컨테이너 코덱 H.264 VP9 HEVC DAG GOP 전처리기 자원 관리자 pre-signed url DRM AES 워터마크 롱테일" }
+      ]
+    },
+    {
+      "id": "ch15",
+      "short": "CH 15",
+      "navTitle": "구글 드라이브 설계",
+      "title": "구글 드라이브 설계",
+      "lead": "파일 동기화의 핵심은 <b>블록 단위로 쪼개 바뀐 것만 보내는</b> 것. 여기에 델타 동기화 / 중복 제거 / 롱 폴링 알림이 붙는다.",
+      "items": [
+        { "id": "item-55", "idx": "15-1", "title": "요구사항과 개략적 설계안", "keywords": "500PB 240 QPS resumable upload 샤딩 S3 동기화 충돌 블록 저장소 아카이빙 콜드 스토리지" },
+        { "id": "item-56", "idx": "15-2", "title": "상세 설계", "keywords": "delta sync 델타 동기화 압축 강한 일관성 업로드 절차 롱 폴링 중복 제거 dedupe 글레이셔 장애 처리" }
+      ]
+    },
+    {
+      "id": "ch19",
+      "short": "CH 19",
+      "navTitle": "분산 메시지 큐",
+      "title": "분산 메시지 큐",
+      "lead": "카프카는 왜 <b>디스크에 순차 쓰기</b>를 하면서도 빠른가. WAL / 세그먼트 / 일괄처리 / 풀 모델이 답이다.",
+      "items": [
+        { "id": "item-57", "idx": "19-1", "title": "메시지 큐의 장점", "keywords": "decoupling 결합도 규모 확장성 가용성 성능 kafka pulsar rabbitmq activemq rocketmq zeromq 이벤트 스트리밍" },
+        { "id": "item-58", "idx": "19-2", "title": "문제 이해 및 설계 범위", "keywords": "at least once at most once exactly once 순서 보장 지속성 내구성 보관 retention" },
+        { "id": "item-59", "idx": "19-3", "title": "개략적인 설계", "keywords": "일대일 발행 구독 topic partition broker 소비자 그룹 consumer group offset 리더 선출 zookeeper etcd" },
+        { "id": "item-60", "idx": "19-4", "title": "상세 설계", "keywords": "WAL write ahead log 세그먼트 순차 접근 메시지 자료구조 CRC 일괄처리 batching 라우팅 계층 리더 사본 push pull 롱 폴링" }
+      ]
+    },
+    {
+      "id": "ch26",
+      "short": "CH 26",
+      "navTitle": "결제 시스템",
+      "title": "결제 시스템",
+      "lead": "성능보다 <b>정확성</b>이 먼저인 유일한 장. 멱등성과 조정(reconciliation)이 이중 청구를 막는 두 겹의 방어선이다.",
+      "items": [
+        { "id": "item-61", "idx": "26-1", "title": "문제 이해 및 설계 정리", "keywords": "pay-in pay-out 대금 수신 정산 TPS 10 신뢰성 내결함성 조정" },
+        { "id": "item-62", "idx": "26-2", "title": "개략적 설계안", "keywords": "payment service executor PSP 원장 ledger 지갑 wallet 복식부기 double entry checkout_id payment_order idempotent key PCI DSS" },
+        { "id": "item-63", "idx": "26-3", "title": "상세 설계", "keywords": "reconciliation 조정 결제 지연 3D Secure 웹훅 동기 비동기 재시도 큐 dead letter queue 지수적 백오프 멱등성 Raft Paxos CockroachDB" }
+      ]
+    }
+  ]
+}

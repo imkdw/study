@@ -1,0 +1,297 @@
+<article class="item" id="item-18-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 18-1</div>
+    <h3>다단 앱 설정</h3>
+    <p class="item-tagline">설정은 한 겹이 아니다. 이미지의 기본값 위에 환경별 파일이 얹히고, 그 위에 환경 변수가 얹힌다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    설정 모델은 <b>데이터의 성격을 반영</b>해야 한다. 버전에 묶인 값, 환경에 묶인 값,
+    실행 시점에만 바꾸고 싶은 값은 서로 다른 층에 두어야 한다.
+  </div>
+
+  <h4>다단 앱 설정</h4>
+  <p>설정 모델에는 설정에 담긴 데이터의 구조가 반영되어야 한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>분류</th><th>성격</th><th>어디에 두는가</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>버전에 따라 달라지는 설정</b></td>
+          <td>모든 환경에서 동일하지만 버전별로 달라짐</td>
+          <td>이미지 안 (기본 설정 파일)</td>
+        </tr>
+        <tr>
+          <td><b>환경에 따라 달라지는 설정</b></td>
+          <td>개발 / 운영 등 환경별로 달라짐</td>
+          <td>마운트하는 오버라이드 파일</td>
+        </tr>
+        <tr>
+          <td><b>기능 설정</b></td>
+          <td>버전별 앱의 동작을 제어하기 위함</td>
+          <td>환경 변수 (실행 시점에 주입)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 250" width="620" role="img" aria-label="이미지 기본 설정 위에 환경별 파일이 얹히고 그 위에 환경 변수가 얹히는 3단 구조">
+        <rect x="120" y="24" width="380" height="46" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="310" y="44" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="middle">환경 변수 (NODE_CONFIG 등)</text>
+        <text x="310" y="61" class="dg-text-sub" font-size="10" text-anchor="middle">실행 시점에 주입 &mdash; 가장 강함</text>
+        <text x="512" y="50" class="dg-text-sub" font-size="10.5">기능 설정</text>
+
+        <rect x="100" y="82" width="420" height="46" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="310" y="102" class="dg-text dg-mono" font-size="12" font-weight="700" text-anchor="middle">환경별 설정 파일 (/app/configoverride)</text>
+        <text x="310" y="119" class="dg-text-sub" font-size="10" text-anchor="middle">볼륨 / 바인드 마운트로 주입</text>
+        <text x="532" y="108" class="dg-text-sub" font-size="10.5">환경별</text>
+
+        <rect x="80" y="140" width="460" height="46" rx="7" class="dg-fill-bg dg-stroke"/>
+        <text x="310" y="160" class="dg-text dg-mono" font-size="12" font-weight="700" text-anchor="middle">이미지 안의 기본 설정 파일</text>
+        <text x="310" y="177" class="dg-text-sub" font-size="10" text-anchor="middle">빌드 시점에 포함 &mdash; 항상 존재하는 바닥</text>
+        <text x="552" y="166" class="dg-text-sub" font-size="10.5">버전별</text>
+
+        <path d="M44 170 L 44 44" fill="none" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#cfg-arr)"/>
+        <defs>
+          <marker id="cfg-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        <text x="36" y="120" class="dg-accent" font-size="10.5" text-anchor="end" transform="rotate(-90 36 120)">우선순위</text>
+
+        <text x="310" y="216" class="dg-text-sub" font-size="11" text-anchor="middle">위 층이 아래 층을 덮어쓰며 <b>병합</b>된다 &mdash; 위 층이 없으면 아래 값이 그대로 쓰인다</text>
+        <text x="310" y="238" class="dg-accent" font-size="11" text-anchor="middle">어느 층이 없어도 앱은 뜬다. 이것이 다단 설정의 목적이다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>바닥이 항상 채워져 있기 때문에 아무것도 주입하지 않아도 앱이 뜬다</b> —
+      개발자는 <code>docker run</code> 만 하면 되고, 환경이 필요로 하는 만큼만 위층을 얹는다.
+    </div>
+  </div>
+
+  <h4>예제 1. 로컬 설정 파일 오버라이드</h4>
+  <p>
+    미리 정의된 경로에서 오버라이드 설정 파일을 읽어 들이도록 해 두면,
+    어떤 경로든 컨테이너 파일 시스템에 설정 파일을 주입하기만 하면 그 설정을 쓸 수 있다.
+  </p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 기본 설정 사용
+$ docker run -d -p 8080:80 diamol/ch18-access-log
+3ea38fcbf319abcfd609116747bbc221112b1f62f7973e63256d943b509f5c90
+
+# 로컬에 존재하는 설정 파일 마운트
+$ docker run -d -p 8081:80 -v "$(pwd)/config/dev:/app/configoverride" diamol/ch18-access-log
+62ccb944842a3f0d4673e13fca1b3cd7f0c702fc20f0e4341484671f93782d95
+
+# 기본 설정 확인
+$ curl http://localhost:8080/config
+{"release":"19.12","environment":"UNKNOWN","metricsEnabled":true}
+
+# 마운트된 설정 확인 — environment 만 바뀌었다
+$ curl http://localhost:8081/config
+{"release":"19.12","environment":"DEV","metricsEnabled":true}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">주목할 것은 <b>바뀌지 않은 값</b>이다 <span class="badge b-blue">보강</span></p>
+      <p>
+        오버라이드 파일이 <code>environment</code> 만 <code>DEV</code> 로 바꿨는데,
+        <code>release</code> 와 <code>metricsEnabled</code> 는 그대로다.
+        <b>덮어쓰기가 아니라 병합</b>이라는 증거다.
+      </p>
+      <p>
+        여기서 <a href="#item-6-4">6-4</a> 의 함정을 피한 방식도 눈여겨볼 만하다.
+        기본 설정 파일이 있는 폴더에 직접 마운트하면 기본 설정이 통째로 가려졌을 것이다.
+        그래서 <b><code>/app/configoverride</code> 라는 별도의 빈 폴더</b>를 마운트 지점으로 두고,
+        앱이 두 폴더를 모두 읽어 병합한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">오탈자 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>
+        원문의 <code>diamol?ch18-access-log</code> 는 <code>diamol/ch18-access-log</code> 의 오타다.
+        위 코드 블록에는 고쳐서 실었다.
+      </p>
+    </div>
+  </div>
+
+  <h4>예제 2. 환경 변수로부터 값 읽어 오기</h4>
+  <ul>
+    <li>기본 파일 + 볼륨 파일 + 주입한 환경 변수를 병합해서 최종 설정이 만들어진다.</li>
+    <li>이 구성은 개발자의 워크플로를 부드럽게 유지할 수 있는 좋은 사례다.</li>
+    <li>단점은 값이 JSON 으로 들어가야 한다는 점이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 환경변수 직접 주입
+$ docker run -d -p 8082:80 -v "$(pwd)/config/dev:/app/configoverride" \
+    -e NODE_CONFIG='{"metrics": {"enabled": "true"}}' diamol/ch18-access-log
+869b0523b12809008d706a92592f675be273047ff2a147e081f260904ca09ad6
+
+# 주입된 환경변수가 적용된 모습
+$ curl http://localhost:8082/config
+{"release":"19.12","environment":"UNKNOWN","metricsEnabled":true}</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">JSON 을 환경 변수에 넣는 것의 대가 <span class="badge b-blue">보강</span></p>
+      <p>
+        원문이 지적한 "값이 JSON 으로 들어가야 한다"는 단점은 생각보다 크다.
+        셸에서 따옴표 이스케이프가 까다롭고, 오타가 나면 <b>조용히 무시되거나 파싱 에러로 앱이 죽는다</b>.
+        CI 스크립트나 컴포즈 파일을 거치면서 이스케이프가 한 번 더 꼬이는 일도 흔하다.
+      </p>
+      <p>
+        그래서 실무에서는 설정 라이브러리가 지원한다면
+        <b>중첩 구조를 평평한 키로 표현하는 방식</b>을 선호한다.
+        .NET 의 <code>Database__Provider</code>(더블 언더스코어 = 계층 구분)나
+        Spring 의 <code>SPRING_DATASOURCE_URL</code> 같은 규칙이 그것이다.
+        <a href="#item-8-3">8-3</a> 의 <code>RngApi__Url</code> 도 같은 관례다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>설정은 이미지 기본값 / 환경별 파일 / 환경 변수 세 층으로 나눈다.</li>
+      <li>위 층이 아래를 덮어쓰되 <b>병합</b>된다. 아무것도 주입하지 않아도 앱이 뜬다.</li>
+      <li>기본 설정 폴더를 직접 마운트하면 가려진다. 별도의 오버라이드 폴더를 둔다.</li>
+      <li>환경 변수에 JSON 을 넣는 방식은 이스케이프가 취약하다. 평평한 키 규칙이 안전하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-18-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 18-2</div>
+    <h3>환경별 설정 패키징하기</h3>
+    <p class="item-tagline">환경별 설정을 이미지 안에 미리 담아 두고, 환경 변수 하나로 어느 것을 쓸지 고른다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    설정 파일을 <b>이미지에 함께 굽고</b> 환경 변수로 선택하는 방식이다.
+    주입할 파일이 없어 배포가 단순해지는 대신, <b>민감한 값은 절대 이 방식으로 담으면 안 된다</b>.
+  </div>
+
+  <h4>환경별 설정 패키징하기</h4>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 기본 설정 실행
+$ docker run -d -p 8083:80 diamol/ch18-todo-list
+e8dcce707cf0ff3640f781fd9e37584606b122985105bd14eb881ae1484d995b
+
+# DOTNET_ENVIRONMENT 추가 — 이미지 안의 Test 설정이 선택된다
+$ docker run -d -p 8084:80 -e DOTNET_ENVIRONMENT=Test diamol/ch18-todo-list
+80322b949244722beda23b84dd8187b10c15bb64eb0ef38d36c85ff180d04383</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 210" width="620" role="img" aria-label="이미지 안에 Development, Test, Production 설정 파일이 모두 들어 있고 DOTNET_ENVIRONMENT 환경 변수가 하나를 선택한다">
+        <rect x="24" y="30" width="270" height="150" rx="9" class="dg-fill-bg dg-stroke"/>
+        <text x="159" y="54" class="dg-text dg-mono" font-size="12" font-weight="700" text-anchor="middle">diamol/ch18-todo-list</text>
+        <line x1="44" y1="64" x2="274" y2="64" class="dg-stroke"/>
+        <rect x="46" y="76" width="226" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="60" y="94" class="dg-text-sub dg-mono" font-size="10.5">appsettings.json</text>
+        <text x="262" y="94" class="dg-text-sub" font-size="9.5" text-anchor="end">기본</text>
+        <rect x="46" y="108" width="226" height="26" rx="4" class="dg-fill-soft dg-stroke"/>
+        <text x="60" y="126" class="dg-accent dg-mono" font-size="10.5">appsettings.Test.json</text>
+        <text x="262" y="126" class="dg-accent" font-size="9.5" text-anchor="end">선택됨</text>
+        <rect x="46" y="140" width="226" height="26" rx="4" class="dg-fill-bg dg-stroke"/>
+        <text x="60" y="158" class="dg-text-sub dg-mono" font-size="10.5">appsettings.Production.json</text>
+
+        <path d="M310 118 L 352 118" fill="none" class="dg-stroke" marker-end="url(#env-arr)"/>
+        <defs>
+          <marker id="env-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+        <text x="331" y="104" class="dg-accent dg-mono" font-size="10" text-anchor="middle">선택</text>
+
+        <rect x="360" y="76" width="238" height="86" rx="8" class="dg-fill-soft dg-stroke"/>
+        <text x="479" y="104" class="dg-text-sub" font-size="10.5" text-anchor="middle">실행 시</text>
+        <text x="479" y="126" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="middle">DOTNET_ENVIRONMENT</text>
+        <text x="479" y="146" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="middle">= Test</text>
+
+        <text x="310" y="196" class="dg-text-sub" font-size="11" text-anchor="middle">모든 환경의 설정이 이미지 안에 함께 들어 있고, 환경 변수가 어느 것을 쓸지만 정한다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>주입할 파일이 없다</b> — 볼륨도 비밀값도 없이 환경 변수 하나로 환경이 결정된다.
+      배포가 단순해지는 대신, 그 파일들은 이미지를 가진 누구나 읽을 수 있다.
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">이 방식에 비밀번호를 넣으면 안 되는 이유</p>
+      <p>
+        이미지에 구운 설정 파일은 <b>그 이미지를 받을 수 있는 누구나 읽을 수 있다</b>.
+        <a href="#item-17-1">17-1</a> 에서 봤듯 레이어에서 파일을 꺼내는 것은 어렵지 않고,
+        나중에 <code>RUN rm</code> 으로 지워도 아래 레이어에 그대로 남는다.
+      </p>
+      <p>
+        그래서 이미지에 담아도 되는 것은 <b>환경별로 다르지만 비밀은 아닌 값</b>에 한한다 &mdash;
+        로그 수준, 기능 플래그, 캐시 크기, 타임아웃 같은 것들이다.
+        커넥션 스트링과 API 키는 <a href="#item-10-3">10-3</a> 의 비밀값으로 런타임에 주입한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 방식이 좋은 이유 <span class="badge b-blue">보강</span></p>
+      <p>
+        단점만 있는 것은 아니다. 오히려 <b>비밀이 아닌 설정</b>에 대해서는 이 방식이 더 낫다.
+        환경별 설정이 이미지와 함께 버전 관리되므로,
+        "운영 서버의 설정 파일이 언제 누구에 의해 바뀌었는지 아무도 모르는" 상황이 생기지 않는다.
+        설정 변경도 코드 리뷰와 파이프라인을 거친다.
+      </p>
+      <p>
+        결국 <a href="#item-18-1">18-1</a> 의 다단 구조와 같은 결론이다.
+        <b>이미지에는 안전한 기본값을, 런타임에는 비밀만.</b>
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>환경별 설정 파일을 모두 이미지에 담고 환경 변수로 선택한다. 주입할 파일이 없어 배포가 단순하다.</li>
+      <li>설정이 이미지와 함께 버전 관리되어 변경 이력이 남는다.</li>
+      <li>이미지에 담은 파일은 누구나 읽을 수 있다. 비밀번호와 키는 절대 넣지 않는다.</li>
+      <li>비밀이 아닌 값은 이미지에, 비밀은 런타임 주입으로 &mdash; 이것이 전체 설정 전략의 결론이다.</li>
+    </ul>
+  </div>
+</article>

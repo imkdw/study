@@ -1,0 +1,303 @@
+<article class="item" id="item-12" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-1</div>
+    <h3>개략적인 규모 측정이란</h3>
+    <p class="item-tagline">정답을 맞히는 게 아니라, 설계가 요구사항에 맞는지 사고실험으로 확인하는 일이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    개략적 추정의 목적은 정확한 숫자가 아니라 <b>"이 설계로 감당이 되는가, 아니면 자릿수가 다른가"</b>를 판별하는 것이다.
+  </div>
+
+  <ul>
+    <li>보편적으로 통용되는 성능 수치 위에서 사고실험을 통해 추정치를 계산하는 행위다.</li>
+    <li>어떤 설계가 요구사항에 부합할지 보기 위한 것이다.</li>
+    <li>2의 제곱수, 응답 지연, 가용성 관련 수치에 대한 이해가 필요하다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>추정은 설계 검증 도구지, 정확도 경쟁이 아니다.</li>
+      <li>필요한 배경 지식은 2의 제곱수 / 응답 지연 / 가용성 세 가지.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-13" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-2</div>
+    <h3>2의 제곱수</h3>
+    <p class="item-tagline">데이터 볼륨 단위를 2의 거듭제곱으로 읽는 감각.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    2<sup>10</sup>씩 올라갈 때마다 <b>한 단위씩 커지고 대략 1,000배가 된다</b>는 것만 기억하면 나머지는 따라온다.
+  </div>
+
+  <ul>
+    <li>최소 단위는 1바이트이며 8비트로 구성된다.</li>
+    <li>ASCII 문자 하나가 차지하는 크기가 1바이트다.</li>
+  </ul>
+
+  <h4>자주 쓰이는 볼륨 단위</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>2의 x 제곱</th><th>근사치</th><th>이름</th><th>축약형</th></tr></thead>
+      <tbody>
+        <tr><td class="t-center">10</td><td>1천</td><td>1킬로바이트</td><td class="t-center">1KB</td></tr>
+        <tr><td class="t-center">20</td><td>1백만</td><td>1메가바이트</td><td class="t-center">1MB</td></tr>
+        <tr><td class="t-center">30</td><td>10억</td><td>1기가바이트</td><td class="t-center">1GB</td></tr>
+        <tr><td class="t-center">40</td><td>1조</td><td>1테라바이트</td><td class="t-center">1TB</td></tr>
+        <tr><td class="t-center">50</td><td>1000조</td><td>1페타바이트</td><td class="t-center">1PB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">한글은 1바이트가 아니다 <span class="badge b-blue">보강</span></p>
+      <p>표의 전제인 "1문자 = 1바이트"는 ASCII 기준이다. UTF-8에서 한글 한 글자는 <b>3바이트</b>다. 13장 검색어 자동완성의 규모 추정이 "1문자 = 1바이트"를 가정하는데, 한글 서비스라면 저장소 추정치를 3배로 잡아야 한다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>2<sup>10</sup> ≈ 1천, 2<sup>20</sup> ≈ 1백만, 2<sup>30</sup> ≈ 10억 … 이 사다리만 외우면 된다.</li>
+      <li>1문자 = 1바이트는 ASCII 한정. 한글은 UTF-8에서 3바이트.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-14" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-3</div>
+    <h3>모든 개발자가 알아야 하는 응답지연 값</h3>
+    <p class="item-tagline">메모리와 디스크와 네트워크 사이에는 자릿수의 벽이 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    컴퓨터 안의 모든 연산은 응답 지연이 다르고, 그 차이는 배수가 아니라 <b>자릿수</b>다. 설계란 결국 비싼 층으로 내려가는 횟수를 줄이는 일이다.
+  </div>
+
+  <h4>결론</h4>
+  <ul>
+    <li>메모리는 빠르지만 디스크는 아직도 느리다.</li>
+    <li>디스크 탐색(seek)은 가능하면 피한다.</li>
+    <li>단순한 압축 알고리즘은 빠르다.</li>
+    <li>데이터를 인터넷으로 보내기 전에는 가능하면 압축한다.</li>
+    <li>데이터 센터는 보통 여러 지역에 분산돼 있고, 센터 간 데이터 전송에는 시간이 걸린다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 240" width="620" role="img" aria-label="연산별 응답지연 자릿수 비교 막대 그래프">
+        <text x="8" y="18" class="dg-text-sub" font-size="11">응답지연 (로그 스케일 / 나노초)</text>
+
+        <text x="8" y="48" class="dg-text dg-mono" font-size="11">L1 캐시 참조</text>
+        <rect x="180" y="38" width="40" height="13" rx="3" class="dg-fill-soft dg-stroke"/>
+        <text x="228" y="48" class="dg-text-sub dg-mono" font-size="10">0.5 ns</text>
+
+        <text x="8" y="74" class="dg-text dg-mono" font-size="11">주 메모리 참조</text>
+        <rect x="180" y="64" width="90" height="13" rx="3" class="dg-fill-soft dg-stroke"/>
+        <text x="278" y="74" class="dg-text-sub dg-mono" font-size="10">100 ns</text>
+
+        <text x="8" y="100" class="dg-text dg-mono" font-size="11">1KB 압축</text>
+        <rect x="180" y="90" width="140" height="13" rx="3" class="dg-fill-soft dg-stroke"/>
+        <text x="328" y="100" class="dg-text-sub dg-mono" font-size="10">10 µs</text>
+
+        <text x="8" y="126" class="dg-text dg-mono" font-size="11">SSD 랜덤 읽기</text>
+        <rect x="180" y="116" width="180" height="13" rx="3" class="dg-fill-soft dg-stroke"/>
+        <text x="368" y="126" class="dg-text-sub dg-mono" font-size="10">150 µs</text>
+
+        <text x="8" y="152" class="dg-text dg-mono" font-size="11">같은 IDC 왕복</text>
+        <rect x="180" y="142" width="210" height="13" rx="3" class="dg-fill-soft dg-stroke"/>
+        <text x="398" y="152" class="dg-text-sub dg-mono" font-size="10">0.5 ms</text>
+
+        <text x="8" y="178" class="dg-text dg-mono" font-size="11">디스크 탐색 (HDD)</text>
+        <rect x="180" y="168" width="270" height="13" rx="3" fill="var(--yellow)" opacity="0.55"/>
+        <text x="458" y="178" class="dg-text-sub dg-mono" font-size="10">10 ms</text>
+
+        <text x="8" y="204" class="dg-text dg-mono" font-size="11">대륙 간 왕복</text>
+        <rect x="180" y="194" width="340" height="13" rx="3" fill="var(--red)" opacity="0.5"/>
+        <text x="528" y="204" class="dg-text-sub dg-mono" font-size="10">150 ms</text>
+
+        <text x="8" y="230" class="dg-text-sub" font-size="10">막대 길이는 로그 스케일 — 실제 차이는 이보다 훨씬 크다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>메모리와 대륙 간 왕복 사이에는 백만 배의 간격이 있다</b> — 캐시를 두는 이유, CDN을 두는 이유, 압축하는 이유가 전부 이 그림 한 장에 들어 있다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메모리 ≪ SSD ≪ HDD 탐색 ≪ 대륙 간 네트워크 순으로 자릿수가 뛴다.</li>
+      <li>설계 판단의 상당수는 "이 요청이 어느 층까지 내려가는가"를 줄이는 문제로 환원된다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-4</div>
+    <h3>가용성에 관계된 수치들</h3>
+    <p class="item-tagline">99와 99.99 사이에는 하루와 5분의 차이가 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    가용성은 "9의 개수"로 말한다. 9가 하나 늘어날 때마다 <b>허용 다운타임이 10분의 1</b>이 되고, 비용은 그 반대로 뛴다.
+  </div>
+
+  <ul>
+    <li>고가용성은 시스템이 오랜 시간 지속적으로 중단 없이 운영될 수 있는 능력을 뜻한다.</li>
+    <li>대부분의 서비스는 99%에서 100% 사이의 값을 갖는다.</li>
+  </ul>
+
+  <h4>SLA (Service Level Agreement)</h4>
+  <ul>
+    <li>서비스 사업자가 통상적으로 사용하는 용어다.</li>
+    <li>서비스 사업자와 고객 사이에 맺어진 합의를 뜻한다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 "아마존, 구글, MS 등은 보통 99%의 SLA를 보장함"이라고 적혀 있지만, 실제 대형 클라우드 사업자의 SLA는 <b>99.9% 이상</b>이다. AWS EC2를 예로 들면 여러 가용 영역에 걸쳐 배포한 경우 리전 수준 SLA가 <b>99.99%</b>이고, 단일 인스턴스에 대한 인스턴스 수준 SLA도 <b>99.5%</b>다. (근거: <a href="https://aws.amazon.com/compute/sla/">Amazon Compute Service Level Agreement</a>)</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>가용성</th><th>하루당 다운타임</th><th>1년당 다운타임</th></tr></thead>
+      <tbody>
+        <tr><td class="t-center">99%</td><td>14.40분</td><td>3.65일</td></tr>
+        <tr><td class="t-center">99.9%</td><td>1.44분</td><td>8.77시간</td></tr>
+        <tr><td class="t-center">99.99%</td><td>8.64초</td><td>52.60분</td></tr>
+        <tr><td class="t-center">99.999%</td><td>864밀리초</td><td>5.26분</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>SLA는 사업자와 고객 사이의 가용성 약속이다.</li>
+      <li>대형 클라우드는 99% 가 아니라 99.9%~99.99% 급을 약속한다.</li>
+      <li>9 하나가 늘 때마다 허용 다운타임은 1/10로 줄어든다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-16" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-5</div>
+    <h3>트위터 QPS와 저장소 요구량 추정</h3>
+    <p class="item-tagline">가정을 적고 → 나누고 → 곱한다. 이게 전부다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    추정의 절차는 언제나 같다. <b>가정을 명시 → 일일 총량 → 초당 총량 → 최대치는 평균의 2배</b>.
+  </div>
+
+  <h4>가정</h4>
+  <ul>
+    <li>월간 능동 사용자(MAU)는 3억 명.</li>
+    <li>그중 50%가 매일 트위터를 사용.</li>
+    <li>평균적으로 사용자당 매일 2건의 트윗 작성.</li>
+    <li>미디어를 포함하는 트윗은 약 10%.</li>
+    <li>데이터는 5년간 보관.</li>
+  </ul>
+
+  <h4>QPS 추정치</h4>
+  <ul>
+    <li>일간 능동 사용자(DAU) = 3억 × 50% = <b>1.5억 명</b></li>
+    <li>QPS = 1.5억 × 2 트윗 ÷ 24시간 ÷ 3600초 ≈ <b>3,500</b></li>
+    <li>최대 QPS = 2 × QPS ≈ <b>7,000</b></li>
+  </ul>
+
+  <h4>미디어 저장을 위한 저장소 요구량</h4>
+  <ul>
+    <li>평균 트윗 크기 — <code>tweet_id</code> 64바이트, <code>text</code> 140바이트, <code>media</code> 1MB</li>
+    <li>미디어 저장소 요구량 = 1.5억 × 2 × 10% × 1MB = <b>30TB/일</b></li>
+    <li>5년간 보관 = 30TB × 365 × 5 = <b>54,750TB (약 55PB)</b></li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["MAU 3억"] -->|"× 50%"| B["DAU 1.5억"]
+  B -->|"× 2 트윗"| C["일 3억 트윗"]
+  C -->|"÷ 86400초"| D["QPS 약 3,500"]
+  D -->|"× 2"| E["최대 QPS 약 7,000"]
+  C -->|"× 10% × 1MB"| F["30TB / 일"]
+  F -->|"× 365 × 5"| G["약 55PB / 5년"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>모든 추정은 이 한 줄기를 탄다</b> — 사용자 수에서 출발해 한쪽은 QPS로, 다른 한쪽은 저장 용량으로 갈라진다. 8/13/14/15장의 규모 추정이 전부 이 형태다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">텍스트는 왜 계산에서 빠졌나 <span class="badge b-blue">보강</span></p>
+      <p>트윗 본문은 트윗당 약 200바이트 남짓이라 하루 60GB 수준이다. 미디어의 30TB에 비하면 무시할 만한 값이라 계산에서 생략됐다. 추정에서는 <b>지배적인 항 하나만 남기고 나머지는 버리는</b> 것이 정석이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>MAU → DAU → 일 총량 → 초당 총량 → 최대치(×2) 순으로 내려간다.</li>
+      <li>저장소는 일 용량 × 보관 일수로 곱해 올린다.</li>
+      <li>지배적이지 않은 항은 과감히 버린다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-17" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-6</div>
+    <h3>추정을 잘하는 팁</h3>
+    <p class="item-tagline">면접관이 보는 것은 답이 아니라 절차다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    중요한 것은 문제를 풀어 나가는 절차다. 완벽한 수치가 아니라 <b>올바른 절차를 밟는지</b>가 평가 대상이다.
+  </div>
+
+  <h4>근사치를 활용한 계산</h4>
+  <ul>
+    <li>99,987 ÷ 9.1 같은 복잡한 연산 대신 100,000 ÷ 10을 쓴다.</li>
+    <li>나중에 다시 볼 수 있도록 가정을 적어 둔다.</li>
+    <li>KB, MB 같은 단위를 반드시 붙인다.</li>
+    <li>자주 출제되는 부분(QPS, 저장 용량, 대역폭)은 미리 연습해 둔다.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">면접에서 자주 묻는 세 가지</p>
+      <p><b>QPS / 최대 QPS / 저장소 요구량</b>. 여기에 캐시에 담을 데이터 양과 필요한 서버 대수가 따라붙는다. 앞의 세 가지에서 뒤의 둘은 대개 자동으로 나온다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>답보다 절차. 가정을 소리 내어 적고 근사치로 계산한다.</li>
+      <li>단위를 붙이지 않은 숫자는 검산이 불가능하다.</li>
+      <li>QPS / 최대 QPS / 저장 용량 세 가지는 손에 익혀 둔다.</li>
+    </ul>
+  </div>
+</article>

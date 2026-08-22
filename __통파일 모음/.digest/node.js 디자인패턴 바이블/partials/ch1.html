@@ -1,0 +1,393 @@
+<article class="item" id="item-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-1</div>
+    <h3>Node.js 철학</h3>
+    <p class="item-tagline">"작게 만들어라"는 취향이 아니라 플랫폼 전체를 지탱하는 설계 결정이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    코어를 작게 유지했기 때문에 npm 생태계가 자랄 수 있었고, 모듈을 작게 유지했기 때문에
+    <b>같은 라이브러리의 다른 버전이 한 프로젝트 안에 공존</b>할 수 있다. 두 결정은 하나의 사슬이다.
+  </div>
+
+  <h4>경량 코어</h4>
+  <ul>
+    <li>Node.js는 최소한의 기능 세트만 코어에 담고, 나머지는 사용자 영역의 모듈 생태계에 맡겼다.</li>
+    <li>이는 코어 관리의 편의를 넘어 <b>생태계 전체의 진화 속도</b>에 긍정적인 문화적 영향을 미쳤다.
+      코어에 들어가지 않은 기능은 여러 구현이 경쟁할 수 있고, 경쟁은 더 나은 API를 만든다.</li>
+  </ul>
+
+  <h4>경량 모듈</h4>
+  <ul>
+    <li>코드를 구성하는 기본 수단으로 <b>모듈</b> 개념을 사용한다.</li>
+    <li>코드의 양뿐 아니라 <b>범위(scope)</b>의 측면에서도 작게 설계하는 것이 원칙이다.
+      "한 가지 일만 하는 모듈"이 곧 좋은 모듈이다.</li>
+    <li>각 패키지가 자신이 필요한 버전을 개별로 관리하기 때문에 종속성 지옥에서 벗어날 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  APP["내 앱"] --> A["패키지 A"]
+  APP --> B["패키지 B"]
+  A --> L1["lodash@3"]
+  B --> L2["lodash@4"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>중첩된 node_modules 가 종속성 지옥을 없앤다</b> — A 와 B 가 서로 다른 버전의 lodash 를 요구해도,
+      각자의 <code>node_modules</code> 안에 자기 버전을 갖기 때문에 충돌하지 않는다. 대신 중복 설치라는 비용을 지불한다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>버전이 호환되면 npm 은 같은 패키지를 최상위 <code>node_modules</code> 로 끌어올려 하나만 설치한다(hoisting).
+        중첩 설치는 <b>호환되지 않을 때만</b> 일어나는 폴백이다. 그래서 "무조건 중복된다"고 이해하면 실제 트리를 봤을 때 헷갈린다.</p>
+    </div>
+  </div>
+
+  <h4>작은 외부 인터페이스</h4>
+  <ul>
+    <li>Node.js 모듈의 장점은 작은 사이즈, 작은 범위, <b>최소한의 기능 노출</b>이다.</li>
+    <li>명백한 단일 진입점을 제공하기 위해 단 하나의 함수나 클래스를 노출한다.</li>
+    <li>모듈은 <b>확장되기보다 사용되기 위해</b> 만들어졌다. 내부를 외부에 노출시키지 않으려고
+      클래스보다 함수를 노출하는 쪽을 선호한다.</li>
+  </ul>
+
+  <h4>간결함과 실용주의</h4>
+  <ul>
+    <li>모든 기능을 갖춘 완벽한 소프트웨어와는 반대로, <b>단순하게 설계하는 것</b>이 좋은 실천이다.</li>
+    <li>실제로 복잡한 클래스 계층을 대체하기 위해 간단한 클래스나 함수, 클로저를 사용한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 챕터가 나중에 어디서 돌아오는가 <span class="badge b-blue">보강</span></p>
+      <p>"클래스 계층 대신 함수와 클로저"라는 원칙은 7장에서 <b>팩토리</b>와 <b>공개 생성자</b>로,
+        "작은 외부 인터페이스"는 2장의 <b>모듈 정의 패턴</b>으로 다시 등장한다.
+        이 챕터는 선언문이고, 나머지 챕터가 그 증명이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>경량 코어 → 생태계에 위임 → npm 이 사실상의 표준 라이브러리가 됨</li>
+      <li>경량 모듈 → 범위를 작게 → 버전 공존이 가능해져 종속성 지옥 회피</li>
+      <li>작은 외부 인터페이스 → 단일 진입점 → 확장보다 사용을 전제로 설계</li>
+      <li>간결함 → 클래스 계층 대신 함수/클로저 → 이후 모든 패턴 구현의 기본 톤</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-2</div>
+    <h3>Node.js는 어떻게 작동할까</h3>
+    <p class="item-tagline">느린 I/O를 스레드로 때우지 않기 위해, 운영체제의 이벤트 통지 인터페이스 위에 리액터 패턴을 얹었다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    Node.js의 동시성은 <b>"기다리지 않는 것"</b>에서 나온다. 스레드를 늘려 대기 시간을 병렬화하는 대신,
+    대기 자체를 운영체제에 위임하고 완료 통지만 받아 콜백을 실행한다.
+  </div>
+
+  <h4>I/O는 느리다</h4>
+  <p>I/O는 컴퓨터의 기본 동작 중 가장 느리다. RAM 접근은 나노초, 디스크와 네트워크는 밀리초 단위다.
+    이 격차가 이후의 모든 설계를 강제한다.</p>
+
+  <h4>블로킹 I/O</h4>
+  <ul>
+    <li>I/O를 요청하는 함수가 작업이 완료될 때까지 <b>스레드의 실행을 차단</b>한다.</li>
+    <li>무거운 작업의 경우 몇 분씩 걸리기도 한다.</li>
+    <li>블로킹을 해결하는 전통적인 방법은 개별 스레드 또는 프로세스를 사용하는 것이다.</li>
+    <li>하지만 작업 간 CPU 유휴 시간이 증가하고, 이는 귀중한 메모리와 CPU를 낭비하게 된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">blocking.ts</span>
+      <span class="code-tag bad">스레드가 멈춘다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const data = socket.read(); // 작업이 끝날 때까지 대기
+
+print(data);</code></pre>
+  </div>
+
+  <h4>논 블로킹 I/O</h4>
+  <ul>
+    <li>이 운영 모드에서 시스템 호출은 데이터 읽기/쓰기를 기다리지 않고 <b>항상 즉시 반환</b>한다.</li>
+    <li>호출하는 순간 데이터가 없다면, 아직 작업이 끝나지 않아 사용 가능한 데이터가 없다는 것을 알린다.</li>
+    <li>가장 기본적인 패턴은 루프 안에서 리소스를 계속 폴링하는 방식이며 <b>바쁜 대기(busy-waiting)</b>라고 부른다.</li>
+    <li>단점은 사용 불가능한 리소스를 계속해서 반복하므로 <b>CPU 시간의 낭비</b>를 초래한다는 것이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">busy-waiting.ts</span>
+      <span class="code-tag bad">CPU를 태운다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const resources = [socketA, socketB, socketC];
+while (!resources.isEmpty()) {
+  for (const resource of resources) {
+    const data = resource.read();
+    if (data === "NO_DATA_AVAILABLE") {
+      // 읽을 데이터가 없음
+      continue;
+    }
+
+    if (data === "RESOURCE_CLOSED") {
+      // 리소스가 닫힘
+      resources.remove(resource);
+    } else {
+      // 데이터를 받고 처리함
+      consumeData(data);
+    }
+  }
+}</code></pre>
+  </div>
+
+  <h4>이벤트 디멀티플렉싱</h4>
+  <ul>
+    <li>바쁜 대기는 논 블로킹 리소스 처리를 위한 이상적인 방법이 아니다.</li>
+    <li>다행히 대부분의 운영체제는 논 블로킹 리소스를 효율적으로 다루기 위한 방법을 제공한다.
+      이를 <b>동기 이벤트 디멀티플렉서</b> 또는 <b>이벤트 통지 인터페이스</b>라고 부른다.</li>
+    <li>여러 개의 리소스를 관찰하고, 이 리소스들 중 읽기/쓰기 연산이 완료되면 새로운 이벤트를 반환하는 방법이다.</li>
+    <li>단일 스레드로 처리할 때는 동시성 이슈 등 다양한 문제가 존재한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">demultiplexer.ts</span>
+      <span class="code-tag good">한 번만 블로킹된다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">const watchedList = [];
+watchedList.push(socketA, FOR_READ);
+watchedList.push(fileB, FOR_READ);
+
+while ((events = demultiplexer.watch(watchedList))) {
+  for (const event of events) {
+    data = event.resource.read();
+    if (data === "RESOURCE_CLOSED") {
+      demultiplexer.unwatch(event.resource);
+    } else {
+      consumeData(data);
+    }
+  }
+}</code></pre>
+  </div>
+
+  <ol class="steps">
+    <li><div class="step-title">각 작업이 관찰 리스트에 추가된다</div>
+      <p>어떤 리소스를, 어떤 연산(읽기/쓰기)에 대해 관찰할지 등록한다.</p></li>
+    <li><div class="step-title">준비된 리소스가 생기면 이벤트가 반환된다</div>
+      <p>이때 디멀티플렉서는 <b>동기식으로</b> 블로킹한다. 관찰 중인 리소스 중 준비된 것이 하나도 없으면 거기서 멈춰 기다린다.
+        바쁜 대기와의 결정적 차이가 여기다 — CPU를 쓰지 않고 기다린다.</p></li>
+    <li><div class="step-title">반환된 이벤트가 처리된다</div>
+      <p>각 이벤트와 관련된 리소스는 <b>읽을 준비가 되어 있고 블로킹되지 않는 것이 보장</b>된다.
+        이 반복 전체를 <b>이벤트 루프</b>라고 부른다.</p></li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>여기서 말하는 "동기 이벤트 디멀티플렉서"의 실제 구현체가 리눅스의 <code>epoll</code>,
+        macOS/BSD 의 <code>kqueue</code>, 솔라리스의 <code>event ports</code>, 윈도우의 <code>IOCP</code> 다.
+        API 이름이 전부 다르고 동작 모델도 미묘하게 달라서, 바로 다음에 나올 libuv 가 필요해진다.</p>
+    </div>
+  </div>
+
+  <h4>리액터(Reactor) 패턴</h4>
+  <p>주된 아이디어는 <b>각 I/O 작업에 연관된 핸들러를 갖는다</b>는 것이며, Node.js에서 핸들러는 곧 콜백 함수다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant App as 애플리케이션
+  participant EDM as 이벤트 디멀티플렉서
+  participant EQ as 이벤트 큐
+  participant EL as 이벤트 루프
+  App->>EDM: 1. I/O 요청 + 핸들러 등록 (논 블로킹)
+  Note over App: 제어권을 즉시 돌려받음
+  EDM->>EQ: 2. 작업 완료 시 이벤트 투입
+  EL->>EQ: 3. 큐를 순회하며 꺼냄
+  EL->>App: 4. 핸들러(콜백) 호출
+  App-->>EL: 5. 실행 완료 후 제어권 반환
+  Note over EL,EDM: 큐가 비면 이벤트 루프는 디멀티플렉서에서 블로킹
+      </pre>
+    </div>
+    <div class="figure-cap"><b>리액터 패턴의 한 사이클</b> — 애플리케이션은 요청과 핸들러를 던지고 즉시 제어권을 돌려받는다.
+      완료 통지는 이벤트 큐를 거쳐 이벤트 루프가 꺼내 핸들러를 호출한다. 큐가 비면 루프는 디멀티플렉서에서 블로킹되고,
+      새 작업이 추가되면 이 과정이 반복된다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이벤트 루프가 멈추는 유일한 방법</p>
+      <p>이벤트 큐가 비고 관찰 중인 리소스도 없으면 프로세스가 종료된다.
+        반대로 <b>핸들러가 오래 걸리면 그동안 다른 어떤 핸들러도 실행되지 않는다</b>.
+        11장의 CPU 바운드 작업 문제가 정확히 이 지점에서 발생한다.</p>
+    </div>
+  </div>
+
+  <h4>libuv, Node.js의 I/O 엔진</h4>
+  <ul>
+    <li>운영체제마다 논 블로킹 I/O를 구성하는 방법이 전부 다르다.</li>
+    <li>이러한 불일치 때문에 이벤트 디멀티플렉서를 위한 <b>더 높은 레벨의 추상화</b>가 필요해진다.</li>
+    <li>Node.js는 그 역할로 <b>libuv</b>를 사용하며, 이는 가장 중요한 구성 요소다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>모든 것이 논 블로킹 통지로 처리되는 것은 아니다. 파일 시스템 접근이나 DNS 조회, <code>zlib</code> 압축처럼
+        OS 가 논 블로킹을 제대로 지원하지 않는 작업은 libuv 가 내부 <b>스레드 풀</b>에 넘겨 처리한다.
+        기본 크기는 4이며 <code>UV_THREADPOOL_SIZE</code> 로 조정한다.
+        "Node.js는 싱글 스레드"라는 말은 <b>자바스크립트 실행이</b> 싱글 스레드라는 뜻이다.</p>
+    </div>
+  </div>
+
+  <h4>Node.js를 위한 구성</h4>
+  <p>libuv 도 중요하지만, Node.js를 이루려면 그 외 세 개의 구성 요소가 더 필요하다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구성 요소</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr><td><b>libuv</b></td><td>OS 별 이벤트 디멀티플렉서를 추상화한 I/O 엔진</td></tr>
+        <tr><td><b>바인딩 세트</b></td><td>libuv 와 다른 저수준 기능들을 래핑해 자바스크립트로 표출</td></tr>
+        <tr><td><b>V8</b></td><td>크롬을 위해 구글이 개발한 자바스크립트 엔진</td></tr>
+        <tr><td><b>코어 JS 라이브러리</b></td><td>고수준 Node.js API(<code>fs</code>, <code>http</code> 등)를 구현</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>I/O가 느리다 → 블로킹하면 스레드가 논다 → 스레드를 늘리면 메모리/컨텍스트 스위칭 비용</li>
+      <li>논 블로킹 + 바쁜 대기 → CPU 낭비 → OS의 이벤트 디멀티플렉서로 해결</li>
+      <li>리액터 패턴 = 각 I/O 요청에 핸들러(콜백)를 붙이고, 완료 이벤트를 이벤트 루프가 꺼내 호출</li>
+      <li>libuv 는 OS 별 디멀티플렉서를 추상화한 계층. Node = libuv + 바인딩 + V8 + 코어 JS 라이브러리</li>
+      <li>핸들러가 오래 걸리면 루프 전체가 멈춘다는 점이 이 모델의 유일하고 결정적인 약점이다</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">1-3</div>
+    <h3>Node.js의 자바스크립트</h3>
+    <p class="item-tagline">언어는 같지만 실행 환경이 다르다. 없는 것과 더 있는 것을 구분해 두어야 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    브라우저는 <b>실행 환경을 고를 수 없어서</b> 트랜스파일과 폴리필이 필요하고,
+    Node.js는 <b>실행 환경을 고를 수 있어서</b> 최신 문법을 그대로 쓰는 대신 버전을 명시할 책임이 생긴다.
+  </div>
+
+  <h4>Node.js에서의 자바스크립트</h4>
+  <ul>
+    <li>Node.js와 브라우저에서 사용하는 자바스크립트는 서로 다르다.</li>
+    <li>Node.js에는 <code>DOM</code>, <code>window</code>, <code>document</code> 가 없다.</li>
+    <li>브라우저에서는 OS 레벨 접근이 불가능하지만 Node.js는 가능하다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 220" width="460" role="img" aria-label="브라우저와 Node.js의 공통 영역과 고유 영역을 나타낸 벤 다이어그램">
+        <circle cx="175" cy="110" r="85" class="venn-a"/>
+        <circle cx="285" cy="110" r="85" class="venn-b"/>
+        <circle cx="175" cy="110" r="85" class="venn-a-s"/>
+        <circle cx="285" cy="110" r="85" class="venn-b-s"/>
+        <text x="112" y="100" class="dg-text dg-mono" font-size="12" text-anchor="middle">DOM</text>
+        <text x="112" y="118" class="dg-text dg-mono" font-size="12" text-anchor="middle">window</text>
+        <text x="112" y="136" class="dg-text dg-mono" font-size="12" text-anchor="middle">document</text>
+        <text x="230" y="96" class="dg-text dg-mono" font-size="12" text-anchor="middle">ECMAScript</text>
+        <text x="230" y="114" class="dg-text dg-mono" font-size="12" text-anchor="middle">Promise</text>
+        <text x="230" y="132" class="dg-text dg-mono" font-size="12" text-anchor="middle">fetch</text>
+        <text x="348" y="100" class="dg-text dg-mono" font-size="12" text-anchor="middle">fs / net</text>
+        <text x="348" y="118" class="dg-text dg-mono" font-size="12" text-anchor="middle">process</text>
+        <text x="348" y="136" class="dg-text dg-mono" font-size="12" text-anchor="middle">Buffer</text>
+        <text x="120" y="30" class="dg-text-sub" font-size="11" text-anchor="middle">브라우저</text>
+        <text x="340" y="30" class="dg-text-sub" font-size="11" text-anchor="middle">Node.js</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>겹치는 부분은 언어, 갈라지는 부분은 환경이다</b> — 10장의 "범용 자바스크립트"는
+      결국 이 교집합 위에서만 코드를 공유하고, 양쪽 날개는 어댑터나 모듈 스와핑으로 갈아 끼우는 이야기다.</div>
+  </div>
+
+  <h4>최신 자바스크립트 실행시키기</h4>
+  <ul>
+    <li>브라우저에서 돌아가는 자바스크립트는 최신이라고 확정할 수 없다. 다행히 트랜스파일러와 폴리필 덕분에 이런 호환 문제는 많이 줄어들었다.</li>
+    <li>Node.js는 <b>내가 고른 런타임 위에서</b> 작동하기 때문에 이런 문제가 훨씬 적다.</li>
+    <li>그래도 문제가 있으므로, 지원 중인 LTS 버전을 기준으로 <code>package.json</code> 의 <code>engines</code> 섹션에 명시하는 것을 권장한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">package.json</span>
+      <span class="code-tag good">권장</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">{
+  "engines": {
+    "node": "&gt;=22.0.0"
+  }
+}</code></pre>
+  </div>
+
+  <h4>모듈 시스템</h4>
+  <ul>
+    <li>이전에는 <b>CommonJS</b>라고 불리는 구형 모듈 시스템을 사용했다.</li>
+    <li>브라우저에서는 Webpack, Rollup 같은 번들러가 유행했다.</li>
+    <li>요즘은 <b>ESM</b>이라 불리는 모듈 문법이 표준이다.</li>
+    <li>브라우저는 원격지에 있는 모듈도 다룰 수 있지만, Node는 로컬에 있는 모듈만 다룬다.</li>
+  </ul>
+
+  <h4>운영체제 기능에 대한 모든 접근</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>모듈</th><th>할 수 있는 일</th></tr></thead>
+      <tbody>
+        <tr><td><code>fs</code></td><td>파일 시스템 제어</td></tr>
+        <tr><td><code>net</code> / <code>dgram</code></td><td>TCP, UDP 소켓 사용</td></tr>
+        <tr><td><code>http</code></td><td>웹 서버 제작</td></tr>
+        <tr><td><code>process</code></td><td>프로세스 정보와 제어(인자, 환경변수, 종료 등)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>네이티브 코드 실행</h4>
+  <ul>
+    <li>레거시 C/C++ 코드도 실행할 수 있다(네이티브 애드온).</li>
+    <li>또한 웹어셈블리(WASM)도 지원한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>Node에는 DOM/window/document 가 없고, 대신 OS 레벨 접근(fs, net, process)이 있다</li>
+      <li>런타임을 고를 수 있으므로 최신 문법을 그대로 쓸 수 있지만, <code>engines</code> 로 버전을 못 박아 두는 것이 안전하다</li>
+      <li>모듈 시스템은 CJS → ESM 으로 이동 중이며, Node 는 로컬 모듈만 다룬다</li>
+      <li>네이티브 애드온과 WASM 으로 C/C++ 자산도 끌어올 수 있다</li>
+    </ul>
+  </div>
+</article>

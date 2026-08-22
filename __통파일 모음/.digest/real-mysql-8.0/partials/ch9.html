@@ -1,0 +1,1754 @@
+<article class="item" id="item-9-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">9-1</div>
+    <h3>개요</h3>
+    <p class="item-tagline">쿼리 실행은 세 단계다 — <b>파싱 · 최적화 · 데이터 가져오기</b>. 앞의 둘은 MySQL 엔진의 몫이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    현대 RDBMS의 옵티마이저는 <b>비용 기반(CBO)</b> 이다. 즉 실행 계획은 <b>통계 정보의 함수</b>이고, 통계가 틀리면 계획도 틀린다.
+  </div>
+
+  <h4>쿼리 실행 절차</h4>
+  <ul>
+    <li>SQL 파싱과 실행 계획 수립은 <b>MySQL 엔진</b>에서 처리한다.</li>
+    <li>마지막 데이터를 가져오는 부분만 MySQL 엔진과 스토리지 엔진이 <b>함께</b> 처리한다.</li>
+  </ul>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title">SQL 파싱</div>
+      <p>요청된 SQL 문장을 쪼개서 DB 서버가 이해할 수 있는 수준으로 분리한다. 내장 SQL Parser가 담당한다.</p>
+    </li>
+    <li>
+      <div class="step-title">최적화 및 실행 계획 수립</div>
+      <p>파싱 과정에서 만들어진 트리를 기반으로 실행 계획을 만든다. 불필요한 조건 제거, 연산 단순화, 테이블 접근 순서, 인덱스 선택 등을 결정한다. <b>옵티마이저</b>의 일이다.</p>
+    </li>
+    <li>
+      <div class="step-title">데이터 가져오기</div>
+      <p>수립된 계획대로 스토리지 엔진에 레코드 읽기를 요청하고, 가져온 데이터로 조인·정렬 등을 수행한다.</p>
+    </li>
+  </ol>
+
+  <h4>옵티마이저의 종류</h4>
+  <p>옵티마이저는 DB 서버에서 <b>사람의 두뇌</b>에 해당한다. 크게 두 방식으로 나뉜다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>판단 근거</th><th>같은 쿼리의 계획</th><th>현재</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>규칙 기반 (RBO)</td>
+          <td>옵티마이저에 <b>내장된 우선순위</b></td>
+          <td>거의 항상 동일</td>
+          <td class="t-center t-no">요즘은 거의 쓰지 않음</td>
+        </tr>
+        <tr>
+          <td>비용 기반 (CBO)</td>
+          <td>단위 작업 비용 + <b>테이블 통계 정보</b></td>
+          <td>데이터 분포에 따라 달라짐</td>
+          <td class="t-center t-ok">대부분의 RDBMS가 채택</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li><b>RBO</b> — 통계 정보 없이 계획을 수립하므로 예측 가능하지만, 데이터 특성을 전혀 반영하지 못한다.</li>
+    <li><b>CBO</b> — 각 실행 계획별로 비용을 산출하고 <b>비용이 최소인 방식</b>을 채택한다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">이 챕터를 읽는 틀 <span class="badge b-blue">보강</span></p>
+      <p>CBO라는 사실 하나가 이 챕터 전체를 설명한다. 실행 계획이 이상하다면 원인은 셋 중 하나다 — ① <a href="#item-10-1">통계 정보가 부정확</a>하거나, ② 비용 모델이 현실과 안 맞거나, ③ 애초에 <b>더 나은 계획을 만들 인덱스가 없거나</b>. 힌트는 이 셋 중 어느 것도 고치지 못하고, 그저 결과를 덮어쓸 뿐이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>파싱과 최적화는 MySQL 엔진, 데이터 읽기만 스토리지 엔진과 협업.</li>
+      <li>MySQL은 <b>비용 기반 옵티마이저</b> — 통계 정보가 계획을 만든다.</li>
+      <li>계획이 마음에 안 들면 먼저 <b>통계와 인덱스</b>를 의심하고, 힌트는 마지막 수단이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">9-2</div>
+    <h3>기본 데이터 처리</h3>
+    <p class="item-tagline">풀 스캔 · 정렬 · 그루핑 · DISTINCT · 임시 테이블 — 옵티마이저가 쓰는 기본 도구 다섯 가지.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>ORDER BY</code> 와 <code>GROUP BY</code> 는 <b>스트리밍 처리를 버퍼링 처리로 바꾼다.</b> 인덱스로 처리되면 다시 스트리밍이 되고, 그것이 <code>LIMIT</code> 최적화의 전부다.
+  </div>
+
+  <h4>풀 테이블 스캔과 풀 인덱스 스캔</h4>
+
+  <h5>풀 테이블 스캔</h5>
+  <p>인덱스를 쓰지 않고 테이블의 데이터를 처음부터 끝까지 읽는 방식이다. 다음 경우에 선택된다.</p>
+  <ul>
+    <li>레코드가 별로 없어서 <b>인덱스보다 풀 스캔이 빠른</b> 경우</li>
+    <li><code>WHERE</code>, <code>ON</code> 절에 적절한 조건이 없는 경우</li>
+    <li>레인지 스캔이 가능하지만, 옵티마이저 판단에 <b>조건 일치 레코드가 너무 많은</b> 경우</li>
+  </ul>
+
+  <h5>풀 테이블 스캔은 페이지를 하나씩 읽을까 — read ahead</h5>
+  <ul>
+    <li>InnoDB는 연속된 데이터 페이지가 읽히면 백그라운드 스레드가 <b>read ahead</b> 작업을 시작한다.</li>
+    <li>read ahead는 <b>앞으로 필요할 영역을 예측해 미리 버퍼 풀에 올려 두는</b> 작업이다.</li>
+    <li>처음에는 포그라운드 스레드가 읽지만, 이후 4개 → 8개 씩 늘려 가며 읽는다.</li>
+    <li>최대 <b>64개의 데이터 페이지</b>까지 미리 읽어 버퍼 풀에 올린다.</li>
+  </ul>
+  <p><code>innodb_read_ahead_threshold</code> 로 임계값을 조정한다. 일반적인 OLTP 서비스는 기본값으로 충분하고, 데이터 웨어하우스라면 더 낮게 잡는 것도 방법이다.</p>
+
+  <h5>풀 인덱스 스캔</h5>
+  <ul>
+    <li>쿼리에 <b>모든 컬럼이 필요하지 않다면</b> 풀 인덱스 스캔이 더 낫다.</li>
+    <li>read ahead는 동일하게 작동한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">-- 풀 인덱스 스캔 (인덱스만 읽으면 된다)
+SELECT COUNT(*) FROM tb_test;
+
+-- 풀 테이블 스캔 (모든 컬럼이 필요하다)
+SELECT * FROM tb_test;</code></pre>
+  </div>
+
+  <h4>병렬 처리</h4>
+  <ul>
+    <li><code>WHERE</code> 조건 없이 <b>전체 테이블을 단순 조회</b>하는 경우에 쓸 수 있다.</li>
+    <li>보유한 CPU보다 많이 설정하면 오히려 성능이 저하된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SET SESSION innodb_parallel_read_threads = 1;
+mysql&gt; SELECT COUNT(*) FROM employees;   -- 1 row in set (0.08 sec)
+
+mysql&gt; SET SESSION innodb_parallel_read_threads = 2;
+mysql&gt; SELECT COUNT(*) FROM employees;   -- 1 row in set (0.04 sec)
+
+mysql&gt; SET SESSION innodb_parallel_read_threads = 4;
+mysql&gt; SELECT COUNT(*) FROM employees;   -- 1 row in set (0.05 sec)</code></pre>
+  </div>
+  <p>2에서 4로 늘려도 더 빨라지지 않았다. 병렬도를 올린다고 계속 좋아지지 않는다는 것을 보여 주는 결과다.</p>
+
+  <h4>ORDER BY 처리 (Using filesort)</h4>
+  <p>레코드를 1~2건만 가져오는 쿼리가 아니라면 정렬은 거의 필수다. 정렬은 <b>인덱스를 쓰는 방법</b>과 <b>Filesort</b> 두 갈래다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>장점</th><th>단점</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>인덱스 사용</td>
+          <td>이미 정렬되어 있어 <b>읽기만 하면 된다</b> — 매우 빠름</td>
+          <td>데이터 수정 시 추가 작업, 디스크 공간과 버퍼 풀 메모리 소모</td>
+        </tr>
+        <tr>
+          <td>Filesort</td>
+          <td>인덱스를 만들지 않아도 됨. 레코드가 적으면 <b>메모리에서 정렬</b>되어 빠름</td>
+          <td>레코드가 많아지면 <b>응답 속도가 급격히 느려짐</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>소트 버퍼</h5>
+  <ul>
+    <li>정렬을 위한 <b>별도의 메모리 공간</b>이며, 정렬이 필요할 때만 할당된다.</li>
+    <li>레코드 크기에 따라 가변적이고, <code>sort_buffer_size</code> 로 최댓값을 설정한다.</li>
+    <li>정렬할 레코드가 버퍼보다 크면 <b>여러 조각으로 나누는데</b>, 이때 임시 저장을 위해 디스크 공간이 필요해진다.</li>
+  </ul>
+
+  <h5>Multi Merge</h5>
+  <ul>
+    <li>소트 버퍼에서 정렬 → 디스크에 저장 → 반복 → 다시 저장.</li>
+    <li>각 버퍼만큼 정렬된 조각들을 <b>병합하면서</b> 최종 정렬을 수행하는데, 이를 <b>멀티 머지</b> 라고 한다.</li>
+    <li>이 작업은 전부 <b>디스크 I/O를 유발</b>한다.</li>
+  </ul>
+
+  <h5>버퍼 크기와 성능</h5>
+  <ul>
+    <li>메모리를 아무리 많이 할당해도 <b>성능은 비슷하다.</b></li>
+    <li>일반적인 경우 <b>256KB ~ 1MB 미만</b>을 권장한다.</li>
+    <li>최댓값을 너무 크게 잡아 OOM이 발생하면 OOM-Killer가 프로세스를 강제 종료한다.
+      <ul><li>우선순위는 <b>메모리를 가장 많이 쓰는 프로세스</b> — 즉 MySQL 자신이 죽는다.</li></ul>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 권장 크기가 "<b>56KB</b> ~ 1MB 미만"으로 적혀 있는데, <code>sort_buffer_size</code> 의 기본값이 <b>256KB(262144)</b> 이고 책의 권장 범위도 256KB~1MB이다. 5가 빠진 오기로 보인다.</p>
+    </div>
+  </div>
+
+  <h5>정렬 알고리즘</h5>
+  <p>소트 버퍼에 <b>레코드 전체를 담을지, 정렬 기준 컬럼만 담을지</b> 에 따라 싱글 패스와 투 패스로 나뉜다. 어느 쪽을 쓰는지는 옵티마이저 트레이스로 확인할 수 있다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>sort_mode</th><th>담는 내용</th><th>방식</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;sort_key, rowid&gt;</code></td><td>정렬 키 + 레코드의 rowid</td><td>투 패스</td></tr>
+        <tr><td><code>&lt;sort_key, additional_fields&gt;</code></td><td>정렬 키 + 레코드 전체 (<b>고정 사이즈</b> 메모리)</td><td>싱글 패스</td></tr>
+        <tr><td><code>&lt;fixed_sort_key, packed_additional_fields&gt;</code></td><td>정렬 키 + 레코드 전체 (<b>가변 사이즈</b> 메모리)</td><td>싱글 패스</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">옵티마이저 트레이스로 확인</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SET OPTIMIZER_TRACE="enabled=on", END_MARKERS_IN_JSON="on";
+
+mysql&gt; SELECT * FROM employees ORDER BY last_name LIMIT 100000,1;
++--------+------------+------------+-----------+--------+------------+
+| emp_no | birth_date | first_name | last_name | gender | hire_date  |
++--------+------------+------------+-----------+--------+------------+
+| 418804 | 1958-01-06 | Jacopo     | Gyimothy  | F      | 1997-06-20 |
++--------+------------+------------+-----------+--------+------------+
+1 row in set (0.22 sec)
+
+mysql&gt; SELECT * FROM INFORMATION_SCHEMA.OPTIMIZER_TRACE \G
+...
+  "peak_memory_used": 262144,
+  "sort_algorithm": "std::stable_sort",
+  "sort_mode": "&lt;fixed_sort_key, packed_additional_fields&gt;"
+...</code></pre>
+  </div>
+
+  <h5>싱글 패스 방식</h5>
+  <ul>
+    <li>정렬 기준 컬럼을 포함해 <b>SELECT 대상 컬럼 전부</b>를 소트 버퍼에 담아 정렬한다.</li>
+    <li>정렬에 필요 없는 컬럼도 전부 담고, 정렬 후 그대로 결과를 반환한다.</li>
+    <li>일반적으로 쓰이는 방식이며, 레코드의 크기나 건수가 작을 때 빠르다.</li>
+  </ul>
+
+  <h5>투 패스 방식</h5>
+  <ul>
+    <li><b>정렬 대상 컬럼과 기본키만</b> 소트 버퍼에 담아 정렬한다.</li>
+    <li>정렬된 기본키 순서대로 <b>레코드를 다시 읽어</b> 결과를 반환한다.</li>
+    <li>TEXT/BLOB 같은 큰 데이터가 있거나 레코드 크기가 클 때 사용된다.</li>
+    <li>정렬 대상의 크기나 건수가 아주 클 때 효율적이다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.20 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p>노트에는 투 패스 전환 기준으로 <code>max_length_for_sort_data</code> 가 언급되는데, 이 변수는 <b>8.0.20에서 deprecated 되었고 더 이상 아무 효과가 없다.</b> 옵티마이저가 짧은 BLOB도 addon field로 정렬할 수 있게 개선되면서 이 변수가 하던 유일한 역할이 사라졌다. 지금은 <b>옵티마이저가 알아서 판단</b>하며, 실제 사용된 방식은 위의 옵티마이저 트레이스 <code>sort_mode</code> 로 확인한다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html">MySQL 8.0 Reference Manual — ORDER BY Optimization</a>)</p>
+    </div>
+  </div>
+
+  <h4>정렬 처리 방법</h4>
+  <p><code>ORDER BY</code> 는 아래 셋 중 하나로 처리되고, 실행 계획에 그대로 드러난다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>처리 방법</th><th>실행 계획 Extra</th><th>비용</th></tr></thead>
+      <tbody>
+        <tr><td>인덱스 사용</td><td class="t-ok">별도 표시 없음</td><td>가장 낮음</td></tr>
+        <tr><td>조인에서 <b>드라이빙 테이블만</b> 정렬</td><td><code>Using filesort</code></td><td>중간</td></tr>
+        <tr><td>조인 결과를 <b>임시 테이블에 저장 후</b> 정렬</td><td class="t-no"><code>Using temporary; Using filesort</code></td><td>가장 높음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>인덱스로 정렬하기 — 조건</h5>
+  <ul>
+    <li><code>ORDER BY</code> 에 명시된 컬럼이 <b>제일 먼저 읽는 테이블</b>에 속해야 한다.</li>
+    <li><code>ORDER BY</code> 의 순서대로 생성된 인덱스가 있어야 한다.</li>
+    <li><code>WHERE</code> 에 첫 테이블 컬럼 조건이 있다면, 그 조건이 <b><code>ORDER BY</code> 와 같은 인덱스</b>를 쓸 수 있어야 한다.</li>
+    <li>해시 인덱스, 전문 검색 인덱스, R-Tree 에서는 사용할 수 없다.</li>
+    <li>테이블이 여러 개 조인되는 경우 <b>nested-loop 조인에서만</b> 가능하다.</li>
+    <li><code>ORDER BY</code> 를 적는다고 없던 작업이 생기지는 않고 실행 계획에 따라 언제든 바뀔 수 있으므로, <b>필요하면 반드시 명시</b>하는 것이 좋다.</li>
+  </ul>
+
+  <h5>조인의 드라이빙 테이블만 정렬</h5>
+  <ul>
+    <li>조인이 수행되면 레코드 수도 크기도 불어난다.</li>
+    <li>따라서 <b>조인 전에 첫 번째 테이블을 먼저 정렬</b>하면 차선책이 된다.</li>
+    <li>단, 정렬 기준이 <b>드라이빙 테이블의 컬럼만으로</b> 이루어져야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT *
+FROM employees e, salaries s
+WHERE s.emp_no = e.emp_no
+  AND e.emp_no BETWEEN 100002 AND 100010
+ORDER BY e.last_name;</code></pre>
+  </div>
+
+  <p>옵티마이저가 <code>employees</code> 를 드라이빙 테이블로 고르는 이유는 두 가지다.</p>
+  <ul>
+    <li><code>WHERE</code> 조건이 <code>employees</code> 의 기본키로 검색되므로 작업량이 크게 줄어든다.</li>
+    <li>드리븐 테이블 <code>salaries</code> 의 조인 컬럼 <code>emp_no</code> 에 인덱스가 있다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td>range</td><td>PRIMARY</td><td>9</td><td><code>Using where; Using filesort</code></td></tr>
+        <tr><td>1</td><td>s</td><td>ref</td><td>PRIMARY</td><td>9</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ol class="steps">
+    <li><div class="step-title">인덱스 레인지 스캔</div><p><code>emp_no BETWEEN 100002 AND 100010</code> 을 만족하는 레코드를 검색한다.</p></li>
+    <li><div class="step-title">Filesort</div><p>검색 결과를 <code>last_name</code> 으로 정렬한다.</p></li>
+    <li><div class="step-title">조인</div><p>정렬된 결과로 <code>salaries</code> 와 조인해 최종 결과를 만든다.</p></li>
+  </ol>
+
+  <h5>임시 테이블을 이용한 정렬</h5>
+  <p>정렬 기준이 <b>드리븐 테이블</b>의 컬럼이라면, 조인을 먼저 해야 하므로 임시 테이블이 필요해진다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees e, salaries s
+WHERE s.emp_no = e.emp_no
+  AND e.emp_no BETWEEN 100002 AND 100010
+ORDER BY s.salary;   -- 드리븐 테이블의 컬럼</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td>range</td><td>PRIMARY</td><td>9</td><td class="t-no"><code>Using where; Using temporary; Using filesort</code></td></tr>
+        <tr><td>1</td><td>s</td><td>ref</td><td>PRIMARY</td><td>9</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>Using temporary; Using filesort</code> 는 <b>임시 테이블에 저장한 뒤 다시 정렬했다</b>는 뜻이다.</p>
+
+  <h5>스트리밍 처리 vs 버퍼링 처리</h5>
+  <ul>
+    <li>대부분의 웹 서비스 쿼리는 <code>ORDER BY</code> 와 <code>LIMIT</code> 을 함께 쓴다.</li>
+    <li><code>LIMIT</code> 은 결과의 일부만 가져오므로 작업량을 줄여 준다.</li>
+    <li>하지만 <code>GROUP BY</code>, <code>ORDER BY</code> 는 <b>조건을 만족하는 만큼만 가져와서는 처리할 수 없다.</b> 전부 읽거나 그루핑을 끝낸 뒤에야 <code>LIMIT</code> 을 적용할 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph S["스트리밍 처리"]
+    S1["레코드 검색"] --> S2["즉시 클라이언트로 전송"]
+    S2 --> S1
+  end
+  subgraph B["버퍼링 처리"]
+    B1["모든 레코드 수집"] --> B2["정렬 / 그루핑"]
+    B2 --> B3["그제야 전송 시작"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>첫 레코드까지의 시간이 결정적으로 다르다</b> — OLTP에서 체감 성능은 대개 이 지점에서 갈린다.</div>
+  </div>
+
+  <h5>스트리밍 처리</h5>
+  <ul>
+    <li>조건에 일치하는 레코드가 검색될 때마다 <b>즉시 클라이언트로 전송</b>한다.</li>
+    <li>클라이언트는 쿼리를 보낸 직후 첫 레코드를 받는다.</li>
+    <li>OLTP 환경에서는 <b>첫 응답 시간</b>이 매우 중요한데, 이 방식은 결과 크기와 무관하게 빠른 첫 응답을 보장한다.</li>
+    <li><code>LIMIT</code> 이 있으면 전체 응답 시간도 줄어든다.</li>
+    <li>다만 클라이언트 API마다 다르다 — <b>JDBC는 서버 쪽은 스트리밍이지만 클라이언트가 버퍼링</b>해서 결국 전부 기다린다. 설정으로 진짜 스트리밍으로 바꿀 수 있다.</li>
+  </ul>
+
+  <h5>버퍼링 처리</h5>
+  <p>DB에서 일괄 가공해야 하므로 스토리지 엔진에서 <b>모두 가져올 때까지 대기</b>한다.</p>
+
+  <h5>인덱스를 사용한다면?</h5>
+  <ul>
+    <li>인덱스 정렬 방식에서는 <code>LIMIT</code> 으로 제한된 <b>건수만큼만 읽고</b> 바로 반환할 수 있다.</li>
+    <li>인덱스를 못 쓰면 <b>모든 연산과 정렬을 끝낸 뒤에야</b> 반환할 수 있다.</li>
+    <li>가능하면 인덱스 정렬로 유도하고, 최소한 <b>드라이빙 테이블만 정렬</b>하도록 만들어도 좋은 튜닝이다.</li>
+  </ul>
+
+  <h5>정렬 관련 상태 변수</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW STATUS LIKE 'Sort%';
++-------------------+-------+
+| Variable_name     | Value |
++-------------------+-------+
+| Sort_merge_passes | 0     |
+| Sort_range        | 0     |
+| Sort_rows         | 86    |
+| Sort_scan         | 1     |
++-------------------+-------+</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상태 변수</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>Sort_merge_passes</code></td><td>멀티 머지 처리 횟수 — <b>0이 아니면 디스크를 썼다는 뜻</b></td></tr>
+        <tr><td><code>Sort_range</code></td><td>인덱스 레인지 스캔을 통한 정렬 작업 <b>횟수</b></td></tr>
+        <tr><td><code>Sort_rows</code></td><td>지금까지 <b>정렬한 총 레코드 건수</b></td></tr>
+        <tr><td><code>Sort_scan</code></td><td>테이블 스캔을 통한 정렬 작업 <b>횟수</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>Sort_rows</code> 를 "풀 테이블 스캔을 통해 검색된 결과에 대한 횟수", <code>Sort_scan</code> 을 "지금까지 정렬한 총 레코드 개수" 로 적었는데 <b>둘의 설명이 뒤바뀌어 있다.</b> 공식 문서는 <code>Sort_rows</code> 를 "The number of sorted rows"(정렬된 레코드 건수), <code>Sort_scan</code> 을 "The number of sorts that were done by scanning the table"(테이블 스캔으로 수행된 정렬 횟수) 로 정의한다. 위 예시에서도 <code>Sort_rows=86</code>, <code>Sort_scan=1</code> 로 "정렬 1회에 86건" 이라는 해석이 자연스럽다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/server-status-variables.html">MySQL 8.0 Server Status Variables</a>)</p>
+    </div>
+  </div>
+
+  <h4>GROUP BY 처리</h4>
+  <ul>
+    <li><code>ORDER BY</code> 와 마찬가지로 <b>스트리밍 처리를 막는</b> 요소다.</li>
+    <li><code>GROUP BY</code> 절에 사용된 조건은 <b>별도의 인덱스를 태울 수 없으므로</b>, HAVING 조건 자체에 대한 인덱스 고민은 필요 없다.</li>
+  </ul>
+
+  <h5>인덱스 스캔을 사용하는 경우 (타이트 인덱스 스캔)</h5>
+  <ul>
+    <li>조인의 드라이빙 테이블에 속한 컬럼만으로 그루핑하고, <code>GROUP BY</code> 컬럼에 이미 인덱스가 있다면, 그 인덱스를 차례대로 읽으며 그루핑한 뒤 조인을 처리한다.</li>
+    <li>이 경우 실행 계획 <code>Extra</code> 에 <b>아무 메시지도 나오지 않는다.</b></li>
+  </ul>
+
+  <h5>루스 인덱스 스캔을 사용하는 경우</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">INDEX(emp_no, from_date) 가정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT emp_no
+FROM salaries s
+WHERE from_date = '1985-03-01'
+GROUP BY emp_no;</code></pre>
+  </div>
+
+  <ol class="steps">
+    <li><div class="step-title">첫 유일값 찾기</div><p>인덱스를 순서대로 조회해 <code>emp_no</code> 의 첫 유일값 10001을 찾는다.</p></li>
+    <li><div class="step-title">그 그룹 안에서 조건 검사</div><p><code>emp_no = 10001 AND from_date = '1985-03-01'</code> 과 유사한 형태로 검색한다.</p></li>
+    <li><div class="step-title">다음 유일값으로 점프</div><p>10001 처리가 끝나면 그다음 유일값 10002로 건너뛰고 반복한다.</p></li>
+  </ol>
+
+  <h5>루스 인덱스 스캔을 쓸 수 없는 경우</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag bad">사용 불가</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- MIN, MAX 이외의 집합 함수가 사용됨
+SELECT col1, SUM(col2) FROM tb GROUP BY col1;
+
+-- GROUP BY 컬럼이 인덱스 구성 컬럼의 왼쪽부터 일치하지 않음
+SELECT col1, col2 FROM tb GROUP BY col2, col3;
+
+-- SELECT 컬럼이 GROUP BY 와 일치하지 않음
+SELECT col1, col3 FROM tb GROUP BY col1, col2;</code></pre>
+  </div>
+
+  <h5>임시 테이블을 사용하는 GROUP BY</h5>
+  <ul>
+    <li>인덱스를 전혀 쓰지 못하면 이 방식으로 처리된다.</li>
+    <li>내부적으로 <code>GROUP BY</code> 컬럼들로 구성된 <b>유니크 인덱스를 가진 임시 테이블</b>을 만들고, 중복 제거와 집합 함수 연산을 함께 수행한다.</li>
+    <li>자동으로 정렬하지는 않는다. 정렬이 필요하면 <code>ORDER BY</code> 를 명시해야 하고, 그러면 Filesort가 추가된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT e.last_name, AVG(s.salary)
+FROM employees e, salaries s
+WHERE s.emp_no = e.emp_no
+GROUP BY e.last_name;</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td class="t-no">ALL</td><td>NULL</td><td>300,252</td><td><code>Using temporary</code></td></tr>
+        <tr><td>1</td><td>s</td><td>ref</td><td>PRIMARY</td><td>9</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>DISTINCT 처리</h4>
+  <ul>
+    <li>특정 컬럼의 유니크한 값을 조회할 때 쓴다.</li>
+    <li>집합 함수와 <b>함께 쓰이는 경우</b>와 <b>그렇지 않은 경우</b>로 나뉜다.</li>
+    <li>인덱스를 쓰지 못하면 임시 테이블이 필요하지만, <b>실행 계획에는 아무 메시지도 표시되지 않는다.</b> 이것이 DISTINCT의 함정이다.</li>
+  </ul>
+
+  <h5>SELECT DISTINCT</h5>
+  <p>단순히 유니크한 값만 가져오는 경우는 <code>GROUP BY</code> 와 동일하다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT DISTINCT emp_no FROM tb;
+SELECT emp_no FROM tb GROUP BY emp_no;</code></pre>
+  </div>
+
+  <h5>주의 1 — 컬럼 하나에만 걸리는 게 아니다</h5>
+  <p>아래 쿼리는 <code>col1</code> 만 유니크하게 가져오는 것이 아니라 <b><code>col1 + col2</code> 조합 전체</b>가 유니크한 결과를 가져온다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT DISTINCT col1, col2 FROM tb;</code></pre>
+  </div>
+
+  <h5>주의 2 — DISTINCT 는 함수가 아니다</h5>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">이렇게 써도</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT DISTINCT(col1), col2 FROM tb;</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">실제로는 이렇게 실행된다</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT DISTINCT col1, col2 FROM tb;</code></pre>
+    </div>
+  </div>
+  <p>괄호는 그냥 제거된다. <code>DISTINCT</code> 는 <b>SELECT 절 전체에 걸리는 키워드</b>이지 함수가 아니다.</p>
+
+  <h5>집합 함수와 함께 사용된 DISTINCT</h5>
+  <p>이때는 <b>집합 함수의 인자로 전달된 컬럼</b>에 대해서만 유니크를 적용한다.</p>
+
+  <h5>예제 1 — 임시 테이블 1개</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT COUNT(DISTINCT s.salary)
+FROM employees e, salaries s
+WHERE e.emp_no = s.emp_no
+  AND e.emp_no BETWEEN 100001 AND 100100;</code></pre>
+  </div>
+  <ul>
+    <li><code>COUNT(DISTINCT ...)</code> 처리를 위해 임시 테이블을 쓰지만 <b>실행 계획에는 표시되지 않는다.</b></li>
+    <li>그 임시 테이블의 <code>salary</code> 컬럼에 유니크 인덱스가 만들어지므로, 레코드가 많아지면 상당히 느려진다.</li>
+  </ul>
+
+  <h5>예제 2 — 임시 테이블 2개</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT COUNT(DISTINCT s.salary), COUNT(DISTINCT e.last_name)
+FROM employees e, salaries s
+WHERE e.emp_no = s.emp_no
+  AND e.emp_no BETWEEN 100001 AND 100100;</code></pre>
+  </div>
+  <p><code>DISTINCT</code> 인자가 두 개면 <b>임시 테이블도 두 개</b> 만들어진다. 역시 실행 계획에는 나타나지 않는다.</p>
+
+  <h5>인덱스된 컬럼이라면</h5>
+  <p>인덱스된 컬럼에 <code>DISTINCT</code> 를 걸면 풀 인덱스 스캔이나 레인지 스캔으로 <b>임시 테이블 없이</b> 처리된다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td>index</td><td>ix_hiredate</td><td>300,252</td><td class="t-ok"><code>Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>내부 임시 테이블 활용</h4>
+  <ul>
+    <li>스토리지 엔진에서 받아온 데이터를 정렬·그루핑할 때 <b>내부(internal) 임시 테이블</b>을 쓴다.</li>
+    <li><code>CREATE TEMPORARY TABLE</code> 로 만든 임시 테이블과는 <b>완전히 다른 것</b>이다.</li>
+    <li>내부 임시 테이블은 쿼리 처리가 끝나면 자동으로 삭제된다.</li>
+  </ul>
+
+  <h5>메모리 임시 테이블과 디스크 임시 테이블</h5>
+  <ul>
+    <li>8.0부터 메모리 임시 테이블은 <b>TempTable</b> 엔진, 디스크 임시 테이블은 <b>InnoDB</b> 를 쓴다.</li>
+    <li>임시 테이블 크기가 <b>1GB</b>(<code>temptable_max_ram</code> 기본값)를 넘어가면 메모리에서 디스크로 넘어간다.</li>
+  </ul>
+
+  <h5>디스크로 넘길 때의 두 갈래</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>동작</th><th>제어 변수</th></tr></thead>
+      <tbody>
+        <tr><td>MMAP</td><td>메모리의 TempTable을 <b>메모리 맵 파일</b>로 전환</td><td><code>temptable_use_mmap</code></td></tr>
+        <tr><td>InnoDB</td><td>디스크의 세션 임시 테이블스페이스에 <b>InnoDB 테이블</b>로 생성</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">MySQL 8.0.16 / 8.0.26 기준 <span class="badge b-purple">최신 반영</span></p>
+      <p>노트에는 기록 방식을 <code>internal_tmp_disk_storage_engine</code> 으로 제어한다고 되어 있으나, 이 변수는 <b>8.0.16에서 제거</b>되었다. 8.0.16부터 디스크 내부 임시 테이블은 <b>InnoDB 만</b> 사용한다. 또 <code>temptable_use_mmap</code> 은 <b>8.0.26에서 deprecated</b> 되었고, 지금은 <code>temptable_max_mmap</code> 을 0으로 두는 것이 같은 효과를 낸다. (근거: <a href="https://dev.mysql.com/doc/refman/8.0/en/internal-temporary-tables.html">MySQL 8.0 Reference Manual — Internal Temporary Table Use</a>)</p>
+    </div>
+  </div>
+
+  <h5>임시 테이블이 필요한 쿼리</h5>
+  <ul>
+    <li><code>ORDER BY</code> 와 <code>GROUP BY</code> 에 명시된 컬럼이 서로 다른 쿼리</li>
+    <li><code>ORDER BY</code> 나 <code>GROUP BY</code> 에 명시된 컬럼이 <b>조인 순서상 첫 번째 테이블이 아닌</b> 쿼리</li>
+    <li><code>DISTINCT</code> 와 <code>ORDER BY</code> 가 동시에 있거나, <code>DISTINCT</code> 가 인덱스로 처리되지 못하는 쿼리</li>
+    <li><code>UNION</code> 이나 <code>UNION DISTINCT</code> 가 사용된 쿼리 (<code>select_type</code> 이 <code>UNION RESULT</code>)</li>
+    <li>실행 계획에서 <code>select_type</code> 이 <code>DERIVED</code> 인 쿼리</li>
+  </ul>
+
+  <h5>임시 테이블이 디스크에 생성되는 경우</h5>
+  <ul>
+    <li><code>UNION</code> / <code>UNION ALL</code> 에서 SELECT 되는 컬럼 중 <b>512바이트 이상</b>인 컬럼이 있는 경우</li>
+    <li><code>GROUP BY</code> 나 <code>DISTINCT</code> 컬럼 중 <b>512바이트 이상</b>인 컬럼이 있는 경우</li>
+    <li>메모리 임시 테이블 크기가 <code>tmp_table_size</code> / <code>max_heap_table_size</code>(MEMORY 엔진) 또는 <code>temptable_max_ram</code>(TempTable 엔진) 을 초과하는 경우</li>
+  </ul>
+
+  <h5>임시 테이블 관련 상태 변수</h5>
+  <p><code>Using temporary</code> 로 사용 여부는 알 수 있지만 <b>몇 개를 썼는지는 알 수 없다.</b> 그건 상태 변수로 본다.</p>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SHOW SESSION STATUS LIKE 'Created_tmp%';
++-------------------------+-------+
+| Variable_name           | Value |
++-------------------------+-------+
+| Created_tmp_disk_tables | 1     |
+| Created_tmp_files       | 0     |
+| Created_tmp_tables      | 1     |
++-------------------------+-------+</code></pre>
+  </div>
+  <p><code>Created_tmp_disk_tables</code> 가 <code>Created_tmp_tables</code> 에 육박한다면, <b>거의 모든 임시 테이블이 디스크로 내려가고 있다</b>는 뜻이다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>풀 스캔은 <b>read ahead</b>(최대 64페이지 선반입) 덕분에 생각보다 빠르다.</li>
+      <li>정렬은 인덱스 &gt; 드라이빙 테이블만 Filesort &gt; 임시 테이블 + Filesort 순으로 비싸다.</li>
+      <li><code>Sort_merge_passes</code> 가 0이 아니면 <b>소트 버퍼가 부족해 디스크를 썼다</b>는 신호다.</li>
+      <li><code>DISTINCT</code> 와 <code>COUNT(DISTINCT ...)</code> 의 임시 테이블은 <b>실행 계획에 보이지 않는다.</b> <code>Created_tmp_*</code> 로 확인한다.</li>
+      <li>8.0.16+ 디스크 내부 임시 테이블은 <b>InnoDB 단일</b>이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">9-3</div>
+    <h3>고급 최적화</h3>
+    <p class="item-tagline"><code>optimizer_switch</code> 뒤에 숨은 열댓 가지 최적화 — <b>대부분은 켜져 있고, 알아야 실행 계획이 읽힌다.</b></p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이 절의 최적화들은 크게 두 부류다 — <b>불필요한 레코드 접근을 줄이는 것</b>(ICP, MRR, 인덱스 머지)과 <b>서브쿼리를 조인으로 바꾸는 것</b>(세미 조인 5종, derived merge).
+  </div>
+
+  <h4>옵티마이저 스위치 옵션</h4>
+  <ul>
+    <li><code>optimizer_switch</code> 시스템 변수로 제어한다.</li>
+    <li>설정이 많고 <b>대부분 활성화</b>되어 있으나, <b>BKA만 기본 off</b> 다.</li>
+    <li><code>default</code> / <code>on</code> / <code>off</code> 세 가지를 지원한다.</li>
+    <li>서버 전체 · 현재 커넥션 · 현재 쿼리 세 수준에 적용할 수 있다.</li>
+  </ul>
+
+  <h4>MRR (Multi-Range Read) 과 BKA (Batched Key Access)</h4>
+
+  <h5>네스티드 루프 (Nested Loop)</h5>
+  <ul>
+    <li>기존부터 지원하던 기본 조인 방식이다.</li>
+    <li>드라이빙 테이블의 레코드를 <b>한 건 읽고</b> → 드리븐 테이블에서 일치하는 레코드를 읽어 조인한다.</li>
+    <li>건별로 요청이 들어오므로 <b>스토리지 엔진 입장에서는 최적화할 여지가 없다.</b></li>
+  </ul>
+
+  <h5>MRR</h5>
+  <ul>
+    <li>조인 버퍼를 활용해 즉시 조인하지 않고 <b>조인 대상을 버퍼링</b>한다.</li>
+    <li>드라이빙 테이블 레코드를 읽어 조인 버퍼에 쌓고, <b>가득 차면 그때 한꺼번에</b> 스토리지 엔진에 요청한다.</li>
+    <li>필요한 레코드들을 <b>데이터 페이지 순서대로 정렬해서</b> 접근하므로 디스크 페이지 읽기가 최소화된다.</li>
+    <li>버퍼 풀에 이미 있더라도 <b>버퍼 풀 접근 횟수를 줄일 수 있다.</b></li>
+  </ul>
+
+  <h5>BKA</h5>
+  <ul>
+    <li>기본적으로 <b>비활성화</b>되어 있다.</li>
+    <li>MRR을 응용해 실행되는 조인 방식을 BKA라고 부른다.</li>
+    <li>쿼리 특성에 따라 도움이 되기도 하지만 <b>부가적인 정렬 작업이 필요해 오히려 나빠질 수도</b> 있다. 기본 off인 이유다.</li>
+  </ul>
+
+  <h4>블록 네스티드 루프 조인 (block_nested_loop)</h4>
+  <ul>
+    <li>네스티드 루프에서 <b>조인 버퍼 사용 여부</b>와 드라이빙/드리븐 테이블의 조인 방식에 따라 구분된다.</li>
+    <li>실행 계획 <code>Extra</code> 에 <code>Using join buffer</code> 가 있으면 조인 버퍼를 쓴 것이다.</li>
+  </ul>
+
+  <h5>조인 버퍼는 언제 쓰이나</h5>
+  <ul>
+    <li>어떤 방식으로도 <b>풀 테이블 스캔이나 풀 인덱스 스캔을 피할 수 없을 때</b> 쓰인다.</li>
+    <li>드라이빙 테이블에서 읽은 레코드를 메모리에 캐싱하고, 드리븐 테이블과 그 캐시를 조인하는 형태다.</li>
+    <li>조인이 끝나면 버퍼는 즉시 해제된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">카테시안 조인 예시</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM dept_emp de, employees e
+WHERE de.from_date &gt; '1995-01-01' AND e.emp_no &lt; 109004;</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td>range</td><td>PRIMARY</td><td>150,126</td><td><code>Using where; Using index</code></td></tr>
+        <tr><td>1</td><td>de</td><td>range</td><td>ix_fromdate</td><td>165,571</td><td><code>Using where; Using index; Using join buffer (hash join)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>조인 수행 과정</h5>
+  <ol class="steps">
+    <li><div class="step-title">dept_emp 에서 조건 만족 레코드 검색</div><p><code>ix_fromdate</code> 인덱스를 쓴다.</p></li>
+    <li><div class="step-title">조인에 필요한 컬럼을 조인 버퍼에 저장</div></li>
+    <li><div class="step-title">employees 에서 기본키로 조건 만족 레코드 검색</div></li>
+    <li><div class="step-title">검색 결과와 조인 버퍼의 레코드를 결합해 반환</div></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">정렬 순서가 흐트러진다</p>
+      <p>실제 드라이빙 테이블의 결과가 <b>조인 버퍼에 저장</b>되고, <b>드리븐 테이블을 읽으면서</b> 버퍼에서 일치하는 레코드를 찾는 방식이라, 두 테이블의 역할이 사실상 뒤바뀐다. 그래서 조인 버퍼가 쓰이면 <b>결과의 정렬 순서를 신뢰할 수 없다.</b> 순서가 필요하면 <code>ORDER BY</code> 를 명시해야 한다.</p>
+    </div>
+  </div>
+
+  <h5>Extra 에 hash join 이 왜 나올까</h5>
+  <ul>
+    <li><b>8.0.18</b> 부터 해시 조인 알고리즘이 도입되었다.</li>
+    <li><b>8.0.20</b> 부터는 블록 네스티드 루프 대신 해시 조인이 쓰인다. 그래서 <code>Using join buffer (hash join)</code> 로 표시된다.</li>
+  </ul>
+
+  <h4>인덱스 컨디션 푸시다운 (ICP)</h4>
+  <ul>
+    <li>인덱스를 비교하는 작업은 <b>스토리지 엔진</b>이 수행한다.</li>
+    <li>테이블 레코드에서 조건을 비교하는 작업은 <b>MySQL 엔진</b>이 수행한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">INDEX(last_name, first_name) 가정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees
+WHERE last_name = 'Acton' AND first_name LIKE '%sal';</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph OFF["ICP 없음"]
+    A1["스토리지 엔진: last_name='Acton' 으로 189건 읽기"] --> A2["189건 전부 MySQL 엔진에 전달"]
+    A2 --> A3["MySQL 엔진: first_name LIKE 조건 검사"]
+    A3 --> A4["최종 1건"]
+  end
+  subgraph ON["ICP 적용"]
+    B1["스토리지 엔진: 두 조건을 인덱스에서 함께 검사"] --> B2["필요한 레코드만 읽어 전달"]
+    B2 --> B3["최종 1건"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>차이는 "레코드를 몇 건 읽었는가"다</b> — 조건 검사를 인덱스가 있는 아래쪽으로 밀어내는 것이 푸시다운이다.</div>
+  </div>
+
+  <h5>ICP 가 없다면</h5>
+  <ul>
+    <li>먼저 <code>last_name = 'Acton'</code> 으로 레인지 스캔을 한다.</li>
+    <li>해당하는 레코드를 <b>전부 MySQL 엔진에 전달</b>해서 조건을 비교한다.</li>
+    <li>일치하는 컬럼이 1건이라면 나머지는 전부 불필요한 레코드 조회였던 셈이다.</li>
+  </ul>
+  <p>이 경우 <code>Extra</code> 는 <code>Using where</code> 다. <code>Using where</code> 는 <b>스토리지 엔진이 돌려준 레코드가 인덱스로 처리할 수 없는 WHERE 조건에 맞는지 MySQL 엔진이 검사했다</b>는 뜻이다.</p>
+
+  <h5>ICP 가 있다면</h5>
+  <ul>
+    <li>인덱스 단계에서 최대한 필터링까지 끝내고 <b>필요한 레코드만</b> 읽는다.</li>
+    <li>쿼리 성능이 몇 배에서 몇십 배까지 좋아질 수 있는 중요한 기능이다.</li>
+    <li><code>Extra</code> 에 <code>Using index condition</code> 으로 표시된다.</li>
+  </ul>
+
+  <h4>인덱스 확장 (use_index_extensions)</h4>
+  <ul>
+    <li>세컨더리 인덱스에 <b>자동으로 붙은 기본키</b>를 활용할지 결정하는 옵션이다.</li>
+    <li>클러스터링 키 구조라 모든 세컨더리 인덱스는 기본키와 함께 저장된다.</li>
+    <li>실행 계획의 <code>key_len</code> 으로 인덱스 중 어디까지 사용했는지 확인할 수 있다.</li>
+  </ul>
+
+  <h4>인덱스 머지 (index_merge)</h4>
+  <ul>
+    <li>보통 옵티마이저는 <b>테이블당 하나의 인덱스</b>만 쓰는 계획을 세운다.</li>
+    <li>그런데 각 조건이 서로 다른 인덱스를 쓸 수 있고, 각각의 예상 건수가 많다면 <b>인덱스 머지</b>를 선택한다.</li>
+    <li>세 가지 세부 계획이 있으며, 모두 여러 인덱스로 결과를 가져오는 것은 동일하다.</li>
+  </ul>
+
+  <h5>교집합 — index_merge_intersection</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">INDEX(first_name), INDEX(emp_no) 가정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE first_name = 'Georgi'
+  AND emp_no BETWEEN 10000 AND 20000;</code></pre>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>type</th><th>key</th><th>key_len</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>index_merge</td><td>ix_firstname,PRIMARY</td><td>62,4</td><td>1</td><td><code>Using intersect(ix_firstname,PRIMARY); Using where</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>Using intersect</code> 는 여러 인덱스를 각각 검색하고 <b>교집합만</b> 반환했다는 뜻이다.</p>
+
+  <h5>합집합 — index_merge_union</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">INDEX(first_name), INDEX(hire_date) 가정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE first_name='Matt' OR hire_date='1987-03-31';</code></pre>
+  </div>
+  <ul>
+    <li>2개 이상의 조건이 각각 인덱스를 쓰고 <code>OR</code> 로 연결된 경우의 최적화다.</li>
+    <li>개별 SELECT로 데이터를 가져와 중복을 제거하는 방식으로 생각하면 편하다.</li>
+    <li>중복 제거에는 <b>우선순위 큐</b>가 쓰인다.</li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">AND 와 OR 의 결정적 차이</p>
+      <p><code>AND</code> 는 조건 중 <b>하나만</b> 인덱스를 쓸 수 있어도 레인지 스캔으로 실행된다. 하지만 <code>OR</code> 는 <b>둘 중 하나라도</b> 인덱스를 못 쓰면 <b>풀 테이블 스캔</b>이 되어 버린다. 성능 차이가 매우 심하니 <code>WHERE</code> 의 <code>OR</code> 는 항상 의심할 것.</p>
+    </div>
+  </div>
+
+  <h5>정렬 후 합집합 — index_merge_sort_union</h5>
+  <ul>
+    <li>인덱스 머지 도중 <b>결과의 정렬이 필요할 때</b> 쓰인다.</li>
+    <li>아래 예에서 <code>hire_date</code> 조건의 결과가 기본키 순으로 정렬되어 있지 않아, <b>우선순위 큐를 바로 쓸 수 없다.</b></li>
+    <li>그래서 중간에 <code>emp_no</code> 기준으로 정렬한 뒤 중복을 제거한다.</li>
+    <li>이때 <code>Extra</code> 에 <code>Using sort_union</code> 이 표시된다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE first_name = 'Matt'
+   OR hire_date BETWEEN '1987-03-01' AND '1987-03-01';</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">노트의 관찰 <span class="badge b-blue">보강</span></p>
+      <p>노트는 "8.4.2 버전 기준 <code>BETWEEN</code> 조건에도 결과가 기본키 기준으로 정렬되어 나온다"고 기록하고 있고, 실제로 위 쿼리의 실행 계획도 <code>Using sort_union</code> 이 아니라 <code>Using union</code> 으로 나왔다. 즉 <b>옵티마이저가 이 케이스에서는 정렬이 불필요하다고 판단</b>한 것이다. 어느 쪽이 선택되는지는 버전과 데이터 분포에 따라 달라지므로, <code>sort_union</code> / <code>union</code> 중 무엇이 나오는지를 <b>직접 확인</b>하는 것이 맞다.</p>
+    </div>
+  </div>
+
+  <h4>세미 조인</h4>
+  <ul>
+    <li>다른 테이블과 실제로 조인하지 않고, <b>조건에 일치하는 레코드가 있는지만 확인</b>하는 형태의 쿼리를 세미 조인이라 한다.</li>
+    <li>이 최적화가 없던 시절에는 서브쿼리를 먼저 실행하는 것이 아니라, <b>바깥 테이블을 풀 스캔하면서 한 건씩 확인</b>했다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">세미 조인 최적화를 끄고 실행</span>
+      <span class="code-tag bad">30만 건을 검사</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SET SESSION optimizer_switch="semijoin=off";
+
+EXPLAIN
+SELECT * FROM employees e
+WHERE e.emp_no IN (
+  SELECT de.emp_no FROM dept_emp de WHERE de.from_date='1995-01-01'
+);</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>PRIMARY</td><td>e</td><td class="t-no">ALL</td><td class="t-no">300,252</td><td><code>Using where</code></td></tr>
+        <tr><td>2</td><td>SUBQUERY</td><td>de</td><td>ref</td><td>57</td><td><code>Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>고작 <b>57건</b>만 검색하면 되는데 <b>30만 건</b>을 검사한다. 세미 조인 최적화의 필요성이 여기서 나온다.</p>
+
+  <h5>최적화 방법의 분류</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>쿼리 형태</th><th>적용 가능한 최적화</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>= (subquery)</code>, <code>IN (subquery)</code> — <b>세미 조인</b></td>
+          <td>세미 조인 최적화 · IN-to-EXISTS · MATERIALIZATION</td>
+        </tr>
+        <tr>
+          <td><code>&lt;&gt; (subquery)</code>, <code>NOT IN (subquery)</code> — <b>안티 세미 조인</b></td>
+          <td>IN-to-EXISTS · MATERIALIZATION</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>8.0에서 도입된 세미 조인 최적화 전략은 다섯 가지다 — <b>Table Pull-out · Duplicate Weed-out · First Match · Loose Scan · Materialization</b>. 이 중 <b>Table Pull-out은 거의 항상 이득</b>이라 끄는 옵션조차 없다.</p>
+
+  <h5>테이블 풀-아웃 (Table Pull-out)</h5>
+  <ul>
+    <li>세미 조인 서브쿼리에 쓰인 테이블을 <b>아우터 쿼리로 끄집어내</b> 조인 쿼리로 재작성하는 최적화다.</li>
+    <li><code>Using table pullout</code> 같은 문구는 따로 없다. <code>id</code> 컬럼이 같아지고 <code>Extra</code> 가 비어 있는 것으로 판단한다.</li>
+    <li><code>SHOW WARNINGS</code> 로 재작성된 쿼리를 직접 확인할 수도 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE e.emp_no IN (
+  SELECT de.emp_no FROM dept_emp de WHERE de.dept_no='d009'
+);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">SHOW WARNINGS 로 본 재작성 결과</span>
+      <span class="code-tag good">서브쿼리가 사라졌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT
+    `realmysql`.`e`.`emp_no`     AS `emp_no`,
+    `realmysql`.`e`.`birth_date` AS `birth_date`,
+    `realmysql`.`e`.`first_name` AS `first_name`,
+    `realmysql`.`e`.`last_name`  AS `last_name`,
+    `realmysql`.`e`.`gender`     AS `gender`,
+    `realmysql`.`e`.`hire_date`  AS `hire_date`
+FROM `realmysql`.`dept_emp` `de`
+JOIN `realmysql`.`employees` `e`
+WHERE (`realmysql`.`e`.`emp_no` = `realmysql`.`de`.`emp_no`)
+  AND (`realmysql`.`de`.`dept_no` = 'd009')</code></pre>
+  </div>
+
+  <h5>적용 가능한 상황</h5>
+  <ul>
+    <li>세미 조인 서브쿼리에서만 쓸 수 있다.</li>
+    <li>서브쿼리 부분이 <b>유니크 인덱스 또는 기본키 룩업</b>으로 결과가 1건인 경우만 가능하다.</li>
+    <li>과거의 튜닝 가이드에 있던 <b>"서브쿼리는 조인으로 바꿔 쓰자"</b> 가 바로 이 최적화다. 이제는 옵티마이저가 알아서 해 준다.</li>
+  </ul>
+
+  <h5>퍼스트 매치 (firstmatch)</h5>
+  <ul>
+    <li><code>IN (subquery)</code> 형태를 <code>EXISTS (subquery)</code> 로 튜닝한 것처럼 동작한다.</li>
+    <li>A 테이블에 대해 B 테이블에서 <b>일치하는 레코드 1건만 찾으면 그만</b> 둔다.</li>
+    <li>결국 서브쿼리가 아니라 조인으로 풀어 실행하면서 첫 번째 일치 레코드만 찾는 최적화다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE e.first_name = 'Matt'
+  AND e.emp_no IN (
+    SELECT t.emp_no FROM titles t
+    WHERE t.from_date BETWEEN '1995-01-01' AND '1995-01-30'
+  );</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td>ref</td><td>ix_firstname</td><td>233</td><td></td></tr>
+        <tr><td>1</td><td>t</td><td>ref</td><td>PRIMARY</td><td>1</td><td><code>Using where; Using index; FirstMatch(e)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>루스 스캔 (loosescan)</h5>
+  <ul>
+    <li><code>GROUP BY</code> 에서 인덱스를 쓰는 것과 유사한 방식이다.</li>
+    <li><code>dept_emp</code> 는 30만 건이지만 <code>departments</code> 는 9건뿐이다.</li>
+    <li>30만 건을 다 읽는 대신, <code>d001</code> 하나를 찾으면 반환하고 <b>다음 중복되지 않은 인덱스 값으로 점프</b>한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM departments d
+WHERE d.dept_no IN (SELECT de.dept_no FROM dept_emp de);</code></pre>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>de</td><td>index</td><td>PRIMARY</td><td>331,143</td><td><code>Using index; LooseScan</code></td></tr>
+        <tr><td>1</td><td>d</td><td>ALL</td><td>NULL</td><td>9</td><td><code>Using where; Using join buffer (hash join)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>구체화 (materialization)</h5>
+  <ul>
+    <li>세미 조인에 쓰인 서브쿼리를 <b>통째로 구체화</b>해서 최적화한다.</li>
+    <li>쉽게 말해 <b>임시 테이블을 만들고</b> 그 테이블로 조인한다.</li>
+    <li>서브쿼리에 <code>GROUP BY</code> 나 집합 함수가 있어도 쓸 수 있다.</li>
+    <li>단, <code>IN (subquery)</code> 의 서브쿼리가 <b>상관 서브쿼리가 아니어야</b> 한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>select_type</th><th>table</th><th>type</th><th>ref</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>SIMPLE</td><td><code>&lt;subquery2&gt;</code></td><td>ALL</td><td></td><td></td></tr>
+        <tr><td>1</td><td>SIMPLE</td><td>e</td><td>eq_ref</td><td><code>&lt;subquery2&gt;.emp_no</code></td><td></td></tr>
+        <tr><td>2</td><td>MATERIALIZED</td><td>de</td><td>ref</td><td>const</td><td><code>Using index</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>중복 제거 (Duplicate Weed-out)</h5>
+  <ul>
+    <li>세미 조인 서브쿼리를 <b>일반 INNER JOIN 으로 바꾸고</b>, 마지막에 중복값을 제거하는 방법이다.</li>
+    <li>실행 계획에 <code>Duplicate Weedout</code> 문구가 직접 나오지는 않는다.</li>
+    <li><code>Start temporary</code> ~ <code>End temporary</code> 구간이 이 최적화가 적용된 범위다.</li>
+    <li>장점과 제약
+      <ul>
+        <li>서브쿼리가 <b>상관 쿼리여도</b> 사용할 수 있다.</li>
+        <li>서브쿼리에 <code>GROUP BY</code> 나 집합 함수가 있으면 사용할 수 없다.</li>
+        <li>서브쿼리 테이블을 조인으로 처리하므로 <b>선택 가능한 실행 방법이 많다.</b></li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>id</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>s</td><td>range</td><td>ix_salary</td><td>36</td><td><code>Using where; Using index; Start temporary</code></td></tr>
+        <tr><td>1</td><td>e</td><td>eq_ref</td><td>PRIMARY</td><td>1</td><td><code>End temporary</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>컨디션 팬아웃 (condition_fanout_filter)</h4>
+  <ul>
+    <li>조인에서 <b>테이블 순서</b>는 성능에 매우 큰 영향을 준다.
+      <ul><li>A가 1만 건, B가 10건일 때 A가 드라이빙이면 B를 <b>1만 번</b> 조회한다.</li></ul>
+    </li>
+    <li>옵티마이저는 가능하면 <b>일치 레코드가 적은 순서로</b> 조인한다.</li>
+    <li>이 옵션은 더 정교한 계산을 위해 <b>더 많은 시간과 컴퓨팅 자원</b>을 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SET optimizer_switch='condition_fanout_filter=off';
+
+EXPLAIN
+SELECT * FROM employees e
+INNER JOIN salaries s ON s.emp_no = e.emp_no
+WHERE e.first_name = 'Matt'
+  AND e.hire_date BETWEEN '1985-11-21' AND '1986-11-21';</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>설정</th><th>table</th><th>rows</th><th>filtered</th><th>해석</th></tr></thead>
+      <tbody>
+        <tr><td><code>off</code></td><td>e</td><td>233</td><td class="t-no">100.00</td><td>233건 <b>전부</b>가 <code>hire_date</code> 조건도 만족할 것이라 예상</td></tr>
+        <tr><td><code>on</code></td><td>e</td><td>233</td><td class="t-ok">26.08</td><td><code>hire_date</code> 조건까지 고려해 <b>약 61건</b>만 남을 것이라 예상</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>조건을 만족하는 건수를 정확히 예측할수록 <b>더 빠른 실행 계획</b>이 나온다.</p>
+
+  <h5>filtered 값은 어떻게 예측할까</h5>
+  <p><code>condition_fanout_filter</code> 는 다음 조건을 만족하는 컬럼에 대해 비율을 계산한다.</p>
+  <ul>
+    <li><code>WHERE</code> 에 쓰인 컬럼에 <b>인덱스</b>가 있는 경우</li>
+    <li><code>WHERE</code> 에 쓰인 컬럼에 <b>히스토그램</b>이 있는 경우</li>
+  </ul>
+  <p>옵티마이저는 통계 정보만 쓰는 것이 아니라 다음 순서로 여러 방식을 동원한다.</p>
+  <ol class="steps">
+    <li><div class="step-title">Range Optimizer 를 사용한 예측</div><p>실제 데이터를 보고 건수를 예측한다 — 쿼리 실행 전에 <b>소량의 데이터를 실제로 읽는다.</b></p></li>
+    <li><div class="step-title">히스토그램을 이용한 예측</div></li>
+    <li><div class="step-title">인덱스 통계를 이용한 예측</div></li>
+    <li><div class="step-title">추측에 기반한 예측 (Guesstimates)</div><p>여기까지 오면 정확도를 기대하기 어렵다.</p></li>
+  </ol>
+
+  <h4>파생 테이블 머지 (derived_merge)</h4>
+  <ul>
+    <li>이전 버전에서는 <code>FROM</code> 절 서브쿼리의 결과를 <b>항상 임시 테이블</b>로 만들었다.</li>
+    <li>현재는 파생 테이블을 <b>외부 쿼리와 병합해 서브쿼리 자체를 제거</b>하는 최적화가 도입되었다.</li>
+    <li>과거에는 DBA가 손으로 하던 작업을 이제 옵티마이저가 한다.</li>
+    <li>다만 여전히 불가능한 경우가 있다.
+      <ul>
+        <li><code>SUM</code>, <code>MIN</code>, <code>MAX</code> 같은 집계 함수나 윈도우 함수가 포함된 서브쿼리</li>
+        <li><code>DISTINCT</code>, <code>GROUP BY</code>, <code>HAVING</code>, <code>LIMIT</code> 이 포함된 서브쿼리</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM (
+  SELECT * FROM employees WHERE first_name='Matt'
+) derived_table
+WHERE derived_table.hire_date = '1986-04-03';</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">SHOW WARNINGS 로 본 재작성 결과</span>
+      <span class="code-tag good">파생 테이블이 사라졌다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">SELECT
+    `realmysql`.`employees`.`emp_no`     AS `emp_no`,
+    `realmysql`.`employees`.`birth_date` AS `birth_date`,
+    `realmysql`.`employees`.`first_name` AS `first_name`,
+    `realmysql`.`employees`.`last_name`  AS `last_name`,
+    `realmysql`.`employees`.`gender`     AS `gender`,
+    `realmysql`.`employees`.`hire_date`  AS `hire_date`
+FROM `realmysql`.`employees`
+WHERE `realmysql`.`employees`.`hire_date` = DATE'1986-04-03'
+  AND `realmysql`.`employees`.`first_name` = 'Matt';</code></pre>
+  </div>
+  <p>재작성 결과 두 조건이 나란히 놓였고, 실행 계획은 <code>Using intersect(ix_hiredate,ix_firstname)</code> 인덱스 머지로 처리됐다.</p>
+
+  <h4>인비저블 인덱스 (use_invisible_indexes)</h4>
+  <p>인덱스를 삭제하지 않고도 옵티마이저가 쓰지 못하게 하는 설정이다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">ALTER TABLE employees ALTER INDEX ix_hiredate INVISIBLE;
+ALTER TABLE employees ALTER INDEX ix_hiredate VISIBLE;</code></pre>
+  </div>
+
+  <h4>스킵 스캔 (skip_scan)</h4>
+  <ul>
+    <li>제한적이지만 <b>인덱스의 제약을 뛰어넘는</b> 최적화다.</li>
+    <li>보통 다중 컬럼 인덱스는 <code>WHERE</code> 에 <b>선행 컬럼이 반드시 있어야</b> 한다.</li>
+    <li>스킵 스캔은 <b>선행 컬럼 없이 후행 컬럼 조건만으로도</b> 인덱스를 쓸 수 있게 한다.</li>
+    <li>내부적으로 <b>선행 컬럼 조건이 있는 것처럼</b> 쿼리를 최적화한다.</li>
+    <li>따라서 <b>선행 컬럼의 유니크 값이 소수일 때만</b> 선택된다.</li>
+  </ul>
+
+  <h4>해시 조인 (hash_join)</h4>
+  <p>많은 사람이 네스티드 루프보다 해시 조인이 빠르다고 생각하지만 <b>틀렸다.</b> 무엇이 빠른가는 <b>무엇을 재느냐</b>에 달렸다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>조인 방식</th><th>첫 레코드</th><th>마지막 레코드</th><th>최적화 목표</th></tr></thead>
+      <tbody>
+        <tr><td>네스티드 루프</td><td class="t-ok">금방 찾음</td><td>오래 걸림</td><td><b>Best Response Time</b></td></tr>
+        <tr><td>해시 조인</td><td class="t-no">오래 걸림</td><td class="t-ok">금방 찾음</td><td><b>Best Throughput</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>일반적인 <b>OLTP 서비스에서는 응답 속도가 더 중요</b>하다. 그래서 네스티드 루프가 기본이다.</li>
+    <li>해시 조인은 <b>조인 컬럼에 인덱스가 없거나</b>, 조인 대상 중 일부의 레코드 건수가 매우 적을 때만 쓰인다.</li>
+    <li>즉 <b>네스티드 루프가 적합하지 않을 때의 차선책</b>이다.</li>
+    <li>강제로 특정 방식을 유도하는 것은 좋지 않다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">인덱스를 강제로 무시해 해시 조인 유도</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees e IGNORE INDEX(PRIMARY, ix_hiredate)
+INNER JOIN dept_emp de IGNORE INDEX(ix_empno_fromdate, ix_fromdate)
+  ON de.emp_no = e.emp_no AND de.from_date = e.hire_date;</code></pre>
+  </div>
+
+  <h5>해시 조인의 두 단계</h5>
+  <ul>
+    <li><b>빌드 단계 (Build Phase)</b> — 조인 대상 중 레코드가 적어 해시 테이블로 만들기 용이한 테이블(빌드 테이블)을 메모리에 올린다.</li>
+    <li><b>프로브 단계 (Probe Phase)</b> — 나머지 테이블(프로브 테이블)의 레코드를 읽어 해시 테이블에서 일치하는 것을 찾는다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  A["dept_emp.emp_no 로 메모리에 해시 테이블 생성"] --> B["빌드 단계 완료"]
+  B --> C["employees.emp_no 로 해시 테이블 검색 및 조인"]
+  C --> D["프로브 단계 완료"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>빌드 단계가 끝나야 첫 결과가 나온다</b> — 해시 조인의 첫 응답이 느린 이유가 이것이다.</div>
+  </div>
+
+  <h5>조인 버퍼가 가득 차면</h5>
+  <ul>
+    <li><code>join_buffer_size</code> 를 넘어가면 나머지 레코드를 <b>청크 단위로 나눠 디스크에 저장</b>한다.</li>
+    <li>빌드 테이블과 프로브 테이블은 <b>동일한 개수의 청크</b>로 쪼개져 디스크에 저장된다.</li>
+  </ul>
+
+  <h5>상세 알고리즘</h5>
+  <ul>
+    <li>빌드 테이블의 크기에 따라 다른 알고리즘을 쓴다.</li>
+    <li>메모리에서 전부 처리 가능하면 <b>클래식 해시 조인</b>.</li>
+    <li>해시 테이블이 조인 버퍼보다 크면 <b>그레이스 해시 조인</b>.</li>
+    <li>두 알고리즘을 <b>하이브리드로</b> 쓸 수 있도록 구현되어 있다.</li>
+    <li>해시 키 생성에는 <b>xxHash64</b> 를 쓴다 — 매우 빠르고 분포도가 훌륭한 알고리즘이다.</li>
+  </ul>
+
+  <h4>인덱스 정렬 선호 (prefer_ordering_index)</h4>
+  <p>아래 예에서 옵티마이저는 두 가지 선택지를 갖는다.</p>
+  <ul>
+    <li><code>ix_hiredate</code> 로 <code>BETWEEN</code> 조건을 만족하는 레코드를 찾고, <code>emp_no</code> 로 정렬 (Filesort)</li>
+    <li>기본키 인덱스로 먼저 읽으며 <code>hire_date</code> 조건을 만족하는 레코드를 고르기 (정렬 불필요)</li>
+  </ul>
+  <ul>
+    <li><code>WHERE</code> 조건의 레코드가 많지 않다면 1번이 효율적이지만, 때로는 2번이 선택되기도 한다.</li>
+    <li><code>ORDER BY</code> 용 인덱스에 <b>너무 큰 가중치를 두지 않게</b> 하는 것이 이 옵션이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT * FROM employees e
+WHERE hire_date BETWEEN '1985-01-01' AND '1985-02-01'
+ORDER BY emp_no;</code></pre>
+  </div>
+
+  <h4>조인 최적화 알고리즘</h4>
+  <p>조인 쿼리의 실행 계획을 만드는 알고리즘이 두 가지 있다.</p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM t1, t2, t3, t4 WHERE ...</code></pre>
+  </div>
+
+  <h5>Exhaustive 검색 알고리즘</h5>
+  <ul>
+    <li><code>FROM</code> 절의 <b>모든 테이블 조합</b>에 대해 최적의 하나를 찾는다.</li>
+    <li>테이블이 20개라면 <code>20!</code>(약 2.4×10<sup>18</sup>) 가지의 조합이 생긴다.</li>
+    <li>테이블이 10개만 넘어도 <b>실행 계획을 만드는 데만 몇 분</b>이 걸린다.</li>
+  </ul>
+
+  <h5>Greedy 검색 알고리즘</h5>
+  <ul>
+    <li><code>optimizer_search_depth</code> 에 설정된 깊이만큼만 조합을 생성한다.
+      <ul>
+        <li>기본값은 <b>62</b> 다.</li>
+        <li><b>0으로 설정하면</b> 옵티마이저가 알아서 최적의 깊이를 계산한다.</li>
+      </ul>
+    </li>
+    <li><code>optimizer_prune_level</code> 은 <b>휴리스틱 알고리즘</b> 사용 여부다.
+      <ul>
+        <li>휴리스틱을 끄면 <code>optimizer_search_depth</code> 는 4~5가 적절하다.</li>
+        <li>특별한 이유가 없으면 <b>0으로 설정하지 않는 것</b>을 권장한다.</li>
+      </ul>
+    </li>
+    <li>8.0에서는 최적화가 많이 개선되어 <b>조인 관련 시스템 변수를 손댈 일이 사실상 없어 보인다.</b></li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>ICP</b> 는 조건 검사를 스토리지 엔진으로 밀어내 <b>읽는 레코드 수 자체</b>를 줄인다. <code>Using index condition</code>.</li>
+      <li><b>인덱스 머지</b> 는 <code>intersect</code>(AND) / <code>union</code>(OR) / <code>sort_union</code>(정렬 필요) 세 갈래.</li>
+      <li><code>WHERE</code> 의 <code>OR</code> 는 한쪽만 인덱스가 없어도 <b>풀 스캔</b>이 된다.</li>
+      <li>세미 조인 5종 — <b>Table Pull-out(항상 이득) · FirstMatch · LooseScan · Materialization · Duplicate Weed-out</b>.</li>
+      <li>해시 조인은 <b>Throughput</b>, 네스티드 루프는 <b>Response Time</b>. OLTP에선 후자가 옳다.</li>
+      <li>8.0에서 조인 관련 옵티마이저 변수는 <b>건드리지 않는 것이 기본</b>이다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">9-4</div>
+    <h3>쿼리 힌트</h3>
+    <p class="item-tagline">힌트는 옵티마이저와의 대화다. <b>인덱스 힌트보다 옵티마이저 힌트</b>가 우선이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    인덱스 힌트는 ANSI-SQL 문법을 깨고, 옵티마이저 힌트는 <b>주석 안에 들어가 호환성을 지킨다.</b> 새로 쓴다면 후자다.
+  </div>
+
+  <h4>두 종류의 힌트</h4>
+  <ul>
+    <li>서비스 개발자나 DBA가 DB보다 나은 실행 계획을 알고 있을 때가 있다.</li>
+    <li>쿼리 힌트는 옵티마이저에게 그것을 알려 주는 방법이다.</li>
+    <li><b>인덱스 힌트</b>와 <b>옵티마이저 힌트</b> 두 가지가 있다.</li>
+  </ul>
+
+  <h4>인덱스 힌트</h4>
+  <ul>
+    <li>옵티마이저 힌트가 도입되기 전에 쓰던 기능으로, <b>ANSI-SQL 문법을 준수하지 못한다.</b></li>
+    <li><code>SELECT</code>, <code>UPDATE</code> 두 명령에서만 쓸 수 있다.</li>
+    <li>가능하면 <b>옵티마이저 힌트를 쓰는 것</b>을 권장한다.</li>
+  </ul>
+
+  <h4>STRAIGHT_JOIN</h4>
+  <ul>
+    <li>옵티마이저 힌트인 동시에 <b>조인 키워드</b>이기도 하다.</li>
+    <li><code>SELECT</code>, <code>UPDATE</code>, <code>DELETE</code> 에서 여러 테이블이 조인될 때 <b>조인 순서를 고정</b>한다.</li>
+    <li>옵티마이저는 보통 통계 정보와 조건을 보고 최적이라 판단한 순서로 조인한다.
+      <ul><li>인덱스에 문제가 없다면 <b>조건에 일치하는 레코드가 적은 테이블</b>을 드라이빙으로 고른다.</li></ul>
+    </li>
+  </ul>
+
+  <h5>고정하기 전</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM employees e, dept_emp de, departments d
+WHERE e.emp_no = de.emp_no AND d.dept_no = de.dept_no;</code></pre>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>순서</th><th>table</th><th>type</th><th>key</th><th>rows</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>d</td><td>ALL</td><td>NULL</td><td>9</td></tr>
+        <tr><td>2</td><td>de</td><td>ref</td><td>PRIMARY</td><td>41,392</td></tr>
+        <tr><td>3</td><td>e</td><td>eq_ref</td><td>PRIMARY</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>레코드가 가장 적은 <code>departments</code>(9건)가 드라이빙으로 선택됐다.</p>
+
+  <h5>고정한 후</h5>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*! STRAIGHT_JOIN */ *
+FROM employees e, dept_emp de, departments d
+WHERE e.emp_no = de.emp_no AND d.dept_no = de.dept_no;</code></pre>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>순서</th><th>table</th><th>type</th><th>key</th><th>rows</th><th>Extra</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>e</td><td class="t-no">ALL</td><td>NULL</td><td class="t-no">300,030</td><td></td></tr>
+        <tr><td>2</td><td>de</td><td>ref</td><td>ix_empno_fromdate</td><td>1</td><td></td></tr>
+        <tr><td>3</td><td>d</td><td>ALL</td><td>NULL</td><td>9</td><td><code>Using join buffer (hash join)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>FROM</code> 절에 적힌 순서(<code>employees</code> → <code>dept_emp</code> → <code>departments</code>)대로 조인됐다. 이 예시에서는 <b>확실히 나빠졌다</b> — 힌트가 늘 이득은 아니라는 좋은 예다.</p>
+
+  <h5>언제 쓰는 게 좋을까</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상황</th><th>권장 드라이빙 테이블</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>임시 테이블 + 일반 테이블 조인</td>
+          <td><b>임시 테이블</b>. 대개 옵티마이저가 알아서 하지만, 못 하면 힌트로 고정</td>
+        </tr>
+        <tr>
+          <td>임시 테이블끼리 조인</td>
+          <td>임시 테이블에는 인덱스가 없으므로 <b>레코드가 적은 쪽</b></td>
+        </tr>
+        <tr>
+          <td>일반 테이블끼리 조인 (양쪽 다 인덱스 있음 / 없음)</td>
+          <td><b>레코드가 적은 쪽</b></td>
+        </tr>
+        <tr>
+          <td>일반 테이블끼리 조인 (한쪽만 인덱스 있음)</td>
+          <td>조인 컬럼에 <b>인덱스가 없는 쪽</b>을 드라이빙으로</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>STRAIGHT_JOIN 과 비슷한 역할들</h5>
+  <ul>
+    <li><code>JOIN_FIXED_ORDER</code> — <code>STRAIGHT_JOIN</code> 과 동일</li>
+    <li><code>JOIN_ORDER</code>, <code>JOIN_PREFIX</code>, <code>JOIN_SUFFIX</code> — <b>일부 테이블의 순서만</b> 제안</li>
+  </ul>
+
+  <h4>USE INDEX / FORCE INDEX / IGNORE INDEX</h4>
+  <ul>
+    <li>3~4개 이상의 컬럼을 포함한 비슷한 인덱스가 여러 개 있으면 <b>옵티마이저도 가끔 실수</b>한다.</li>
+    <li>인덱스 힌트는 <b>그 테이블 바로 뒤</b>에 명시한다.</li>
+    <li>별도로 만들지 않은 기본키 인덱스는 <code>PRIMARY</code> 로 지칭한다.</li>
+    <li>정확한 판단이 어렵다면 <b>옵티마이저에게 맡기는 편이 낫다.</b></li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">가장 훌륭한 최적화</p>
+      <p>힌트를 고민하기 전에 생각해 볼 것들 — <b>쿼리를 아예 없애기</b>, <b>다루는 데이터를 최소화하기</b>, <b>데이터 모델을 단순화하기</b>. 힌트는 이 셋이 모두 불가능할 때의 마지막 수단이다.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>힌트</th><th>강도</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>USE INDEX</code></td><td>권장</td>
+          <td>특정 인덱스를 쓰도록 <b>권장</b>. 채택은 하지만 항상 그 인덱스를 쓰는 것은 아니다</td>
+        </tr>
+        <tr>
+          <td><code>FORCE INDEX</code></td><td>강함</td>
+          <td><code>USE INDEX</code> 보다 영향이 크지만, <b>사실상 <code>USE INDEX</code> 만으로 충분</b>하다. <code>USE INDEX</code> 로 안 되는 경우는 <code>FORCE INDEX</code> 로도 안 된다</td>
+        </tr>
+        <tr>
+          <td><code>IGNORE INDEX</code></td><td>배제</td>
+          <td>특정 인덱스를 <b>쓰지 못하게</b> 한다. 풀 인덱스 스캔 대신 풀 테이블 스캔을 유도할 때도 쓴다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">SELECT * FROM employees USE INDEX(PRIMARY) WHERE emp_no = 1000;
+SELECT * FROM employees FORCE INDEX(ix_name) WHERE emp_no = 1000;
+SELECT * FROM employees IGNORE INDEX(ix_name) WHERE emp_no = 1000;</code></pre>
+  </div>
+
+  <h4>SQL_CALC_FOUND_ROWS</h4>
+  <ul>
+    <li>보통 <code>LIMIT</code> 은 그 건수를 채우면 검색을 <b>중단</b>한다.</li>
+    <li><code>SQL_CALC_FOUND_ROWS</code> 를 쓰면 중단하지 않고 <b>끝까지 수행</b>한다.</li>
+    <li>결과가 300건이라면 랜덤 I/O가 300번 발생한다.</li>
+    <li>이는 성능이 아니라 <b>개발자의 편의를 위해</b> 만들어진 힌트다.</li>
+    <li>다만 <code>SELECT</code> 가 제대로 튜닝되지 않았거나 인덱스 설계가 잘못된 경우에는 <b>오히려 빠를 수도</b> 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT SQL_CALC_FOUND_ROWS * FROM employees s LIMIT 0, 20;
+20 rows in set, 1 warning (0.10 sec)
+
+mysql&gt; SELECT FOUND_ROWS() AS total_count;
++-------------+
+| total_count |
++-------------+
+|      300024 |
++-------------+</code></pre>
+  </div>
+
+  <h4>옵티마이저 힌트</h4>
+  <p>종류가 매우 다양하고 영향 범위도 제각각이다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>범위</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>인덱스</td><td>특정 인덱스 이름을 지정할 수 있는 힌트</td></tr>
+        <tr><td>테이블</td><td>특정 테이블의 인덱스를 대상으로 하는 힌트</td></tr>
+        <tr><td>쿼리 블록</td><td><b>힌트가 명시된 쿼리 블록</b>에만 영향을 주는 힌트</td></tr>
+        <tr><td>글로벌</td><td>쿼리 전체에 영향을 주는 힌트</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>주의점</h5>
+  <ul>
+    <li>위 구분 때문에 힌트의 <b>작성 위치가 달라지지는 않는다.</b> 모두 <code>/*+ ... */</code> 안에 쓴다.</li>
+    <li>인덱스 이름 없이 테이블 이름만 쓰면 <b>테이블 수준 힌트</b>가 된다.</li>
+    <li>모든 인덱스 수준 힌트는 <b>반드시 테이블명이 선행</b>되어야 한다.</li>
+    <li>특정 쿼리 블록을 <b>외부에서</b> 지정하려면 <code>QB_NAME()</code> 힌트로 이름을 부여해야 한다.</li>
+  </ul>
+
+  <h4>MAX_EXECUTION_TIME</h4>
+  <ul>
+    <li>유일하게 <b>실행 계획에 영향을 주지 않는</b> 힌트다. 단순히 쿼리의 최대 실행 시간(밀리초)을 설정한다.</li>
+    <li>그 시간을 초과하면 쿼리는 <b>실패</b>한다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">mysql</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">mysql&gt; SELECT /*+ MAX_EXECUTION_TIME(1) */ *
+    -&gt; FROM employees e
+    -&gt; ORDER BY last_name DESC, emp_no ASC LIMIT 1;
+ERROR 3024 (HY000): Query execution was interrupted,
+maximum statement execution time exceeded</code></pre>
+  </div>
+
+  <h4>SET_VAR</h4>
+  <ul>
+    <li>실행 계획을 바꾸는 것뿐 아니라 <b>버퍼 크기를 일시적으로 늘리는</b> 데도 쓸 수 있다.</li>
+    <li>대용량 쿼리의 성능 향상 용도로 유용하다.</li>
+    <li>다만 <b>모든 시스템 변수를 조정할 수 있는 것은 아니다.</b></li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ SET_VAR(optimizer_switch='index_merge_intersection=off') */ *
+FROM employees e
+WHERE first_name='Georgi' AND emp_no BETWEEN 10000 AND 20000;</code></pre>
+  </div>
+
+  <h4>SEMIJOIN &amp; NO_SEMIJOIN</h4>
+  <ul>
+    <li>세미 조인 최적화 전략 중 어느 것을 쓰거나 쓰지 않을지 제어한다.</li>
+    <li><b>Table Pull-out</b> 은 대부분 성능이 좋아서 제어 옵션 자체가 없다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">힌트를 어디에 쓰는가</p>
+      <p>세미 조인 최적화 힌트는 <b>외부 쿼리가 아니라 서브쿼리에</b> 명시한다. 외부에서 지정하려면 <code>QB_NAME()</code> 으로 쿼리 블록에 이름부터 붙여야 한다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">서브쿼리에 직접 명시</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM departments d
+WHERE d.dept_no IN (
+  SELECT /*+ SEMIJOIN(MATERIALIZATION) */ de.dept_no
+  FROM dept_emp de
+);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">쿼리 블록 이름으로 외부에서 지정</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ SEMIJOIN(@subq1 MATERIALIZATION) */ *
+FROM departments d
+WHERE d.dept_no IN (
+  SELECT /*+ QB_NAME(subq1) */ de.dept_no
+  FROM dept_emp de
+);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">특정 전략만 배제</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">EXPLAIN
+SELECT *
+FROM departments d
+WHERE d.dept_no IN (
+  SELECT /*+ NO_SEMIJOIN(MATERIALIZATION) */ de.dept_no
+  FROM dept_emp de
+);</code></pre>
+  </div>
+  <p>구체화를 배제하니 옵티마이저는 <code>LooseScan</code> 을 선택했다.</p>
+
+  <h4>SUBQUERY</h4>
+  <ul>
+    <li><b>세미 조인 최적화를 쓸 수 없을 때</b> 동원되는 최적화 방법을 지정한다.</li>
+    <li>세미 조인 최적화는 <code>IN (subquery)</code> 형태에만 쓰이고 <b>안티 세미 조인에는 쓸 수 없다.</b></li>
+    <li>서브쿼리에 직접 힌트를 쓰거나, 쿼리 블록에 이름을 붙여 외부에서 지정할 수 있다.</li>
+    <li>웬만해서는 쓰지 않는다.</li>
+  </ul>
+
+  <h4>BNL / NO_BNL / HASHJOIN / NO_HASHJOIN</h4>
+  <ul>
+    <li><b>8.0.20 이후</b> 로는 블록 네스티드 루프 조인이 더 이상 쓰이지 않는다.</li>
+    <li><code>HASHJOIN</code>, <code>NO_HASHJOIN</code> 은 <b>8.0.18 에서만</b> 유효하다.</li>
+    <li>그 이후 버전에서는 <code>BNL</code>, <code>NO_BNL</code> 로 해시 조인을 제어한다 — 이름은 BNL이지만 실제로 켜지는 것은 해시 조인이다.</li>
+    <li>조인 컬럼의 인덱스가 잘 설계되어 있다면 <code>BNL</code> 을 줘도 그대로 인덱스 조인을 할 것이다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ BNL(e, de) */ *
+FROM employees e
+INNER JOIN dept_emp de ON de.emp_no = e.emp_no;</code></pre>
+  </div>
+
+  <h4>JOIN_FIXED_ORDER / JOIN_ORDER / JOIN_PREFIX / JOIN_SUFFIX</h4>
+  <ul>
+    <li><code>STRAIGHT_JOIN</code> 은 <b><code>FROM</code> 절의 순서 자체를 조인 순서에 맞게 고쳐 써야</b> 했다.</li>
+    <li>또 일부 테이블만 고정하고 나머지는 옵티마이저에게 맡기는 것이 불가능했다.</li>
+    <li>이 단점을 보완하려고 네 가지 힌트를 제공한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>힌트</th><th>효과</th></tr></thead>
+      <tbody>
+        <tr><td><code>JOIN_FIXED_ORDER()</code></td><td><code>STRAIGHT_JOIN</code> 처럼 <code>FROM</code> 절 순서 그대로 조인</td></tr>
+        <tr><td><code>JOIN_ORDER(d, de)</code></td><td>힌트에 명시된 <b>테이블들의 순서</b>대로 조인</td></tr>
+        <tr><td><code>JOIN_PREFIX(e, de)</code></td><td><b>드라이빙(앞쪽) 테이블만</b> 강제</td></tr>
+        <tr><td><code>JOIN_SUFFIX(e, de)</code></td><td><b>드리븐(뒤쪽) 테이블만</b> 강제</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ JOIN_PREFIX(e, de) */ *
+FROM employees e
+INNER JOIN dept_emp de ON de.emp_no = e.emp_no
+INNER JOIN departments d ON d.dept_no = de.dept_no;</code></pre>
+  </div>
+
+  <h4>MERGE &amp; NO_MERGE</h4>
+  <ul>
+    <li>임시 테이블의 비효율을 줄이려고 <b>서브쿼리를 외부 쿼리와 병합</b>하는 최적화(derived_merge)가 도입되었다.</li>
+    <li>때로는 옵티마이저가 잘못 판단할 수 있는데, <code>MERGE</code> / <code>NO_MERGE</code> 로 제어한다.</li>
+  </ul>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">MERGE — 파생 테이블 제거</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ MERGE(sub) */ *
+FROM (
+  SELECT * FROM employees e
+  WHERE first_name = 'Matt'
+) sub LIMIT 10;
+-- select_type: SIMPLE
+-- table: e</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">NO_MERGE — 파생 테이블 유지</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ NO_MERGE(sub) */ *
+FROM (
+  SELECT * FROM employees e
+  WHERE first_name = 'Matt'
+) sub LIMIT 10;
+-- select_type: PRIMARY / DERIVED
+-- table: &lt;derived2&gt;</code></pre>
+    </div>
+  </div>
+
+  <h4>INDEX_MERGE &amp; NO_INDEX_MERGE</h4>
+  <p>하나의 테이블에 여러 인덱스를 동시에 쓰는 인덱스 머지의 사용 여부를 제어한다.</p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ NO_INDEX_MERGE(employees PRIMARY) */ *
+FROM employees e
+WHERE first_name = 'Georgi'
+  AND emp_no BETWEEN 10000 AND 20000;</code></pre>
+  </div>
+
+  <h4>NO_ICP</h4>
+  <ul>
+    <li>대부분의 경우 인덱스 컨디션 푸시다운은 성능에 도움이 된다.</li>
+    <li>비활성화가 필요할 때만 쓴다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ NO_ICP(employees ix_lastname_firstname) */ *
+FROM employees e
+WHERE last_name="Acton" AND first_name LIKE '%sal';</code></pre>
+  </div>
+
+  <h4>SKIP_SCAN &amp; NO_SKIP_SCAN</h4>
+  <ul>
+    <li>스킵 스캔은 선행 컬럼 조건 없이도 인덱스를 쓰게 해 주는 좋은 최적화다.</li>
+    <li>하지만 <b>선행 컬럼의 유니크 값이 많아지면 오히려 느려진다.</b></li>
+    <li>옵티마이저가 비효율적인 상황에서 스킵 스캔을 선택하면 끌 수 있다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ NO_SKIP_SCAN(employees ix_gender_birthdate) */ *
+FROM employees e
+WHERE birth_date &gt;= '1965-02-01';</code></pre>
+  </div>
+
+  <h4>INDEX &amp; NO_INDEX</h4>
+  <ul>
+    <li>기존 인덱스 힌트를 대체하는 용도의 옵티마이저 힌트다.</li>
+    <li>인덱스 힌트와 달리 <b>테이블명과 인덱스명을 함께</b> 지정해야 한다.</li>
+  </ul>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">EXPLAIN
+SELECT /*+ INDEX(employees ix_firstname) */ *
+FROM employees e
+WHERE first_name = 'Matt';</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>새 코드에는 <b>옵티마이저 힌트</b>를 쓴다 — 주석 안에 있어 다른 DBMS에서도 무시된다.</li>
+      <li><code>STRAIGHT_JOIN</code> 은 <code>FROM</code> 순서를 그대로 강제한다. 부분 고정에는 <code>JOIN_ORDER</code> 계열이 낫다.</li>
+      <li><code>FORCE INDEX</code> 는 사실상 필요 없다 — <code>USE INDEX</code> 로 안 되면 그것도 안 된다.</li>
+      <li>세미 조인 힌트는 <b>서브쿼리 안에</b> 쓰거나 <code>QB_NAME()</code> 으로 이름을 붙인다.</li>
+      <li>8.0.20+ 에서 해시 조인 제어는 <code>BNL</code> / <code>NO_BNL</code> 이다.</li>
+      <li>가장 좋은 최적화는 <b>쿼리를 없애거나, 데이터를 줄이거나, 모델을 단순화</b>하는 것이다.</li>
+    </ul>
+  </div>
+</article>

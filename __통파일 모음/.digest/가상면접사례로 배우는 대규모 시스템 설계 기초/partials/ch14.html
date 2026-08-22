@@ -1,0 +1,517 @@
+<article class="item" id="item-52" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-1</div>
+    <h3>요구사항과 개략적 규모</h3>
+    <p class="item-tagline">하루 150TB의 저장소와 하루 15만 달러의 CDN 비용.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    유튜브 설계의 지배적 제약은 성능이 아니라 <b>비용</b>이다. CDN 요금이 하루 15만 달러라는 계산이 뒤의 모든 최적화를 정당화한다.
+  </div>
+
+  <h4>필요한 기능</h4>
+  <ul>
+    <li>빠른 비디오 업로드</li>
+    <li>원활한 비디오 재생</li>
+    <li>재생 품질 선택 기능</li>
+    <li>낮은 인프라 비용</li>
+    <li>높은 가용성과 규모 확장성, 안정성</li>
+    <li>지원 클라이언트 — 모바일 앱, 웹 브라우저, 스마트 TV</li>
+  </ul>
+
+  <h4>개략적 규모</h4>
+  <ul>
+    <li>DAU — 5,000,000</li>
+    <li>사용자 한 명이 평균 하루 5개의 비디오를 시청</li>
+    <li>10%의 사용자가 하루에 1개의 비디오를 업로드</li>
+    <li>비디오 평균 크기는 300MB</li>
+    <li>하루 저장 용량 = 500만 × 10% × 300MB = <b>150TB</b></li>
+    <li>CDN 비용 —
+      <ul>
+        <li>AWS CloudFront 기준, 모든 트래픽이 미국에서 발생한다면 1GB당 $0.02</li>
+        <li>매일 500만 × 5비디오 × 0.3GB × $0.02 = <b>$150,000</b></li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">연간 5,475만 달러</p>
+      <p>하루 15만 달러는 <b>연 5천만 달러가 넘는 비용</b>이다. 14-3의 "인기 없는 비디오는 미리 인코딩하지 않는다", "지역 편중 비디오는 옮기지 않는다", "ISP와 계약해 CDN을 직접 구축한다" 같은 제안들이 왜 나오는지가 이 숫자 하나로 설명된다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>하루 저장 증가 150TB, 하루 CDN 비용 15만 달러.</li>
+      <li>기능 요구사항 안에 "낮은 인프라 비용"이 명시적으로 들어 있다.</li>
+      <li>이 장의 최적화는 대부분 비용 최적화다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-53" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-2</div>
+    <h3>개략적 설계</h3>
+    <p class="item-tagline">비디오는 BLOB에, 배포는 CDN에. 나머지는 트랜스코딩 파이프라인이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    업로드 요청은 <b>파일 업로드와 메타데이터 갱신 두 갈래로 병렬 진행</b>된다. 큰 파일 전송을 기다리며 메타데이터까지 멈출 이유가 없기 때문이다.
+  </div>
+
+  <h4>저장 공간과 CDN</h4>
+  <blockquote>
+    <p>직접 바닥부터 모든 걸 만드는 것은 매우 비싼 시간적/물적 비용이 든다. 이미 만들어진 것을 적절하게 쓰자.</p>
+  </blockquote>
+  <ul>
+    <li>비디오를 저장하기 위해 <b>BLOB 스토리지</b>를 쓴다.</li>
+    <li>빠른 다운로드를 위해 <b>CDN</b>을 쓴다.</li>
+    <li>넷플릭스는 AWS CloudFront를, 페이스북은 Akamai를 쓰는 등 회사마다 다양하다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  D["단말기들<br>Web / App / TV"] -->|"비디오 스트리밍 요청"| CDN["CDN"]
+  D -->|"그 외 나머지 요청"| API["API 서버"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>비디오 트래픽은 우리 서버에 오지 않는다</b> — 스트리밍은 전부 CDN이 받고, API 서버는 메타데이터 / 검색 / 추천 같은 가벼운 요청만 처리한다.</div>
+  </div>
+
+  <h4>비디오 업로드 절차</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["유저 단말기들"] -->|"비디오 업로드"| ORIG[("원본 저장소")]
+  U --> LB["로드밸런서"] --> API["API 서버"]
+  API --> MC[("메타데이터 캐시")]
+  API --> MDB[("메타데이터 DB")]
+  ORIG -->|"원본 비디오를 가져와<br>트랜스코딩 진행"| TC["트랜스코딩 서버"]
+  TC -->|"트랜스코딩 결과물 업로드"| TS[("트랜스코딩 비디오 저장소<br>BLOB")]
+  TS -->|"CDN 에 업로드"| CDN["CDN"]
+  TC -->|"이벤트 추가"| CQ[["트랜스코딩 완료 큐"]]
+  CQ --> CH["트랜스코딩 완료 핸들러"]
+  CH -->|"캐시 갱신"| MC
+  CH -->|"DB 갱신"| MDB
+  CH -.->|"스트리밍 완료 알림"| U
+      </pre>
+    </div>
+    <div class="figure-cap"><b>업로드가 끝나도 재생 준비는 끝나지 않는다</b> — 트랜스코딩이 완료되고 완료 핸들러가 메타데이터를 갱신해야 비로소 재생 가능 상태가 된다. 완료 큐가 이 비동기 구간을 이어 준다.</div>
+  </div>
+
+  <h5>트랜스코딩 서버 (transcoding server)</h5>
+  <ul>
+    <li>트랜스코딩은 비디오 인코딩이라고도 부르며, 비디오의 포맷을 변환하는 절차다.</li>
+    <li>단말이나 대역폭 요구사항에 맞는 최적의 비디오 스트림을 제공하기 위해 필요하다.</li>
+  </ul>
+
+  <h5>트랜스코딩 비디오 저장소 (transcoded storage)</h5>
+  <ul><li>트랜스코딩이 완료된 비디오를 저장하는 BLOB 스토리지다.</li></ul>
+
+  <h5>CDN</h5>
+  <ul>
+    <li>트랜스코딩이 완료된 비디오를 캐시한다.</li>
+    <li>사용자가 재생을 누르면 스트리밍은 CDN을 통해 이루어진다.</li>
+  </ul>
+
+  <h5>트랜스코딩 완료 큐 (completion queue)</h5>
+  <ul><li>비디오 트랜스코딩 완료 이벤트를 보관할 메시지 큐다.</li></ul>
+
+  <h5>트랜스코딩 완료 핸들러 (completion handler)</h5>
+  <ul>
+    <li>완료 큐에서 이벤트를 꺼내 처리한다.</li>
+    <li>메타데이터 캐시와 메타데이터 DB를 갱신하는 작업 서버들이다.</li>
+  </ul>
+
+  <h4>프로세스 A : 비디오 업로드</h4>
+  <ol class="steps">
+    <li><div class="step-title">비디오를 원본 저장소에 업로드한다</div></li>
+    <li><div class="step-title">트랜스코딩 서버가 원본을 가져와 변환한다</div></li>
+    <li><div class="step-title">결과물을 트랜스코딩 비디오 저장소에 올린다</div></li>
+    <li><div class="step-title">완료 이벤트를 큐에 넣고, 핸들러가 메타데이터를 갱신한다</div></li>
+    <li><div class="step-title">CDN에 배포하고 사용자에게 알린다</div></li>
+  </ol>
+
+  <h4>프로세스 B : 메타데이터 갱신</h4>
+  <ul>
+    <li>원본 저장소에 파일이 업로드되는 동안, 단말은 <b>병렬로</b> 비디오 메타데이터 갱신 요청을 보낸다.</li>
+    <li>메타데이터에는 이름, 크기, 포맷 등의 정보가 포함된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  U["유저 단말기"] -->|"메타데이터 갱신 요청"| LB["로드밸런서"]
+  LB --> API["API 서버"]
+  API --> MC[("메타데이터 캐시")]
+  API --> MDB[("메타데이터 DB")]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>파일 전송과 무관한 가벼운 경로</b> — 300MB 전송이 끝나기를 기다리지 않고 제목/설명 같은 정보를 먼저 저장할 수 있다.</div>
+  </div>
+
+  <h4>비디오 스트리밍 절차</h4>
+  <ul>
+    <li>유튜브에서 비디오를 재생하면 다운로드가 끝난 뒤 재생되는 것이 아니라 즉시 영상이 시작된다.</li>
+    <li>스트리밍은 지속적으로 비디오 스트림을 전송받아 영상을 재생하는 것을 뜻한다.</li>
+  </ul>
+
+  <h5>스트리밍 프로토콜</h5>
+  <ul>
+    <li>비디오 스트리밍을 위해 데이터를 전송할 때 쓰이는 표준화된 통신 방법이다.</li>
+    <li>MPEG-DASH, HLS, MSS, HDS 등 다양한 프로토콜이 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">프로토콜이 곧 화질 전환의 메커니즘 <span class="badge b-blue">보강</span></p>
+      <p>MPEG-DASH와 HLS는 비디오를 <b>몇 초짜리 조각들로 잘라 두고</b>, 화질별 조각 목록을 담은 매니페스트를 준다. 플레이어가 네트워크 상태를 보며 조각 단위로 화질을 바꿔 요청하기 때문에 재생 중에도 화질이 자연스럽게 바뀐다. "재생 품질 선택 기능"이 별도 기능이 아니라 프로토콜 위에서 자동으로 얻어지는 이유다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>비디오는 BLOB 스토리지, 배포는 CDN, 메타데이터는 DB + 캐시.</li>
+      <li>업로드는 파일 전송과 메타데이터 갱신 두 갈래로 병렬 진행된다.</li>
+      <li>트랜스코딩 완료 큐가 비동기 구간을 이어 준다.</li>
+      <li>스트리밍 프로토콜(HLS/DASH)이 조각 단위 적응형 화질 전환을 제공한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-54" data-spy>
+  <header class="item-head">
+    <div class="item-num">14-3</div>
+    <h3>상세 설계</h3>
+    <p class="item-tagline">DAG로 파이프라인을 추상화하고, GOP로 쪼개 병렬화하고, 롱테일로 비용을 깎는다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이 절의 최적화는 전부 <b>"쪼개서 병렬로"</b>라는 한 가지 아이디어의 변주다. GOP로 쪼개 업로드하고, 작업으로 쪼개 스케줄링하고, 단계로 쪼개 메시지 큐로 잇는다.
+  </div>
+
+  <h4>비디오 트랜스코딩</h4>
+  <ul>
+    <li>비트레이트는 비디오를 구성하는 비트가 얼마나 빨리 처리되어야 하는지를 나타낸다.</li>
+    <li>비트레이트가 높을수록 화질이 좋다.</li>
+    <li>높은 비트레이트의 비디오를 재생하려면 고성능 컴퓨팅 파워와 좋은 회선이 있어야 한다.</li>
+  </ul>
+
+  <h5>비디오 트랜스코딩이 중요한 이유</h5>
+  <ul>
+    <li>원본 비디오(raw video)는 저장 공간을 많이 쓴다. 초당 60FPS로 녹화된 HD 비디오는 수백 GB를 차지할 수도 있다.</li>
+    <li>상당수의 단말과 브라우저는 특정 종류의 포맷만 지원한다. 여러 단말과 브라우저를 지원하려면 여러 포맷으로 인코딩해야 한다.</li>
+    <li>끊김 없는 재생을 위해 네트워크 대역폭에 따라 고화질/저화질을 모두 제공할 수 있어야 한다.</li>
+  </ul>
+
+  <h5>인코딩 포맷</h5>
+  <ul>
+    <li>다양한 포맷이 있지만 크게 두 부분으로 나뉜다.</li>
+    <li><b>컨테이너</b> —
+      <ul>
+        <li>비디오 파일, 오디오, 메타데이터를 담는 바구니다.</li>
+        <li><code>.avi</code>, <code>.mov</code>, <code>.mp4</code> 같은 확장자로 구분한다.</li>
+      </ul>
+    </li>
+    <li><b>코덱</b> —
+      <ul>
+        <li>화질은 보존하고 파일 크기를 줄일 목적으로 고안된 압축/해제 프로토콜이다.</li>
+        <li>가장 많이 쓰이는 코덱은 H.264, VP9, HEVC다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>유향 비순환 그래프(DAG) 모델</h4>
+  <ul>
+    <li>모든 비디오는 사용자 취향에 따라 다양한 커스텀이 들어간다.</li>
+    <li>서로 다른 유형의 비디오 프로세싱 파이프라인을 지원하면서 병렬 처리 효율을 높이려면 적절한 수준의 추상화가 필요하다.</li>
+    <li>예를 들어 클라이언트가 직접 실행할 작업을 손수 정의할 수 있게 하는 방식이 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  RAW["원본 비디오"] --> V["비디오"]
+  RAW --> A["오디오"]
+  RAW --> M["메타데이터"]
+  V --> STAGE["검사 / 인코딩<br>썸네일 추출 / 워터마크"]
+  STAGE -->|"품질 검사"| Q["360.mp4<br>480.mp4<br>720.mp4"]
+  A --> AE["오디오 인코딩"]
+  Q --> MERGE["병합"]
+  AE --> MERGE
+      </pre>
+    </div>
+    <div class="figure-cap"><b>DAG로 표현하면 어떤 작업이 병렬 가능한지 그림에 드러난다</b> — 비디오 인코딩과 오디오 인코딩은 서로 의존하지 않으므로 동시에 돌릴 수 있다.</div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  RAW["원본 비디오"] --> S1V["1단계: 비디오 추출"]
+  RAW --> S1A["1단계: 오디오 추출"]
+  RAW --> S1M["1단계: 메타데이터 추출"]
+  S1V --> S2V["2단계: 비디오 인코딩"]
+  S1V --> S2T["2단계: 썸네일"]
+  S1A --> S2A["2단계: 오디오 인코딩"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>단계가 나뉘면 스케줄링 단위가 생긴다</b> — DAG 스케줄러가 이 단계들을 작업 큐에 밀어 넣는다.</div>
+  </div>
+
+  <h4>비디오 트랜스코딩 아키텍처</h4>
+
+  <h5>전처리기 (preprocessor)</h5>
+  <ul>
+    <li><b>비디오 분할(video splitting)</b> —
+      <ul>
+        <li>비디오 스트림을 GOP(Group of Pictures) 단위로 쪼갠다.</li>
+        <li>GOP 하나는 독립적으로 재생 가능하며 보통 몇 초 정도다.</li>
+        <li>구버전 단말이나 브라우저는 GOP 단위 분할을 지원하지 않아 전처리기가 대신 담당한다.</li>
+      </ul>
+    </li>
+    <li><b>DAG 생성</b> — 클라이언트가 작성한 설정 파일에 따라 DAG를 만든다.</li>
+    <li><b>데이터 캐시</b> —
+      <ul>
+        <li>전처리기는 분할된 비디오의 캐시 역할도 한다.</li>
+        <li>GOP와 메타데이터를 임시 저장소에 보관하고, 인코딩 실패 시 보관된 데이터로 재개한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">dag-config.json</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">{
+  "name": "transcode",
+  "type": "Transcode",
+  "input": {
+    "input": "context.input"
+  }
+}</code></pre>
+  </div>
+
+  <h5>DAG 스케줄러</h5>
+  <ul><li>DAG 그래프를 몇 개의 단계로 분할해 각각을 자원 관리자의 작업 큐에 집어넣는다.</li></ul>
+
+  <h5>자원 관리자</h5>
+  <ul>
+    <li>자원 배분을 효과적으로 수행하는 역할을 담당한다.</li>
+    <li><b>작업 큐(task queue)</b> — 실행될 작업이 들어 있는 우선순위 큐</li>
+    <li><b>작업 서버 큐(worker queue)</b> — 작업 서버의 가용 상태 정보가 보관된 큐</li>
+    <li><b>실행 큐(running queue)</b> — 현재 실행 중인 작업 및 작업 서버 정보가 보관된 큐</li>
+    <li><b>작업 스케줄러</b> — 최적의 서버와 작업을 골라 그 서버가 작업을 수행하도록 지시한다</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  TQ[["작업 큐"]] -->|"가장 높은 우선순위 작업"| SCH["작업 스케줄러"]
+  WQ[["작업 서버 큐"]] -->|"최적 작업 서버"| SCH
+  SCH -->|"실행 큐에 작업/서버 정보 추가"| RQ[["실행 큐"]]
+  SCH -->|"작업 실행"| WS["작업 서버"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>스케줄러는 두 큐에서 하나씩 꺼내 짝지어 준다</b> — 무엇을 할지(작업 큐)와 누가 할지(작업 서버 큐)를 분리해 둔 덕에 각각을 독립적으로 확장할 수 있다.</div>
+  </div>
+
+  <h5>임시 저장소</h5>
+  <ul>
+    <li>저장할 데이터 유형, 크기, 이용 빈도에 따라 구현을 골라야 한다.</li>
+    <li>메타데이터는 작업 서버가 빈번하게 참조하고 크기도 작은 것이 보통이다 → 메모리 캐시.</li>
+    <li>오디오나 동영상을 저장하려면 BLOB 스토리지가 낫다.</li>
+    <li>임시 저장소의 데이터는 비디오 프로세싱이 끝나면 삭제한다.</li>
+  </ul>
+
+  <h4>시스템 최적화</h4>
+
+  <h5>속도 최적화 : 비디오 병렬 업로드</h5>
+  <ul>
+    <li>비디오 전부를 한 번의 업로드로 올리는 것은 비효율적이다.</li>
+    <li>비디오를 GOP 단위로 분할해 병렬로 업로드하면 효율적이다 —
+      <ul>
+        <li>중간에 실패해도 업로드한 지점부터 이어서 작업할 수 있다.</li>
+        <li>병렬로 처리되므로 업로드 속도가 올라간다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  V["Video"] -->|"GOP 단위로 분할"| ORIG[("원본 저장소")]
+  ORIG --> G1["GOP 1"]
+  ORIG --> G2["GOP 2"]
+  ORIG --> G3["GOP 3"]
+  G1 -->|"병렬 처리"| U["유저 단말기"]
+  G2 --> U
+  G3 --> U
+      </pre>
+    </div>
+    <div class="figure-cap"><b>실패의 단위가 파일 전체에서 조각 하나로 줄어든다</b> — 300MB를 99% 올리고 끊겼을 때 처음부터 다시 하지 않아도 된다.</div>
+  </div>
+
+  <h5>속도 최적화 : 업로드 센터를 위치 기반으로 지정</h5>
+  <ul>
+    <li>업로드 센터를 여러 곳에 배치한다.</li>
+    <li>미국 거주자는 미국 업로드 센터로, 중국 거주자는 아시아로 보낸다.</li>
+    <li>이를 위해 CDN을 업로드 센터로 활용할 수 있다.</li>
+  </ul>
+
+  <h5>속도 최적화 : 모든 절차를 병렬화</h5>
+  <ul>
+    <li>낮은 지연을 달성하기는 어렵다.</li>
+    <li>또 다른 방법은 느슨하게 결합된 시스템을 만들어 병렬성을 높이는 것이다.</li>
+    <li>기존에는 선행 작업이 끝나야 다음 작업이 진행되었지만, 메시지 큐를 도입해 느슨하게 결합하면 이벤트 각각을 병렬로 처리할 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  subgraph BEFORE["기존 — 직렬"]
+    O1[("원본 저장소")] -->|"분할된 원본 다운"| D1["다운로드 모듈"]
+    D1 -->|"분할된 원본 비디오"| E1["인코딩 모듈"]
+    E1 -->|"인코딩된 비디오"| UP1["업로드 모듈"]
+    UP1 -->|"인코딩된 비디오 업로드"| S1[("인코딩된 비디오 스토리지")]
+    S1 --> C1["CDN"]
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>기존 구조에서는 앞 단계가 끝나야 뒤 단계가 시작한다</b> — 다운로드 중에는 인코딩 모듈이 놀고 있다.</div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  O2[("원본 저장소")] --> MQ1[["메시지 큐"]]
+  MQ1 --> D2["다운로드 모듈"]
+  D2 --> MQ2[["메시지 큐"]]
+  MQ2 --> E2["인코딩 모듈"]
+  E2 --> MQ3[["메시지 큐"]]
+  D2 --> MQ4[["메시지 큐"]]
+  MQ4 --> UP2["업로드 모듈"]
+  UP2 --> S2[("인코딩된 비디오 스토리지")]
+  S2 -->|"인코딩된 비디오 업로드"| C2["CDN"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>모듈 사이마다 큐를 끼운다</b> — 각 모듈은 자기 큐만 보면 되므로 서로의 속도를 기다리지 않고, 모듈별로 따로 증설할 수 있다. 1-8 메시지 큐의 효용이 그대로 적용된 사례다.</div>
+  </div>
+
+  <h5>안정성 최적화 : pre-signed URL</h5>
+  <ul>
+    <li>허가받은 사용자만 동영상을 업로드할 수 있도록 제한한다.</li>
+    <li>대표적으로 AWS S3의 pre-signed URL이 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+sequenceDiagram
+  participant U as 유저 단말기
+  participant A as API 서버
+  participant S as 원본 저장소
+  U->>A: 1. POST /upload
+  A-->>U: 2. pre-signed URL 반환
+  U->>S: 3. 그 URL 로 직접 비디오 업로드
+      </pre>
+    </div>
+    <div class="figure-cap"><b>비디오는 우리 서버를 거치지 않는다</b> — API 서버는 권한만 발급하고, 300MB 전송은 클라이언트와 저장소가 직접 처리한다. 서버 대역폭을 아끼는 동시에 권한도 통제하는 구조다.</div>
+  </div>
+
+  <h5>안정성 최적화 : 비디오 보호</h5>
+  <ul>
+    <li><b>디지털 저작권 관리(DRM)</b> — 가장 널리 쓰이는 방식. 애플의 FairPlay, 구글의 Widevine, MS의 PlayReady가 있다.</li>
+    <li><b>AES 암호화</b> —
+      <ul>
+        <li>비디오를 암호화하고 접근 권한을 설정하는 방식이다.</li>
+        <li>암호화된 비디오는 재생 시에만 복호화된다.</li>
+        <li>허락된 사용자만 시청할 수 있다.</li>
+      </ul>
+    </li>
+    <li><b>워터마크</b> —
+      <ul>
+        <li>비디오 위에 소유자 정보를 포함하는 이미지 오버레이를 올린다.</li>
+        <li>회사 로고나 이름 등을 이 용도로 쓸 수 있다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>비용 최적화</h4>
+  <ul>
+    <li>CDN은 이 서비스의 핵심이자 가장 많은 요금을 지불하는 서비스다.</li>
+    <li>연구 결과에 따르면 유튜브 비디오 스트리밍은 <b>롱테일 분포</b>를 따른다 — 인기 있는 것은 자주 재생되지만 나머지는 거의 보는 사람이 없다.</li>
+    <li>인기 없는 비디오는 미리 인코딩할 필요가 없을 수도 있고, 짧은 비디오라면 필요할 때 인코딩해 재생시켜 줄 수도 있다.</li>
+    <li>어떤 비디오는 특정 지역에서만 인기가 높아 다른 지역으로 옮길 필요가 없을 수도 있다.</li>
+    <li>ISP와 계약을 맺어 CDN을 직접 구축할 수도 있다. 기존 통신비보다는 절감되겠지만, CDN을 직접 구축하는 것은 매우 힘든 일이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 200" width="560" role="img" aria-label="비디오 조회수의 롱테일 분포 곡선">
+        <line x1="50" y1="155" x2="530" y2="155" class="dg-stroke"/>
+        <line x1="50" y1="25" x2="50" y2="155" class="dg-stroke"/>
+        <text x="30" y="32" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">조회수</text>
+        <text x="290" y="188" class="dg-text-sub" font-size="11" text-anchor="middle">비디오 (인기순)</text>
+
+        <path d="M55 35 C 90 120, 130 145, 200 150 C 300 154, 420 155, 528 155" stroke="var(--accent)" stroke-width="2.5" fill="none"/>
+        <path d="M55 35 C 90 120, 130 145, 145 148 L145 155 L55 155 Z" fill="var(--accent)" opacity="0.22"/>
+        <path d="M145 148 C 300 154, 420 155, 528 155 L528 155 L145 155 Z" fill="var(--yellow)" opacity="0.28"/>
+
+        <text x="100" y="95" class="dg-text dg-mono" font-size="11">소수의 인기 영상</text>
+        <text x="100" y="112" class="dg-text-sub" font-size="10">CDN 캐싱 / 사전 인코딩</text>
+
+        <text x="360" y="128" class="dg-text dg-mono" font-size="11" text-anchor="middle">긴 꼬리 — 거의 안 보는 영상</text>
+        <text x="360" y="145" class="dg-text-sub" font-size="10" text-anchor="middle">요청 시 인코딩 / CDN 제외</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>비용은 꼬리에서 샌다</b> — 거의 재생되지 않는 영상까지 미리 인코딩해 CDN에 얹으면 저장/전송 비용만 나가고 회수되지 않는다.</div>
+  </div>
+
+  <h4>오류 처리</h4>
+  <ul>
+    <li>대형 시스템에서 오류는 불가피하다.</li>
+    <li>가능하면 장애를 잘 감내하는 서비스를 만들어 우아하게 처리하고 빠르게 회복해야 한다.</li>
+  </ul>
+
+  <h5>회복 가능 오류 (recoverable error)</h5>
+  <ul>
+    <li>특정 비디오 세그먼트를 트랜스코딩하다 실패하는 등의 오류는 회복할 수 있다.</li>
+    <li>일반적으로는 몇 번 재시도하면 해결된다.</li>
+    <li>N번 이상 재시도해도 실패한다면 적절한 오류 코드를 반환해야 한다.</li>
+  </ul>
+
+  <h5>회복 불가능 오류 (non-recoverable error)</h5>
+  <ul>
+    <li>비디오 포맷이 잘못되었거나 회복 불가능한 오류가 발견되면, 시스템은 그 비디오에 대한 작업을 중단하고 적절한 오류 코드를 반환해야 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>트랜스코딩은 저장 공간 / 단말 호환성 / 적응형 화질 세 가지를 위해 필요하다.</li>
+      <li>DAG로 파이프라인을 추상화하고, 스케줄러가 단계를 작업 큐에 넣는다.</li>
+      <li>GOP 단위 분할이 병렬 업로드와 재개 가능한 업로드를 동시에 준다.</li>
+      <li>모듈 사이에 큐를 끼워 전 과정을 병렬화한다.</li>
+      <li>pre-signed URL로 서버를 거치지 않고 권한만 통제한다.</li>
+      <li>롱테일 분포를 이용해 인기 없는 비디오의 인코딩/캐싱 비용을 줄인다.</li>
+    </ul>
+  </div>
+</article>

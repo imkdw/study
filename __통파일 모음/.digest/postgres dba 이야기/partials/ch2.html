@@ -1,0 +1,884 @@
+<article class="item" id="item-2-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-2</div>
+    <h3>인덱스</h3>
+    <p class="item-tagline">운영 중인 테이블에 인덱스를 거는 유일한 방법은 <code>CONCURRENTLY</code>다. 그 대가는 느린 속도와 INVALID 인덱스다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    CIC는 락 경합을 피하는 대신 <b>테이블을 두 번 스캔</b>하고, 실패하면 <b>쓸모없는 INVALID 인덱스를 남긴다</b>. 생성 후 상태 확인은 선택이 아니라 절차다.
+  </div>
+
+  <h4>PG의 인덱스</h4>
+  <p>PostgreSQL은 B*Tree 인덱스 외에도 여러 종류의 인덱스를 제공한다. BRIN, GIN, GiST 등이 대표적이다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>기본 6종의 성격을 한 줄로 구분해두면 선택이 빨라진다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>유형</th><th>강점</th><th>전형적인 용도</th></tr></thead>
+          <tbody>
+            <tr><td><code>btree</code></td><td>등호/범위/정렬</td><td>기본값. 대부분의 OLTP 조건</td></tr>
+            <tr><td><code>hash</code></td><td>등호 전용</td><td>긴 값의 등호 비교</td></tr>
+            <tr><td><code>gist</code></td><td>기하/범위/근접</td><td>좌표, 범위 타입, 전문 검색</td></tr>
+            <tr><td><code>gin</code></td><td>다중 값 컬럼</td><td>배열, JSONB, 전문 검색</td></tr>
+            <tr><td><code>brin</code></td><td>블록 범위 요약</td><td>물리 순서와 값 순서가 일치하는 대용량 이력 테이블</td></tr>
+            <tr><td><code>spgist</code></td><td>비균형 분할</td><td>텍스트 접두사, 사분트리</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h4>인덱스 생성</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">기본 문법</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">create (unique) index &lt;index_name&gt; on &lt;schema_name&gt;.&lt;table_name&gt; (column_name);</code></pre>
+  </div>
+
+  <p>B*Tree 인덱스는 세 가지 방식으로 만들 수 있다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>방식</th><th>목적</th><th>주의</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>create index</code></td>
+          <td>기본적인 인덱스 생성</td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><code>... include(column)</code></td>
+          <td>커버링 인덱스로 테이블 랜덤 액세스 제거</td>
+          <td><code>include</code> 절의 컬럼은 인덱스에 <b>저장</b>되지만 <b>검색 조건으로는 쓰이지 않는다</b></td>
+        </tr>
+        <tr>
+          <td><code>... where (condition)</code></td>
+          <td>조건에 맞는 레코드만 담는 <b>partial index</b></td>
+          <td>데이터 분포 차이가 큰 컬럼이나 복잡한 조건이 붙는 쿼리에 효과적</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>CIC(Create Index Concurrently) 옵션</h4>
+  <p>운영 중인 데이터베이스에서 쿼리 성능 개선을 위해 인덱스를 추가하는 일은 흔하다. 그런데 일반적인 <code>CREATE INDEX</code>는 다른 트랜잭션과 락이 충돌해 대기가 발생한다. 대부분의 DBMS가 트랜잭션 수행과 무관하게 인덱스를 만드는 &ldquo;온라인&rdquo; 기능을 제공하는데, PostgreSQL에서는 <code>CONCURRENTLY</code> 옵션이 그 역할을 한다.</p>
+
+  <h5>단점 1. 일반 방식보다 느리다</h5>
+  <ul>
+    <li>CIC를 쓰면 테이블을 <b>두 번</b> 스캔한다.</li>
+    <li>스캔 중 진행 중인 트랜잭션이 있으면 그 트랜잭션이 끝날 때까지 작업을 멈췄다가 재개한다.</li>
+    <li>그래서 트랜잭션이 빈번한 테이블에서는 일반 방식보다 인덱스 생성이 확연히 느려진다.</li>
+    <li>다만 락 경합을 회피한다는 이점에 비하면 상대적으로 사소한 단점이다.</li>
+  </ul>
+
+  <h5>테이블을 두 번 스캔하는 이유</h5>
+  <ol class="steps">
+    <li>
+      <div class="step-title">1차 스캔 &mdash; 정렬해서 트리에 넣는다</div>
+      <p>테이블 레코드를 읽어 정렬하고 인덱스 트리 구조에 입력한다. 여기까지는 CIC 없이 만들어도 동일하다.</p>
+    </li>
+    <li>
+      <div class="step-title">그 사이 다른 트랜잭션이 계속 돈다</div>
+      <p>CIC는 인덱스 생성 도중에도 DML을 허용하므로, 1차 스캔에 반영되지 않은 레코드가 생긴다.</p>
+    </li>
+    <li>
+      <div class="step-title">2차 스캔 &mdash; 누락분을 따라잡는다</div>
+      <p>1차 스캔 이후 발생해 반영되지 않은 레코드를 인덱스에 반영한다.</p>
+    </li>
+  </ol>
+
+  <h5>단점 2. INVALID 상태의 인덱스가 남을 수 있다</h5>
+  <ul>
+    <li>CIC로 시작하면 인덱스 메타 정보가 시스템 카탈로그에 먼저 등록되는데, 이때 상태는 <code>INVALID</code>다.</li>
+    <li>생성이 끝나면 <code>VALID</code>로 바뀐다.</li>
+    <li>중간에 작업이 취소되거나, 유니크 인덱스를 만들 때 중복 값 때문에 오류가 나면 <code>INVALID</code>로 남는다.</li>
+    <li><code>INVALID</code> 인덱스는 <b>쿼리에 쓰이지 못하면서 디스크만 차지하고, DML 작업도 반영되지 않는다</b>.</li>
+    <li>그래서 CIC로 인덱스를 만들었다면 생성 후 상태 확인이 반드시 필요하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">인덱스 생성 도중 취소 시 발생하는 문제 재현</span>
+      <span class="code-tag bad">42MB가 그냥 버려진다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 데이터 준비
+postgres=# create table svc.t1 (c1 integer, c2 varchar(10));
+postgres=# insert into svc.t1 select i, 'N' from generate_series(1, 10000000) i;
+postgres=# \dt+ svc.t1
+                                   List of relations
+ Schema | Name | Type  |  Owner   | Persistence | Access method |  Size  | Description
+--------+------+-------+----------+-------------+---------------+--------+-------------
+ svc    | t1   | table | postgres | permanent   | heap          | 346 MB |
+(1 row)
+
+
+-- 인덱스 생성 도중 취소 요청
+postgres=# create index concurrently t1_n1 on svc.t1(c1);
+^CCancel request sent
+ERROR:  canceling statement due to user request
+
+
+-- 테이블 정보 확인
+postgres=# \d+ svc.t1;
+ Column |         Type          | Collation | Nullable | Default | Storage  | Compression
+--------+-----------------------+-----------+----------+---------+----------+-------------
+ c1     | integer               |           |          |         | plain    |
+ c2     | character varying(10) |           |          |         | extended |
+Indexes:
+    "t1_n1" btree (c1) INVALID -- INVALID 상태의 인덱스가 생성된 모습
+Access method: heap
+
+-- 인덱스 확인, 42MB의 불필요한 인덱스가 생성된 모습
+postgres=# \di+ svc.t1_n1;
+ Schema | Name  | Type  |  Owner   | Table | Persistence | Access method | Size  | Description
+--------+-------+-------+----------+-------+-------------+---------------+-------+-------------
+ svc    | t1_n1 | index | postgres | t1    | permanent   | btree         | 42 MB |
+(1 row)</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">유니크 제약 위배로 실패하는 경우 재현</span>
+      <span class="code-tag bad">214MB가 그냥 버려진다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 유니크 인덱스를 생성하는 도중에 새로운 레코드가 추가됨
+-- 해당 레코드는 유니크 제약조건을 위배하는 레코드라서 인덱스 생성에 실패함
+postgres=# create unique index concurrently t1_uk on svc.t1(c1);
+ERROR:  duplicate key value violates unique constraint "t1_uk"
+DETAIL:  Key (c1)=(1) already exists.
+
+
+-- 테이블 정보 확인, INVALID 상태의 인덱스가 생성된 모습
+postgres=# \d+ svc.t1;
+                                                    Table "svc.t1"
+ Column |         Type          | Collation | Nullable | Default | Storage  | Compression
+--------+-----------------------+-----------+----------+---------+----------+-------------
+ c1     | integer               |           |          |         | plain    |
+ c2     | character varying(10) |           |          |         | extended |
+Indexes:
+    "t1_uk" UNIQUE, btree (c1) INVALID
+Access method: heap
+
+
+-- 인덱스 확인, 214MB의 불필요한 인덱스가 생성된 모습
+postgres=# \di+ svc.t1_uk
+                                       List of relations
+ Schema | Name  | Type  |  Owner   | Table | Persistence | Access method |  Size  | Description
+--------+-------+-------+----------+-------+-------------+---------------+--------+-------------
+ svc    | t1_uk | index | postgres | t1    | permanent   | btree         | 214 MB |
+(1 row)</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">INVALID 인덱스를 찾는 쿼리 <span class="badge b-blue">보강</span></p>
+      <p>CIC 작업 뒤에 돌려볼 정형 쿼리 하나는 만들어두는 편이 낫다. <code>pg_index.indisvalid</code>가 <code>false</code>인 인덱스는 <code>DROP INDEX (CONCURRENTLY)</code>로 지우고 다시 만드는 것 외에 방법이 없다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">select i.indexrelid::regclass as index_name,
+       i.indrelid::regclass  as table_name,
+       pg_size_pretty(pg_relation_size(i.indexrelid)) as size
+from   pg_index i
+where  not i.indisvalid;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h5>단점 3. 인덱스 생성이 지연될 수 있다</h5>
+  <ul>
+    <li>CIC는 테이블 스캔이 두 번 발생하는데, 2차 스캔 이전에 시작된 쿼리가 아직 수행 중이면 인덱스 생성을 완료하지 못하고 그 쿼리의 종료를 기다린다.</li>
+    <li><b>그 쿼리가 인덱스 대상 테이블을 건드리지 않더라도</b> CIC 세션은 락을 대기한다는 점이 중요하다.</li>
+    <li>CIC를 쓸 때는 세션과 인덱스 진행 상황을 함께 모니터링할 필요가 있다.</li>
+    <li>한 테이블에 대한 CIC 작업은 <b>동시에 하나만</b> 가능하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">장시간 실행되는 쿼리로 인한 락 대기 재현</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 다른 세션에서 사전에 블로킹 쿼리 실행
+postgres=# select pg_sleep(100000000); -- 계속 실행 중..
+
+-- 인덱스 생성
+postgres=# create index concurrently t1_n1 on svc.t1(c1); -- 계속 진행 중
+
+-- 락 대기 정보 확인
+-[ RECORD 1 ]--+-----------------------------------------------
+blocked_pid    | 5998
+blocked_user   | postgres
+blocking_pid   | 6014
+blocking_user  | postgres
+blocking_query | select pg_sleep(100000000);
+blocked_query  | create index concurrently t1_n1 on svc.t1(c1);</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">CIC의 진짜 적은 <code>idle in transaction</code></p>
+      <p>여기서 확인한 대기는 <code>Lock:virtualxid</code>로 관찰된다. 실무에서 CIC가 몇 시간씩 끝나지 않는 원인 대부분은 대상 테이블과 무관한, 열어놓고 커밋하지 않은 세션이다. <a href="#item-8-2">8-2 대기이벤트</a>의 <code>virtualxid</code> 항목과 함께 보면 된다.</p>
+    </div>
+  </div>
+
+  <h4>인덱스 리빌드</h4>
+  <ul>
+    <li><code>VACUUM FULL</code>을 수행하면 <b>인덱스 블로팅</b> 문제도 함께 해결된다.</li>
+    <li>그러나 <code>VACUUM FULL</code>은 온라인 기능을 지원하지 않아 주기적으로 돌릴 수 없다면 인덱스 리빌드가 필요하다.</li>
+    <li>리빌드는 조건부 수행이 가능하고, <code>CONCURRENTLY</code> 옵션으로 온라인 처리도 가능하다.</li>
+  </ul>
+
+  <h5>리빌드 시 CIC의 동작 차이</h5>
+  <ul>
+    <li>내부적으로 작업용 인덱스인 <code>_ccnew</code> 인덱스가 만들어진다.</li>
+    <li>기존 인덱스는 그대로 두고 별도의 작업용 인덱스에 리빌드한 뒤, 완료되면 교체하는 방식이다.</li>
+    <li>리빌드 도중 비정상 종료되면 이 <code>_ccnew</code> 인덱스가 <code>INVALID</code> 상태로 남는다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">임시 인덱스 _ccnew 확인하기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 인덱스 리빌드 실행
+postgres=# reindex index concurrently svc.t1_n1;
+REINDEX
+
+-- 테이블 정보 확인, 임시 인덱스인 `_ccnew` 인덱스가 생성된 모습
+postgres=# \d svc.t1;
+                         Table "svc.t1"
+ Column |         Type          | Collation | Nullable | Default
+--------+-----------------------+-----------+----------+---------
+ c1     | integer               |           |          |
+ c2     | character varying(10) |           |          |
+Indexes:
+    "t1_n1" btree (c1)
+    "t1_n1_ccnew" btree (c1) INVALID</code></pre>
+  </div>
+
+  <h4>인덱스 관리 명령어</h4>
+  <h5>인덱스 이름 변경</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 테이블 정보 확인, 인덱스 이름이 `t1_n1`인 모습
+postgres=# \d svc.t1;
+Indexes:
+    "t1_n1" btree (c1)
+
+-- 인덱스 이름 변경
+postgres=# alter index svc.t1_n1 rename to t1_idx1;
+
+-- 테이블 정보 확인, 인덱스 이름이 `t1_idx1`로 변경된 모습
+postgres=# \d svc.t1;
+Indexes:
+    "t1_idx1" btree (c1)</code></pre>
+  </div>
+
+  <h5>인덱스 구성 컬럼 변경 후 중복 인덱스 삭제 시 주의사항</h5>
+  <ul>
+    <li>운영 환경에서 인덱스를 삭제할 때는 <b>반드시</b> <code>CONCURRENTLY</code> 옵션을 사용한다.</li>
+    <li>기존 인덱스를 참조 중인 쿼리가 수행되고 있으면 삭제를 요청한 세션이 락을 대기하기 때문이다.</li>
+    <li>CIC로 지운 다음 남은 인덱스의 이름을 바꾸는 순서가 좋다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag good">이 순서로</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 인덱스 구성 컬럼이 `c1`과 `c2`인 모습
+-- 이 때 c1 컬럼의 경우 (c1, c2) 인덱스에 포함되므로 삭제 대상이 됨
+postgres=# \d svc.t1;
+Indexes:
+    "t1_idx1" btree (c1)
+    "t1_n1_new" btree (c1, c2)
+
+
+-- CONCURRENTLY 옵션을 통한 인덱스 삭제
+postgres=# drop index concurrently svc.t1_idx1;
+
+
+-- 인덱스 명 변경
+postgres=# alter index svc.t1_n1_new rename to t1_n1;
+postgres=# \d svc.t1;
+Indexes:
+    "t1_n1" btree (c1, c2)</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>운영 중 인덱스 생성/삭제/리빌드는 전부 <code>CONCURRENTLY</code>가 기본이다. 대가는 두 번의 테이블 스캔이다.</li>
+      <li>CIC 실패는 조용히 <code>INVALID</code> 인덱스를 남긴다. 쿼리에 쓰이지도 않으면서 디스크와 DML 비용만 먹는다.</li>
+      <li>CIC 세션은 <b>대상 테이블과 무관한</b> 장기 트랜잭션에도 막힌다. 작업 전에 오래된 세션을 정리한다.</li>
+      <li><code>include</code>는 커버링용이라 검색 조건에 쓰이지 않고, <code>where</code>는 partial index를 만든다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">2-3</div>
+    <h3>파티션</h3>
+    <p class="item-tagline">선언적 문법은 10부터지만, 안은 여전히 <b>상속받은 별개의 테이블들</b>이다. 이 사실이 인덱스 동작 전부를 설명한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    부모 테이블은 <b>껍데기</b>고 데이터는 자식 테이블에 있다. 그래서 부모에는 CIC를 걸 수 없고, <code>ONLY</code> + 자식별 CIC + <code>ATTACH</code>라는 우회로가 필요하다.
+  </div>
+
+  <h4>파티션</h4>
+  <ul>
+    <li>대용량 테이블을 효율적으로 관리하기 위한 필수 기능이다.</li>
+    <li>9.6까지는 구현 방식이 매우 복잡했으나 10부터 크게 편해졌다.</li>
+  </ul>
+
+  <h4>PG 파티션의 특징</h4>
+  <ul>
+    <li>10부터 <b>선언적 파티션 생성 문법</b>을 지원하지만, 내부적으로는 기존 방식을 그대로 쓴다.</li>
+    <li>기존 방식은 부모 테이블을 만든 뒤 그 구조를 상속해 자식 테이블을 만드는 구조다.</li>
+    <li>물리적인 관점에서 <b>부모 테이블과 자식 테이블은 서로 별개의 테이블</b>이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  P["Parent Table<br>(데이터 없음)"]
+  C1["Child Table #1"]
+  C2["Child Table #2"]
+  P -->|"Inherits"| C1
+  P -->|"Inherits"| C2
+      </pre>
+    </div>
+    <div class="figure-cap"><b>선언적 문법이라도 실체는 상속이다</b> &mdash; 부모는 파티션 키와 메타 정보만 들고 있고, 실제 블록은 자식 테이블 파일에 있다.</div>
+  </div>
+
+  <h4>PG 파티션 유형</h4>
+  <ul>
+    <li>RANGE, LIST, HASH 세 가지를 지원하고, 이들을 조합한 서브 파티션도 가능하다.</li>
+    <li>다만 실제로 서브 파티션을 적용하는 경우는 매우 드물다.</li>
+  </ul>
+
+  <h4>RANGE 파티션</h4>
+  <ul>
+    <li>이력 테이블 관리에 큰 장점을 준다.</li>
+    <li>단일 테이블에 모든 이력을 쌓으면 관리 이슈가 생긴다.</li>
+    <li>오래된 데이터를 <code>DELETE</code>로 지우면 대량의 WAL이 발생해 부하가 커진다.</li>
+    <li>테이블 단위 백업이나 Vacuum 수행에도 많은 시간이 든다.</li>
+    <li>RANGE 파티션을 적용하면 파티션 단위 작업이 가능해져 관리 효율이 크게 오른다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">부모 테이블 생성</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres@localhost:postgres&gt; create table svc.t1_r (
+ c1 integer not null,
+ log_date varchar(8) not null,
+ dummy varchar(10)
+)
+partition by range(log_date);
+
+
+postgres@localhost:postgres&gt; \d svc.t1_r;
++----------+-----------------------+-----------+
+| Column   | Type                  | Modifiers |
+|----------+-----------------------+-----------|
+| c1       | integer               |  not null |
+| log_date | character varying(8)  |  not null |
+| dummy    | character varying(10) |           |
++----------+-----------------------+-----------+
+Partition key: RANGE (log_date)</code></pre>
+  </div>
+  <p>부모 테이블 생성 시 파티션 유형을 정의하며, <code>\d</code>로 파티션 테이블임을 확인할 수 있다. 최초에는 자식 테이블이 없어 파티션 개수가 0개다.</p>
+
+  <h5>자식 테이블 생성</h5>
+  <ul>
+    <li>RANGE 파티션의 자식은 <code>FROM(시작)</code>, <code>TO(다음 파티션 시작값)</code>으로 범위를 지정한다.</li>
+    <li><b><code>TO</code>에 지정한 값은 해당 파티션에 포함되지 않는다.</b> 경계는 항상 <code>[FROM, TO)</code>다.</li>
+    <li>이미 운영 중인 테이블을 파티셔닝한다면 <code>FROM(MINVALUE)</code>로 오래된 데이터를 하나의 파티션에 묶을 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 제일 작은 값부터 20210101까지 파티션 생성
+postgres@localhost:postgres&gt; create table svc.t1_r_p2020 partition of svc.t1_r for values from(MINVALUE) to ('20210101');
+
+-- 20210101부터 20220101까지 파티션 생성
+postgres@localhost:postgres&gt; create table svc.t1_r_p2021 partition of svc.t1_r for values from('20210101') to ('20220101');
+
+-- 20220101부터 20230101까지 파티션 생성
+postgres@localhost:postgres&gt; create table svc.t1_r_p2022 partition of svc.t1_r for values from('20220101') to ('20230101');
+
+-- 파티션 정보 확인
+postgres@localhost:postgres&gt; \d+ svc.t1_r;
+Partition key: RANGE (log_date)
+Partitions: svc.t1_r_p2020 FOR VALUES FROM (MINVALUE) TO ('20210101')
+            svc.t1_r_p2021 FOR VALUES FROM ('20210101') TO ('20220101')
+            svc.t1_r_p2022 FOR VALUES FROM ('20220101') TO ('20230101')</code></pre>
+  </div>
+
+  <h4>LIST 파티션</h4>
+  <ul>
+    <li>코드 값을 기준으로 테이블을 분할하는 방식이다.</li>
+    <li>국가별, 지점별처럼 대분류 항목으로 나눌 때 유용하다.</li>
+    <li><code>IN</code> 절로 각 자식 테이블에 들어갈 코드 값을 명시한다.</li>
+    <li>새 코드 값이 반영되지 않아 오류가 나는 일이 있으니 <b>DEFAULT 파티션</b>을 함께 만들어두는 편이 좋다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">파티션 생성 예제</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- A, B 코드 값을 가지는 데이터는 t1_l_p1 파티션에 저장
+postgres@localhost:postgres&gt; create table svc.t1_l_p1 partition of svc.t1_l for values in ('A', 'B');
+
+-- C 코드 값을 가지는 데이터는 t1_l_p2 파티션에 저장
+postgres@localhost:postgres&gt; create table svc.t1_l_p2 partition of svc.t1_l for values in ('C');
+
+-- 나머지 코드 값을 가지는 데이터는 t1_l_pd 파티션에 저장
+postgres@localhost:postgres&gt; create table svc.t1_l_pd partition of svc.t1_l default;</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">등록되지 않은 값은 DEFAULT 파티션으로 간다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- D 코드 값을 가지는 데이터는 t1_l_pd 파티션에 저장
+postgres@localhost:postgres&gt; insert into svc.t1_l values(1, 'D', 'dummy');
+
+-- DEFAULT 파티션에 저장된 데이터 확인
+postgres@localhost:postgres&gt; select * from svc.t1_l_pd;
++----+---------+-------+
+| c1 | divcode | dummy |
+|----+---------+-------|
+| 1  | D       | dummy |
++----+---------+-------+</code></pre>
+  </div>
+
+  <h5>DEFAULT 파티션에 들어간 값으로 새 자식 테이블을 만들 때의 오류</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag bad">실패</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres@localhost:postgres&gt; create table svc.t1_l_p3 partition of svc.t1_l for values in ('D');
+updated partition constraint for default partition "t1_l_pd" would be violated by some row</code></pre>
+  </div>
+  <p>DEFAULT 파티션에 이미 <code>'D'</code> 값이 들어 있어, 새 파티션을 붙이면 DEFAULT 파티션의 제약 조건이 깨지기 때문이다. 오라클은 파티션을 쪼개는 <b>스플릿</b> 기능을 제공하지만 PostgreSQL은 지원하지 않으므로, 다음 순서로 직접 처리한다.</p>
+  <ol class="steps">
+    <li><div class="step-title">DEFAULT 파티션에서 스플릿 대상 데이터 추출</div></li>
+    <li><div class="step-title">DEFAULT 파티션에서 스플릿 대상 데이터 삭제</div></li>
+    <li><div class="step-title">신규 자식 테이블 생성</div></li>
+    <li><div class="step-title">추출한 데이터를 신규 자식 테이블에 입력</div></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">18에서도 여전히 스플릿은 없다 <span class="badge b-purple">최신 반영</span></p>
+      <p><code>ALTER TABLE ... SPLIT PARTITION</code> / <code>MERGE PARTITIONS</code>는 여러 차례 제안됐지만 PostgreSQL 17과 18 릴리스 노트 어디에도 들어가지 않았다. 위의 수작업 절차는 최신 버전에서도 그대로 유효하다.</p>
+    </div>
+  </div>
+
+  <h4>HASH 파티션</h4>
+  <ul>
+    <li>동시에 대량의 입력이 발생하면 핫 블록 때문에 병목이 생길 수 있다.</li>
+    <li>이 병목을 줄이려면 입력 위치를 분산시키는 것이 효과적이고, 그때 쓰는 방법이 해시 파티션이다.</li>
+  </ul>
+
+  <h5>Hot Block</h5>
+  <ul>
+    <li>동시에 많은 트랜잭션이 동일한 데이터 블록에 접근하려 할 때 발생하는 경합 현상이다.</li>
+    <li>여러 세션이 같은 블록의 데이터를 동시에 생성/수정/삭제할 때 나타난다.</li>
+    <li>해당 블록의 락을 얻으려고 대기하면서 병목이 발생한다.</li>
+  </ul>
+
+  <h5>mod 연산으로 자식 테이블에 분산 저장하기</h5>
+  <p>해시 키는 <code>hash(seqno) % modulus = remainder</code> 방식으로 동작한다. 아래 예제는 나머지가 0, 1, 2, 3인 데이터를 각각의 파티션에 저장하도록 구성한 것이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 해시 파티션 생성
+postgres@localhost:postgres&gt; create table svc.t1_h (
+ c1 integer not null,
+ seqno integer not null,
+ dummy varchar(10))
+ partition by hash(seqno);
+
+-- modulus 4, remainder 0: hash(seqno) % 4 = 0인 데이터
+postgres@localhost:postgres&gt; create table svc.t1_h_p1 partition of svc.t1_h for values with (modulus 4, remainder 0);
+
+-- modulus 4, remainder 1: hash(seqno) % 4 = 1인 데이터
+postgres@localhost:postgres&gt; create table svc.t1_h_p2 partition of svc.t1_h for values with (modulus 4, remainder 1);
+
+-- modulus 4, remainder 2: hash(seqno) % 4 = 2인 데이터
+postgres@localhost:postgres&gt; create table svc.t1_h_p3 partition of svc.t1_h for values with (modulus 4, remainder 2);
+
+-- modulus 4, remainder 3: hash(seqno) % 4 = 3인 데이터
+postgres@localhost:postgres&gt; create table svc.t1_h_p4 partition of svc.t1_h for values with (modulus 4, remainder 3);</code></pre>
+  </div>
+
+  <h4>파티션 인덱스</h4>
+  <p>파티션 인덱스를 만들 때는 <b>반드시 파티션 컬럼을 포함</b>해야 한다. 포함하지 않으면 에러가 발생한다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">정확히는 &ldquo;유니크 인덱스에 한해서&rdquo;다 <span class="badge b-red">원문 교정</span></p>
+      <p>파티션 컬럼을 반드시 포함해야 하는 것은 <b>PRIMARY KEY / UNIQUE 인덱스</b>다. 파티션 테이블의 유니크 제약은 각 자식 테이블 안에서만 보장되므로, 파티션 키가 인덱스에 포함되어야 전체 유일성이 성립하기 때문이다. 일반 (non-unique) 인덱스는 파티션 컬럼 없이도 만들 수 있다. 아래 예제의 <code>t1_r_pk</code>가 <code>(c1, log_date)</code>인 이유가 이것이고, <code>t1_r_n1</code>은 <code>(log_date)</code> 단독으로도 생성된다.</p>
+    </div>
+  </div>
+
+  <h5>자동 인덱스 생성 방식</h5>
+  <ul>
+    <li>11부터 지원한다. 부모 테이블에 인덱스를 만들면 자식 테이블에도 동일한 인덱스가 자동으로 생성된다.</li>
+    <li>이전 버전에서는 자식 테이블을 추가할 때마다 인덱스를 수동으로 만들어야 했던 불편을 개선한 것이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">파티션 인덱스 생성</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres@localhost:postgres&gt; alter table svc.t1_r add constraint t1_r_pk primary key (c1, log_date);
+postgres@localhost:postgres&gt; create index t1_r_n1 on svc.t1_r(log_date);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">부모에 만들면 자식에도 생긴다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 부모 테이블
+postgres@localhost:postgres&gt; \d svc.t1_r;
+Indexes:
+    "t1_r_pk" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_n1" btree (log_date)
+Partition key: RANGE (log_date)
+Number of partitions 3: (Use \d+ to list them.)
+
+
+-- 자식 테이블
+postgres@localhost:postgres&gt; \d svc.t1_r_p2022;
+Indexes:
+    "t1_r_p2022_pkey" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_p2022_log_date_idx" btree (log_date)
+Partition of: svc.t1_r FOR VALUES FROM ('20220101') TO ('20230101')
+Partition constraint: ((log_date IS NOT NULL) AND ((log_date)::text &gt;= '20220101'::character varying(8)) AND ((log_date)::text &lt; '20230101'::character varying(8)))
+
+
+-- 자식 테이블
+postgres@localhost:postgres&gt; \d svc.t1_r_p2021;
+Indexes:
+    "t1_r_p2021_pkey" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_p2021_log_date_idx" btree (log_date)
+Partition of: svc.t1_r FOR VALUES FROM ('20210101') TO ('20220101')
+Partition constraint: ((log_date IS NOT NULL) AND ((log_date)::text &gt;= '20210101'::character varying(8)) AND ((log_date)::text &lt; '20220101'::character varying(8)))</code></pre>
+  </div>
+
+  <h5>수동 인덱스 생성 방식</h5>
+  <ul>
+    <li>자식 테이블마다 개별적으로 인덱스를 만드는 방식이다.</li>
+    <li>자동 생성 기능이 추가된 뒤로는 잘 쓰지 않지만, 특정 상황에서는 여전히 유용하다.</li>
+    <li><b>특정 파티션에만 선별적으로 인덱스가 필요한 경우</b>가 그렇다. 자동으로 생성된 인덱스는 자식 테이블 단위로 제거할 수 없기 때문이다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">특정 자식에만 인덱스 두기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 기존 인덱스 제거
+postgres@localhost:postgres&gt; drop index svc.t1_r_n1;
+
+-- 자식 테이블에 인덱스 추가
+postgres@localhost:postgres&gt; create index t1_r_p2022_n1 on svc.t1_r_p2022 (log_date);
+
+-- 부모 테이블에는 인덱스가 없는 모습
+postgres@localhost:postgres&gt; \d+ svc.t1_r
+Indexes:
+    "t1_r_pk" PRIMARY KEY, btree (c1, log_date)
+Partition key: RANGE (log_date)
+Partitions: svc.t1_r_p2020 FOR VALUES FROM (MINVALUE) TO ('20210101')
+            svc.t1_r_p2021 FOR VALUES FROM ('20210101') TO ('20220101')
+            svc.t1_r_p2022 FOR VALUES FROM ('20220101') TO ('20230101')
+
+
+-- 자식 테이블에만 인덱스가 존재하는 모습
+postgres@localhost:postgres&gt; \d svc.t1_r_p2022;
+Indexes:
+    "t1_r_p2022_pkey" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_p2022_n1" btree (log_date) -- 이거
+Partition of: svc.t1_r FOR VALUES FROM ('20220101') TO ('20230101')</code></pre>
+  </div>
+
+  <h4>인덱스 ONLY 옵션</h4>
+  <ul>
+    <li>파티션 테이블에 <code>ONLY</code> 옵션으로 인덱스를 만들면 <b>부모 테이블에만 INVALID 상태의 인덱스</b>가 생성된다.</li>
+    <li>자식 테이블에는 인덱스가 생기지 않으며, 이 때문에 <code>ONLY</code>로 만든 인덱스는 그대로는 사용할 수 없다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- ONLY 옵션을 적용해서 인덱스 생성
+postgres@localhost:postgres&gt; create index t1_r_n1 on only svc.t1_r(log_date);
+
+-- 인덱스가 INVALID 상태로 생성된 모습
+postgres@localhost:postgres&gt; \d svc.t1_r;
+Indexes:
+    "t1_r_pk" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_n1" btree (log_date) INVALID
+Partition key: RANGE (log_date)
+Number of partitions 3: (Use \d+ to list them.)
+
+-- 자식 테이블에는 인덱스가 만들어지지 않았음
+postgres@localhost:postgres&gt; \d svc.t1_r_p2022;
+Indexes:
+    "t1_r_p2022_pkey" PRIMARY KEY, btree (c1, log_date)
+Partition of: svc.t1_r FOR VALUES FROM ('20220101') TO ('20230101')</code></pre>
+  </div>
+
+  <h5>그런데 왜 이런 옵션이 필요한가</h5>
+  <p>운영 중인 파티션 테이블에 인덱스를 추가해야 하는 상황을 생각해보자. PostgreSQL은 <b>부모(파티션) 테이블에 대한 <code>CREATE INDEX CONCURRENTLY</code>를 지원하지 않는다.</b> 그래서 <code>ONLY</code> 옵션이 우회로가 된다.</p>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title"><code>ONLY</code> 옵션으로 부모 테이블에 인덱스 생성</div>
+      <p>INVALID 상태의 &ldquo;껍데기&rdquo; 인덱스가 만들어진다. 이 시점에는 아직 아무 락도 오래 잡지 않는다.</p>
+    </li>
+    <li>
+      <div class="step-title">자식 테이블 각각에 CIC로 인덱스 생성</div>
+      <p>자식은 일반 테이블이므로 <code>CONCURRENTLY</code>가 통한다. 서비스 영향 없이 하나씩 만든다.</p>
+    </li>
+    <li>
+      <div class="step-title">자식 인덱스를 부모 인덱스에 <code>ATTACH</code></div>
+      <p>모든 자식이 붙는 순간 부모 인덱스의 <code>INVALID</code> 표시가 사라진다.</p>
+    </li>
+  </ol>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">자식 테이블에 각각 온라인으로 인덱스 생성</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres@localhost:postgres&gt; create index concurrently t1_r_p2020_n1 on svc.t1_r_p2020(log_date);
+postgres@localhost:postgres&gt; create index concurrently t1_r_p2021_n1 on svc.t1_r_p2021(log_date);
+postgres@localhost:postgres&gt; create index concurrently t1_r_p2022_n1 on svc.t1_r_p2022(log_date);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">ATTACH 하면 INVALID가 사라진다</span>
+      <span class="code-tag good">완성</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- ATTACH 진행
+postgres@localhost:postgres&gt; alter index svc.t1_r_n1 attach partition svc.t1_r_p2020_n1;
+postgres@localhost:postgres&gt; alter index svc.t1_r_n1 attach partition svc.t1_r_p2021_n1;
+postgres@localhost:postgres&gt; alter index svc.t1_r_n1 attach partition svc.t1_r_p2022_n1;
+
+-- 모든 자식 테이블의 인덱스가 ATTACH된 이후에 부모 테이블의 인덱스 상태가 VALID로 변경된 모습
+postgres@localhost:postgres&gt; \d+ svc.t1_r;
+Indexes:
+    "t1_r_pk" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_n1" btree (log_date) -- INVALID 사라짐
+Partition key: RANGE (log_date)
+Partitions: svc.t1_r_p2020 FOR VALUES FROM (MINVALUE) TO ('20210101')
+            svc.t1_r_p2021 FOR VALUES FROM ('20210101') TO ('20220101')
+            svc.t1_r_p2022 FOR VALUES FROM ('20220101') TO ('20230101')</code></pre>
+  </div>
+
+  <h4>파티션 관리 명령어</h4>
+  <h5>자식 테이블 추가</h5>
+  <p><code>create table ... partition of</code> 구문으로 추가한다.</p>
+
+  <h5>자식 테이블 제거</h5>
+  <p>일반 테이블과 동일하게 <code>DROP TABLE</code>을 사용한다.</p>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 테이블 제거
+postgres@localhost:postgres&gt; drop table svc.t1_r_p2020;
+
+-- 자식 테이블이 없어진 모습
+postgres@localhost:postgres&gt; \d+ svc.t1_r;
+Indexes:
+    "t1_r_pk" PRIMARY KEY, btree (c1, log_date)
+    "t1_r_n1" btree (log_date)
+Partition key: RANGE (log_date)
+Partitions: svc.t1_r_p2021 FOR VALUES FROM ('20210101') TO ('20220101')
+            svc.t1_r_p2022 FOR VALUES FROM ('20220101') TO ('20230101')</code></pre>
+  </div>
+
+  <h5>자식 테이블 분리(DETACH)</h5>
+  <ul>
+    <li>제거하는 대신 부모와 분리해 보관할 수 있다.</li>
+    <li><code>DETACH</code> 명령으로 분리하며, <code>CONCURRENTLY</code>도 지원하므로 온라인 작업이 가능하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">파티션 구성 상태 확인</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres@localhost:postgres&gt; select pg_partition_tree('svc.t1_r');
++------------------------------------------+
+| pg_partition_tree                        |
+| ---------------------------------------- |
+| ('svc.t1_r', None, 'f', '0')             |
+| ('svc.t1_r_p2021', 'svc.t1_r', 't', '1') |
+| ('svc.t1_r_p2022', 'svc.t1_r', 't', '1') |
++------------------------------------------+</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">자식 테이블 분리하기</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 테이블 분리하기
+postgres@localhost:postgres&gt; alter table svc.t1_r detach partition svc.t1_r_p2021 concurrently;
+
+-- 테이블이 분리된 모습
+postgres@localhost:postgres&gt; select pg_partition_tree('svc.t1_r');
++------------------------------------------+
+| pg_partition_tree                        |
+| ---------------------------------------- |
+| ('svc.t1_r', None, 'f', '0')             |
+| ('svc.t1_r_p2022', 'svc.t1_r', 't', '1') |
++------------------------------------------+</code></pre>
+  </div>
+
+  <h5>파티션 ATTACH</h5>
+  <ul>
+    <li>일반 테이블을 자식 테이블로 빠르게 전환할 수 있고, 이때 두 가지 검사가 자동으로 수행된다.</li>
+    <li><b>자동 인덱스 생성</b> &mdash; 자식 테이블에 이미 같은 인덱스가 있으면 이 단계는 생략된다.</li>
+    <li><b>체크 제약 조건 검사</b> &mdash; 자식 테이블이 파티션 범위를 충족하는지 확인하는 과정으로, 이미 체크 제약이 있으면 건너뛴다.</li>
+    <li>따라서 <b>ATTACH를 빠르게 끝내려면 인덱스와 제약조건을 미리 만들어두면 된다.</b></li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">테스트용 데이터 생성</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 테이블 생성
+postgres@localhost:postgres&gt; create table svc.t_log (
+ c1 integer not null,
+ log_date varchar(8) not null,
+ dummy varchar(10));
+
+-- PK 제약조건 추가
+postgres@localhost:postgres&gt; alter table svc.t_log add constraint t_log_pk primary key (c1, log_date);
+
+-- 인덱스 생성
+postgres@localhost:postgres&gt; create index t1_log_n1 on svc.t_log(log_date);
+
+-- 데이터 생성
+postgres@localhost:postgres&gt; insert into svc.t_log select c1, c2, 'dummy' from (select row_number() over () as c1, to_char(c2, 'YYYYMMDD')
+  c2 from (select c2, generate_series(1, 1000) as per_day from generate_series('2020-01-01'::DATE, '2025-03-23'::DATE, '1 day') as c2) as
+ t) as t;
+
+-- RANGE 파티션 테이블 생성
+postgres@localhost:postgres&gt; create table svc.t_log_r (
+ c1 integer not null,
+ log_date varchar(8) not null,
+ dummy varchar(10))
+ partition by range(log_date);</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">빠른 작업을 위한 사전 작업</span>
+      <span class="code-tag good">이걸 해두면 ATTACH가 즉시 끝난다</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 원본 테이블과 동일한 제약조건 생성
+postgres@localhost:postgres&gt; alter table svc.t_log_r add constraint t_log_r_pk primary key (c1, log_date);
+
+-- 원본 테이블과 동일한 인덱스 생성
+postgres@localhost:postgres&gt; create index t_log_r_n1 on svc.t_log_r(log_date);
+
+-- 파티션을 위한 제약조건 생성
+postgres@localhost:postgres&gt; alter table svc.t_log add constraint t_log_chk1 check (log_date &lt; '20260101');</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">파티션 ATTACH</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 파티션 ATTACH
+postgres@localhost:postgres&gt; alter table svc.t_log_r attach partition svc.t_log for values from (MINVALUE) to ('20260101');
+
+-- 파티션 ATTACH 후 모습
+postgres@localhost:postgres&gt; \d svc.t_log_r;
+Indexes:
+    "t_log_r_pk" PRIMARY KEY, btree (c1, log_date)
+    "t_log_r_n1" btree (log_date)
+Partition key: RANGE (log_date)
+Number of partitions 1: (Use \d+ to list them.)</code></pre>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>선언적 문법 뒤에는 상속이 있다. 부모는 껍데기, 자식이 실제 테이블이다.</li>
+      <li>RANGE의 경계는 <code>[FROM, TO)</code>다. <code>TO</code> 값은 다음 파티션에 들어간다.</li>
+      <li>LIST에는 DEFAULT 파티션을 항상 같이 만든다. 대신 나중에 쪼갤 때 수작업이 필요하다.</li>
+      <li>부모 테이블에 CIC는 불가능하다. <code>ONLY</code> → 자식별 CIC → <code>ATTACH</code>가 온라인으로 파티션 인덱스를 추가하는 유일한 길이다.</li>
+      <li>ATTACH 전에 인덱스와 CHECK 제약을 미리 만들어두면 검증 단계를 건너뛰어 즉시 끝난다.</li>
+    </ul>
+  </div>
+</article>

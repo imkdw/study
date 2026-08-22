@@ -1,0 +1,157 @@
+<article class="item" id="item-5-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">5-1</div>
+    <h3>GPU에 올라가는 데이터 살펴보기</h3>
+    <p class="item-tagline">OOM 은 운이 나빠서 나는 게 아니다. 무엇이 얼마나 올라가는지 세면 예측된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    모델 용량 = <b>파라미터 수 × 파라미터당 바이트 수</b>. 7B 모델을 16비트로 올리면 <code>7 × 2 = 14GB</code> 다. 학습할 땐 여기에 그레이디언트/옵티마이저 상태/순전파 활성값이 더 붙는다.
+  </div>
+
+  <h4>필요한 패키지</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">pip install transformers==4.40.1 datasets==2.19.0 accelerate==0.30.0 peft==0.10.0 bitsandbytes==0.42.0 -qqq</code></pre>
+  </div>
+
+  <h4>GPU에 올라가는 데이터</h4>
+  <p>딥러닝 모델을 학습/추론할 때 가장 흔히 만나는 문제가 <b>OOM</b>(Out Of Memory)이다. 기본적으로 GPU 에는 <b>딥러닝 모델 자체</b>가 올라간다. 모델은 수많은 행렬 곱셈을 위한 <b>파라미터의 집합</b>이고, 각 파라미터는 소수 또는 정수 형식의 숫자다.</p>
+
+  <h4>딥러닝 모델의 데이터 타입</h4>
+  <p>파라미터가 70억 개인 LLM 에는 행렬 연산에 쓰이는 70억 개의 수가 저장돼 있다. 따라서 <b>모델 용량은 각 수를 몇 비트로 표현하느냐에 따라 달라진다</b>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>형식</th><th>비트</th><th>7B 모델 용량</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td><code>fp32</code></td><td>32비트 (4바이트)</td><td>약 28GB</td><td>과거의 기본. 모델이 커지면서 GPU 한 장에 안 들어가고 연산도 느려졌다</td></tr>
+        <tr><td><code>fp16</code> / <code>bf16</code></td><td>16비트 (2바이트)</td><td>약 14GB</td><td>최근 학습/추론의 표준</td></tr>
+        <tr><td><code>int8</code></td><td>8비트 (1바이트)</td><td>약 7GB</td><td>양자화</td></tr>
+        <tr><td><code>int4</code> / <code>nf4</code></td><td>4비트 (0.5바이트)</td><td>약 3.5GB</td><td>양자화. QLoRA 등에서 사용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>최근에는 모델이 커지면서 <b>B</b>(billion, 10억) 단위로 크기를 표기한다. 7B 모델을 16비트로 올리면 <code>7 × 2 = 14GB</code> — 이 암산이 GPU 를 고를 때의 첫 번째 계산이다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">fp16 과 bf16 은 왜 갈렸나 <span class="badge b-blue">보강</span></p>
+      <p>둘 다 16비트지만 비트를 나누는 방식이 다르다. <code>fp16</code> 은 지수 5비트 + 가수 10비트로 <b>정밀도</b>가 높고, <code>bf16</code> 은 지수 8비트 + 가수 7비트로 <b>표현 범위</b>가 fp32 와 같다. 학습 중 그레이디언트가 아주 작거나 클 때 fp16 은 언더/오버플로로 터지기 쉬운데, bf16 은 범위가 넓어 안정적이다. 그래서 대형 모델 학습은 bf16 쪽이 기본값이 되어가고 있다(단, bf16 은 Ampere 이후 GPU 에서만 지원된다).</p>
+    </div>
+  </div>
+
+  <h4>양자화로 모델 용량 줄이기</h4>
+  <p>모델이 커지면서 <b>더 적은 비트로 모델을 표현하는 양자화</b> 기술이 개발됐다. 양자화의 핵심 과제는 <b>비트를 줄이면서도 원본 정보의 소실을 최소화하는 것</b>이다.</p>
+
+  <p>또 다른 방법으로 <b>퀀타일</b>(quantile) 방식이 있는데, 별도의 메모리를 추가로 사용해야 한다는 단점이 있다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">퀀타일 방식이 메모리를 더 쓰는 이유 <span class="badge b-blue">보강</span></p>
+      <p>단순 양자화는 <b>최솟값~최댓값을 균등하게</b> 나눈다. 퀀타일 방식은 실제 값 분포의 분위수를 기준으로 구간을 나누므로 정보 손실이 적지만, <b>어떤 값이 어떤 구간에 대응되는지를 담은 표(스케일/영점 등의 상수)</b>를 함께 들고 있어야 한다. 그 표가 추가 메모리다. bitsandbytes 의 <code>nf4</code>(4-bit NormalFloat)가 이 계열이며, 신경망 가중치가 대체로 정규분포를 따른다는 성질을 이용한다.</p>
+    </div>
+  </div>
+
+  <h4>GPU 메모리 분해하기</h4>
+  <p>학습 중 GPU 메모리에는 네 가지가 올라간다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  P["① 모델 파라미터<br>모델을 올린 순간부터 상주"]
+  A["④ 순전파 상태 (활성값)<br>역전파에 쓰려고 보관"]
+  G["② 그레이디언트<br>파라미터와 같은 크기"]
+  O["③ 옵티마이저 상태<br>Adam이면 파라미터의 2배"]
+  P -->|"순전파"| A
+  A -->|"손실 계산 후 역전파"| G
+  G -->|"옵티마이저 업데이트"| O
+  O -->|"파라미터 갱신"| P
+      </pre>
+    </div>
+    <div class="figure-cap"><b>추론은 ①만, 학습은 ①~④ 전부 필요하다</b> — 학습에 추론보다 훨씬 큰 GPU 가 필요한 이유다.</div>
+  </div>
+
+  <p>흐름으로 보면 이렇다 — <b>순전파를 수행</b>하고, 그때 계산한 손실로부터 <b>역전파</b>를 수행하고, 마지막으로 <b>옵티마이저</b>를 통해 모델을 업데이트한다.</p>
+
+  <h5>GPU 메모리 사용량 계산</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">gpu_util.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import torch
+
+def print_gpu_utilization():
+    if torch.cuda.is_available():
+        used_memory = torch.cuda.memory_allocated() / 1024 ** 3
+        print(f"GPU Memory Usage: {used_memory:.3f} GB")
+    else:
+        print("Change to runtime GPU")
+
+print_gpu_utilization()</code></pre>
+  </div>
+
+  <h5>모델을 불러온 뒤 메모리와 데이터 타입 확인</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">load_and_measure.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+def print_gpu_utilization():
+    if torch.cuda.is_available():
+        used_memory = torch.cuda.memory_allocated() / 1024**3
+        print(f"GPU 메모리 사용량: {used_memory:.3f} GB")
+    else:
+        print("런타임 유형을 GPU로 변경하세요")
+
+def load_model_and_tokenizer(model_id, peft=None):
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    if peft is None:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id, torch_dtype="auto", device_map={"": 0}
+        )
+
+    print_gpu_utilization()
+    return model, tokenizer
+
+model_id = "EleutherAI/polyglot-ko-1.3b"
+model, tokenizer = load_model_and_tokenizer(model_id)
+print("모델 파라미터 데이터 타입: ", model.dtype)</code></pre>
+  </div>
+
+  <p><code>torch_dtype="auto"</code> 는 저장소의 <code>config.json</code> 에 기록된 데이터 타입을 그대로 따르라는 뜻이고, <code>device_map={"": 0}</code> 은 모델 전체를 0번 GPU 에 올리라는 뜻이다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">memory_allocated 는 전부를 보여주지 않는다 <span class="badge b-blue">보강</span></p>
+      <p><code>torch.cuda.memory_allocated()</code> 는 <b>파이토치가 텐서에 실제로 할당한 양</b>만 센다. CUDA 컨텍스트와 파이토치가 미리 잡아둔 캐시 블록은 빠져 있어서, <code>nvidia-smi</code> 로 본 값보다 항상 작게 나온다. 캐시까지 포함한 값이 필요하면 <code>torch.cuda.memory_reserved()</code> 를 쓴다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>모델 용량 = 파라미터 수 × 바이트 수. <b>7B × 2바이트 = 14GB</b> 가 기준 암산이다.</li>
+      <li>fp32 → fp16/bf16 으로 옮겨온 이유는 용량과 속도, bf16 이 우세해진 이유는 표현 범위(안정성)다.</li>
+      <li><b>양자화</b>는 비트를 줄이되 정보 손실을 최소화하는 기술이고, 퀀타일 방식은 정확도를 위해 추가 메모리를 쓴다.</li>
+      <li>학습 중 GPU 에는 <b>파라미터 / 그레이디언트 / 옵티마이저 상태 / 순전파 활성값</b> 네 가지가 올라간다.</li>
+      <li><code>torch.cuda.memory_allocated()</code> 로 실제 할당량을, <code>model.dtype</code> 으로 데이터 타입을 확인한다.</li>
+    </ul>
+  </div>
+</article>

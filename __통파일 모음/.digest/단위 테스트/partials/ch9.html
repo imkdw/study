@@ -1,0 +1,191 @@
+<article class="item" id="item-9-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">9-1</div>
+    <h3>목의 가치를 극대화하기</h3>
+    <p class="item-tagline">목은 시스템 끝단에 붙일수록 더 많은 코드를 지켜준다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>비관리 의존성과 통신하는 마지막 타입</b>을 목으로 처리한다. 그래야 통합 테스트가 거치는 클래스 수가 늘어나 회귀 방지가 극대화된다.
+  </div>
+
+  <h4>시스템 끝에서 상호 작용 검증하기</h4>
+
+  <p>목을 쓸 때는 <b>시스템 끝에서</b> 비관리 의존성과의 상호작용을 검증해야 한다. 회귀 방지는 테스트 중에 실행되는 코드 양의 함수이므로, 목을 바깥으로 밀수록 그 사이에 있는 클래스가 전부 테스트 범위 안으로 들어온다.</p>
+
+  <p><a href="#item-8-6">8-6</a> 의 <code>DomainLogger</code> 와 <code>Logger</code> 를 예로 들면, 둘 중 <b>바깥쪽인 <code>Logger</code></b> 를 목으로 처리해야 <code>DomainLogger</code> 의 변환 로직까지 함께 검증된다.</p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">두 가지 책임을 분리한다</p>
+      <p><b>외부 라이브러리의 복잡성을 숨기는 일</b>과 <b>모든 앱 메세지를 한 곳에 모으는 일</b>은 서로 다른 책임이므로 분리되어 있는 게 좋다. 목은 그중 바깥쪽, 즉 라이브러리에 가장 가까운 타입에 붙인다.</p>
+    </div>
+  </div>
+
+  <h4>목을 스파이로 대체하기</h4>
+
+  <p>스파이와 목은 목적이 같고 <b>생성하는 방식</b>만 다르다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>생성 방식</th></tr></thead>
+      <tbody>
+        <tr><td><b>목</b></td><td>외부 라이브러리의 도움으로 생성한다</td></tr>
+        <tr><td><b>스파이</b></td><td>직접 작성한다. 그래서 "직접 작성한 목" 이라고도 부른다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">bus-spy.ts</span>
+      <span class="code-tag good">스파이 + 플루언트 인터페이스</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">interface IBus {
+  send(message: string): void;
+}
+
+class BusSpy implements IBus {
+  private sentMessages: string[] = [];
+
+  send(message: string): void {
+    this.sentMessages.push(message);
+  }
+
+  shouldSendNumberOfMessages(count: number): BusSpy {
+    expect(this.sentMessages).toHaveLength(count);
+    return this; // 메소드 체이닝
+  }
+
+  withEmailChangedMessage(userId: number, newEmail: string): BusSpy {
+    const expected = `Type: USER EMAIL CHANGED; Id: ${userId}; NewEmail: ${newEmail}`;
+    expect(this.sentMessages).toContain(expected);
+    return this;
+  }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">user-controller.integration.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">it("changing_email_from_corporate_to_non_corporate", () =&gt; {
+  const busSpy = new BusSpy();
+  const messageBus = new MessageBus(busSpy); // 시스템 끝단을 스파이로
+  const loggerMock: jest.Mocked&lt;IDomainLogger&gt; = {
+    userTypeHasChanged: jest.fn(),
+  };
+  const sut = new UserController(messageBus, loggerMock);
+
+  // ...
+
+  busSpy
+    .shouldSendNumberOfMessages(1)
+    .withEmailChangedMessage(userId, newEmail);
+});</code></pre>
+  </div>
+
+  <h5>플루언트 인터페이스</h5>
+
+  <p>메소드 체이닝을 기반으로 코드가 <b>쉬운 영어 문장처럼</b> 보이게 하는 설계 기법이다. 위 예제에서 <code>BusSpy</code> 는 검증 구문을 플루언트 인터페이스로 제공해 상호작용 검증을 간결하고 표현력 있게 만든다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">스파이가 목보다 나은 지점 <span class="badge b-blue">보강</span></p>
+      <p>스파이는 <b>테스트가 직접 소유하는 코드</b>다. 메세지 포맷 같은 검증 로직을 한곳에 모아두면, 포맷이 바뀌었을 때 고칠 자리가 하나뿐이다. 목 라이브러리로 같은 일을 하면 그 문자열 조립이 테스트마다 흩어진다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>목은 <b>비관리 의존성과 통신하는 마지막 타입</b>에 붙인다.</li>
+      <li>바깥으로 밀수록 실행되는 코드가 늘어 회귀 방지가 커진다.</li>
+      <li>스파이는 직접 작성한 목이며, 검증 로직을 한곳에 모을 수 있다.</li>
+      <li>플루언트 인터페이스로 검증 구절을 문장처럼 읽히게 만든다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-9-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">9-2</div>
+    <h3>목 처리에 대한 모범 사례</h3>
+    <p class="item-tagline">목은 통합 테스트만을 위한 것이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    도메인 모델은 단위 테스트, 컨트롤러는 통합 테스트. 목은 <b>비관리 의존성을 다루는 컨트롤러</b>에만 붙으므로, 결국 통합 테스트에만 등장한다.
+  </div>
+
+  <h4>목은 통합 테스트만을 위한 것</h4>
+
+  <p>도메인 모델은 단위 테스트에 속하고, 컨트롤러는 통합 테스트에 속한다. 목은 비관리 의존성에만 해당하며, 그런 의존성을 처리하는 코드는 컨트롤러뿐이다. 따라서 <b>통합 테스트에서 컨트롤러를 테스트할 때만</b> 목을 적용한다.</p>
+
+  <h4>테스트당 목이 하나일 필요는 없음</h4>
+
+  <p>"단위" 는 코드 단위가 아니라 <b>동작 단위</b>이며, 동작 단위를 구현하는 데 필요한 코드의 양과는 상관이 없다. 마찬가지로 동작 단위를 검증하는 데 필요한 목의 수도 상관이 없다. <b>목의 수는 오직 그 연산에 참여하는 비관리 의존성의 수에만 의존한다.</b></p>
+
+  <h4>호출 횟수 검증하기</h4>
+
+  <p>비관리 의존성과의 통신에서는 두 가지를 모두 확인해야 한다.</p>
+
+  <ul>
+    <li>예상하는 호출이 <b>있는가</b></li>
+    <li>예상치 못한 호출이 <b>없는가</b></li>
+  </ul>
+
+  <p>앱은 외부 시스템이 예상하는 메세지를 생략해서도 안 되고, 예상치 못한 메세지를 만들어서도 안 되기 때문이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">integration.spec.ts</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-typescript">// 기대한 인자로 호출됐는가
+expect(messageBusMock.sendEmailChangedMessage).toHaveBeenCalledWith(
+  userId,
+  newEmail
+);
+
+// 그리고 그 외의 호출은 없었는가
+expect(messageBusMock.sendEmailChangedMessage).toHaveBeenCalledTimes(1);</code></pre>
+  </div>
+
+  <h4>보유 타입만 목으로 처리하기</h4>
+
+  <p>서드파티 라이브러리 위에는 <b>항상 어댑터를 작성</b>하고, 기본 타입 대신 그 어댑터를 목으로 처리하라는 지침이다. 이유는 세 가지다.</p>
+
+  <ol class="steps">
+    <li><div class="step-title">서드파티 코드의 작동 방식을 정확히 알지 못한다</div></li>
+    <li><div class="step-title">라이브러리가 인터페이스를 제공하더라도 확인이 필요하다</div><p>목으로 처리한 동작이 실제 외부 라이브러리의 동작과 일치하는지 검증해야 한다.</p></li>
+    <li><div class="step-title">기술 세부 사항이 앱에 필요하지 않다</div><p>어댑터가 그것을 추상화하고, <b>앱 관점에서</b> 라이브러리와의 관계를 정의해야 한다.</p></li>
+  </ol>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">어댑터는 손상 방지 계층이다</p>
+      <p>실제로 어댑터는 우리 코드와 외부 환경 사이의 <b>손상 방지 계층(anti-corruption layer)</b> 으로 작동한다. 외부 라이브러리의 모델이 우리 도메인 모델을 오염시키는 것을 막는다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>목은 통합 테스트에서 컨트롤러를 테스트할 때만 쓴다.</li>
+      <li>목의 수는 <b>연산에 참여하는 비관리 의존성 수</b>로만 결정된다.</li>
+      <li>기대한 호출과 예상치 못한 호출 <b>둘 다</b> 검증한다.</li>
+      <li>서드파티 타입이 아니라 그 위의 <b>어댑터</b>를 목으로 처리한다.</li>
+    </ul>
+  </div>
+</article>

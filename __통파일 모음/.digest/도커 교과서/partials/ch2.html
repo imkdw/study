@@ -1,0 +1,645 @@
+<article class="item" id="item-2-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2-1</div>
+    <h3>컨테이너로 헬로월드 실행하기</h3>
+    <p class="item-tagline">이미지가 로컬에 없으면 받아 오고, 받아 온 뒤 실행한다. <code>docker container run</code> 한 줄이 그 두 단계를 다 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    첫 실행에서 <code>Unable to find image ... locally</code> 가 뜬 뒤 여러 줄의 <code>Pull complete</code> 가 이어지는 것이
+    <b>이미지가 여러 개의 레이어로 나뉘어 있다</b>는 첫 번째 증거다.
+  </div>
+
+  <p>
+    <code>diamol/ch02-hello-diamol</code> 이미지를 내려받고 컨테이너로 실행하는 과정이다.
+    <code>docker container run</code> 은 컨테이너로 앱을 실행하라는 도커 명령이다.
+  </p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker container run diamol/ch02-hello-diamol
+
+Unable to find image 'diamol/ch02-hello-diamol:latest' locally
+latest: Pulling from diamol/ch02-hello-diamol
+941f399634ec: Pull complete
+93931504196e: Pull complete
+d7b1f3678981: Pull complete
+Digest: sha256:c4f45e04025d10d14d7a96df2242753b925e5c175c3bea9112f93bf9c55d4474
+Status: Downloaded newer image for diamol/ch02-hello-diamol:latest
+---------------------
+Hello from Chapter 2!
+---------------------
+My name is:
+0264c09ff63e
+---------------------
+Im running on:
+Linux 6.10.12-orbstack-00282-gd1783374c25e aarch64
+---------------------
+My address is:
+inet addr:192.168.215.2 Bcast:192.168.215.255 Mask:255.255.255.0
+---------------------</code></pre>
+  </div>
+
+  <p>
+    출력에서 눈여겨볼 것은 컨테이너가 자기 자신에 대해 말하는 세 가지다.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>출력</th><th>값</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td>My name is</td><td class="dg-mono"><code>0264c09ff63e</code></td><td>컨테이너의 호스트명. 컨테이너 ID 앞 12자리가 그대로 쓰인다.</td></tr>
+        <tr><td>Im running on</td><td class="dg-mono"><code>Linux 6.10.12-orbstack ...</code></td><td>호스트의 커널이다. 게스트 OS 를 따로 부팅하지 않고 커널을 공유한다.</td></tr>
+        <tr><td>My address is</td><td class="dg-mono"><code>192.168.215.2</code></td><td>컨테이너 전용 IP. 호스트 IP 와 별개로 도커가 할당한다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>docker container run</code> 은 사실 <b>두 명령의 합성</b>이다.
+        이미지가 없으면 <code>docker image pull</code>, 그다음 컨테이너를 만드는 <code>docker container create</code>,
+        마지막으로 <code>docker container start</code>. 뒤에 나올 <code>docker container start --attach</code> 로
+        같은 컨테이너를 다시 살릴 수 있는 것도 이 때문이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>docker container run &lt;이미지&gt;</code> 는 "없으면 받아서, 컨테이너 만들고, 실행한다"를 한 번에 한다.</li>
+      <li>이미지는 <code>Pull complete</code> 줄 수만큼의 레이어로 쪼개져 내려온다.</li>
+      <li>컨테이너는 자기만의 호스트명과 IP 를 갖지만, 커널은 호스트 것을 그대로 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2-3</div>
+    <h3>컨테이너를 원격 컴퓨터처럼 사용하기</h3>
+    <p class="item-tagline">컨테이너에 들어가서 셸을 쓰고, 밖에서 프로세스 / 로그 / 상세 정보를 들여다보는 네 가지 명령.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    컨테이너 조회 명령은 전부 <b>ID 앞글자만 입력해도 패턴 매칭</b>으로 동작한다. <code>docker top 84</code> 처럼 두 글자면 충분하다.
+  </div>
+
+  <h4><code>--interactive</code> 플래그</h4>
+  <ul>
+    <li><code>--interactive</code> 플래그를 쓰면 컨테이너에 접속한 상태로 실행할 수 있다.</li>
+    <li>도커가 구동 중인 환경에 따라 프롬프트가 다르지만, 컨테이너 내부에서는 동일한 명령어를 쓸 수 있다.</li>
+    <li>아래 예시에서는 <code>hostname</code>, <code>date</code> 로 호스트명과 날짜를 확인한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run --interactive --tty diamol/base
+
+Unable to find image 'diamol/base:latest' locally
+latest: Pulling from diamol/base
+941f399634ec: Already exists
+716aca3e500c: Pull complete
+Digest: sha256:787fe221a14f46b55e224ea0436aca77d345c3ded400aaf6cd40125e247f35c7
+Status: Downloaded newer image for diamol/base:latest
+/ # hostname
+840925fb1055
+/ # date
+Sat Oct 26 04:04:15 UTC 2024
+/ #</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>941f399634ec: Already exists</code> 를 놓치지 말자. 앞의 <code>ch02-hello-diamol</code> 과
+        <code>diamol/base</code> 가 <b>같은 기반 레이어를 공유</b>하고 있어서 다시 내려받지 않은 것이다.
+        이미지 레이어가 왜 읽기 전용이어야 하는지는 <a href="#item-3-4">3-4</a> 에서 이어진다.
+      </p>
+    </div>
+  </div>
+
+  <h4><code>docker container ls</code></h4>
+  <ul>
+    <li>현재 실행 중인 모든 컨테이너의 정보를 확인할 수 있다.</li>
+    <li>컨테이너의 바탕이 된 이미지, 컨테이너 ID 등이 출력된다. 컨테이너 ID 는 실행할 때마다 무작위로 생성된다.</li>
+    <li><code>--all</code> 플래그를 붙이면 실행 상태와 상관없이 모든 컨테이너 목록을 볼 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker container ls
+
+CONTAINER ID   IMAGE         COMMAND     CREATED              STATUS              PORTS     NAMES
+840925fb1055   diamol/base   "/bin/sh"   About a minute ago   Up About a minute             reverent_bhaskara</code></pre>
+  </div>
+
+  <h4><code>docker top &lt;container_id&gt;</code></h4>
+  <ul>
+    <li>특정 컨테이너에서 실행 중인 프로세스 목록을 보여준다.</li>
+    <li>패턴 매칭 방식이라 컨테이너 ID 의 앞글자만 입력해도 된다. 여러 개가 매칭되면 매칭된 모든 컨테이너의 프로세스를 출력한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker top 84
+
+PID                 USER                TIME                COMMAND
+7979                root                0:00                /bin/sh</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>
+        여기 찍힌 PID <code>7979</code> 는 <b>호스트에서 본 번호</b>다. 컨테이너 안에서 <code>ps</code> 를 치면 같은
+        프로세스가 PID 1 로 보인다. 같은 프로세스를 PID 네임스페이스 안팎에서 각각 다른 번호로 보는 것이고,
+        이것이 "컨테이너는 격리된 프로세스일 뿐"이라는 말의 실체다.
+      </p>
+    </div>
+  </div>
+
+  <h4><code>docker logs &lt;container_id&gt;</code></h4>
+  <ul>
+    <li>대상 컨테이너에서 수집된 모든 로그를 출력한다.</li>
+    <li>실제 앱이 구동되는 컨테이너에서는 앱이 출력하는 로그만 보인다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker logs 84
+
+/ # hostname
+840925fb1055
+/ # date
+Sat Oct 26 04:04:15 UTC 2024</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>
+        도커가 수집하는 것은 <b>PID 1 프로세스의 표준 출력/표준 에러뿐</b>이다.
+        앱이 로그를 파일에 쓰도록 설정돼 있으면 <code>docker logs</code> 에는 아무것도 안 나온다.
+        컨테이너용 앱에서 로그를 stdout 으로 내보내는 게 관례가 된 이유가 여기 있다.
+      </p>
+    </div>
+  </div>
+
+  <h4><code>docker inspect &lt;container_id&gt;</code></h4>
+  <ul>
+    <li>대상 컨테이너의 상세한 정보를 보여준다.</li>
+    <li>JSON 포맷으로 출력되며 상태, 네트워크 설정 등 앱에 일어난 문제를 추적하기 위해 일상적으로 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">$ docker inspect 84
+
+[
+    {
+        "Id": "840925fb1055450623273c76ddecb6e6b6b8f4be9015c5060ea636beb051a395",
+        "Created": "2024-10-26T04:04:04.909715959Z",
+        "Path": "/bin/sh",
+        "Args": [],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false
+        }
+        // more...
+    }
+]</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>
+        노트에는 <code>docker inspect</code> 로 "CPU 사용량, 네트워크 상태"를 본다고 적혀 있지만,
+        <code>inspect</code> 가 보여주는 것은 <b>설정과 상태 스냅숏</b>(경로, 마운트, 네트워크 설정, 헬스 상태 등)이지
+        실시간 리소스 사용량이 아니다. 실시간 CPU / 메모리 사용량은 <a href="#item-2-4"><code>docker stats</code></a> 가 담당한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>--interactive --tty</code> (줄여서 <code>-it</code>) 로 컨테이너 안에서 셸을 쓴다.</li>
+      <li><code>ls</code> 는 목록, <code>top</code> 은 프로세스, <code>logs</code> 는 stdout, <code>inspect</code> 는 설정 스냅숏.</li>
+      <li>컨테이너 ID 는 앞글자만 써도 되고, <code>--all</code> 없이는 종료된 컨테이너가 안 보인다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2-4</div>
+    <h3>컨테이너를 사용해서 웹 사이트 호스팅하기</h3>
+    <p class="item-tagline">컨테이너 IP 로는 못 들어간다. 호스트 포트를 열어 도커가 트래픽을 넘겨줘야 들어갈 수 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>--publish 8088:80</code> 은 "호스트의 8088 로 들어온 트래픽을 컨테이너의 80 으로 넘겨라"는 뜻이다.
+    <b>공개하지 않은 컨테이너는 외부에서 IP 로 직접 찔러도 열리지 않는다.</b>
+  </div>
+
+  <h4>모든 도커 컨테이너 확인하기</h4>
+  <p><code>docker container ls --all</code> 로 확인할 수 있다. 여기서 알아야 할 점이 두 가지 있다.</p>
+  <ol class="steps">
+    <li>
+      <div class="step-title">컨테이너 내부의 앱이 실행 중이어야 컨테이너도 실행이 유지된다</div>
+      <p>종료된 컨테이너는 더 이상 CPU 나 메모리 자원을 사용하지 않는다.</p>
+    </li>
+    <li>
+      <div class="step-title">컨테이너가 종료돼도 사라지지 않는다</div>
+      <p>나중에 다시 실행하거나 로그를 확인하는 등의 작업이 가능하다. 다만 계속 남아 있어서 저장 공간을 차지한다.</p>
+    </li>
+  </ol>
+
+  <h4>컨테이너에서 간단한 웹 사이트 호스팅하기</h4>
+  <ul>
+    <li><code>--detach</code> — 컨테이너를 백그라운드에서 실행하며 컨테이너 ID 를 출력하는 플래그</li>
+    <li><code>--publish</code> — 컨테이너의 포트를 호스트 컴퓨터에 공개하는 플래그</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run --detach --publish 8088:80 diamol/ch02-hello-diamol-web
+
+Unable to find image 'diamol/ch02-hello-diamol-web:latest' locally
+latest: Pulling from diamol/ch02-hello-diamol-web
+dce8679b510e: Pull complete
+c111552b26df: Pull complete
+ef4263ddbf41: Pull complete
+cac4170335ae: Pull complete
+0a26a833371b: Pull complete
+994988584430: Pull complete
+Digest: sha256:fe5a4c954fe2df5cadeea304ab632533f8ece9e31bd219ea22fdbf8b597571eb
+Status: Downloaded newer image for diamol/ch02-hello-diamol-web:latest
+066b8d99bf049c42cf82995f6cc4a2131800481c3d2aa8851c78b328122381ee</code></pre>
+  </div>
+
+  <h4>컨테이너 포트를 호스트 컴퓨터에 공개하는 원리</h4>
+  <ul>
+    <li>도커를 설치하면 호스트 컴퓨터의 네트워크 계층에 도커가 끼어든다.</li>
+    <li>호스트를 드나드는 네트워크 트래픽을 도커가 가로채서, 필요한 것만 컨테이너에 전달한다.</li>
+    <li>기본적으로 컨테이너는 외부에 노출되지 않으므로 외부에서 컨테이너 IP 로 직접 접근할 수 없다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 280" width="620" role="img" aria-label="호스트 172.30.1.100 의 8088 포트로 접근하면 성공하고, 컨테이너 IP 192.168.215.3 의 80 포트로 직접 접근하면 실패한다">
+        <rect x="8" y="30" width="380" height="230" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="24" y="52" class="dg-text-sub" font-size="11">호스트 컴퓨터</text>
+        <text x="376" y="52" class="dg-accent dg-mono" font-size="12" font-weight="700" text-anchor="end">IP 172.30.1.100</text>
+
+        <line x1="120" y1="30" x2="120" y2="16" class="dg-stroke"/>
+        <circle cx="120" cy="14" r="3.5" class="dg-fill-bg dg-stroke"/>
+        <text x="132" y="18" class="dg-accent dg-mono" font-size="12" font-weight="700">Port 8088 (공개)</text>
+
+        <rect x="34" y="98" width="200" height="140" rx="8" class="dg-fill-soft dg-stroke"/>
+        <text x="48" y="120" class="dg-text-sub" font-size="11">Container 1</text>
+        <rect x="66" y="140" width="136" height="52" rx="6" class="dg-fill-bg dg-stroke"/>
+        <text x="134" y="172" class="dg-text dg-mono" font-size="14" font-weight="700" text-anchor="middle">APP 1</text>
+        <text x="248" y="146" class="dg-text dg-mono" font-size="11">IP 192.168.215.3</text>
+
+        <line x1="100" y1="98" x2="100" y2="80" class="dg-stroke"/>
+        <circle cx="100" cy="78" r="3.5" class="dg-fill-bg dg-stroke"/>
+        <text x="112" y="82" class="dg-text dg-mono" font-size="11">Port 80</text>
+
+        <rect x="470" y="120" width="106" height="52" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="523" y="152" class="dg-text" font-size="13" text-anchor="middle">외부 기기</text>
+
+        <path d="M470 132 C 430 96, 410 76, 392 62" fill="none" stroke="var(--green)" stroke-width="2" marker-end="url(#ok-arrow)"/>
+        <path d="M470 162 C 380 196, 300 186, 244 176" fill="none" stroke="var(--red)" stroke-width="2" stroke-dasharray="5 4"/>
+        <g stroke="var(--red)" stroke-width="2.4" stroke-linecap="round">
+          <line x1="346" y1="180" x2="360" y2="194"/>
+          <line x1="360" y1="180" x2="346" y2="194"/>
+        </g>
+        <defs>
+          <marker id="ok-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="var(--green)"/>
+          </marker>
+        </defs>
+
+        <text x="404" y="94" class="dg-mono" font-size="10.5" fill="var(--green)" font-weight="700">172.30.1.100:8088 → OK</text>
+        <text x="404" y="228" class="dg-mono" font-size="10.5" fill="var(--red)" font-weight="700">192.168.215.3:80 → 실패</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>컨테이너 IP 는 호스트 안에서만 유효한 주소다</b> — 외부에서 닿을 수 있는 유일한 통로는
+      <code>--publish</code> 로 연 호스트 포트뿐이고, 그 앞에서 도커가 트래픽을 받아 컨테이너로 넘긴다.
+    </div>
+  </div>
+
+  <h4><code>docker stats &lt;container_id&gt;</code></h4>
+  <ul>
+    <li>컨테이너의 리소스 사용 현황을 확인하는 명령이다.</li>
+    <li>실시간으로 CPU, 메모리, 네트워크, 디스크 사용량을 볼 수 있다.</li>
+    <li>출력 결과는 리눅스와 윈도우에서 조금 다르다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker stats 06
+
+CONTAINER ID   NAME           CPU %     MEM USAGE / LIMIT    MEM %     NET I/O           BLOCK I/O        PIDS
+066b8d99bf04   kind_khorana   0.00%     3.23MiB / 5.189GiB   0.06%     4.04kB / 2.64kB   5.69MB / 4.1kB   109</code></pre>
+  </div>
+
+  <h4>모든 도커 컨테이너 삭제</h4>
+  <ul>
+    <li><code>$()</code> 문법은 앞 명령의 출력을 다른 명령의 인자로 넘기는 역할을 한다.</li>
+    <li>아래 명령은 존재하는 모든 컨테이너 목록을 만들고, 그것을 전부 제거한다.</li>
+    <li>한 번에 정리할 수 있지만 <b>삭제 전 아무 확인 절차가 없으므로</b> 주의해야 한다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-tag bad">되돌릴 수 없음</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker rm --force $(docker container ls --all --quiet)
+
+8ae8aac5d26f
+066b8d99bf04
+840925fb1055
+f48db9608988
+d37b24b40c09
+0264c09ff63e
+e00a0c5ef157
+6f6c3b39e0c9
+a2d1a275c2d4
+577e48d535f7
+1de943992dac
+30614a62b73e
+33ac23d75dfc
+4e23f69e2d90</code></pre>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">실습 환경에서만 쓸 것</p>
+      <p>
+        이 명령은 <b>이 머신의 모든 컨테이너</b>를 지운다. 실습용 컨테이너만 골라내려면
+        <code>--filter</code> 를 쓰는 편이 안전하다. 예를 들어 종료된 것만 지우려면
+        <code>docker container prune</code>, 특정 이름 패턴만 지우려면
+        <code>docker rm -f $(docker ps -aq --filter "name=todo")</code> 처럼 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>컨테이너는 종료돼도 남아 있다. 자원은 안 쓰지만 디스크는 차지한다.</li>
+      <li><code>--publish 호스트:컨테이너</code> 로 연 포트만 외부에서 닿는다. 컨테이너 IP 직접 접근은 안 된다.</li>
+      <li>실시간 사용량은 <code>docker stats</code>, 설정 스냅숏은 <code>docker inspect</code> 로 역할이 갈린다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2-5</div>
+    <h3>도커가 컨테이너를 실행하는 원리</h3>
+    <p class="item-tagline">CLI 는 아무 일도 하지 않는다. REST API 를 호출할 뿐이고, 실제 작업은 엔진이 한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>docker</code> 명령은 <b>API 클라이언트</b>일 뿐이다. CLI 와 엔진이 API 로 분리돼 있기 때문에
+    Portainer 같은 다른 클라이언트도, 원격 호스트 제어도 같은 방식으로 가능해진다.
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  CLI["docker CLI"] -->|"HTTP REST 호출"| API["Docker API"]
+  OTHER["다른 클라이언트 (Portainer 등)"] -->|"같은 API"| API
+  API --> ENG["Docker Engine (상시 데몬)"]
+  ENG -->|"컨테이너 / 가상 네트워크 생성"| OS["호스트 OS"]
+  ENG <-->|"없으면 내려받고 있으면 재사용"| CACHE["로컬 이미지 캐시"]
+      </pre>
+    </div>
+    <div class="figure-cap">
+      <b>CLI → API → 엔진 순서로 흐른다</b> — CLI 를 통째로 다른 도구로 갈아 끼워도 아래 두 층은 그대로다.
+      엔진 설정을 바꾸면 이 API 를 네트워크 너머에서 호출하도록 열 수도 있다.
+    </div>
+  </div>
+
+  <h4>도커 엔진</h4>
+  <ul>
+    <li>도커의 관리 기능을 담당하는 컴포넌트다.</li>
+    <li>로컬 이미지 캐싱을 담당한다. 새 이미지가 필요하면 내려받고, 기존에 있으면 그대로 쓴다.</li>
+    <li>호스트 OS 와 함께 컨테이너와 가상 네트워크 등 도커 리소스를 만드는 일도 담당한다.</li>
+    <li>항시 동작하는 백그라운드 프로세스다.</li>
+  </ul>
+
+  <h4>도커 API</h4>
+  <ul>
+    <li>표준 HTTP 기반 REST API 다.</li>
+    <li>도커 엔진은 이 API 를 통해 맡은 기능을 수행한다.</li>
+    <li>엔진 설정을 바꾸면 네트워크를 경유해 외부 컴퓨터에서 호출할 수 있는지를 제어할 수 있다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">주의 <span class="badge b-blue">보강</span></p>
+      <p>
+        도커 API 를 TCP 로 열 때는 인증 없이 열지 않는다. 도커 데몬은 사실상 호스트의 root 권한과
+        동등하므로, 인증 없는 <code>2375</code> 포트는 호스트를 통째로 넘겨주는 것과 같다.
+        원격 접근이 필요하면 TLS 로 상호 인증(<code>2376</code>)하거나 SSH 컨텍스트
+        (<code>docker context create --docker "host=ssh://..."</code>)를 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <h4>도커 CLI</h4>
+  <ul>
+    <li>도커 API 의 클라이언트다.</li>
+    <li>명령을 실행할 때 실제로 도커 API 를 호출하는 주체가 도커 CLI 다.</li>
+  </ul>
+
+  <h4>오픈소스인 도커 API</h4>
+  <ul>
+    <li>도커는 모든 API 명세가 공개돼 있다.</li>
+    <li>도커 CLI 외에도 다른 클라이언트(Portainer 등)를 쓸 수 있다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>구조는 <b>CLI → API → 엔진 → OS</b> 네 층이다. CLI 는 얇은 클라이언트일 뿐이다.</li>
+      <li>엔진이 이미지 캐시를 관리한다. <code>Already exists</code> 가 뜨는 이유가 이것이다.</li>
+      <li>API 가 공개돼 있어 다른 UI 나 원격 제어가 붙을 수 있다. 반대로 함부로 열면 위험하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-2-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 2-6</div>
+    <h3>연습문제 — 컨테이너 파일 시스템 다루기</h3>
+    <p class="item-tagline">실행 중인 컨테이너에 파일을 밀어 넣어 화면을 바꿔 본다. 그 변경이 어디에 저장되는지가 6장의 주제가 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>docker container cp</code> 로 호스트의 파일을 실행 중인 컨테이너로 복사할 수 있다.
+    이 변경은 <b>그 컨테이너에만</b> 남고, 이미지에도 다른 컨테이너에도 영향을 주지 않는다.
+  </div>
+
+  <p>
+    <b>문제</b> — 웹 사이트 컨테이너를 실행하고 <code>index.html</code> 파일을 교체해서 웹 페이지 내용을 수정하라.
+    <code>index.html</code> 은 <code>/usr/local/apache2/htdocs</code> 에 위치한다.
+  </p>
+
+  <h4>기존 웹 사이트</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 170" width="560" role="img" aria-label="localhost:8080 에 Hello from Chapter 2 라는 제목과 Learn Docker in a Month of Lunches 링크가 보인다">
+        <rect x="8" y="8" width="544" height="154" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="8" y="8" width="544" height="34" rx="8" class="dg-fill-soft"/>
+        <line x1="8" y1="42" x2="552" y2="42" class="dg-stroke"/>
+        <circle cx="34" cy="25" r="4.5" class="dg-stroke" fill="none"/>
+        <rect x="52" y="15" width="230" height="20" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="66" y="29" class="dg-text-sub dg-mono" font-size="11">localhost:8080</text>
+        <text x="28" y="90" class="dg-text" font-size="21" font-weight="800">Hello from Chapter 2!</text>
+        <text x="28" y="128" class="dg-text" font-size="14" font-weight="700">This is <tspan class="dg-accent" text-decoration="underline">Learn Docker in a Month of Lunches</tspan>.</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>이미지에 포함된 원래 <code>index.html</code></b> — 이 파일을 갈아 끼우는 게 이번 문제다.</div>
+  </div>
+
+  <h4>풀이</h4>
+
+  <h5>1. 웹 사이트 컨테이너를 백그라운드로 실행</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run -d -p 8080:80 diamol/ch02-hello-diamol-web
+
+b04b0fbe9e7eeb151111f80c4c1f5d8f1547878d036ce9f02cdc440342e9bd20</code></pre>
+  </div>
+
+  <h5>2. 새로운 index.html 파일을 해당 경로에 복사하기</h5>
+  <p><code>docker exec</code> 로 기존 파일을 먼저 확인할 수 있다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker exec b04 ls /usr/local/apache2/htdocs
+index.html</code></pre>
+  </div>
+
+  <p>이후 로컬에서 <code>index.html</code> 을 만들고 위 경로에 복사한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker container cp index.html b04:/usr/local/apache2/htdocs/index.html
+Successfully copied 2.05kB to b04:/usr/local/apache2/htdocs/index.html</code></pre>
+  </div>
+
+  <h4>파일 변경 후 웹 사이트</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 170" width="560" role="img" aria-label="같은 localhost:8080 주소에 Maplestory / Jung Sang Wha 로 내용이 바뀌어 보인다">
+        <rect x="8" y="8" width="544" height="154" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="8" y="8" width="544" height="34" rx="8" class="dg-fill-soft"/>
+        <line x1="8" y1="42" x2="552" y2="42" class="dg-stroke"/>
+        <circle cx="34" cy="25" r="4.5" class="dg-stroke" fill="none"/>
+        <rect x="52" y="15" width="230" height="20" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="66" y="29" class="dg-text-sub dg-mono" font-size="11">localhost:8080</text>
+        <text x="28" y="90" class="dg-text" font-size="21" font-weight="800">Maplestory</text>
+        <text x="28" y="128" class="dg-text" font-size="15" font-weight="700">Jung Sang Wha</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>이미지는 그대로인데 화면만 바뀌었다</b> — 바뀐 파일은 이 컨테이너의 기록 가능 레이어에만 존재한다.
+      컨테이너를 지우면 원래 화면으로 돌아온다.
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">함께 알아두기 <span class="badge b-blue">보강</span></p>
+      <p>
+        같은 이미지로 컨테이너를 하나 더 띄워 보면 원래 화면이 그대로 나온다. 이 변경이
+        <b>이미지가 아니라 컨테이너에 붙는다</b>는 것을 눈으로 확인하는 가장 빠른 방법이다.
+        왜 그런지는 <a href="#item-6-1">6-1</a> 의 기록 가능 레이어와 기록 중 복사(copy-on-write)에서 이어진다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>docker exec &lt;id&gt; &lt;명령&gt;</code> 으로 실행 중인 컨테이너 안에서 명령을 돌릴 수 있다.</li>
+      <li><code>docker container cp</code> 는 호스트 ↔ 컨테이너 양방향으로 파일을 복사한다.</li>
+      <li>실행 중인 컨테이너의 파일 변경은 그 컨테이너에만 남는다. 이미지는 변하지 않는다.</li>
+    </ul>
+  </div>
+</article>

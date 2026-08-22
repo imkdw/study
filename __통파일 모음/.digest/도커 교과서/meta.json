@@ -1,0 +1,200 @@
+{
+  "title": "도커 교과서",
+  "subtitle": "Learn Docker in a Month of Lunches 정리",
+  "mark": "DK",
+  "eyebrow": "STUDY DIGEST",
+  "description": "도커 교과서(Learn Docker in a Month of Lunches) 학습 노트를 한 권으로 정리한 자료. 컨테이너 기초부터 이미지 최적화, 컴포즈, 헬스체크, 모니터링, 오케스트레이션까지.",
+  "lead": "컨테이너 하나 띄우는 <b>docker run</b> 에서 출발해 이미지 레이어, 볼륨, 컴포즈, 헬스체크, 프로메테우스, 도커 스웜까지 이어지는 학습 기록이다. 손으로 그린 개념도와 터미널 로그를 그대로 살리되, 버전에 민감한 서술은 <b>공식 문서와 로컬 실행으로 검증</b>해 교정했다.",
+  "coverNote": "<div class=\"callout tip\"><div class=\"ic\">i</div><div><p class=\"callout-title\">이 정리본을 읽는 법</p><p>본문은 원문 노트의 흐름과 실습 로그를 그대로 따른다. 노트가 쓰인 시점(2024년 10월)과 지금 사이에 바뀐 내용은 <span class=\"badge b-purple\">최신 반영</span>, 사실과 다른 서술을 고친 곳은 <span class=\"badge b-red\">원문 교정</span>, 함께 알아두면 좋은 내용은 <span class=\"badge b-blue\">보강</span> 으로 표시했다. 검증은 Docker Engine 29.4 / Compose v5.1.2 환경에서 직접 실행하거나 공식 문서를 확인해 진행했다.</p></div></div>",
+  "footer": "출처 — 엘튼 스톤맨, <b>도커 교과서</b>(Learn Docker in a Month of Lunches, 길벗). 실습 이미지는 <code>diamol/*</code> 저장소, 예제 코드는 <a href=\"https://github.com/sixeyed/diamol\" target=\"_blank\" rel=\"noopener\">sixeyed/diamol</a>. 검증 기준은 Docker Engine 29.4 / Docker Compose v5.1.2 및 <a href=\"https://docs.docker.com/\" target=\"_blank\" rel=\"noopener\">docs.docker.com</a>.",
+  "stats": [
+    { "val": "57", "unit": "개", "label": "아이템" },
+    { "val": "14", "unit": "개", "label": "챕터" },
+    { "val": "36", "unit": "장", "label": "도해 재작도" }
+  ],
+  "chapters": [
+    {
+      "id": "ch1",
+      "short": "CH 1",
+      "navTitle": "시작하기 전에",
+      "title": "시작하기 전에",
+      "lead": "왜 지금 컨테이너인가. 가상 머신과 무엇이 다르고, 클라우드 이주에서 IaaS/PaaS 사이의 어느 자리를 차지하는지부터 잡는다.",
+      "items": [
+        { "id": "item-1-1", "idx": "1-1", "title": "컨테이너가 IT 세상을 점령한 이유", "keywords": "docker container IaaS PaaS cloud serverless devops 모놀리식 MSA 하이퍼바이저 hypervisor VM" }
+      ]
+    },
+    {
+      "id": "ch2",
+      "short": "CH 2",
+      "navTitle": "도커의 기본적인 사용법",
+      "title": "도커의 기본적인 사용법",
+      "lead": "<code>docker container run</code> 한 줄로 시작해 컨테이너를 원격 컴퓨터처럼 다루고, 포트를 공개해 웹 사이트를 띄우고, 그 과정을 도커 엔진/API/CLI 구조로 되짚는다.",
+      "items": [
+        { "id": "item-2-1", "idx": "2-1", "title": "컨테이너로 헬로월드 실행하기", "keywords": "docker container run hello world pull image layer 이미지 다운로드" },
+        { "id": "item-2-3", "idx": "2-3", "title": "컨테이너를 원격 컴퓨터처럼 사용하기", "keywords": "interactive tty exec ls top logs inspect 대화형 셸 shell" },
+        { "id": "item-2-4", "idx": "2-4", "title": "컨테이너를 사용해서 웹 사이트 호스팅하기", "keywords": "detach publish port stats rm force 포트 공개 포트포워딩 8088" },
+        { "id": "item-2-5", "idx": "2-5", "title": "도커가 컨테이너를 실행하는 원리", "keywords": "docker engine api cli daemon rest 이미지 캐시 portainer" },
+        { "id": "item-2-6", "idx": "2-6", "title": "연습문제 — 컨테이너 파일 시스템 다루기", "keywords": "exec cp copy index.html apache htdocs 연습문제 lab" }
+      ]
+    },
+    {
+      "id": "ch3",
+      "short": "CH 3",
+      "navTitle": "도커 이미지 만들기",
+      "title": "도커 이미지 만들기",
+      "lead": "남이 만든 이미지를 쓰는 단계에서, 내가 Dockerfile 을 써서 이미지를 굽는 단계로. 레이어와 빌드 캐시가 여기서 처음 등장한다.",
+      "items": [
+        { "id": "item-3-1", "idx": "3-1", "title": "도커 허브에 공유된 이미지 사용하기", "keywords": "docker pull registry hub image layer env environment variable 환경변수 web-ping" },
+        { "id": "item-3-2", "idx": "3-2", "title": "Dockerfile 작성하기", "keywords": "dockerfile instruction FROM ENV WORKDIR COPY CMD 인스트럭션" },
+        { "id": "item-3-3", "idx": "3-3", "title": "컨테이너 이미지 빌드하기", "keywords": "docker build tag context buildkit dockerignore 빌드 컨텍스트" },
+        { "id": "item-3-4", "idx": "3-4", "title": "도커 이미지와 이미지 레이어 이해하기", "keywords": "image history layer 논리 용량 읽기 전용 read-only 공유 rootfs" },
+        { "id": "item-3-5", "idx": "3-5", "title": "이미지 레이어 캐시를 이용한 Dockerfile 최적화", "keywords": "build cache CACHED 캐시 무효화 invalidation 인스트럭션 순서" },
+        { "id": "item-3-6", "idx": "3-6", "title": "연습 문제 — Dockerfile 없이 이미지 빌드하기", "keywords": "docker commit 연습문제 lab ch03-lab" }
+      ]
+    },
+    {
+      "id": "ch4",
+      "short": "CH 4",
+      "navTitle": "소스코드에서 도커 이미지까지",
+      "title": "애플리케이션 소스코드에서 도커 이미지까지",
+      "lead": "빌드 도구를 로컬에 깔지 않고 컨테이너 안에서 컴파일한다. 멀티 스테이지 빌드가 표준화/성능/이미지 크기 세 가지를 한 번에 해결하는 방식.",
+      "items": [
+        { "id": "item-4-5", "idx": "4-5", "title": "멀티 스테이지 Dockerfile 스크립트 이해하기", "keywords": "multi-stage build 멀티 스테이지 표준화 캐시 이미지 크기 builder sdk runtime" }
+      ]
+    },
+    {
+      "id": "ch5",
+      "short": "CH 5",
+      "navTitle": "레지스트리에 이미지 공유하기",
+      "title": "도커 허브 등 레지스트리에 이미지 공유하기",
+      "lead": "이미지 이름은 그냥 이름이 아니라 레지스트리 주소다. 태그 전략과 신뢰할 수 있는 기반 이미지 고르기까지.",
+      "items": [
+        { "id": "item-5-1", "idx": "5-1", "title": "레지스트리, 레포지토리, 이미지 태그", "keywords": "registry repository tag docker.io latest 이미지 참조 reference" },
+        { "id": "item-5-2", "idx": "5-2", "title": "도커 허브에 직접 빌드한 이미지 푸시하기", "keywords": "docker login push image tag mounted from digest 배포" },
+        { "id": "item-5-3", "idx": "5-3", "title": "나만의 도커 레지스트리 운영하기", "keywords": "private registry self-hosted distribution insecure-registries 사설 레지스트리" },
+        { "id": "item-5-4", "idx": "5-4", "title": "이미지 태그를 효율적으로 사용하기", "keywords": "semver major minor patch versioning 별명 alias 태그 전략" },
+        { "id": "item-5-5", "idx": "5-5", "title": "공식 이미지에서 골든 이미지로 전환하기", "keywords": "official image verified publisher golden image 골든 이미지 취약점 공급망" }
+      ]
+    },
+    {
+      "id": "ch6",
+      "short": "CH 6",
+      "navTitle": "도커 볼륨과 퍼시스턴트 스토리지",
+      "title": "도커 볼륨을 이용한 퍼시스턴트 스토리지",
+      "lead": "컨테이너가 사라지면 데이터도 사라진다. 그 이유를 유니언 파일 시스템으로 설명하고, 볼륨과 바인드 마운트로 라이프사이클을 떼어낸다.",
+      "items": [
+        { "id": "item-6-1", "idx": "6-1", "title": "컨테이너 속 데이터가 사라지는 이유", "keywords": "writable layer copy-on-write 기록 가능 레이어 라이프사이클 cp" },
+        { "id": "item-6-2", "idx": "6-2", "title": "도커 볼륨을 사용하는 컨테이너 실행하기", "keywords": "docker volume create VOLUME instruction -v mount inspect 볼륨" },
+        { "id": "item-6-3", "idx": "6-3", "title": "파일시스템 마운트를 사용하는 컨테이너 실행하기", "keywords": "bind mount --mount type=bind readonly source target 바인드 마운트" },
+        { "id": "item-6-4", "idx": "6-4", "title": "파일 시스템 마운트의 한계점", "keywords": "bind mount 한계 덮어쓰기 단일 파일 마운트 windows invalid mount config" },
+        { "id": "item-6-5", "idx": "6-5", "title": "컨테이너 파일시스템이 만들어지는 방법", "keywords": "union file system overlay2 유니언 파일 시스템 스토리지 선택 기준" }
+      ]
+    },
+    {
+      "id": "ch7",
+      "short": "CH 7",
+      "navTitle": "도커 컴포즈로 분산 앱 실행",
+      "title": "도커 컴포즈로 분산 앱 실행",
+      "lead": "여러 개의 <code>docker run</code> 명령을 YAML 한 장으로 대체한다. 서비스/네트워크 개념과 DNS 디스커버리가 여기서 나온다.",
+      "items": [
+        { "id": "item-7-1", "idx": "7-1", "title": "도커 컴포즈 파일의 구조", "keywords": "compose yaml version services networks external up 컴포즈 파일" },
+        { "id": "item-7-2", "idx": "7-2", "title": "여러 컨테이너로 구성된 앱 실행하기", "keywords": "depends_on scale up stop start 스케일 아웃 image-gallery iotd accesslog" },
+        { "id": "item-7-3", "idx": "7-3", "title": "도커 컨테이너 간 통신", "keywords": "dns discovery nslookup 로드밸런싱 embedded dns 127.0.0.11 라운드로빈" },
+        { "id": "item-7-4", "idx": "7-4", "title": "도커 컴포즈로 앱 설정값 지정하기", "keywords": "environment secrets postgres 설정 분리 secrets.json 커넥션 스트링" },
+        { "id": "item-7-5", "idx": "7-5", "title": "도커 컴포즈도 만능은 아니다", "keywords": "compose 한계 프로덕션 desired state E2E CI QA 쿠버네티스" }
+      ]
+    },
+    {
+      "id": "ch8",
+      "short": "CH 8",
+      "navTitle": "헬스체크와 디펜던시 체크",
+      "title": "헬스체크와 디펜던시 체크로 앱의 신뢰성 확보하기",
+      "lead": "프로세스가 살아 있다고 앱이 살아 있는 건 아니다. HEALTHCHECK 로 진짜 상태를 알리고, 디펜던시 체크로 기동 순서 의존을 없앤다.",
+      "items": [
+        { "id": "item-8-1", "idx": "8-1", "title": "헬스체크를 지원하는 도커 이미지 만들기", "keywords": "HEALTHCHECK curl --fail interval retries unhealthy inspect State.Health" },
+        { "id": "item-8-2", "idx": "8-2", "title": "디펜던시 체크가 적용된 컨테이너 실행하기", "keywords": "dependency check CMD 의존관계 could not resolve host exit code" },
+        { "id": "item-8-3", "idx": "8-3", "title": "앱 체크를 위한 커스텀 유틸리티 만들기", "keywords": "custom utility HttpCheck curl 제거 보안 정책 --health-interval 멀티 스테이지" },
+        { "id": "item-8-4", "idx": "8-4", "title": "도커 컴포즈에 헬스 체크와 디펜던시 체크 정의하기", "keywords": "healthcheck interval timeout retries start_period restart on-failure depends_on condition" },
+        { "id": "item-8-5", "idx": "8-5", "title": "복원력 있는 앱을 만들 수 있는 이유", "keywords": "self-healing 자기 수복 일시적 오류 transient error 복원력 resilience" }
+      ]
+    },
+    {
+      "id": "ch9",
+      "short": "CH 9",
+      "navTitle": "컨테이너 모니터링",
+      "title": "컨테이너 모니터링으로 투명성 있는 앱 만들기",
+      "lead": "떴다 사라지는 컨테이너를 어떻게 감시할 것인가. 프로메테우스가 <code>/metrics</code> 를 긁어 오고, 그라파나가 그것을 화면으로 만든다.",
+      "items": [
+        { "id": "item-9-1", "idx": "9-1", "title": "컨테이너화된 앱에서 사용되는 모니터링 기술 스택", "keywords": "prometheus cncf metrics-addr 9323 도커 엔진 측정값 orbstack" },
+        { "id": "item-9-2", "idx": "9-2", "title": "앱의 측정값 출력하기", "keywords": "client library metrics endpoint go goroutines jvm 런타임 측정값 비즈니스 지표" },
+        { "id": "item-9-3", "idx": "9-3", "title": "측정값 수집을 맡을 프로메테우스 컨테이너 실행하기", "keywords": "scrape_interval static_configs dns_sd_configs scraping promql sum" },
+        { "id": "item-9-4", "idx": "9-4", "title": "측정값 시각화를 위한 그라파나 컨테이너 실행하기", "keywords": "grafana dashboard data source import json 3000 promql 시각화" },
+        { "id": "item-9-5", "idx": "9-5", "title": "투명성의 수준", "keywords": "observability 투명성 관측 가능성 대시보드 아키텍처" }
+      ]
+    },
+    {
+      "id": "ch10",
+      "short": "CH 10",
+      "navTitle": "컴포즈로 여러 환경 구성",
+      "title": "도커 컴포즈를 이용한 여러 환경 구성",
+      "lead": "같은 컴포즈 파일로 dev/test/uat 를 한 서버에 나란히 띄운다. 프로젝트 이름과 오버라이드 파일이 핵심 도구.",
+      "items": [
+        { "id": "item-10-1", "idx": "10-1", "title": "도커 컴포즈로 여러 개의 앱 배포하기", "keywords": "project -p 프로젝트 이름 리소스 명명 규칙 COMPOSE_PROJECT_NAME" },
+        { "id": "item-10-2", "idx": "10-2", "title": "도커 컴포즈의 오버라이드 파일", "keywords": "override merge -f config dev test uat 병합 규칙 down" },
+        { "id": "item-10-3", "idx": "10-3", "title": "환경 변수와 비밀값을 이용해 설정 주입하기", "keywords": "environment env_file secrets .env --env-file 비밀값 설정 주입" },
+        { "id": "item-10-4", "idx": "10-4", "title": "확장 필드로 중복 제거하기", "keywords": "extension fields x- YAML anchor alias 확장 필드 중복 제거" },
+        { "id": "item-10-5", "idx": "10-5", "title": "도커를 이용한 설정 워크플로 이해하기", "keywords": "설정 워크플로 동일 이미지 승격 promotion 컨테이너 설정 앱 설정" }
+      ]
+    },
+    {
+      "id": "ch11",
+      "short": "CH 11",
+      "navTitle": "도커로 앱 빌드 및 테스트",
+      "title": "도커, 컴포즈를 통한 앱 빌드 및 테스트",
+      "lead": "CI 서버에 언어 런타임을 깔지 않는다. 빌드도 테스트도 컨테이너 안에서 돌면 파이프라인이 어디서든 같은 결과를 낸다.",
+      "items": [
+        { "id": "item-11-1", "idx": "11-1", "title": "도커를 이용한 CI 절차", "keywords": "ci pipeline build test push 일관성 자동화 테스트" },
+        { "id": "item-11-2", "idx": "11-2", "title": "도커를 이용한 빌드 인프라 구축", "keywords": "gogs jenkins registry 폐쇄망 airgap 자체 구축 인프라" },
+        { "id": "item-11-3", "idx": "11-3", "title": "도커 컴포즈를 이용한 빌드 설정", "keywords": "REGISTRY 기본값 :- LABEL ARG build-arg 이미지 레이블" }
+      ]
+    },
+    {
+      "id": "ch12",
+      "short": "CH 12",
+      "navTitle": "컨테이너 오케스트레이션",
+      "title": "컨테이너 오케스트레이션 — 도커 스웜과 쿠버네티스",
+      "lead": "한 대에서 여러 대로. 클러스터가 원하는 상태를 스스로 유지하고, 서비스 정의를 바꾸면 롤링 업데이트가 돈다.",
+      "items": [
+        { "id": "item-12-1", "idx": "12-1", "title": "컨테이너 오케스트레이션 도구", "keywords": "orchestration cluster 고가용성 로드밸런싱 swarm kubernetes yaml" },
+        { "id": "item-12-2", "idx": "12-2", "title": "도커 스웜으로 클러스터 만들기", "keywords": "docker swarm init join token node ls manager worker 2377" },
+        { "id": "item-12-3", "idx": "12-3", "title": "도커 스웜 서비스로 앱 실행하기", "keywords": "docker service create replicas rolling update rollback 레플리카 클러스터 데이터베이스" },
+        { "id": "item-12-4", "idx": "12-4", "title": "클러스터 환경에서 네트워크 트래픽 관리하기", "keywords": "overlay network ingress network VIP 가상 IP 라우팅 메시 routing mesh" },
+        { "id": "item-12-5", "idx": "12-5", "title": "도커 스웜, 쿠버네티스 중 뭘 쓸까", "keywords": "swarm vs kubernetes 온프레미스 클라우드 매니지드 러닝커브 선택" }
+      ]
+    },
+    {
+      "id": "ch17",
+      "short": "CH 17",
+      "navTitle": "도커 이미지 최적화하기",
+      "title": "도커 이미지 최적화하기",
+      "lead": "이미지 크기는 디스크 문제만이 아니라 보안 문제다. 한 번 레이어에 들어간 파일은 지워도 사라지지 않는다는 원리에서 출발한다.",
+      "items": [
+        { "id": "item-17-1", "idx": "17-1", "title": "도커 이미지를 최적화하는 방법", "keywords": "docker system df prune dockerignore 불필요한 파일 레이어 삭제" },
+        { "id": "item-17-2", "idx": "17-2", "title": "좋은 기반 이미지 고르기", "keywords": "base image 취약점 curl sdk 골든 이미지 anchore 앤코어 스캔 scout distroless" },
+        { "id": "item-17-3", "idx": "17-3", "title": "이미지 레이어 수와 이미지 크기는 최소한으로", "keywords": "apt-get no-install-recommends rm -rf /var/lib/apt/lists 레이어 수 최소화 128" },
+        { "id": "item-17-4", "idx": "17-4", "title": "멀티 스테이지 빌드를 한 단계 업그레이드하기", "keywords": "--target 스테이지 중단 download expand 캐시 주의 버전 고정" }
+      ]
+    },
+    {
+      "id": "ch18",
+      "short": "CH 18",
+      "navTitle": "컨테이너의 앱 설정관리",
+      "title": "컨테이너의 앱 설정관리",
+      "lead": "설정은 한 겹이 아니다. 이미지에 담긴 기본값 위에 환경별 파일이 얹히고, 그 위에 환경 변수가 얹힌다.",
+      "items": [
+        { "id": "item-18-1", "idx": "18-1", "title": "다단 앱 설정", "keywords": "다단 설정 hierarchical config override NODE_CONFIG 환경 변수 병합" },
+        { "id": "item-18-2", "idx": "18-2", "title": "환경별 설정 패키징하기", "keywords": "DOTNET_ENVIRONMENT appsettings 환경별 설정 패키징 12 factor" }
+      ]
+    }
+  ]
+}

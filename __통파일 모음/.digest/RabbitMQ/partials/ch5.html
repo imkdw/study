@@ -1,0 +1,490 @@
+<article class="item" id="item-20" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 20</div>
+    <h3>DLX: 실패한 메시지의 종착지</h3>
+    <p class="item-tagline">BullMQ의 failed 셋에 해당하지만, 이건 진짜 큐다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    dead letter exchange는 <b>특별한 종류의 exchange가 아니다.</b> 그냥 평범한 exchange인데, 큐가 "여기로 버려라"고 지목했을 뿐이다.
+  </div>
+
+  <h4>메시지가 dead-letter되는 네 가지 경우</h4>
+  <ol class="steps">
+    <li><div class="step-title">컨슈머가 requeue 없이 거절</div><p><code>basic.reject</code> 또는 <code>basic.nack</code>에 <code>requeue=false</code>. 가장 흔한 경로.</p></li>
+    <li><div class="step-title">메시지 TTL 만료</div><p>메시지별 <code>expiration</code> 또는 큐의 <code>x-message-ttl</code>이 지났을 때.</p></li>
+    <li><div class="step-title">큐 길이 초과</div><p><code>x-max-length</code>/<code>x-max-length-bytes</code>를 넘겨 밀려난 메시지.</p></li>
+    <li><div class="step-title">재배달 한도 초과</div><p>quorum queue의 <code>x-delivery-limit</code>을 넘었을 때.</p></li>
+  </ol>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">큐 자체가 만료되면 dead-letter되지 않는다</p>
+      <p>
+        <code>x-expires</code>로 <b>큐가 통째로 사라지는</b> 경우, 안에 있던 메시지는 DLX로 가지 않고 그냥 없어진다.
+        헷갈리기 쉬운 예외다.
+      </p>
+    </div>
+  </div>
+
+  <h4>구성</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dlx.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 1) DLX 와 DLQ 를 먼저 만든다
+await ch.assertExchange('order.dlx', 'topic', { durable: true });
+await ch.assertQueue('order.payment.dlq', {
+  durable: true,
+  arguments: { 'x-queue-type': 'quorum' },
+});
+await ch.bindQueue('order.payment.dlq', 'order.dlx', 'order.payment');
+
+// 2) 업무 큐가 그 DLX 를 지목한다
+await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-dead-letter-exchange': 'order.dlx',
+    'x-dead-letter-routing-key': 'order.payment',  // 생략하면 원래 routing key 유지
+  },
+});</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  X{{"order.events"}} --> WQ["order.payment (업무 큐)"]
+  WQ --> C["컨슈머"]
+  C -->|"nack requeue=false"| DLX{{"order.dlx"}}
+  DLX --> DLQ["order.payment.dlq"]
+  DLQ --> OPS["사람이 조사하거나 재투입"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>DLQ는 종점이자 대기실이다</b> — 원인을 고친 뒤 다시 업무 큐로 흘려보낼 수 있어야 한다.</div>
+  </div>
+
+  <h4>x-death 헤더 읽기</h4>
+  <p>
+    dead-letter된 메시지에는 <code>x-death</code> 헤더가 붙는다. <b>어느 큐에서, 왜, 몇 번, 언제</b>
+    버려졌는지가 배열로 쌓이고 <b>최신 항목이 앞</b>에 온다.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">x-death.json</span><span class="code-spacer"></span></div>
+<pre><code class="language-json">{
+  "x-death": [
+    {
+      "count": 3,
+      "reason": "rejected",
+      "queue": "order.payment",
+      "exchange": "order.events",
+      "routing-keys": ["order.payment.requested"],
+      "time": "2026-08-22T04:11:07Z"
+    }
+  ]
+}</code></pre>
+  </div>
+  <p>
+    <code>reason</code>은 <code>rejected</code> / <code>expired</code> / <code>maxlen</code> /
+    <code>delivery_limit</code> 중 하나다. DLQ 컨슈머는 이 값만 봐도 "코드 버그로 거절된 건지, 그냥 늦어서
+    만료된 건지"를 구분할 수 있다.
+  </p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">DLX로 가는 길에도 유실이 있다 <span class="badge b-blue">보강</span></p>
+      <p>
+        기본 dead lettering은 <b>퍼블리셔 컨펌 없이</b> 재발행한다(at-most-once). 클러스터 상황에 따라
+        DLQ에 도착하지 못할 수 있다. quorum queue라면 policy로
+        <code>dead-letter-strategy: at-least-once</code>를 걸어 내부 컨펌을 켤 수 있는데,
+        <b><code>overflow: reject-publish</code>가 함께 필요하다.</b> 결제/정산처럼 실패 기록조차 잃으면
+        안 되는 큐에는 이 조합을 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>DLX는 평범한 exchange다. 큐가 <code>x-dead-letter-exchange</code>로 지목할 뿐.</li>
+      <li>거절/TTL만료/길이초과/재배달한도 네 가지가 dead-letter를 유발한다. 큐 만료는 아니다.</li>
+      <li><code>x-death</code>의 <code>reason</code>과 <code>count</code>가 사후 분석의 핵심 자료다.</li>
+      <li>중요한 큐라면 <code>dead-letter-strategy: at-least-once</code>를 검토한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-21" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 21</div>
+    <h3>delivery-limit와 poison message</h3>
+    <p class="item-tagline">BullMQ의 <code>attempts</code>에 가장 가까운 브로커 기능.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    quorum queue는 재배달 횟수를 <b>브로커가 직접</b> 센다. 기본 한도는 <b>20</b>이고, 넘으면 dead-letter된다.
+  </div>
+
+  <p>
+    poison message는 <b>처리할 때마다 반드시 실패하는 메시지</b>다. 스키마가 깨졌거나, 참조하는 리소스가
+    사라졌거나, 컨슈머 코드에 버그가 있는 경우다. 방치하면 이 한 건이 컨슈머 CPU를 영원히 태운다.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delivery-limit.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-delivery-limit': 5,                        // 5회 초과하면 포기
+    'x-dead-letter-exchange': 'order.dlx',        // 포기한 메시지는 여기로
+  },
+});</code></pre>
+  </div>
+
+  <p>
+    컨슈머는 현재 시도 횟수를 헤더로 볼 수 있다.
+  </p>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">consumer.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const attempt = (msg.properties.headers?.['x-delivery-count'] ?? 0) + 1;
+logger.warn({ attempt, messageId: msg.properties.messageId }, '재처리 시도');</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>BullMQ</th><th>RabbitMQ (quorum)</th></tr></thead>
+      <tbody>
+        <tr><td>설정 위치</td><td>잡 옵션 <code>attempts</code></td><td>큐 인자/policy <code>x-delivery-limit</code></td></tr>
+        <tr><td>단위</td><td>잡별로 다르게 가능</td><td class="t-no">큐 단위. 메시지별로 다르게 못 준다</td></tr>
+        <tr><td>기본값</td><td>1 (재시도 없음)</td><td>20</td></tr>
+        <tr><td>소진 후</td><td>failed 셋으로</td><td>DLX로 dead-letter</td></tr>
+        <tr><td>현재 시도 확인</td><td><code>job.attemptsMade</code></td><td><code>x-delivery-count</code> 헤더</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">4.3: 명시적 return은 횟수에 안 센다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        4.3부터 한도 판정 기준이 <code>acquired-count</code>가 아니라 <b><code>delivery-count</code></b>로 바뀌었다.
+        컨슈머가 "지금은 내가 못 하니 다른 데 줘"라고 명시적으로 되돌리는 경우는 <b>무제한으로 허용</b>되고,
+        실제 실패로 인한 재배달만 한도에 반영된다. 셧다운 중 메시지를 되돌리는 패턴을 쓸 때 이 차이가 크다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">classic queue에는 이 기능이 없다</p>
+      <p>
+        classic queue를 쓴다면 재시도 횟수를 직접 세야 한다. 보통 <code>x-death</code>의 <code>count</code>를
+        읽거나, 커스텀 헤더에 시도 횟수를 담아 재발행하는 식으로 구현한다. quorum queue를 기본으로 두라는
+        권고에는 이 이유도 있다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>quorum queue의 <code>x-delivery-limit</code>이 무한 재시도를 막는 안전장치다. 기본 20.</li>
+      <li>한도를 넘으면 DLX로 간다. DLX가 없으면 그냥 버려진다.</li>
+      <li>한도는 <b>큐 단위</b>다. 메시지별 재시도 횟수 차등은 애플리케이션에서 구현한다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-22" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 22</div>
+    <h3>지연 재시도: 4.3의 백오프</h3>
+    <p class="item-tagline">드디어 브로커가 백오프를 해준다. 단, 선형이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    RabbitMQ 4.3부터 quorum queue는 <b>재시도에 지연을 넣을 수 있다</b>. 실패한 메시지를 큐 내부에 잠시 치워 뒀다가 시간이 지나면 다시 배달 가능 상태로 만든다.
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delayed-retry.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-delayed-retry-type': 'failed',   // disabled | all | returned | failed
+    'x-delayed-retry-min': 5000,        // 최소 지연 5초
+    'x-delayed-retry-max': 60000,       // 최대 지연 60초
+    'x-delivery-limit': 8,
+    'x-dead-letter-exchange': 'order.dlx',
+  },
+});</code></pre>
+  </div>
+
+  <h4>지연 계산식</h4>
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">선형 백오프</p>
+      <p>
+        <code>지연 = min(min_delay × delivery_count, max_delay)</code><br>
+        min 5초 / max 60초라면 5초 → 10초 → 15초 → ... → 60초에서 고정된다. BullMQ의 지수 백오프
+        (<code>2^n × delay</code>)와 달리 <b>선형</b>이라는 점만 주의하면 된다.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>x-delayed-retry-type</code></th><th>어떤 경우에 지연을 거는가</th></tr></thead>
+      <tbody>
+        <tr><td><code>disabled</code></td><td>기본값. 지연 없음</td></tr>
+        <tr><td><code>returned</code></td><td>컨슈머가 명시적으로 되돌린 경우</td></tr>
+        <tr><td><code>failed</code></td><td>실패로 되돌아온 경우 (컨슈머 크래시, 타임아웃 등)</td></tr>
+        <tr><td><code>all</code></td><td>되돌아온 모든 경우</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  Q["order.payment 큐"] --> C["컨슈머"]
+  C -->|"실패"| S["큐 내부 대기 영역"]
+  S -->|"min x count 만큼 지연"| Q
+  Q -->|"delivery-limit 초과"| DLX{{"order.dlx"}}
+      </pre>
+    </div>
+    <div class="figure-cap"><b>큐 밖으로 안 나간다</b> — 별도 재시도 큐를 만들 필요 없이 원래 큐 안에서 지연이 처리된다.</div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">4.2 이하라면 못 쓴다</p>
+      <p>
+        이 기능은 <b>4.3에서 추가</b>됐고 <b>quorum queue 전용</b>이다. 이직할 회사의 브로커 버전을 먼저
+        확인하자. 4.2 이하이거나 classic queue를 쓴다면 ITEM 23~24의 TTL+DLX 방식으로 직접 만들어야 한다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>4.3 + quorum queue에서는 백오프 재시도가 큐 인자 세 개로 끝난다.</li>
+      <li>지연은 <b>선형</b>이다. <code>min × 시도횟수</code>, 상한은 <code>max</code>.</li>
+      <li>재시도 큐를 따로 만들 필요가 없어서 토폴로지가 훨씬 단순해진다.</li>
+      <li>4.2 이하라면 이 기능이 없다. 버전 확인이 먼저다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-23" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 23</div>
+    <h3>지연 메시지: TTL+DLX와 플러그인의 종말</h3>
+    <p class="item-tagline">BullMQ의 <code>delay: 60000</code>에 해당하는 기능은 RabbitMQ에 없다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    "10분 뒤에 이 메시지를 처리해라"는 <b>네이티브 기능이 아니다.</b> TTL이 만료되면 DLX로 흘러가는 성질을 이용해 흉내 낸다.
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">delayed message exchange 플러그인은 끝났다 <span class="badge b-red">주의</span></p>
+      <p>
+        검색하면 반드시 나오는 <code>rabbitmq_delayed_message_exchange</code>(<code>x-delayed-message</code>
+        exchange 타입 + <code>x-delay</code> 헤더)는 <b>2026년 4월 16일 저장소가 아카이브됐다.</b>
+        Mnesia에 의존했는데 Mnesia가 4.3에서 완전히 제거되면서 <b>4.3 이상 오픈소스 버전에서는 로드되지 않는다.</b>
+        원래도 "지연 메시지를 단일 노드 테이블에 저장하므로 그 노드가 죽으면 전부 유실"되고 대량 사용에
+        부적합하다는 경고가 붙어 있던 물건이다. 새 코드에서 이 경로를 택하지 않는다.
+      </p>
+    </div>
+  </div>
+
+  <h4>정석: TTL + DLX 지연 큐</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["Publisher"] -->|"발행"| DQ["delay.5s 큐: 컨슈머 없음, TTL 5초, DLX 지정"]
+  DQ -->|"5초 뒤 TTL 만료"| DLX{{"work.exchange"}}
+  DLX --> WQ["order.payment 업무 큐"]
+  WQ --> C["컨슈머"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>컨슈머 없는 큐를 타이머로 쓴다</b> — 아무도 안 꺼내가면 TTL이 만료되고, 만료된 메시지는 DLX로 나간다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">delay-queue.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 지연 전용 큐: 컨슈머를 절대 붙이지 않는다
+await ch.assertQueue('delay.30s', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-message-ttl': 30000,                    // 30초 뒤 만료
+    'x-dead-letter-exchange': 'work.exchange', // 만료되면 업무 exchange 로
+    'x-dead-letter-routing-key': 'order.payment',
+  },
+});
+
+// 30초 뒤에 처리하고 싶으면 이 큐로 보낸다
+ch.sendToQueue('delay.30s', buf, { persistent: true });</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">메시지별 TTL을 섞으면 머리에서 막힌다</p>
+      <p>
+        큐는 FIFO다. 메시지마다 <code>expiration</code>을 다르게 줘서 한 큐에 넣으면,
+        <b>맨 앞 메시지의 TTL이 끝나야 그 뒤가 검사된다.</b> 60초짜리가 앞에 있으면 뒤의 5초짜리는
+        60초를 기다린다. 그래서 지연 큐는 <code>delay.5s</code>, <code>delay.30s</code>,
+        <code>delay.5m</code>처럼 <b>지연 단계별로 큐를 따로</b> 만들고 큐 인자
+        <code>x-message-ttl</code>로 고정하는 게 정석이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">긴 지연은 브로커에 맡기지 않는다 <span class="badge b-blue">보강</span></p>
+      <p>
+        "3일 뒤 리마인드", "한 달 뒤 구독 갱신" 같은 건 메시지 브로커의 일이 아니다. DB 테이블에
+        실행 시각을 저장하고 스케줄러가 그 시각에 메시지를 발행하는 구조가 맞다. 브로커의 지연 패턴은
+        <b>초~시간 단위 재시도</b>까지가 적정선이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>지연 발행은 네이티브 기능이 아니다. TTL 만료 → DLX 흐름으로 만든다.</li>
+      <li>지연 플러그인은 아카이브됐고 4.3에서 못 쓴다. 새로 쓰지 않는다.</li>
+      <li>지연 큐는 <b>단계별로 분리</b>한다. 한 큐에 여러 TTL을 섞으면 head-of-line 블로킹이 생긴다.</li>
+      <li>일 단위 이상 지연은 DB + 스케줄러로 뺀다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-24" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 24</div>
+    <h3>재시도 아키텍처를 직접 설계하기</h3>
+    <p class="item-tagline">BullMQ 옵션 두 줄이 여기서는 그림 한 장이 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    4.3 + quorum queue면 <b>큐 인자만으로</b> 끝난다. 그게 안 되는 환경이면 <b>업무 큐 / 재시도 큐 / DLQ</b> 3단 구조를 직접 만든다.
+  </div>
+
+  <h4>패턴 A — 4.3 quorum queue (권장)</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-tag good">가장 단순</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await ch.assertQueue('order.payment', {
+  durable: true,
+  arguments: {
+    'x-queue-type': 'quorum',
+    'x-delayed-retry-type': 'all',
+    'x-delayed-retry-min': 2000,
+    'x-delayed-retry-max': 120000,
+    'x-delivery-limit': 6,
+    'x-dead-letter-exchange': 'order.dlx',
+  },
+});
+// 컨슈머는 실패하면 nack(msg, false, false) 하나만 하면 된다.</code></pre>
+  </div>
+
+  <h4>패턴 B — TTL+DLX 3단 구조</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  IN{{"work.exchange"}} --> W["order.payment 업무 큐"]
+  W --> C["컨슈머"]
+  C -->|"실패: retry.exchange 로 재발행"| RX{{"retry.exchange"}}
+  RX --> R1["retry.10s TTL 10초"]
+  RX --> R2["retry.60s TTL 60초"]
+  RX --> R3["retry.300s TTL 300초"]
+  R1 --> IN
+  R2 --> IN
+  R3 --> IN
+  C -->|"한도 초과"| DLX{{"order.dlx"}}
+  DLX --> DLQ["order.payment.dlq"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>계단식 재시도</b> — 시도 횟수에 따라 다른 TTL의 재시도 큐로 보내면 지수 백오프를 흉내 낼 수 있다.</div>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">retry-router.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">const LEVELS = [10, 60, 300];   // 초 단위 재시도 단계
+
+function onFailure(ch, msg) {
+  const attempt = Number(msg.properties.headers?.attempt ?? 0);
+  if (attempt >= LEVELS.length) {
+    ch.nack(msg, false, false);            // DLX 로 보낸다
+    return;
+  }
+  ch.publish('retry.exchange', `retry.${LEVELS[attempt]}s`, msg.content, {
+    ...msg.properties,
+    headers: { ...msg.properties.headers, attempt: attempt + 1 },
+    persistent: true,
+  });
+  ch.ack(msg);                             // 원본은 확정 처리
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">"재발행 후 ack"의 위험</p>
+      <p>
+        위 코드는 재발행이 성공한 뒤 원본을 ack한다. 하지만 <b>재발행과 ack 사이에 프로세스가 죽으면</b>
+        원본이 requeue되어 메시지가 두 벌이 된다. 그래서 발행에는 <b>컨펌 채널</b>을 쓰고,
+        컨슈머는 어차피 멱등해야 한다(ITEM 15). 이 복잡도가 싫으면 그게 바로 패턴 A를 쓸 이유다.
+      </p>
+    </div>
+  </div>
+
+  <h4>DLQ 이후를 반드시 설계한다</h4>
+  <ul>
+    <li><b>알람.</b> DLQ 메시지 수에 임계값을 걸어 둔다. 아무도 안 보는 DLQ는 그냥 쓰레기통이다.</li>
+    <li><b>재투입 경로.</b> 원인을 고친 뒤 DLQ → 업무 큐로 되돌리는 스크립트나 관리 화면을 미리 만든다. shovel 플러그인으로 큐 사이 이동을 걸 수도 있다.</li>
+    <li><b>보존.</b> DLQ에 <code>x-max-length</code>를 걸어 무한정 쌓이지 않게 한다.</li>
+  </ul>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>4.3 + quorum이면 재시도는 큐 인자만으로 끝난다. 이걸 1순위로 검토한다.</li>
+      <li>안 되면 재시도 큐를 지연 단계별로 만들고 헤더로 시도 횟수를 관리한다.</li>
+      <li>재발행 방식은 중복 위험이 있다. 컨펌 + 멱등 컨슈머가 전제다.</li>
+      <li>DLQ에 알람과 재투입 경로가 없으면 DLQ를 만든 의미가 없다.</li>
+    </ul>
+  </div>
+</article>

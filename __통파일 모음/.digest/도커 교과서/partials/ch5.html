@@ -1,0 +1,575 @@
+<article class="item" id="item-5-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5-1</div>
+    <h3>레지스트리, 레포지토리, 이미지 태그</h3>
+    <p class="item-tagline">이미지 이름은 이름이 아니라 주소다. 네 부분으로 쪼개 보면 어디서 무엇을 받아 오는지가 그대로 읽힌다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>docker.io/diamol/golang:latest</code> 는 <b>레지스트리 / 계정 / 레포지토리 / 태그</b> 네 조각이다.
+    로컬에서만 쓸 때는 아무래도 좋지만, 공유하는 순간 이 문자열이 유일한 식별자가 된다.
+  </div>
+
+  <h4>도커 허브</h4>
+  <ul>
+    <li>도커 허브는 도커 엔진에 기본으로 설정된 레지스트리다.</li>
+    <li>로컬에 없는 이미지를 실행하려고 하면 가장 먼저 찾아보는 곳이 도커 허브다.</li>
+    <li>이미지 이름은 크게 네 가지 요소로 구분된다.</li>
+  </ul>
+
+  <h4>도커 이미지 이름 구분</h4>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 220" width="620" role="img" aria-label="docker.io/diamol/golang:latest 를 레지스트리 도메인, 계정, 레포지토리, 태그 네 부분으로 분해한 그림">
+        <text x="30" y="52" class="dg-mono" font-size="19" font-weight="700">
+          <tspan class="dg-accent">docker.io</tspan><tspan class="dg-text-sub">/</tspan><tspan class="dg-text">diamol</tspan><tspan class="dg-text-sub">/</tspan><tspan class="dg-text">golang</tspan><tspan class="dg-text-sub">:</tspan><tspan class="dg-accent">latest</tspan>
+        </text>
+
+        <path d="M74 66 L 74 96 L 40 96" fill="none" class="dg-stroke"/>
+        <text x="34" y="100" class="dg-text-sub" font-size="11" text-anchor="end">1</text>
+        <text x="90" y="100" class="dg-text" font-size="12" font-weight="700">레지스트리 도메인</text>
+        <text x="90" y="116" class="dg-text-sub" font-size="10.5">기본값은 도커 허브</text>
+
+        <path d="M176 66 L 176 134 L 86 134" fill="none" class="dg-stroke"/>
+        <text x="90" y="138" class="dg-text" font-size="12" font-weight="700">계정 이름</text>
+        <text x="90" y="154" class="dg-text-sub" font-size="10.5">이미지 작성자 — 개인 또는 단체</text>
+
+        <text x="330" y="100" class="dg-text" font-size="12" font-weight="700">레포지토리 이름</text>
+        <text x="330" y="116" class="dg-text-sub" font-size="10.5">보통 앱 이름. 여러 버전을 담는다</text>
+        <path d="M262 66 L 262 96 L 324 96" fill="none" class="dg-stroke"/>
+
+        <text x="330" y="138" class="dg-text" font-size="12" font-weight="700">태그</text>
+        <text x="330" y="154" class="dg-text-sub" font-size="10.5">버전 또는 변종. 기본값은 <tspan class="dg-mono">latest</tspan></text>
+        <path d="M356 66 L 356 134 L 324 134" fill="none" class="dg-stroke"/>
+
+        <rect x="30" y="176" width="560" height="30" rx="6" class="dg-fill-soft dg-stroke"/>
+        <text x="310" y="196" class="dg-text-sub" font-size="11" text-anchor="middle">레지스트리를 생략하면 <tspan class="dg-mono">docker.io</tspan>, 태그를 생략하면 <tspan class="dg-mono">:latest</tspan> 가 자동으로 붙는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>생략된 부분은 사라진 게 아니라 기본값으로 채워진 것이다</b> — <code>docker pull nginx</code> 는
+      실제로는 <code>docker.io/library/nginx:latest</code> 를 받는다.
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">오탈자 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>
+        원문에는 <code>docker.io</code> 설명이 "기본값은 도커 gjqmek"으로 적혀 있다. 한영 전환 오타이며
+        <b>"기본값은 도커 허브"</b> 가 맞다.
+      </p>
+    </div>
+  </div>
+
+  <h4>이미지 이름이 중요한 이유</h4>
+  <ul>
+    <li>로컬에서 단순하게 빌드할 때는 상관없지만, 레지스트리를 통해 공유한다면 잘 입력해야 한다.</li>
+    <li>그 이미지 참조가 레지스트리에서 특정 이미지를 식별하는 <b>식별자</b> 역할을 하기 때문이다.</li>
+  </ul>
+
+  <h4>이미지 태그가 중요한 이유</h4>
+  <ul>
+    <li>애플리케이션을 배포한다면 반드시 태그로 어떤 버전 / 변종인지 표기하자.</li>
+    <li>태그가 없는 이미지를 빌드하면 이게 실제로 최신 버전인지 구분할 수 없게 된다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>latest</code> 는 "최신"이라는 뜻이 아니다 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>latest</code> 는 <b>태그를 생략했을 때 붙는 기본 문자열</b>일 뿐, 최신 버전을 가리킨다는 보장이 전혀 없다.
+        누군가 오래된 이미지에 <code>latest</code> 를 붙여 푸시하면 그게 <code>latest</code> 가 된다.
+        배포 대상을 완전히 고정하려면 태그 대신 다이제스트를 쓴다
+        (<code>image@sha256:...</code>). 태그는 옮겨 붙을 수 있지만 다이제스트는 내용 해시라 변하지 않는다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>이미지 이름 = <code>레지스트리/계정/레포지토리:태그</code>. 생략하면 <code>docker.io</code> 와 <code>latest</code> 가 채워진다.</li>
+      <li>레포지토리 하나에 여러 버전의 이미지가 태그로 구분되어 담긴다.</li>
+      <li><code>latest</code> 는 기본값일 뿐 최신 보장이 아니다. 배포에는 명시적 태그, 완전 고정에는 다이제스트를 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5-2</div>
+    <h3>도커 허브에 직접 빌드한 이미지 푸시하기</h3>
+    <p class="item-tagline">푸시할 때 <code>Mounted from</code> 이 뜨는 이유 — 레지스트리도 레이어를 공유한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    푸시는 이미지 전체를 올리는 게 아니라 <b>레지스트리에 아직 없는 레이어만</b> 올린다.
+    나머지는 <code>Mounted from</code> 으로 기존 레이어를 참조하고 끝난다.
+  </div>
+
+  <h4>도커 허브 설정하기</h4>
+  <p>먼저 도커 허브 회원 가입이 필요하다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># dockerId 환경변수 설정하기
+$ export dockerId="imkdw99"
+
+# 도커 허브 로그인
+$ docker login --username $dockerId
+Password: ***************
+Login Succeeded</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">비밀번호 대신 액세스 토큰 <span class="badge b-blue">보강</span></p>
+      <p>
+        <code>docker login</code> 은 자격 증명을 <code>~/.docker/config.json</code> 에 저장한다.
+        운영체제 키체인이 연동돼 있지 않으면 base64 로만 인코딩되어 사실상 평문으로 남는다.
+        계정 비밀번호 대신 도커 허브의 <b>Personal access token</b> 을 발급해 쓰고,
+        CI 에서는 반드시 토큰을 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <h4>기존 이미지에 태그 부여하기</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker image tag &lt;origin_image&gt; &lt;new_image:tag&gt;
+
+$ docker image tag temp-nodejs $dockerId/dont-stop-using-nodejs:v1</code></pre>
+  </div>
+
+  <h4>이미지 배포하기</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker image push $dockerId/dont-stop-using-nodejs:v1
+
+The push refers to repository [docker.io/imkdw99/dont-stop-using-nodejs]
+23c3905ddd3b: Pushed
+8fb816c99d6c: Pushed
+0a6a364b44af: Mounted from diamol/node
+20e8cfeb051c: Mounted from diamol/node
+0c7669bfb3ce: Mounted from diamol/node
+6d626da635fc: Mounted from diamol/node
+v1: digest: sha256:a3d1c821688f55267ce06d4405a1c2acda563a5cc8db211f036f1a6010ddac3c size: 1571</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>Pushed</code> 2개, <code>Mounted from</code> 4개 <span class="badge b-blue">보강</span></p>
+      <p>
+        실제로 업로드된 것은 내 앱이 만든 레이어 2개뿐이다. 나머지 4개는 이미 도커 허브의
+        <code>diamol/node</code> 에 있는 레이어라서 <b>업로드 없이 참조만 걸었다</b>.
+        <a href="#item-3-4">3-4</a> 의 레이어 공유가 로컬 디스크뿐 아니라 레지스트리에서도 그대로 적용되는 것이다.
+        기반 이미지를 팀 안에서 통일하면 푸시/풀 트래픽이 함께 줄어드는 이유가 여기 있다.
+      </p>
+    </div>
+  </div>
+
+  <h4>배포된 이미지 확인</h4>
+  <p>주소는 <code>https://hub.docker.com/repository/docker/{$dockerId}/dont-stop-using-nodejs/tags</code> 다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 210" width="620" role="img" aria-label="도커 허브 Tags 화면에 v1 태그가 linux/arm64, 24.42MB 로 등록되어 있다">
+        <rect x="8" y="8" width="604" height="194" rx="8" class="dg-fill-bg dg-stroke"/>
+        <rect x="8" y="8" width="604" height="36" rx="8" class="dg-fill-soft"/>
+        <line x1="8" y1="44" x2="612" y2="44" class="dg-stroke"/>
+        <text x="26" y="31" class="dg-accent dg-mono" font-size="11.5">hub.docker.com</text>
+        <text x="150" y="31" class="dg-text-sub dg-mono" font-size="11.5">/ imkdw99 / dont-stop-using-nodejs / Tags</text>
+
+        <rect x="26" y="62" width="568" height="122" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="44" y="84" class="dg-text-sub" font-size="10">TAG</text>
+        <circle cx="48" cy="102" r="4" fill="var(--green)"/>
+        <text x="62" y="107" class="dg-accent dg-mono" font-size="13" font-weight="700">v1</text>
+        <text x="62" y="124" class="dg-text-sub" font-size="10">Last pushed 3 minutes ago by imkdw99</text>
+
+        <rect x="380" y="88" width="200" height="26" rx="5" class="dg-fill-bg dg-stroke"/>
+        <text x="392" y="105" class="dg-text-sub dg-mono" font-size="9.5">docker pull imkdw99/dont-stop-...:v1</text>
+
+        <line x1="44" y1="138" x2="576" y2="138" class="dg-stroke"/>
+        <text x="44" y="154" class="dg-text" font-size="10.5" font-weight="700">Digest</text>
+        <text x="200" y="154" class="dg-text" font-size="10.5" font-weight="700">OS/ARCH</text>
+        <text x="360" y="154" class="dg-text" font-size="10.5" font-weight="700">Last pull</text>
+        <text x="576" y="154" class="dg-text" font-size="10.5" font-weight="700" text-anchor="end">Compressed Size</text>
+        <text x="44" y="174" class="dg-accent dg-mono" font-size="10.5">a3d1c821688f</text>
+        <text x="200" y="174" class="dg-text-sub dg-mono" font-size="10.5">linux/arm64</text>
+        <text x="360" y="174" class="dg-text-sub" font-size="10.5">3 minutes ago</text>
+        <text x="576" y="174" class="dg-text-sub dg-mono" font-size="10.5" text-anchor="end">24.42 MB</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>OS/ARCH 가 <code>linux/arm64</code> 하나뿐이다</b> — Apple Silicon 에서 빌드했기 때문이다.
+      x86 서버에서 이 이미지를 받으면 실행되지 않는다. 아래 콜아웃 참고.
+    </div>
+  </div>
+
+  <h4>배포된 이미지 실행해 보기</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker run imkdw99/dont-stop-using-nodejs:v1
+
+Unable to find image 'imkdw99/dont-stop-using-nodejs:v1' locally
+v1: Pulling from imkdw99/dont-stop-using-nodejs
+0362ad1dd800: Already exists
+b09a182c47e8: Already exists
+39d61d2ed871: Already exists
+b4e2115e274a: Already exists
+f74e0639f9d6: Already exists
+cff596a0aadb: Already exists
+Digest: sha256:a3d1c821688f55267ce06d4405a1c2acda563a5cc8db211f036f1a6010ddac3c
+Status: Downloaded newer image for imkdw99/dont-stop-using-nodejs:v1
+Don't stop using node.js</code></pre>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">Apple Silicon 에서 빌드했다면 아키텍처를 확인하자 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        <code>docker build</code> 는 기본적으로 <b>빌드한 머신의 아키텍처</b>로만 이미지를 만든다.
+        M 시리즈 맥에서 빌드해 푸시하면 <code>linux/arm64</code> 단일 이미지가 되고,
+        x86 서버에서는 <code>exec format error</code> 로 실행되지 않는다.
+        두 아키텍처를 모두 지원하려면 buildx 로 멀티 플랫폼 이미지를 만들어 푸시한다.
+      </p>
+      <div class="code">
+        <div class="code-head">
+          <div class="code-dots"><i></i><i></i><i></i></div>
+          <span class="code-tag good">권장</span>
+          <span class="code-spacer"></span>
+        </div>
+<pre><code class="language-bash">$ docker buildx build --platform linux/amd64,linux/arm64 \
+    -t $dockerId/myapp:v1 --push .</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>docker image tag</code> 로 레지스트리 주소가 포함된 이름을 붙인 뒤 <code>push</code> 한다.</li>
+      <li>레지스트리에 이미 있는 레이어는 올리지 않고 <code>Mounted from</code> 으로 참조만 건다.</li>
+      <li>빌드 머신의 아키텍처가 그대로 이미지에 박힌다. 배포 대상이 다르면 buildx 로 멀티 플랫폼 빌드가 필요하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5-3</div>
+    <h3>나만의 도커 레지스트리 운영하기</h3>
+    <p class="item-tagline">노트에서는 건너뛴 절. 언제 필요해지는지와 최소한의 골자만 정리해 둔다.</p>
+  </header>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">원문 노트에서는 "패스"로 넘어간 절이다</p>
+      <p>
+        나중에 필요해질 때 되돌아올 수 있도록, 이 절이 다루는 내용의 골자만 짧게 남긴다.
+        실제 운영 구축은 <a href="#item-11-2">11-2</a> 의 빌드 인프라 구축에서 다시 다뤄진다.
+      </p>
+    </div>
+  </div>
+
+  <h4>언제 자체 레지스트리가 필요한가</h4>
+  <ul>
+    <li><b>폐쇄망</b> — 외부 인터넷으로 이미지를 내보내거나 받아 올 수 없는 환경</li>
+    <li><b>대역폭과 속도</b> — 같은 이미지를 수십 대가 동시에 받아야 할 때, 사내 레지스트리가 캐시 역할을 한다</li>
+    <li><b>규정 준수</b> — 이미지 안에 들어간 코드가 조직 밖으로 나가면 안 되는 경우</li>
+    <li><b>도커 허브 요금/제한</b> — 비인증 풀 횟수 제한, 프라이빗 레포지토리 개수 제한을 피하고 싶을 때</li>
+  </ul>
+
+  <h4>기본 골자</h4>
+  <p>
+    레지스트리 자체도 컨테이너로 뜬다. 오픈소스 구현체
+    (<code>registry</code> / CNCF Distribution)를 컨테이너로 실행하고, 이미지 이름 앞에
+    그 호스트와 포트를 붙이면 그쪽으로 푸시된다.
+  </p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash"># 레지스트리를 컨테이너로 실행
+$ docker run -d -p 5000:5000 --name registry registry:2
+
+# 이미지 이름 앞에 레지스트리 호스트:포트를 붙여 태그
+$ docker image tag web-ping registry.local:5000/diamol/web-ping:v1
+$ docker image push registry.local:5000/diamol/web-ping:v1</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">HTTPS 가 기본이다 <span class="badge b-blue">보강</span></p>
+      <p>
+        도커 엔진은 레지스트리와 <b>HTTPS 로만</b> 통신하려 한다. 인증서 없이 띄운 사내 레지스트리에
+        푸시하면 <code>http: server gave HTTP response to HTTPS client</code> 로 거부당한다.
+        정식으로는 인증서를 붙이고, 실습이라면 데몬 설정의 <code>insecure-registries</code> 에
+        해당 호스트를 등록한 뒤 도커를 재시작한다. 이 예외는 <b>신뢰하는 사내망에서만</b> 쓴다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>폐쇄망 / 대역폭 / 규정 준수 / 도커 허브 제한 회피가 자체 레지스트리를 두는 이유다.</li>
+      <li>레지스트리도 컨테이너다. 이미지 이름 앞에 <code>호스트:포트</code> 를 붙이면 그쪽으로 간다.</li>
+      <li>기본은 HTTPS 다. 인증서를 붙이거나, 실습 한정으로 <code>insecure-registries</code> 를 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5-4</div>
+    <h3>이미지 태그를 효율적으로 사용하기</h3>
+    <p class="item-tagline">semver 자릿수만큼 태그를 붙여 두면, 사용자가 "얼마나 최신을 따라갈지"를 스스로 고를 수 있다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    실제 버전을 가리키는 태그는 <code>2.1.106</code> 하나뿐이고, <code>2.1</code> / <code>2</code> / <code>latest</code> 는
+    <b>움직이는 별명</b>이다. 어느 별명을 참조하느냐가 곧 업데이트 수용 범위가 된다.
+  </div>
+
+  <h4>이미지 태그의 특성</h4>
+  <ul>
+    <li>어떠한 문자열도 포함시킬 수 있다.</li>
+    <li>같은 이미지에 여러 개의 태그를 부여할 수 있다.</li>
+    <li>태그를 통해 버전을 구별하고, 사용자는 어떤 이미지를 쓸지 고를 수 있다.</li>
+  </ul>
+
+  <h4>버저닝 방식</h4>
+  <ul>
+    <li>대부분의 소프트웨어처럼 <b>semver</b> 방식이 표준이다. <code>[major].[minor].[patch]</code> 형식이다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>자리</th><th>올라가는 조건</th><th>호환성</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono"><b>patch</b></td><td>버그만 수정됨</td><td class="t-center t-ok">✓ 기존 그대로</td></tr>
+        <tr><td class="dg-mono"><b>minor</b></td><td>기능이 추가됐지만 기존 기능은 모두 유지됨</td><td class="t-center t-ok">✓ 기존 그대로</td></tr>
+        <tr><td class="dg-mono"><b>major</b></td><td>완전히 다른 기능을 가짐</td><td class="t-center t-no">✗ 깨질 수 있음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">$ docker image tag temp registry.local:5000/temp/ui:latest
+$ docker image tag temp registry.local:5000/temp/ui:2
+$ docker image tag temp registry.local:5000/temp/ui:2.1
+$ docker image tag temp registry.local:5000/temp/ui:2.1.106</code></pre>
+  </div>
+
+  <h4>버전업에 따른 태그 변화 예시</h4>
+  <p>한 달에 한 번 릴리스할 때마다 버전이 바뀐다고 가정한다.</p>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 640 260" width="640" role="img" aria-label="7월 8월 9월 릴리스마다 latest, major, minor 별명 태그가 새 버전으로 옮겨 붙는 모습">
+        <rect x="8" y="8" width="624" height="150" rx="9" class="dg-fill-bg dg-stroke"/>
+        <text x="320" y="30" class="dg-text dg-mono" font-size="12" font-weight="700" text-anchor="middle">temp/ui</text>
+
+        <rect x="30" y="44" width="180" height="98" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="52" y="66" class="dg-accent dg-mono" font-size="12">:latest</text>
+        <text x="66" y="86" class="dg-text-sub dg-mono" font-size="12">:2</text>
+        <text x="66" y="106" class="dg-text-sub dg-mono" font-size="12">:2.1</text>
+        <text x="66" y="126" class="dg-text dg-mono" font-size="12" font-weight="700">:2.1.106</text>
+
+        <rect x="230" y="44" width="180" height="98" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="252" y="66" class="dg-accent dg-mono" font-size="12">:latest</text>
+        <text x="266" y="86" class="dg-text-sub dg-mono" font-size="12">:2</text>
+        <text x="266" y="106" class="dg-text-sub dg-mono" font-size="12">:2.2</text>
+        <text x="266" y="126" class="dg-text dg-mono" font-size="12" font-weight="700">:2.2.11</text>
+
+        <rect x="430" y="44" width="180" height="98" rx="7" class="dg-fill-soft dg-stroke"/>
+        <text x="452" y="66" class="dg-accent dg-mono" font-size="12">:latest</text>
+        <text x="466" y="86" class="dg-text-sub dg-mono" font-size="12">:3</text>
+        <text x="466" y="106" class="dg-text-sub dg-mono" font-size="12">:3.0</text>
+        <text x="466" y="126" class="dg-text dg-mono" font-size="12" font-weight="700">:3.0.42</text>
+
+        <path d="M120 152 L 120 186" fill="none" class="dg-stroke" marker-end="url(#tag-arr)"/>
+        <path d="M320 152 L 320 186" fill="none" class="dg-stroke" marker-end="url(#tag-arr)"/>
+        <path d="M520 152 L 520 186" fill="none" class="dg-stroke" marker-end="url(#tag-arr)"/>
+        <defs>
+          <marker id="tag-arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="currentColor" class="dg-text"/>
+          </marker>
+        </defs>
+
+        <text x="120" y="206" class="dg-text" font-size="12" font-weight="700" text-anchor="middle">7월 릴리스</text>
+        <text x="320" y="206" class="dg-text" font-size="12" font-weight="700" text-anchor="middle">8월 릴리스</text>
+        <text x="520" y="206" class="dg-text" font-size="12" font-weight="700" text-anchor="middle">9월 릴리스</text>
+        <text x="120" y="228" class="dg-accent dg-mono" font-size="13" text-anchor="middle">2.1.106</text>
+        <text x="320" y="228" class="dg-accent dg-mono" font-size="13" text-anchor="middle">2.2.11</text>
+        <text x="520" y="228" class="dg-accent dg-mono" font-size="13" text-anchor="middle">3.0.42</text>
+
+        <text x="320" y="252" class="dg-text-sub" font-size="11" text-anchor="middle">semver 형식의 전체 버전 말고는 전부 &ldquo;별명&rdquo;이며, 릴리스마다 새 이미지로 옮겨 붙는다</text>
+      </svg>
+    </div>
+    <div class="figure-cap">
+      <b>어느 태그를 참조하느냐가 곧 업데이트 정책이다</b> — <code>:2.1</code> 을 쓰면 patch 만,
+      <code>:2</code> 를 쓰면 minor 까지 자동으로 따라간다. <code>:2.1.106</code> 을 쓰면 아무것도 바뀌지 않는다.
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>참조하는 태그</th><th>자동으로 받는 업데이트</th><th>적합한 곳</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">:2.1.106</td><td class="t-no">없음 (완전 고정)</td><td>운영 배포</td></tr>
+        <tr><td class="dg-mono">:2.1</td><td>patch 업데이트</td><td>버그 픽스는 자동으로 받고 싶을 때</td></tr>
+        <tr><td class="dg-mono">:2</td><td>minor + patch 업데이트</td><td>호환되는 범위는 계속 따라가고 싶을 때</td></tr>
+        <tr><td class="dg-mono">:latest</td><td class="t-no">전부 (major 포함)</td><td>실습 / 로컬 실험</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>같은 이미지에 semver 자릿수만큼 태그를 겹쳐 붙여 사용자에게 선택권을 준다.</li>
+      <li>전체 버전 태그 하나만 불변이고 나머지는 릴리스마다 옮겨 붙는 별명이다.</li>
+      <li>운영에서는 전체 버전을, 실험에서는 별명을 쓴다. <code>latest</code> 는 운영에 쓰지 않는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-5-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 5-5</div>
+    <h3>공식 이미지에서 골든 이미지로 전환하기</h3>
+    <p class="item-tagline">공식 이미지의 검증은 그대로 물려받으면서, 조직의 규칙을 한 겹 얹은 것이 골든 이미지다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    골든 이미지는 새로 만드는 게 아니라 <b>공식 이미지를 <code>FROM</code> 으로 삼아 한 겹 얹는 것</b>이다.
+    그래야 공식 이미지의 이점(취약점 스캔, 정기 업데이트)을 유지한 채 조직 표준을 강제할 수 있다.
+  </div>
+
+  <h4>도커 허브의 신뢰성</h4>
+  <ul>
+    <li>누구나 이미지를 만들어 레지스트리에 푸시할 수 있다.</li>
+    <li>해커의 관점에서 보면 멀웨어를 배포하기 제격인 조건이다.</li>
+    <li>도커 허브는 이런 피해를 방지하기 위해 <b>검증된 퍼블리셔</b>와 <b>공식 이미지</b> 제도를 두고 있다.</li>
+  </ul>
+
+  <h5>검증된 퍼블리셔(Verified Publisher)</h5>
+  <ul>
+    <li>IBM, MS, Oracle 등 신뢰할 수 있는 큰 기업을 검증된 퍼블리셔로 지정한다.</li>
+    <li>이들이 배포하는 이미지는 사전에 취약점 탐지 등 승인 절차를 거쳐 공개된다.</li>
+    <li>컨테이너에서 최신 버전의 상용 소프트웨어를 써야 한다면, 검증된 퍼블리셔의 인증된 이미지를 쓰는 게 최선이다.</li>
+  </ul>
+
+  <h5>공식 이미지(Official Image)</h5>
+  <ul>
+    <li>주로 오픈소스 소프트웨어가 배포되며, 해당 프로젝트 개발팀과 도커팀이 함께 이미지를 관리한다.</li>
+    <li>마찬가지로 취약점 탐색을 거쳐 주기적으로 업데이트되고, 잘 최적화된 Dockerfile 로 구성된다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">지금의 도커 허브 신뢰 콘텐츠는 네 종류다 <span class="badge b-purple">최신 반영</span></p>
+      <p>
+        노트가 쓰인 이후 프로그램이 늘었다. 현재 도커 허브의 신뢰 콘텐츠(Trusted Content)는 다음 네 가지다.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>프로그램</th><th>주로 담는 것</th></tr></thead>
+          <tbody>
+            <tr><td><b>Docker Official Images</b></td><td>큐레이션된 오픈소스 이미지. 정기 업데이트, 모범 사례 Dockerfile</td></tr>
+            <tr><td><b>Verified Publisher</b></td><td>도커가 검증한 상용 퍼블리셔의 이미지</td></tr>
+            <tr><td><b>Docker-Sponsored Open Source</b></td><td>도커가 후원하는 오픈소스 프로젝트가 직접 관리하는 이미지</td></tr>
+            <tr><td><b>Docker Hardened Images</b></td><td>도커가 관리하는 최소 이미지. CVE 를 거의 0 에 가깝게 유지하고 SBOM / 프로버넌스 서명을 포함</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        원문의 "Verfieid Publisher" 는 <b>Verified Publisher</b> 의 오타다.
+      </p>
+    </div>
+  </div>
+
+  <h4>골든 이미지(Golden Image)</h4>
+  <ul>
+    <li>대부분은 공식 이미지로 무언가를 빌드하지만, 언젠가는 좀 더 많은 것을 통제하고 싶어지는 시기가 온다.</li>
+    <li>이때 개발자는 자신이 선호하는 기반 이미지로 전환하는데, 이것을 <b>골든 이미지</b>라고 부른다.</li>
+    <li>기반 이미지에 원하는 환경 설정값 등 필요한 설정을 추가하는 것을 뜻한다.</li>
+    <li>공식 이미지의 이점을 그대로 누리면서 필요한 설정을 더할 수 있는 것이 장점이다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  HUB["node:20 (도커 허브 공식 이미지)"] -->|"FROM"| GOLD["golden/node:20 (사내 인증서 / 보안 패치 추가)"]
+  GOLD -->|"FROM"| APP["project/node-app (앱 코드 추가)"]
+      </pre>
+    </div>
+    <div class="figure-cap">
+      <b>골든 이미지는 공식 이미지를 대체하지 않고 그 위에 한 겹 얹는다</b> —
+      각 프로젝트는 골든 이미지만 <code>FROM</code> 으로 쓰면 사내 표준을 자동으로 물려받는다.
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">골든 이미지에 보통 무엇을 넣는가 <span class="badge b-blue">보강</span></p>
+      <p>
+        사내 CA 인증서, 사설 패키지 저장소 설정, 비 root 실행 사용자,
+        타임존/로케일, 공통 로깅 설정 정도가 대표적이다. 여기에 <b>기반 이미지 버전을 조직 단위로 고정</b>하는
+        효과까지 따라온다. 프로젝트마다 <code>node:20</code>, <code>node:22</code> 가 제각각 흩어지는 대신
+        골든 이미지 하나만 올리면 전 프로젝트가 함께 올라간다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>도커 허브는 아무나 푸시할 수 있으므로 신뢰 콘텐츠 프로그램으로 기반 이미지를 고른다.</li>
+      <li>골든 이미지 = 공식 이미지 + 조직 표준 한 겹. 새로 만드는 게 아니라 <code>FROM</code> 으로 얹는다.</li>
+      <li>각 프로젝트가 골든 이미지만 참조하면 기반 이미지 업그레이드가 한 곳에서 끝난다.</li>
+    </ul>
+  </div>
+</article>

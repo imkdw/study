@@ -1,0 +1,699 @@
+<article class="item" id="item-57" data-spy>
+  <header class="item-head">
+    <div class="item-num">19-1</div>
+    <h3>메시지 큐의 장점</h3>
+    <p class="item-tagline">결합도 / 확장성 / 가용성 / 성능. 네 가지가 전부 같은 뿌리에서 나온다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    네 가지 장점은 사실 하나다 — <b>생산자와 소비자가 서로를 몰라도 되게 만든 것</b>. 나머지는 전부 그 결과다.
+  </div>
+
+  <ul>
+    <li>현대적 소프트웨어 아키텍처를 따르는 시스템은 잘 정의된 인터페이스를 경계로 나뉜 작고 독립적인 블록들로 구성된다.</li>
+    <li>메시지 큐는 이 블록들 사이의 통신과 조율을 담당한다.</li>
+  </ul>
+
+  <h4>결합도 완화 (decoupling)</h4>
+  <ul>
+    <li>메시지 큐를 쓰면 컴포넌트 사이의 강한 결합이 사라진다.</li>
+    <li>각각을 독립적으로 갱신할 수 있다.</li>
+  </ul>
+
+  <h4>규모 확장성 개선</h4>
+  <ul>
+    <li>메시지 큐에 데이터를 생산하는 역할을 <b>생산자(producer)</b>라 부른다.</li>
+    <li>메시지 큐에서 데이터를 소비하는 역할을 <b>소비자(consumer)</b>라 부른다.</li>
+    <li>각 역할을 트래픽 부하에 맞게 독립적으로 늘릴 수 있다.</li>
+  </ul>
+
+  <h4>가용성 개선</h4>
+  <ul>
+    <li>특정 컴포넌트에 장애가 나도 다른 컴포넌트는 큐와 계속 상호작용할 수 있다.</li>
+  </ul>
+
+  <h4>성능 개선</h4>
+  <ul>
+    <li>비동기 통신이 쉽게 가능해진다.</li>
+    <li>생산자는 응답을 기다리지 않고 메시지를 보낼 수 있고, 소비자는 읽을 메시지가 있을 때만 소비한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["생산자"] -->|"메시지 생산"| Q[["메시지 큐"]]
+  Q -->|"소비"| C["소비자"]
+  C -.->|"구독"| Q
+      </pre>
+    </div>
+    <div class="figure-cap"><b>생산자와 소비자 사이에 직접 선이 없다</b> — 이 한 가지 사실에서 결합도 / 확장성 / 가용성 / 성능이 모두 파생된다.</div>
+  </div>
+
+  <h4>메시지 큐의 종류들</h4>
+  <div class="tag-row">
+    <span class="badge">아파치 카프카</span>
+    <span class="badge">아파치 펄사</span>
+    <span class="badge">아파치 RocketMQ</span>
+    <span class="badge">아파치 ActiveMQ</span>
+    <span class="badge">RabbitMQ</span>
+    <span class="badge">ZeroMQ</span>
+  </div>
+
+  <h4>메시지 큐 vs 이벤트 스트리밍 플랫폼</h4>
+  <ul>
+    <li>엄밀히 말하면 카프카나 펄사는 메시지 큐가 아니라 <b>이벤트 스트리밍 플랫폼</b>이다.</li>
+    <li>최근에는 지원 기능이 서로 수렴하면서 그 경계가 점점 희미해지고 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">경계를 가르는 한 가지 질문 <span class="badge b-blue">보강</span></p>
+      <p><b>"소비한 메시지가 사라지는가?"</b> — 전통적 메시지 큐(RabbitMQ)는 소비되면 지운다. 이벤트 스트리밍 플랫폼(Kafka)은 지우지 않고 보관 기한까지 남겨 두므로, 같은 메시지를 여러 소비자가 각자 읽을 수 있고 나중에 다시 읽을 수도 있다. 26장에서 다중 수신자 시나리오에 카프카를 쓰는 이유가 이것이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>메시지 큐의 네 장점은 "서로를 모르게 만든 것"의 결과다.</li>
+      <li>생산자와 소비자를 각각 독립적으로 확장할 수 있다.</li>
+      <li>메시지 큐와 이벤트 스트리밍의 차이는 소비 후 메시지가 사라지느냐다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-58" data-spy>
+  <header class="item-head">
+    <div class="item-num">19-2</div>
+    <h3>문제 이해 및 설계 범위</h3>
+    <p class="item-tagline">보관(retention)을 요구사항에 넣는 순간 전통적 큐가 아니게 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    "오래된 이력 데이터를 삭제할 수 있어야 한다"는 요구사항은 곧 <b>메시지를 오래 보관한다</b>는 뜻이다. 이 한 줄이 설계를 카프카 쪽으로 밀어붙인다.
+  </div>
+
+  <h4>기능적 요구사항</h4>
+  <ul>
+    <li>생산자는 메시지 큐에 메시지를 보낼 수 있다.</li>
+    <li>소비자는 메시지 큐에 있는 메시지를 수신할 수 있다.</li>
+    <li>메시지는 반복적으로 수신할 수도 있고, 단 한 번만 수신하도록 설정될 수도 있어야 한다.</li>
+    <li>오래된 이력 데이터는 삭제할 수 있어야 한다.</li>
+    <li>메시지 크기는 KB 수준이다.</li>
+    <li>메시지가 생산된 순서대로 소비자에게 전달될 수 있어야 한다.</li>
+    <li>메시지 전달 방식은 최소 한 번(at-least once), 최대 한 번(at-most once), 정확히 한 번(exactly once) 중에서 설정할 수 있어야 한다.</li>
+  </ul>
+
+  <h4>비기능적 요구사항</h4>
+  <ul>
+    <li>높은 대역폭과 낮은 전송 지연 중 하나를 설정으로 선택할 수 있게 하는 기능</li>
+    <li>규모 확장성 — 메시지 양이 급증해도 처리할 수 있어야 한다.</li>
+    <li>지속성 및 내구성 — 데이터는 디스크에 지속적으로 보관되어야 하고, 여러 노드에 복제되어야 한다.</li>
+  </ul>
+
+  <h4>전통적인 메시지 큐와 다른 점</h4>
+  <ul>
+    <li>RabbitMQ 같은 전통적 메시지 큐는 이벤트 스트리밍 플랫폼처럼 <b>메시지 보관 문제를 중요하게 다루지 않는다</b>.</li>
+    <li>전통적 큐는 메시지가 소비자에게 전달되기 충분한 시간 동안만 메모리에 보관한다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>전달 방식</th><th>보장</th><th>대가</th><th>쓰이는 곳</th></tr></thead>
+      <tbody>
+        <tr><td>최대 한 번</td><td>중복 없음</td><td>손실 가능</td><td>메트릭 수집처럼 조금 잃어도 되는 경우</td></tr>
+        <tr><td>최소 한 번</td><td>손실 없음</td><td>중복 가능</td><td>10장 알림 시스템</td></tr>
+        <tr><td>정확히 한 번</td><td>둘 다 없음</td><td>구현 비용이 매우 큼</td><td>26장 결제 시스템</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>기능 요구사항은 순서 보장, 재수신, 보관, 그리고 세 가지 전달 보장.</li>
+      <li>비기능 요구사항은 대역폭과 지연 중 선택, 확장성, 디스크 지속성.</li>
+      <li>보관을 요구하는 순간 전통적 큐가 아니라 이벤트 스트리밍에 가까워진다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-59" data-spy>
+  <header class="item-head">
+    <div class="item-num">19-3</div>
+    <h3>개략적인 설계</h3>
+    <p class="item-tagline">토픽 → 파티션 → 브로커. 이 세 층이 확장성의 뼈대다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>순서 보장은 파티션 안에서만 성립한다</b>. 이 제약을 이해하면 소비자 그룹의 규칙("파티션 하나는 그룹 내 소비자 하나만")이 왜 필요한지가 바로 보인다.
+  </div>
+
+  <h4>기본적인 기능</h4>
+  <ul>
+    <li>생산자는 메시지 큐에 메시지를 발행하고, 소비자는 큐를 구독하고 메시지를 소비한다.</li>
+    <li>메시지 큐는 생산자와 소비자 사이의 결합을 느슨하게 하는 서비스로, 양쪽의 독립적인 운영과 규모 확장을 가능하게 한다.</li>
+    <li>생산자와 소비자는 클라이언트/서버 모델 관점에서 보면 모두 <b>클라이언트</b>다.</li>
+    <li>서버 역할을 하는 것은 메시지 큐이며, 이 클라이언트와 서버는 네트워크를 통해 통신한다.</li>
+  </ul>
+
+  <h4>메시지 모델</h4>
+
+  <h5>일대일 모델</h5>
+  <ul>
+    <li>흔히 발견되는 전통적인 모델이다.</li>
+    <li>큐에 전송된 메시지는 오직 하나의 소비자만 가져갈 수 있다.</li>
+    <li>소비자가 가져갔다고 큐에 알리면 그 메시지는 삭제된다.</li>
+    <li>즉 <b>데이터 보관(data retention)을 지원하지 않는다</b>.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["생산자"] -->|"메시지 A"| Q[["메시지 큐"]]
+  Q -->|"메시지 A"| C1["소비자 1"]
+  Q -.->|"같은 메시지 수신 불가"| C2["소비자 2"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>먼저 가져간 쪽이 이긴다</b> — 소비자 1이 메시지 A를 가져가면 소비자 2에게는 남지 않는다. 작업 분배에는 좋지만 브로드캐스트는 불가능하다.</div>
+  </div>
+
+  <h5>발행-구독 모델</h5>
+  <ul>
+    <li>이 모델에서는 <b>토픽(topic)</b>이라는 개념이 등장하며, 메시지를 주제별로 정리하는 데 쓴다.</li>
+    <li>각 토픽은 메시지 큐 서비스 전반에서 고유한 이름을 가지며, 보낼 때와 받을 때 모두 토픽을 통해 처리한다.</li>
+    <li>전통적 메시지 큐와 달리, 토픽에 전달된 메시지는 <b>그 토픽을 구독하는 모든 소비자</b>에게 전달된다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  P["생산자"] -->|"메시지 A"| Q[["토픽"]]
+  Q -->|"메시지 A"| C1["소비자 1"]
+  Q -->|"메시지 A"| C2["소비자 2"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>양쪽 소비자가 같은 메시지를 받는다</b> — 동일 메시지가 복제되어 전달되므로 서로 다른 목적(결제 처리와 분석)에 같은 이벤트를 쓸 수 있다.</div>
+  </div>
+
+  <h4>토픽, 파티션, 브로커</h4>
+  <ul>
+    <li>토픽에 보관되는 메시지의 양이 커지면 서버 한 대로 감당하기 힘든 상황이 생긴다.</li>
+    <li>이때 <b>파티션</b>, 즉 샤딩 기법을 활용하면 처리할 수 있다.</li>
+    <li>토픽을 여러 파티션으로 분할한 뒤 메시지를 모든 파티션에 균등하게 나눠 보낸다.</li>
+    <li>파티션을 유지하는 서버를 <b>브로커</b>라고 부른다.</li>
+    <li>파티션을 브로커에 분산하는 것이 높은 규모 확장을 달성하는 비결이다. 토픽의 용량을 늘리고 싶다면 파티션 개수를 늘리면 된다.</li>
+    <li>각 토픽 파티션은 FIFO로 동작한다. 즉 <b>같은 파티션 안에서는 메시지의 순서가 유지된다</b>.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  T1["토픽 A<br>(단일 큐)"] -->|"분할"| T2["토픽 A"]
+  T2 --> P1["파티션 1"]
+  T2 --> P2["파티션 2"]
+  P1 --> B1["브로커 1"]
+  P2 --> B2["브로커 2"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>토픽을 쪼개 여러 브로커에 흩는다</b> — 1-10 샤딩과 같은 아이디어다. 파티션 개수를 늘리는 것이 곧 토픽의 수평 확장이다.</div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  PG["생산자 그룹"] -->|"메시지 발행"| B["브로커<br>(파티션 보관)"]
+  B -->|"메시지 소비"| CG["소비자 그룹"]
+  CG -.->|"구독"| B
+      </pre>
+    </div>
+    <div class="figure-cap"><b>브로커가 생산자 그룹과 소비자 그룹 사이에 선다</b> — 브로커는 파티션을 보관하는 서버일 뿐, 라우팅 지식은 생산자 쪽에 있다(19-4 참조).</div>
+  </div>
+
+  <h4>소비자 그룹</h4>
+  <ul>
+    <li>소비자 그룹 내의 소비자들은 토픽에서 메시지를 소비하기 위해 서로 협력한다.</li>
+    <li>한 소비자 그룹은 여러 토픽을 구독할 수 있고, 오프셋을 별도로 관리한다.</li>
+    <li>같은 그룹 안의 소비자들은 메시지를 병렬로 소비할 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  TA1["토픽 A / 파티션 1"] --> G1C1["소비자 그룹 1 / 소비자 1"]
+  TA2["토픽 A / 파티션 2"] --> G1C2["소비자 그룹 1 / 소비자 2"]
+  TA2 --> G2C3["소비자 그룹 2 / 소비자 3"]
+  TB1["토픽 B / 파티션 1"] --> G2C4["소비자 그룹 2 / 소비자 4"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>그룹이 다르면 같은 파티션을 함께 읽을 수 있다</b> — 파티션 2는 그룹 1과 그룹 2가 각각 읽는다. 제약은 <b>같은 그룹 안에서만</b> 적용된다.</div>
+  </div>
+
+  <h5>소비자 그룹의 소비 순서 문제</h5>
+  <ul>
+    <li>데이터를 병렬 처리하면 대역폭(throughput)은 좋아지지만, 파티션 안의 메시지를 순서대로 소비할 수 없게 된다.</li>
+    <li>어떤 파티션의 메시지는 한 그룹 안에서 <b>오직 한 소비자만 읽을 수 있도록</b> 제한하면 해결된다.</li>
+    <li>이 제약을 도입한 상태에서 모든 소비자를 같은 그룹에 두면, 같은 파티션의 메시지는 오직 한 소비자만 가져갈 수 있다. 결국 1:1 모델에 수렴한다.</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">병렬성의 상한은 파티션 개수</p>
+      <p>"파티션 하나는 그룹 내 소비자 하나만"이라는 규칙에서 따라 나오는 결론이 있다. <b>소비자를 파티션 개수보다 많이 두면 남는 소비자는 아무 일도 하지 않는다.</b> 소비 처리량을 늘리려면 소비자가 아니라 파티션을 먼저 늘려야 한다.</p>
+    </div>
+  </div>
+
+  <h4>개략적 설계안</h4>
+  <ul>
+    <li><b>서비스 탐색</b> — 어떤 브로커가 살아 있는지 알려 준다.</li>
+    <li><b>리더 선출</b> —
+      <ul>
+        <li>브로커 중 하나가 컨트롤러를 담당한다. 한 클러스터에는 반드시 하나의 활성 컨트롤러가 존재해야 하며, 파티션 배치를 담당한다.</li>
+        <li>일반적으로 아파치 ZooKeeper나 etcd가 컨트롤러 선출을 담당한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  MD[("메타데이터 저장소<br>토픽 설정 / 토픽 속성")] <--> B
+  COORD["조율 서비스<br>서비스 탐색 / 리더 선출"] <--> B
+  P["생산자"] -->|"메시지 발행"| B["브로커<br>데이터 저장소 (메시지)<br>상태 저장소 (소비자 상태)"]
+  B -->|"메시지 소비"| C["소비자<br>(소비자 그룹)"]
+  C -.->|"토픽 구독"| B
+      </pre>
+    </div>
+    <div class="figure-cap"><b>브로커는 데이터와 상태를 함께 들고 있다</b> — 메시지 본체(데이터 저장소)와 소비자가 어디까지 읽었는지(상태 저장소)가 분리되어 있는 점이 중요하다.</div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>일대일 = 소비하면 사라짐, 발행-구독 = 모든 구독자에게 전달.</li>
+      <li>토픽을 파티션으로 쪼개 브로커에 분산하는 것이 확장의 핵심.</li>
+      <li>순서 보장은 파티션 안에서만 성립한다.</li>
+      <li>같은 그룹 안에서 파티션 하나는 소비자 하나만 → 병렬성 상한은 파티션 수.</li>
+      <li>서비스 탐색과 리더 선출은 ZooKeeper/etcd가 맡는다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-60" data-spy>
+  <header class="item-head">
+    <div class="item-num">19-4</div>
+    <h3>상세 설계</h3>
+    <p class="item-tagline">디스크에 순차로 쓰고, 복사를 피하고, 묶어서 보낸다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    카프카가 빠른 이유는 메모리를 쓰기 때문이 아니라, <b>디스크를 순차 접근만 하도록 접근 패턴 자체를 설계</b>했기 때문이다.
+  </div>
+
+  <h4>높은 대역폭을 제공하기 위한 설계</h4>
+  <ul>
+    <li><b>회전식 디스크 사용과 적극적 디스크 캐시 전략</b> —
+      <ul>
+        <li>높은 순차 탐색 성능을 활용한다.</li>
+        <li>현대적 OS가 제공하는 페이지 캐시 전략 위에서 디스크 기반 자료구조를 쓴다.</li>
+      </ul>
+    </li>
+    <li><b>수정 없이 전달 가능한 메시지 자료구조</b> — 데이터 양이 막대할 때 메시지 복사 비용을 최소화하기 위함이다.</li>
+    <li><b>일괄처리를 우선시하는 시스템 설계</b> —
+      <ul>
+        <li>소규모 I/O가 많으면 높은 대역폭을 내기 어렵다.</li>
+        <li>생산자는 메시지를 일괄 전송한다.</li>
+        <li>메시지 큐는 메시지들을 더 큰 단위로 묶어 보관한다.</li>
+        <li>소비자도 가능하면 일괄 수신한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>데이터 저장소</h4>
+  <ul>
+    <li>메시지 큐의 트래픽 패턴 —
+      <ul>
+        <li>읽기와 쓰기가 빈번하게 발생한다.</li>
+        <li>갱신/삭제 연산은 발생하지 않는다. 순차적인 읽기/쓰기가 대부분이다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>선택지 1 : 데이터베이스</h5>
+  <ul>
+    <li>관계형 DB — 토픽별로 테이블을 만들고, 토픽에 보내지는 메시지를 새 레코드로 추가한다.</li>
+    <li>NoSQL DB — 토픽별로 컬렉션을 만들고, 토픽에 보내는 메시지를 하나의 문서로 만든다.</li>
+    <li>읽기/쓰기 연산이 동시에 대규모로 빈번하게 발생하는 DB 설계는 어렵다.</li>
+    <li>최적의 선택지가 될 수 없고 오히려 병목 지점이 될 수 있다.</li>
+  </ul>
+
+  <h5>선택지 2 : 쓰기 우선 로그 (Write-Ahead Log, WAL)</h5>
+  <ul>
+    <li>새 항목이 추가되기만 하는 <code>append-only</code> 일반 파일이다.</li>
+    <li>대표적으로 MySQL의 redo log, 아파치 ZooKeeper가 이 기술을 쓴다.</li>
+    <li>지속성을 보장해야 하는 메시지는 디스크에 WAL로 보관할 것을 추천한다.</li>
+    <li>접근 패턴이 읽기/쓰기 전부 순차적이고, 순차 접근일 때 디스크는 아주 좋은 성능을 낸다.</li>
+    <li>파일 크기가 무한정 커지는 것을 막기 위해 <b>세그먼트 단위</b>로 나눈다.</li>
+    <li>새 메시지는 활성 상태의 세그먼트에만 추가되고, 가득 차면 비활성 상태로 바뀐다.</li>
+    <li>비활성 세그먼트는 보관 기한이 만료되거나 용량 한계에 다다르면 삭제할 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 620 190" width="620" role="img" aria-label="WAL 로그가 세그먼트로 나뉘고 오프셋이 증가하는 구조">
+        <text x="45" y="95" class="dg-text dg-mono" font-size="12" text-anchor="middle">토픽 A</text>
+        <text x="45" y="115" class="dg-text dg-mono" font-size="12" text-anchor="middle">파티션 1</text>
+
+        <rect x="110" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="168" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="226" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="284" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="342" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="400" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="458" y="70" width="58" height="42" class="dg-fill-soft dg-stroke"/>
+        <rect x="516" y="70" width="58" height="42" class="dg-stroke" fill="none" stroke-dasharray="4 3"/>
+
+        <text x="139" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">0</text>
+        <text x="197" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">1</text>
+        <text x="255" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">2</text>
+        <text x="313" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">3</text>
+        <text x="371" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">4</text>
+        <text x="429" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">5</text>
+        <text x="487" y="97" class="dg-text dg-mono" font-size="13" text-anchor="middle">6</text>
+        <text x="545" y="97" class="dg-text-sub dg-mono" font-size="13" text-anchor="middle">7</text>
+
+        <path d="M112 58 L342 58" stroke="var(--accent)" stroke-width="1.6" fill="none"/>
+        <text x="227" y="48" class="dg-text dg-mono" font-size="11" text-anchor="middle" fill="var(--accent)">세그먼트 1 (비활성)</text>
+        <path d="M344 58 L574 58" stroke="var(--accent)" stroke-width="1.6" fill="none"/>
+        <text x="459" y="48" class="dg-text dg-mono" font-size="11" text-anchor="middle" fill="var(--accent)">세그먼트 2 (활성)</text>
+
+        <text x="139" y="140" class="dg-text-sub" font-size="11" text-anchor="middle">↑ 첫 번째 레코드</text>
+        <text x="545" y="140" class="dg-text-sub" font-size="11" text-anchor="middle">↑ 다음 레코드가</text>
+        <text x="545" y="156" class="dg-text-sub" font-size="11" text-anchor="middle">기록될 곳</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>쓰기는 항상 맨 끝에서만 일어난다</b> — 중간을 고칠 일이 없으므로 디스크 헤드가 움직이지 않고, 오래된 세그먼트는 통째로 지우면 되므로 삭제도 싸다.</div>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  subgraph TA["토픽 A"]
+    subgraph P1["파티션 1"]
+      M1["메시지 1 / 메시지 2 / 메시지 3 …"]
+    end
+    subgraph P2["파티션 2"]
+      M2["메시지 1 / 메시지 2 / 메시지 3 …"]
+    end
+  end
+      </pre>
+    </div>
+    <div class="figure-cap"><b>파티션마다 독립적인 로그 파일을 갖는다</b> — 그래서 파티션을 다른 브로커에 두면 디스크 I/O도 함께 분산된다.</div>
+  </div>
+
+  <h4>디스크의 성능 관련 유의사항</h4>
+  <ul>
+    <li>HDD(회전식 디스크)가 느리다는 것은 널리 퍼진 편견이다.</li>
+    <li>회전식 디스크가 정말로 느려지는 것은 데이터 접근 패턴이 <b>무작위(random)</b>일 때다.</li>
+    <li>순차적으로 접근하는 경우 RAID를 구성하면 초당 수백 MB 단위 처리도 가능하고 비용도 저렴하다.</li>
+  </ul>
+
+  <h4>메시지 자료 구조</h4>
+  <ul>
+    <li>메시지 자료 구조는 생산자, 메시지 큐, 소비자 사이의 <b>계약(contract)</b>이다.</li>
+    <li>컴포넌트 중 하나라도 이 계약을 받아들이지 못하면 메시지 변경이 필요해지고, 값비싼 복사로 이어져 전반적인 성능이 저하된다.</li>
+  </ul>
+
+  <h5>메시지 자료 구조 스키마</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>필드 이름</th><th>데이터 자료형</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr><td class="dg-mono">key</td><td class="dg-mono">byte[]</td><td>파티션 결정</td></tr>
+        <tr><td class="dg-mono">value</td><td class="dg-mono">byte[]</td><td>페이로드 본문</td></tr>
+        <tr><td class="dg-mono">topic</td><td class="dg-mono">string</td><td>소속 토픽</td></tr>
+        <tr><td class="dg-mono">partition</td><td class="dg-mono">int</td><td>소속 파티션 ID</td></tr>
+        <tr><td class="dg-mono">offset</td><td class="dg-mono">long</td><td>파티션 내 위치</td></tr>
+        <tr><td class="dg-mono">timestamp</td><td class="dg-mono">long</td><td>저장 시각</td></tr>
+        <tr><td class="dg-mono">size</td><td class="dg-mono">integer</td><td>메시지 크기</td></tr>
+        <tr><td class="dg-mono">crc</td><td class="dg-mono">integer</td><td>무결성 검사</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>메시지의 key</h5>
+  <ul>
+    <li>key는 파티션을 정할 때 쓴다. 주어지지 않으면 파티션은 무작위로 결정된다.</li>
+    <li>키가 주어지면 <code>hash(key) % 파티션수</code>로 결정된다.</li>
+    <li>키에는 비즈니스에 관련된 정보가 담기는 것이 보통이고, 클라이언트에 노출되지 않는다.</li>
+    <li>일반적으로 키-값 저장소에서 말하는 키와는 다르다. 메시지의 키는 <b>중복될 수 있다</b>.</li>
+  </ul>
+
+  <h5>메시지 value</h5>
+  <ul>
+    <li>메시지의 내용, 즉 페이로드를 뜻한다.</li>
+    <li>일반 텍스트일 수도 있고 압축된 이진 블록일 수도 있다.</li>
+  </ul>
+
+  <h5>메시지 기타 필드</h5>
+  <ul>
+    <li><b>토픽</b> — 메시지가 속한 토픽 이름</li>
+    <li><b>파티션</b> — 메시지가 속한 파티션의 ID</li>
+    <li><b>오프셋</b> — 파티션 내 메시지의 위치. 메시지는 <b>토픽 + 파티션 + 오프셋</b> 세 정보만 알면 찾을 수 있다.</li>
+    <li><b>타임스탬프</b> — 메시지가 저장된 시각</li>
+    <li><b>크기</b> — 메시지의 크기</li>
+    <li><b>CRC</b> — 순환 중복 검사(Cyclic Redundancy Check)의 약자로, 데이터 무결성 보장에 쓰인다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">key 가 순서 보장의 열쇠다 <span class="badge b-blue">보강</span></p>
+      <p>같은 key를 가진 메시지는 항상 같은 파티션으로 가고, 파티션 안에서는 순서가 보장된다. 따라서 <b>"특정 사용자의 이벤트만 순서대로 처리하고 싶다"면 key를 <code>user_id</code>로 잡으면 된다.</b> 전역 순서를 포기하고 필요한 범위의 순서만 사는 것이 카프카의 실용적 타협이다.</p>
+    </div>
+  </div>
+
+  <h4>일괄처리</h4>
+  <ul>
+    <li>생산자, 소비자, 메시지 큐 모두 메시지를 가급적 일괄 처리한다.</li>
+    <li>여러 메시지를 한꺼번에 보내면 네트워크 요청 한 번으로 전송할 수 있어 비싼 왕복 비용을 아낀다.</li>
+    <li>여러 메시지를 한 번에 로그에 저장하면 더 큰 규모의 순차 쓰기가 발생한다.</li>
+    <li>그러면 OS가 관리하는 디스크 캐시에서 더 큰 연속 공간을 점유할 수 있어, 더 높은 디스크 접근 대역폭을 달성한다.</li>
+  </ul>
+
+  <h4>생산자 측 작업 흐름</h4>
+  <ul>
+    <li>라우팅 계층은 적절한 브로커에 메시지를 보내는 역할을 담당한다.</li>
+    <li>라우팅 계층 덕분에 생산자는 어떤 파티션에 메시지를 보낼지 알 수 있다.</li>
+    <li>브로커를 여러 개로 복제해 운영한다면, 메시지를 받을 적절한 브로커는 <b>리더(leader) 브로커</b>다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  P["생산자"] -->|"1. 라우팅 계층으로 전송"| R["라우팅 계층"]
+  MD[("메타데이터 DB<br>사본 분산 계획")] --> R
+  R -->|"2. 파티션 1 리더 사본에게 전송"| B1["브로커 1<br>토픽 A / 파티션 1"]
+  B1 -->|"3. 메시지 복제"| B2["브로커 2<br>토픽 A / 파티션 1"]
+  B2 -->|"OK"| B1
+  B1 -->|"응답"| R
+  R -->|"결과"| P
+      </pre>
+    </div>
+    <div class="figure-cap"><b>리더에게만 쓰고, 리더가 사본에 복제한다</b> — 복제가 완료되어야 커밋이 확정되므로, 리더가 죽어도 데이터가 남는다.</div>
+  </div>
+
+  <h5>리더와 사본이 필요한 이유</h5>
+  <ul>
+    <li>장애 감내(fault tolerance)를 위해 동기화가 필요하다.</li>
+    <li>다만 라우팅 계층을 별도로 두면 거쳐야 할 네트워크 노드가 하나 늘어 오버헤드가 생기고 전송 지연이 늘어난다.</li>
+    <li>일괄처리로 효율을 크게 높일 수 있는데 그 점이 고려되지 않았다.</li>
+  </ul>
+
+  <h5>개선된 구조</h5>
+  <ul>
+    <li>라우팅 계층을 <b>생산자 안으로 편입</b>한다.</li>
+    <li>생산자와 라우터 계층 간 네트워크 통신이 없어져 전송 지연이 줄어든다.</li>
+    <li>생산자는 메시지를 어떤 파티션에 보낼지 자신만의 로직을 가질 수 있다.</li>
+    <li>전송할 메시지를 버퍼 메모리에 모았다가 목적지로 일괄 전송해 대역폭을 높일 수 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  P["생산자<br>버퍼 → 라우팅 (내장)"] -->|"직접 전송"| B1["브로커 1<br>토픽 A / 파티션 1"]
+  P --> B2["브로커 2<br>토픽 A / 파티션 1"]
+  B1 <--> B2
+      </pre>
+    </div>
+    <div class="figure-cap"><b>중간 홉 하나가 사라졌다</b> — 라우팅 지식을 클라이언트로 옮기면서 지연도 줄고 버퍼링(일괄처리)도 가능해졌다. 카프카 프로듀서가 실제로 이 구조다.</div>
+  </div>
+
+  <h5>얼마나 많은 메시지를 일괄 처리할지</h5>
+  <ul>
+    <li>결국 대역폭과 응답 지연 사이에서 타협점을 찾는 일이다.</li>
+    <li>일괄 처리 양을 늘리면 대역폭은 늘지만 응답 속도는 느려진다.</li>
+    <li>줄이면 대역폭은 줄지만 응답 속도가 빨라진다.</li>
+    <li>생산자는 메시지 큐의 용도를 감안해 일괄 처리 양을 조절해야 한다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 500 200" width="500" role="img" aria-label="일괄처리 메시지 양이 늘어날수록 대역폭과 지연이 함께 증가하는 그래프">
+        <line x1="60" y1="160" x2="450" y2="160" class="dg-stroke"/>
+        <line x1="60" y1="25" x2="60" y2="160" class="dg-stroke"/>
+
+        <text x="34" y="32" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">높음</text>
+        <text x="34" y="163" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">낮음</text>
+        <text x="30" y="95" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle" fill="var(--accent)">지연</text>
+
+        <text x="440" y="180" class="dg-text-sub dg-mono" font-size="11" text-anchor="middle" fill="var(--accent)">대역폭</text>
+        <text x="100" y="180" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">낮음</text>
+        <text x="400" y="180" class="dg-text-sub dg-mono" font-size="10" text-anchor="middle">높음</text>
+
+        <path d="M62 158 L400 40" stroke="var(--accent)" stroke-width="2.5" fill="none" marker-end="url(#arrE)"/>
+        <defs>
+          <marker id="arrE" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0 L8,3.5 L0,7 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        <text x="320" y="45" class="dg-text dg-mono" font-size="12">일괄처리 메시지의 양 →</text>
+        <text x="255" y="130" class="dg-text-sub" font-size="11" text-anchor="middle">둘 다 함께 오르므로, 어디서 멈출지가 설계 결정이다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>공짜 점심은 없다</b> — 배치 크기를 키우면 처리량이 오르지만 그만큼 메시지가 버퍼에서 기다린다. 19-2의 "대역폭과 지연 중 하나를 선택 가능하게" 요구사항이 바로 이 조절 노브다.</div>
+  </div>
+
+  <h4>소비자 측 작업 흐름</h4>
+  <ul>
+    <li>소비자는 특정 파티션의 오프셋을 지정하고, 그 위치부터 이벤트를 묶어 가져온다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 560 200" width="560" role="img" aria-label="두 소비자가 같은 파티션에서 서로 다른 오프셋까지 읽은 상태">
+        <rect x="60" y="80" width="420" height="42" rx="4" class="dg-stroke" fill="none"/>
+        <line x1="120" y1="80" x2="120" y2="122" class="dg-stroke"/>
+        <line x1="180" y1="80" x2="180" y2="122" class="dg-stroke"/>
+        <line x1="240" y1="80" x2="240" y2="122" class="dg-stroke"/>
+        <line x1="300" y1="80" x2="300" y2="122" class="dg-stroke"/>
+        <line x1="360" y1="80" x2="360" y2="122" class="dg-stroke"/>
+        <line x1="420" y1="80" x2="420" y2="122" class="dg-stroke"/>
+        <text x="90" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">1</text>
+        <text x="150" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">2</text>
+        <text x="210" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">3</text>
+        <text x="270" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">4</text>
+        <text x="330" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">5</text>
+        <text x="390" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">6</text>
+        <text x="450" y="107" class="dg-text dg-mono" font-size="13" text-anchor="middle">7</text>
+
+        <path d="M62 62 L238 62" stroke="var(--accent)" stroke-width="2" fill="none"/>
+        <text x="150" y="52" class="dg-text dg-mono" font-size="11" text-anchor="middle" fill="var(--accent)">소비자 1 이 가져감</text>
+        <text x="330" y="52" class="dg-text dg-mono" font-size="11" text-anchor="middle" fill="var(--accent)">마지막 오프셋 3</text>
+
+        <path d="M62 142 L418 142" stroke="var(--green)" stroke-width="2" fill="none"/>
+        <text x="200" y="162" class="dg-text dg-mono" font-size="11" text-anchor="middle" fill="var(--green)">소비자 2 가 가져감</text>
+        <text x="430" y="162" class="dg-text dg-mono" font-size="11" text-anchor="middle" fill="var(--green)">마지막 오프셋 6</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>같은 로그를 각자의 속도로 읽는다</b> — 메시지를 지우지 않고 오프셋만 따로 관리하므로, 소비자를 되감아 과거 데이터를 다시 처리할 수도 있다.</div>
+  </div>
+
+  <h4>푸시 vs 풀</h4>
+
+  <h5>푸시 모델</h5>
+  <ul>
+    <li><b>장점</b> — 낮은 지연. 브로커는 메시지를 받는 즉시 소비자에게 보낼 수 있다.</li>
+    <li><b>단점</b> —
+      <ul>
+        <li>소비자의 처리 속도가 생산 속도보다 느리면 소비자에게 큰 부하가 걸린다.</li>
+        <li>생산자가 데이터 전송 속도를 좌우하므로, 소비자는 항상 그에 맞는 컴퓨팅 자원을 갖춰야 한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h5>풀 모델</h5>
+  <ul>
+    <li><b>장점</b> —
+      <ul>
+        <li>소비 속도를 소비자가 스스로 결정한다. 누구는 실시간, 누구는 일괄로 가져가는 구성이 가능하다.</li>
+        <li>소비 속도가 생산보다 느리면 소비자를 늘리거나, 따라잡을 때까지 대기할 수 있다.</li>
+        <li>일괄처리에 적합하다. 오프셋을 기준으로 마지막으로 가져온 메시지부터 끝까지 다 가져올 수 있다.</li>
+      </ul>
+    </li>
+    <li><b>단점</b> —
+      <ul>
+        <li>브로커에 메시지가 없어도 소비자가 계속 가져오려 한다. 브로커의 컴퓨팅 자원 낭비로 이어진다.</li>
+        <li>이를 극복하기 위해 많은 메시지 큐가 <b>롱 폴링 모드</b>를 지원한다.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["1. 소비자 그룹 1 합류<br>토픽 A 구독"] --> B["2. 파티션 2 할당"]
+  B --> C["3. 그룹-1 담당 코디네이터<br>(브로커 1)"]
+  C --> D["4. 토픽 A / 파티션 2<br>(브로커 2) 에서 메시지 수신"]
+  D --> E["5. 데이터 처리 및 오프셋 갱신"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>소비자는 코디네이터에게 배정을 받고 브로커에서 직접 당겨 온다</b> — 처리한 만큼 오프셋을 갱신하므로, 중간에 죽어도 이어받은 소비자가 그 지점부터 다시 시작한다.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>구분</th><th>푸시</th><th>풀</th></tr></thead>
+      <tbody>
+        <tr><td>전송 지연</td><td class="t-center t-ok">✓ 낮음</td><td class="t-center">폴링 주기에 의존</td></tr>
+        <tr><td>속도 결정권</td><td class="t-center t-no">생산자</td><td class="t-center t-ok">소비자</td></tr>
+        <tr><td>소비자 과부하</td><td class="t-center t-no">✗ 발생 가능</td><td class="t-center t-ok">✓ 없음</td></tr>
+        <tr><td>일괄처리</td><td class="t-center">어려움</td><td class="t-center t-ok">✓ 자연스러움</td></tr>
+        <tr><td>빈 폴링 낭비</td><td class="t-center t-ok">없음</td><td class="t-center t-no">있음 (롱 폴링으로 완화)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>소비자 재조정 (Consumer Rebalancing)</h4>
+  <ul>
+    <li>소비자가 그룹에 합류하거나 이탈하면 파티션 배정을 다시 계산해야 한다. 이 과정을 소비자 재조정이라 한다.</li>
+    <li>원본 노트는 이 절을 보류 상태로 남겨 두었으므로, 이 정리본에서도 개념만 짚고 상세는 다루지 않는다.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이 주제는 노트가 비어 있다 <span class="badge b-red">원문 미완</span></p>
+      <p>원본 노트의 "소비자 재조정" 절은 <b>"보류.."</b>로 끝난다. 추측으로 채우지 않고 그대로 둔다. 다시 공부할 때 채워야 할 지점 — 코디네이터의 역할, 재조정 중 소비 중단(stop-the-world), 그리고 이를 완화하는 증분 협력 재조정(incremental cooperative rebalancing).</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>DB가 아니라 append-only WAL + 세그먼트가 메시지 저장의 정답이다.</li>
+      <li>HDD가 느린 것은 무작위 접근일 때뿐, 순차 접근에서는 충분히 빠르다.</li>
+      <li>메시지 자료구조는 세 컴포넌트 간의 계약이며, 변경 없이 흘려보내는 것이 성능의 핵심.</li>
+      <li>key로 파티션이 정해지므로, key 설계가 곧 순서 보장 범위 설계다.</li>
+      <li>라우팅 계층을 생산자에 편입하면 지연이 줄고 일괄처리가 가능해진다.</li>
+      <li>푸시 대신 풀 — 소비자가 속도를 쥐고, 빈 폴링은 롱 폴링으로 완화한다.</li>
+    </ul>
+  </div>
+</article>

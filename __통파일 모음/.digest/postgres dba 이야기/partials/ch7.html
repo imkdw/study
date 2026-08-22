@@ -1,0 +1,921 @@
+<article class="item" id="item-7-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-2</div>
+    <h3>데이터베이스 모니터링</h3>
+    <p class="item-tagline">누적값은 정보가 아니다. <b>델타</b>와 <b>초당 값</b>으로 바꾸는 순간부터 지표가 된다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>pg_stat_database</code>의 모든 카운터는 <b>인스턴스 기동 이후의 누적값</b>이다. 두 시점을 빼서 주기당 증가량으로 바꿔야 비로소 의미가 생긴다.
+  </div>
+
+  <h4>데이터베이스 모니터링</h4>
+  <ul>
+    <li>PostgreSQL은 Top-Down 방식의 모니터링을 적용하기 어렵다. <b>세션 레벨에서 제공되는 성능 데이터가 충분하지 않기 때문</b>이다.</li>
+    <li>아직 세션 단위의 성능 지표는 제공하지 않지만, DB 전체의 일량 확인은 가능하므로 여러 정보를 얻을 수 있다.</li>
+  </ul>
+
+  <h4><code>pg_stat_database</code> 뷰를 활용한 성능 모니터링</h4>
+  <ul>
+    <li>DB 레벨의 성능 정보를 제공하는 뷰다.</li>
+    <li>모니터링 관점에서는 누적값보다 <b>모니터링 주기 내 증가량(델타값)</b>과 이를 초 단위로 환산한 <b>초당 처리량</b>이 더 의미 있다.</li>
+    <li>자체 모니터링 시스템을 구축할 때는 이 델타값과 초당 값을 쓰는 편이 좋다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>컬럼</th><th>의미</th><th>이 값이 튀면</th></tr></thead>
+      <tbody>
+        <tr><td><code>numbackends</code></td><td>현재 이 DB에 접속 중인 백엔드 프로세스 수</td><td>커넥션 풀 설정이나 누수를 본다</td></tr>
+        <tr><td><code>xact_commit</code></td><td>커밋 횟수</td><td>커밋은 트랜잭션 보장을 위한 필수 요소지만, <b>지나치게 빈번한 커밋은 성능에 악영향</b>을 준다</td></tr>
+        <tr><td><code>blks_read</code></td><td>디스크에서 읽은 블록 수</td><td>인덱스가 없는 테이블을 풀 스캔할 때 급격히 증가한다</td></tr>
+        <tr><td><code>blks_hit</code></td><td>공유 버퍼에서 읽은 블록 수</td><td>비정상적으로 높다면 비효율적인 쿼리가 돌고 있을 가능성이 높다</td></tr>
+        <tr><td><code>active_time</code></td><td>쿼리 수행 시간</td><td>DB가 실제로 일한 시간의 총량</td></tr>
+        <tr><td><code>stats_reset</code></td><td><code>pg_stat_reset()</code>으로 초기화된 시간</td><td>누적값의 기준점. 이 값이 언제인지 모르면 위 숫자들은 해석할 수 없다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">&ldquo;공유 버퍼 히트가 높으면 좋은 것 아닌가&rdquo; <span class="badge b-blue">보강</span></p>
+      <p>비율로 보면 그렇지만, <b>절대량</b>으로 보면 다르다. <code>blks_hit</code>이 크다는 것은 그만큼 많은 블록을 &ldquo;만졌다&rdquo;는 뜻이고, 메모리 읽기도 CPU를 쓴다. 인덱스 없이 캐시된 테이블을 반복 풀스캔하는 쿼리는 디스크 I/O 없이도 CPU를 태운다. 이 관점은 <a href="#item-7-4">7-4</a>의 <code>shared_blks_hit</code> 상위 쿼리부터 튜닝하라는 조언과 <a href="#item-7-5">7-5</a>의 <code>client backend / normal</code> 비중 해석으로 그대로 이어진다.</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">델타 계산을 SQL 한 줄로 <span class="badge b-blue">보강</span></p>
+      <p>모니터링 도구가 없다면 <code>stats_reset</code> 이후 경과 시간으로 나눠 평균 초당 값을 구할 수 있다. 정확한 주기별 델타는 아니지만 기준선을 잡는 데는 충분하다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">select datname,
+       xact_commit,
+       round(xact_commit / extract(epoch from now() - stats_reset)) as commit_per_sec,
+       round(blks_read  / extract(epoch from now() - stats_reset)) as read_blk_per_sec
+from   pg_stat_database
+where  datname is not null and stats_reset is not null;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>PostgreSQL은 세션 단위 성능 지표가 약해 Top-Down 분석이 어렵다. DB 전체 일량부터 잡는다.</li>
+      <li><code>pg_stat_database</code>는 누적 카운터다. 델타와 초당 값으로 바꿔서 본다.</li>
+      <li><code>blks_read</code>는 디스크, <code>blks_hit</code>은 메모리. 둘 다 절대량이 크면 문제 신호다.</li>
+      <li><code>stats_reset</code>을 확인하지 않으면 나머지 숫자는 해석할 수 없다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-3</div>
+    <h3>세션 모니터링</h3>
+    <p class="item-tagline"><code>pg_stat_activity</code> 없이는 모니터링을 할 수 없다고 해도 과언이 아니다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이 뷰 하나에 <b>누가(usename/client_addr) 무엇을(query) 언제부터(xact_start/query_start) 왜 못 하고 있는지(wait_event)</b>가 전부 들어 있다.
+  </div>
+
+  <h4>세션 모니터링</h4>
+  <ul>
+    <li>DB 성능 모니터링에서 가장 핵심적인 요소가 세션 모니터링이다.</li>
+    <li>접속 중인 세션, 쿼리 수행 정보 등 다양한 내용을 확인할 수 있다.</li>
+    <li><code>pg_stat_activity</code> 뷰로 세션 단위 모니터링을 수행한다.</li>
+  </ul>
+
+  <h4><code>pg_stat_activity</code> 뷰를 이용한 세션 모니터링</h4>
+  <ul>
+    <li>세션 레벨의 성능 정보를 제공하는 대표적인 뷰다.</li>
+    <li>성능 모니터링 관점에서 이 뷰 없이는 모니터링이 불가능하다고 할 만큼 필수적이다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>컬럼</th><th>쓰임</th></tr></thead>
+      <tbody>
+        <tr><td><code>datname</code></td><td>데이터베이스 이름. 대부분의 stat 정보는 인스턴스 단위로 수집되어 어느 DB에서 조회해도 값이 같으므로, 이 컬럼으로 DB를 식별한다</td></tr>
+        <tr><td><code>pid</code></td><td>백엔드 프로세스의 OS PID. OS 레벨에서 세션을 추적할 때 유용하다</td></tr>
+        <tr><td><code>usename</code></td><td>접속한 유저 이름. 유저별 접속 통계를 낼 때 쓴다</td></tr>
+        <tr><td><code>application_name</code></td><td>앱 이름. JDBC 기반 접속 여부를 식별하는 데 유용하다</td></tr>
+        <tr><td><code>client_addr</code></td><td>클라이언트 IP. WAS 서버별 접속 통계를 볼 때 쓴다</td></tr>
+        <tr><td><code>xact_start</code></td><td>트랜잭션 시작 시간. <b>트랜잭션 응답 시간을 파악하는 매우 중요한 지표</b></td></tr>
+        <tr><td><code>query_start</code></td><td>쿼리 시작 시간. 쿼리 응답 시간을 측정하는 핵심 컬럼</td></tr>
+        <tr><td><code>wait_event_type</code></td><td>대기 이벤트 유형. 병목 발생 위치를 대략적으로 파악한다</td></tr>
+        <tr><td><code>wait_event</code></td><td>구체적인 대기 이벤트</td></tr>
+        <tr><td><code>state</code></td><td>세션 상태. <code>active</code>, <code>idle</code>, <code>idle in transaction</code> 등</td></tr>
+        <tr><td><code>backend_xmin</code></td><td>쿼리 수행 시점의 XMIN 값</td></tr>
+        <tr><td><code>query_id</code></td><td>쿼리 ID. <code>compute_query_id</code>를 <code>on</code>으로 설정해야 값이 채워진다</td></tr>
+        <tr><td><code>query</code></td><td>현재 수행 중인 SQL 문장. 실시간 모니터링에 반드시 필요하다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">이 뷰에서 가장 먼저 찾아야 할 두 가지</p>
+      <p>첫째는 <code>state = 'idle in transaction'</code>이면서 <code>xact_start</code>가 오래된 세션이다. 이 세션 하나가 <a href="#item-2-2">CIC를 무한정 대기시키고</a>, <a href="#item-9-4">데이터베이스 전체의 Vacuum을 막는다</a>. 둘째는 <code>backend_xmin</code>이 가장 작은 세션이다. 이 값이 곧 Vacuum이 넘어설 수 없는 경계선이다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-file">오래된 트랜잭션 찾기</span><span class="code-spacer"></span></div>
+<pre><code class="language-sql">select pid, usename, state,
+       now() - xact_start  as xact_age,
+       now() - query_start as query_age,
+       backend_xmin, left(query, 60) as query
+from   pg_stat_activity
+where  state &lt;&gt; 'idle' and xact_start is not null
+order  by xact_start;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h5><code>extract(epoch from ...)</code></h5>
+  <p>타임스탬프 형식을 초 단위로 변환하는 함수다. 위와 같은 경과 시간 계산에서 반복적으로 쓰인다.</p>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# select extract (epoch from current_timestamp), current_timestamp;
+      extract      |       current_timestamp
+-------------------+-------------------------------
+ 1762525376.086389 | 2025-11-07 14:22:56.086389+00
+(1 row)</code></pre>
+  </div>
+
+  <h5><code>pg_blocking_pids</code> 함수</h5>
+  <p>현재 세션을 블로킹하고 있는 세션의 PID를 알려준다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">블로킹 관계를 한 번에 펼치기 <span class="badge b-blue">보강</span></p>
+      <p><a href="#item-2-2">2-2</a>에서 본 <code>blocked_pid</code> / <code>blocking_query</code> 형태의 출력은 이 함수로 만든다. <code>pg_locks</code>를 직접 조인하는 것보다 훨씬 간단하다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">select a.pid           as blocked_pid,
+       a.wait_event_type || ':' || a.wait_event as waiting_on,
+       left(a.query, 50) as blocked_query,
+       b.pid           as blocking_pid,
+       b.state         as blocking_state,
+       left(b.query, 50) as blocking_query
+from   pg_stat_activity a
+join   lateral unnest(pg_blocking_pids(a.pid)) as bp(pid) on true
+join   pg_stat_activity b on b.pid = bp.pid
+where  cardinality(pg_blocking_pids(a.pid)) &gt; 0;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>pg_stat_activity</code> 하나로 접속 주체 / 수행 쿼리 / 경과 시간 / 대기 원인을 모두 본다.</li>
+      <li><code>state</code>와 <code>xact_start</code>로 <code>idle in transaction</code> 장기 세션을 잡는 것이 첫 번째 일이다.</li>
+      <li><code>backend_xmin</code>은 Vacuum의 삭제 경계선과 직결된다.</li>
+      <li>블로킹 관계는 <code>pg_blocking_pids()</code>로 펼치는 것이 가장 간단하다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-4</div>
+    <h3>SQL 모니터링</h3>
+    <p class="item-tagline">느린 쿼리 한 개보다 <b>빠른 쿼리 백만 개</b>가 시스템을 더 자주 무너뜨린다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>log_min_duration_statement</code>는 <b>한 번이 느린 쿼리</b>를, <code>pg_stat_statements</code>는 <b>합쳐서 느린 쿼리</b>를 잡는다. 둘은 겹치지 않는다.
+  </div>
+
+  <h4>SQL 모니터링</h4>
+  <ul>
+    <li>DB 성능을 개선하는 활동은 OS 레벨, 인스턴스 레벨 등 매우 다양하다.</li>
+    <li>하지만 가장 직접적인 효과를 주는 것은 <b>SQL 튜닝</b>이다.</li>
+    <li>1회 수행 시 응답 시간이 느린 쿼리, 반복 수행으로 시스템 자원을 과도하게 쓰는 쿼리 등이 대상이다.</li>
+  </ul>
+
+  <h4>1회 수행 시 응답시간이 느린 쿼리 모니터링</h4>
+  <ul>
+    <li><code>log_min_duration_statement</code> 값보다 오래 실행된 쿼리는 자동으로 로그 파일에 기록된다.</li>
+    <li>1000으로 설정하면 1초 이상 수행된 쿼리가 기록된다.</li>
+    <li>바인드 방식으로 실행된 쿼리는 바인드 변수에 입력된 실제 값도 함께 기록된다.</li>
+    <li>주의할 점은 <b>정상적으로 처리된 쿼리만</b> 로그에 남는다는 것이다.</li>
+  </ul>
+
+  <h5>슬로우 쿼리 확인 방법</h5>
+  <p>MySQL처럼 별도의 슬로우 쿼리 파일을 제공하지 않으므로, 일반 로그 파일에서 <code>duration</code> 키워드로 검색해야 한다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 1초 이상 걸린 쿼리를 로그 파일에 기록
+postgres=# SET log_min_duration_statement = 1000;
+
+-- 5초 동안 대기
+postgres=# SELECT pg_sleep(5);</code></pre>
+  </div>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">root@dff5953eda06:/var/lib/postgresql/data/log# cat postgresql-2025-11-07_143835.log
+# ...
+2025-11-07 14:39:03.759 UTC [41] STATEMENT:  select sleep(5);
+2025-11-07 14:39:11.640 UTC [41] LOG:  duration: 5006.742 ms  statement: select pg_sleep(5);</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">&ldquo;정상 처리된 쿼리만 남는다&rdquo;가 뜻하는 것</p>
+      <p><code>log_min_duration_statement</code>는 쿼리가 <b>끝났을 때</b> 소요 시간을 판단해 기록한다. 그래서 취소되거나 타임아웃으로 죽은 쿼리, 지금 이 순간 몇 시간째 돌고 있는 쿼리는 이 로그에 없다. <b>지금 도는 것</b>은 <a href="#item-7-3">7-3</a>의 <code>pg_stat_activity</code>로, <b>끝난 것</b>은 이 로그로 본다.</p>
+    </div>
+  </div>
+
+  <h4>런타임 실행계획 확인: auto_explain 활용</h4>
+  <ul>
+    <li><code>explain (analyze, buffers)</code>로 쿼리 실행 시의 실행 계획과 일량을 직접 분석할 수 있다.</li>
+    <li>그런데 쿼리를 다시 실행하면 매우 빠르게 끝나는 경우가 있다. 이럴 때는 <b>로그에 기록된 시점의 실행 계획과 현재의 실행 계획을 비교</b>해서, 응답 시간 차이가 실행 계획 변경 때문인지 디스크 I/O 때문인지 파악해야 한다.</li>
+    <li><code>auto_explain</code> 확장을 쓰면 일정 시간 이상 수행된 쿼리의 <b>실제 실행계획이 로그에 자동으로 기록</b>된다.</li>
+  </ul>
+
+  <h5>auto_explain 설정</h5>
+  <p>배치 환경에서는 60초, 온라인 환경에서는 10초 정도로 설정하고 점차 조정하면 된다.</p>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">postgresql.conf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-ini">shared_preload_libraries = 'pg_stat_statements, auto_explain'
+auto_explain.log_min_duration = 1s # 테스트를 위해서 1초로 설정
+auto_explain.log_analyze = on
+auto_explain.log_buffers = on</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>log_analyze = on</code>은 공짜가 아니다</p>
+      <p><code>auto_explain.log_analyze</code>를 켜면 <b>모든</b> 쿼리에 실행 계측이 붙는다(로그에 남는 것만이 아니다). 짧은 쿼리가 초당 수천 번 도는 OLTP에서는 이 오버헤드가 무시하기 어렵다. <code>auto_explain.log_timing = off</code>로 노드별 타이밍만 꺼도 부담이 크게 줄어든다. 운영에 넣기 전에 <code>pg_test_timing</code>으로 이 서버의 타이밍 비용을 먼저 재보는 것이 좋다.</p>
+    </div>
+  </div>
+
+  <h5>테스트하기</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 1000만 건 데이터 삽입
+postgres=# INSERT INTO svc.t1 (c1, c2, c3, c4)
+SELECT
+    i,
+    CASE WHEN i % 5 = 0 THEN 'A|B'
+         WHEN i % 5 = 1 THEN 'X|Y'
+         WHEN i % 5 = 2 THEN 'P|Q'
+         WHEN i % 5 = 3 THEN 'M|N'
+         ELSE 'E|F' END,
+    CASE WHEN i % 4 = 0 THEN 'C|D'
+         WHEN i % 4 = 1 THEN 'G|H'
+         WHEN i % 4 = 2 THEN 'K|L'
+         ELSE 'R|S' END,
+    (i % 100) + 1
+FROM generate_series(3, 10000000) AS i;
+
+-- 조회
+postgres=# SELECT * FROM svc.t1 WHERE c2 = 'A|B' AND c3 = 'C|D';</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">postgresql.log &mdash; auto_explain이 남긴 실행계획</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">2025-11-07 14:45:55.296 UTC [41] LOG:  duration: 8468.651 ms  plan:
+        Query Text: INSERT INTO svc.t1 (c1, c2, c3, c4)
+        SELECT
+            i,
+            CASE WHEN i % 5 = 0 THEN 'A|B'
+                 WHEN i % 5 = 1 THEN 'X|Y'
+                 WHEN i % 5 = 2 THEN 'P|Q'
+                 WHEN i % 5 = 3 THEN 'M|N'
+                 ELSE 'E|F' END,
+            CASE WHEN i % 4 = 0 THEN 'C|D'
+                 WHEN i % 4 = 1 THEN 'G|H'
+                 WHEN i % 4 = 2 THEN 'K|L'
+                 ELSE 'R|S' END,
+            (i % 100) + 1
+        FROM generate_series(3, 10000000) AS i;
+        Insert on t1  (cost=0.00..549999.89 rows=0 width=0) (actual time=8468.606..8468.618 rows=0 loops=1)
+          Buffers: shared hit=10108092 dirtied=54055 written=89226, temp read=17090 written=17090
+          -&gt;  Function Scan on generate_series i  (cost=0.00..549999.89 rows=9999998 width=84) (actual time=554.658..1887.623 rows=9999998 loops=1)
+                Buffers: temp read=17090 written=17090
+        JIT:
+          Functions: 4
+          Options: Inlining true, Optimization true, Expressions true, Deforming true
+          Timing: Generation 0.384 ms (Deform 0.038 ms), Inlining 69.920 ms, Optimization 15.425 ms, Emission 16.581 ms, Total 102.310 ms
+2025-11-07 14:45:55.308 UTC [41] LOG:  duration: 8822.697 ms  statement: INSERT INTO svc.t1 (c1, c2, c3, c4)
+        ...</code></pre>
+  </div>
+
+  <p>같은 쿼리가 두 줄로 남은 것에 주목한다. 위쪽 <code>duration: 8468.651 ms plan:</code>은 <code>auto_explain</code>이, 아래쪽 <code>duration: 8822.697 ms statement:</code>는 <code>log_min_duration_statement</code>가 남긴 것이다. 계획 안의 <code>Buffers: shared hit=10108092 dirtied=54055 written=89226</code>과 <code>temp read=17090 written=17090</code>이 이 INSERT의 실제 일량이다.</p>
+
+  <h4>반복 수행으로 과부하를 주는 쿼리 모니터링</h4>
+  <ul>
+    <li>보통 튜닝은 슬로우 쿼리부터 시작한다.</li>
+    <li>하지만 <b>응답 속도는 빠르지만 매우 자주 수행되는 쿼리</b>가 오히려 더 큰 부하를 유발하는 경우가 많다.</li>
+    <li>예를 들어 0.1초 걸리는 풀 스캔 쿼리는 인덱스를 만들면 0.0001초 이내로 개선할 수 있다.</li>
+    <li>실제로 디스크 I/O 사용률 개선에는 개별 슬로우 쿼리보다 <b>빈번하게 수행되는 쿼리의 최적화</b>가 더 효과적인 경우가 많다.</li>
+  </ul>
+
+  <h5>pg_stat_statements 설정하기</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">postgresql.conf</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-ini">pg_stat_statements.max = 10000
+pg_stat_statements.track = all
+track_activity_query_size = 64kb</code></pre>
+  </div>
+
+  <h5>쿼리 기본 정보 컬럼</h5>
+  <ul>
+    <li><code>userid</code> &mdash; 쿼리를 실행한 유저</li>
+    <li><code>dbid</code> &mdash; 쿼리가 실행된 DB ID</li>
+    <li><code>queryid</code> &mdash; 정규화된 쿼리의 해시값</li>
+    <li><code>query</code> &mdash; 정규화된 SQL 문장. 입력값은 변수로 치환된다</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">-- 기존 정보 초기화
+postgres=# select pg_stat_statements_reset();
+
+-- 쿼리 실행
+postgres=# select pg_sleep(1) from generate_series(1, 1) i;
+
+-- 쿼리 실행
+postgres=# select pg_sleep(2) from generate_series(2, 2) i;
+
+-- 쿼리 실행 후 정보 조회
+postgres=# select userid, dbid, queryid, query from pg_stat_statements order by stats_since limit 3;
+ userid | dbid |       queryid       |                       query
+--------+------+---------------------+----------------------------------------------------
+     10 |    5 | 5226144649890563814 | select pg_stat_statements_reset()
+     10 |    5 | 9077879155684233118 | select pg_sleep($1) from generate_series($2, $3) i
+     10 |    5 | 4463986769292944571 | select * from pg_stat_statements</code></pre>
+  </div>
+
+  <p>두 번 실행한 서로 다른 <code>pg_sleep</code> 쿼리가 <b>하나의 <code>queryid</code>로 합쳐진</b> 것이 정규화다. 상수가 <code>$1</code>, <code>$2</code>, <code>$3</code>으로 치환되어 &ldquo;같은 모양의 쿼리&rdquo;를 하나로 집계할 수 있게 된다.</p>
+
+  <h5>파싱 수행 정보 컬럼</h5>
+  <ul>
+    <li><code>pg_stat_statements.track_planning</code>을 켜면 파싱 관련 정보를 확인할 수 있다.</li>
+    <li>일반적으로 OLTP 서비스는 비활성화 상태로 운영해도 큰 문제가 없다.</li>
+    <li>다만 SQL이 길고 복잡한 경우에는 파싱 정보를 수집해 분석하는 것도 좋다.</li>
+  </ul>
+
+  <h5>응답 시간 정보 컬럼</h5>
+  <p><code>total_exec_time</code>으로 DB 내 전체 실행 시간 비중이 높은 Top 쿼리를 쉽게 식별할 수 있다.</p>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# select dbid, queryid, query, total_exec_time from pg_stat_statements order by total_exec_time desc limit 1;
+ dbid |       queryid       |                       query                        | total_exec_time
+------+---------------------+----------------------------------------------------+-----------------
+    5 | 9077879155684233118 | select pg_sleep($1) from generate_series($2, $3) i |     3010.985278</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>total_exec_time</code>과 <code>mean_exec_time</code>을 같이 본다 <span class="badge b-blue">보강</span></p>
+      <p><code>total_exec_time = calls × mean_exec_time</code>이다. 같은 <code>total</code>이라도 <b>calls가 크고 mean이 작은 쿼리</b>는 인덱스 추가로 극적으로 개선되고, <b>calls가 작고 mean이 큰 쿼리</b>는 실행계획을 뜯어봐야 한다. 이 항목 첫머리의 &ldquo;0.1초 × 백만 번&rdquo; 이야기가 정확히 전자다. 두 컬럼을 나란히 놓고 정렬해야 어느 쪽인지 갈린다.</p>
+    </div>
+  </div>
+
+  <h5>I/O 정보 컬럼</h5>
+  <p>쿼리 수행 시 발생하는 I/O 통계를 제공한다. 공유 버퍼 관련, Temporary 테이블 관련, 로컬 메모리 부족으로 인한 Temp 파일 I/O를 확인할 수 있다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>접두사</th><th>대상</th><th>튀었을 때의 해석</th></tr></thead>
+      <tbody>
+        <tr><td><code>shared_blks_hit</code></td><td>공유 버퍼 읽기</td><td>메모리 읽기도 CPU를 쓴다. <b>CPU 사용률을 낮추려면 이 값이 높은 쿼리부터</b> 튜닝하는 것이 효과적이다</td></tr>
+        <tr><td><code>shared_blks_read</code></td><td>디스크 읽기</td><td>인덱스가 없거나 비효율적인 인덱스를 쓰는 경우가 많다. 인덱스 추가나 쿼리 튜닝으로 개선한다</td></tr>
+        <tr><td><code>local_</code></td><td>Temporary 테이블</td><td><b>local은 Temp 테이블에 대한 I/O를 의미</b>한다는 점에 유의한다</td></tr>
+        <tr><td><code>temp_</code></td><td><code>work_mem</code> 부족으로 생긴 Temp 파일</td><td><code>work_mem</code>이 작아 정렬/해시 도중 메모리가 부족할 때 발생한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title"><code>local_</code>과 <code>temp_</code>는 이름이 헷갈리게 지어졌다</p>
+      <p>직관과 반대라서 실무에서 자주 뒤집혀 읽힌다. <code>local_</code>은 <b>Temp 테이블</b>(로컬 버퍼, <code>temp_buffers</code>가 담당), <code>temp_</code>는 <b>정렬/해시가 흘러넘쳐 만든 임시 파일</b>(<code>work_mem</code>이 담당)이다. 처방도 완전히 다르다. 앞은 <code>temp_buffers</code>, 뒤는 <code>work_mem</code>이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>느린 쿼리는 <code>log_min_duration_statement</code>, 자주 도는 쿼리는 <code>pg_stat_statements</code>로 잡는다.</li>
+      <li>로그는 끝난 쿼리만 남긴다. 지금 도는 것은 <code>pg_stat_activity</code>에 있다.</li>
+      <li><code>auto_explain</code>은 실제 실행계획을 남겨주지만 <code>log_analyze</code>의 계측 비용을 감수해야 한다.</li>
+      <li><code>total_exec_time</code>은 <code>calls</code>와 <code>mean_exec_time</code>으로 분해해서 봐야 처방이 갈린다.</li>
+      <li><code>local_</code> = Temp 테이블(<code>temp_buffers</code>), <code>temp_</code> = 정렬 임시 파일(<code>work_mem</code>).</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-5" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-5</div>
+    <h3>I/O 모니터링</h3>
+    <p class="item-tagline">대용량 스캔이 공유 버퍼를 쓸어버리지 못하게 막는 장치가 <b>링 버퍼</b>다. <code>pg_stat_io</code>는 그 장치가 언제 작동했는지를 보여준다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>pg_stat_io</code>의 <code>context</code>(normal / bulkread / bulkwrite / vacuum)는 곧 <b>버퍼 액세스 전략</b>이다. 어느 칸의 숫자가 큰지가 그대로 진단이 된다.
+  </div>
+
+  <h4>I/O 모니터링</h4>
+  <ul>
+    <li>I/O 모니터링은 성능 개선이나 성능 저하 시점 분석을 위한 필수 작업이다.</li>
+    <li>PostgreSQL 16부터 <code>pg_stat_io</code> 뷰를 제공해 시스템 레벨에서 I/O 성능을 모니터링할 수 있게 되었다.</li>
+  </ul>
+
+  <h4>버퍼 액세스 전략과 링 버퍼</h4>
+  <h5>버퍼 액세스 전략</h5>
+  <ul>
+    <li>I/O 유형에 따라 서로 다른 방식으로 버퍼에 접근하는 방법을 말한다.</li>
+    <li>전략을 나누는 이유는 <b>대용량 테이블을 읽거나 쓸 때 공유 버퍼 영역을 보호하기 위해서</b>다.</li>
+    <li>공유 버퍼가 10GB인 환경에서 10GB짜리 테이블을 풀스캔하면 버퍼가 바로 바닥난다.</li>
+  </ul>
+
+  <h5>버퍼 액세스 전략 유형</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>전략</th><th>사용 시점</th><th>링 버퍼</th><th>크기</th></tr></thead>
+      <tbody>
+        <tr><td><code>BAS_NORMAL</code></td><td>일반적인 버퍼 I/O</td><td class="t-center t-no">사용 안 함</td><td>&mdash;</td></tr>
+        <tr><td><code>BAS_BULKREAD</code></td><td>대용량 테이블 읽기</td><td class="t-center t-ok">사용</td><td>256 KB (32 블록)</td></tr>
+        <tr><td><code>BAS_BULKWRITE</code></td><td>대용량 파일의 COPY, CTAS</td><td class="t-center t-ok">사용</td><td>16 MB (2048 블록)</td></tr>
+        <tr><td><code>BAS_VACUUM</code></td><td>VACUUM 작업</td><td class="t-center t-ok">사용</td><td>2 MB (256 블록)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h5>대용량 테이블 판단 기준</h5>
+  <ul>
+    <li>테이블의 블록 수가 <b>전체 공유 버퍼 크기의 1/4을 초과</b>하면 대용량 테이블로 인식하고 <code>BULKREAD</code> 전략을 적용한다.</li>
+    <li>반대로 1/4 이내의 테이블은 Seq Scan을 수행해도 전체를 공유 버퍼에 적재할 수 있다.</li>
+  </ul>
+
+  <h5>링 버퍼란</h5>
+  <ul>
+    <li>원형으로 동작하는 버퍼 배열이다.</li>
+    <li>일정 크기의 버퍼 영역을 순환하며 사용해서, 대용량 스캔이 전체 공유 버퍼를 밀어내는 현상을 방지한다.</li>
+    <li>링 버퍼는 테이블 단위로 하나씩 할당되는 것이 아니라 <b>스캔이 시작될 때마다 하나씩</b> 할당된다.</li>
+  </ul>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">VACUUM 링 버퍼는 이제 조절할 수 있다 <span class="badge b-purple">최신 반영</span></p>
+      <p>PostgreSQL 16부터 <code>vacuum_buffer_usage_limit</code> 파라미터가 생겼다. 기본값은 위 표와 같은 <b>2MB</b>이고, <code>128kB</code>~<code>16GB</code> 범위에서 조절할 수 있으며 <code>0</code>으로 두면 링 버퍼 없이 공유 버퍼를 마음껏 쓴다(단 <code>shared_buffers</code>의 1/8을 넘으면 조용히 잘린다). 개별 명령에서는 <code>VACUUM (BUFFER_USAGE_LIMIT '256MB') tbl;</code>처럼 덮어쓸 수 있다. 서비스가 멈춘 정기 점검 시간에 대용량 테이블 Vacuum을 빨리 끝내야 한다면 이 값을 크게 잡는 것이 가장 직접적인 수단이다.</p>
+    </div>
+  </div>
+
+  <h4><code>pg_stat_io</code> 뷰를 이용한 시스템 레벨 I/O 분석</h4>
+  <ul>
+    <li>이 뷰로 시스템 레벨의 I/O 성능을 체계적으로 모니터링하고 병목 지점을 분석할 수 있다.</li>
+    <li>프로세스를 여러 유형으로 분류한 뒤, 유형별로 오브젝트 유형과 버퍼 액세스 전략에 따른 성능 지표를 제공한다.</li>
+  </ul>
+
+  <h5>뷰의 구조</h5>
+  <ul>
+    <li>오브젝트 유형은 <code>relation</code>과 <code>temp relation</code> 두 가지다.
+      <ul>
+        <li><code>relation</code> &mdash; 테이블 및 인덱스</li>
+        <li><code>temp relation</code> &mdash; Temporary 테이블 및 인덱스</li>
+      </ul>
+    </li>
+    <li><code>context</code>는 버퍼 액세스 전략과 동일한 normal, bulkread, bulkwrite, vacuum 네 가지다.</li>
+    <li><code>_time</code>으로 끝나는 컬럼은 <code>track_io_timing</code>이 <code>on</code>이어야 채워진다.</li>
+    <li>모든 시간 단위는 1/1000초(밀리초) 기준이다.</li>
+  </ul>
+
+  <h5>시간 정보 활성화 시 고려사항</h5>
+  <ul>
+    <li>I/O 성능을 정확히 분석하려면 I/O 처리 시간 정보가 반드시 필요하다.</li>
+    <li>시스템 상황에 따라 처리 시간이 달라진다면, 실행계획 변경보다 <b>시스템 레벨에서 발생한 다른 영향</b>을 의심해야 한다.</li>
+    <li>처리 시간 정보는 병목 분석에 매우 유용한 단서이며 <code>track_io_timing</code>이 <code>on</code>이어야 한다.</li>
+    <li>다만 오버헤드를 유발할 수 있으므로 <code>pg_test_timing</code> 유틸리티로 사전에 테스트가 필요하다.</li>
+  </ul>
+
+  <h4>패턴별 해석</h4>
+  <p><code>backend_type</code> × <code>context</code> 조합을 읽는 법이다. 이 표가 <code>pg_stat_io</code> 활용의 전부라고 해도 좋다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>어느 칸이 높은가</th><th>원인</th><th>조치</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>client backend</code> × <code>normal</code></td>
+          <td>버퍼 캐시의 25%보다 <b>작은</b> 테이블에 대한 반복 Seq Scan. 블록 전체를 공유 버퍼에 올릴 수 있으므로 링 버퍼를 쓰지 않는다</td>
+          <td>동일 테이블 반복 Seq Scan이 확인되면 적절한 인덱스를 생성한다</td>
+        </tr>
+        <tr>
+          <td><code>client backend</code> × <code>bulkread</code></td>
+          <td>버퍼 캐시의 25%보다 <b>큰</b> 대용량 테이블에 대한 반복 Seq Scan. 자동으로 bulkread 전략과 링 버퍼가 적용된다</td>
+          <td>불필요한 Seq Scan인지 판단하고 인덱스 생성이나 쿼리 튜닝을 한다</td>
+        </tr>
+        <tr>
+          <td><code>client backend</code> × <code>bulkwrite</code></td>
+          <td>대용량 파일의 COPY 및 CTAS 작업</td>
+          <td>DB 이행/적재 과정의 정상 작업이므로 별도 조치는 불필요하다. 다만 <b>작업 스케줄이 서비스 시간과 겹치지 않는지</b>만 확인한다</td>
+        </tr>
+        <tr>
+          <td><code>client backend</code> × <code>temp relation</code></td>
+          <td><code>temp_buffers</code>로 설정된 로컬 메모리 공간이 부족하다</td>
+          <td>필요 이상의 데이터를 Temp 테이블로 처리하는지 점검하고, 실제로 필요하다면 <code>temp_buffers</code>를 늘린다</td>
+        </tr>
+        <tr>
+          <td><code>background worker</code> × <code>bulkread</code></td>
+          <td>일정 크기 이상의 테이블에 병렬 프로세스가 Seq Scan을 수행했다</td>
+          <td>PostgreSQL이 테이블 크기에 따라 자동으로 병렬 쿼리를 실행하면서 background worker가 동작한 것이다</td>
+        </tr>
+        <tr>
+          <td><code>autovacuum worker</code> × <code>vacuum</code></td>
+          <td>Vacuum 대상 테이블이 많거나 동시 수행 프로세스가 많다</td>
+          <td>중요 시간대에 서비스 응답 시간에 영향을 준다고 판단되면 일시적으로 관련 파라미터를 끄고 프로세스를 정리한다</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4><code>pg_stat_all_tables</code>, <code>pg_statio_all_tables</code>를 이용한 테이블 I/O 분석</h4>
+  <ul>
+    <li><code>pg_stat_all_tables</code> &mdash; 액세스 패턴별 수행 횟수, 명령어별 수행 건수 등 다양한 정보를 제공한다.</li>
+    <li><code>pg_statio_all_tables</code> &mdash; 테이블 및 인덱스에 대한 I/O 블록 수를 제공한다.</li>
+    <li>Seq Scan으로 빈번하게 접근하는 테이블을 추출할 때는, <b>수행 횟수뿐 아니라 레코드 수 등 여러 지표를 같이 봐야</b> 영향도를 제대로 판단할 수 있다.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">횟수만 보면 작은 코드 테이블에 속는다 <span class="badge b-blue">보강</span></p>
+      <p><code>seq_scan</code>이 아무리 커도 10행짜리 코드 테이블이면 문제가 아니다. 봐야 할 것은 <code>seq_tup_read / seq_scan</code>, 즉 <b>한 번 스캔할 때 몇 행을 읽는가</b>다. 이 값이 크면서 <code>seq_scan</code>도 큰 테이블이 진짜 인덱스가 필요한 테이블이다.</p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">select relname, seq_scan, seq_tup_read,
+       seq_tup_read / nullif(seq_scan, 0) as tup_per_scan,
+       idx_scan
+from   pg_stat_all_tables
+where  seq_scan &gt; 0
+order  by seq_tup_read desc
+limit  10;</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h4><code>pg_stat_wal</code> 뷰를 이용한 WAL I/O 모니터링</h4>
+  <ul>
+    <li>성능 모니터링에서 WAL I/O 모니터링은 매우 중요하다.</li>
+    <li>WAL 파일은 보통 별도 볼륨으로 구성하므로 OS 모니터링으로도 현황을 볼 수 있다.</li>
+    <li>하지만 성능 분석을 위해서는 <b>초당 발생하는 WAL 크기</b>와 <b>Full Page Write 발생 횟수</b> 정보가 필요하다.</li>
+    <li><code>_time</code>으로 끝나는 컬럼은 <code>track_wal_io_timing</code>이 <code>on</code>이어야 한다.</li>
+  </ul>
+
+  <h5>WAL 파일 덤프 예제</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">root@b20fa9478609:~# pg_waldump 000000010000000000000005
+rmgr: ReplicationOrigin len (rec/tot):     42/    42, tx:      89217, lsn: 0/059AF6C0, prev 0/059AF680, desc: SET set 3; lsn 0/404F740; force: 1
+rmgr: Heap2       len (rec/tot):    269/   269, tx:      89217, lsn: 0/059AF6F0, prev 0/059AF6C0, desc: MULTI_INSERT ntuples: 12, flags: 0x0A, offsets: [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48], blkref #0: rel 1663/5/16389 blk 1
+rmgr: Transaction len (rec/tot):     57/    57, tx:      89217, lsn: 0/059AF800, prev 0/059AF6F0, desc: ABORT 2025-11-08 07:11:01.270996 UTC; origin: node 3, lsn 0/0, at 2025-11-08 07:11:01.234018 UTC
+pg_waldump: error: error in WAL record at 0/59AF800: invalid record length at 0/59AF840: expected at least 24, got 0</code></pre>
+  </div>
+
+  <p>마지막 줄의 에러는 고장이 아니다. <b>아직 쓰이지 않은 WAL 영역에 도달했다</b>는 뜻으로, 현재 기록 중인 세그먼트를 덤프하면 정상적으로 나타난다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>버퍼 액세스 전략은 대용량 스캔으로부터 공유 버퍼를 지키는 장치다. NORMAL을 뺀 셋이 링 버퍼를 쓴다.</li>
+      <li>대용량 기준선은 <b>공유 버퍼의 1/4</b>. 이 선을 넘으면 자동으로 bulkread로 넘어간다.</li>
+      <li><code>pg_stat_io</code>는 <code>backend_type</code> × <code>context</code> 표로 읽는다. 어느 칸이 큰지가 곧 진단이다.</li>
+      <li>16부터 Vacuum 링 버퍼는 <code>vacuum_buffer_usage_limit</code>으로 조절할 수 있다.</li>
+      <li>테이블 Seq Scan 판단은 횟수가 아니라 <code>seq_tup_read / seq_scan</code>으로.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-6" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-6</div>
+    <h3>복제 모니터링</h3>
+    <p class="item-tagline">지연은 <b>시간</b>과 <b>용량</b> 두 축으로 봐야 한다. 그리고 어느 단계에서 밀렸는지까지.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <code>sent → write → flush → replay</code> 네 개의 LSN이 곧 복제의 파이프라인이다. 인접한 두 LSN의 간격이 <b>어느 구간에서 막혔는지</b>를 말해준다.
+  </div>
+
+  <h4>복제 모니터링</h4>
+  <ul>
+    <li>복제는 일반적으로 비동기 방식을 사용한다.</li>
+    <li>대량의 트랜잭션이 발생하면 복제 지연이 생긴다.</li>
+    <li>지연이 발생하면 <b>복제 지연된 WAL 용량</b>과 <b>복제 지연 시간</b>을 함께 분석해야 한다.</li>
+    <li>각 단계별 지연 정도도 확인이 필요하며 <code>pg_stat_replication</code> 뷰로 확인한다.</li>
+  </ul>
+
+  <h4><code>pg_stat_replication</code>을 이용한 복제 지연 분석</h4>
+  <ul>
+    <li>복제 지연 시간은 <code>_lag</code>로 끝나는 3개 컬럼으로 확인한다.</li>
+    <li>각 단계별 LSN 값의 차이로 복제 지연 용량도 확인할 수 있다.</li>
+    <li>차이 계산은 <code>pg_wal_lsn_diff()</code> 함수를 쓴다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">pg_stat_replication 구조</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# \d pg_stat_replication;
+                    View "pg_catalog.pg_stat_replication"
+      Column      |           Type           | Collation | Nullable | Default
+------------------+--------------------------+-----------+----------+---------
+ pid              | integer                  |           |          |
+ usesysid         | oid                      |           |          |
+ usename          | name                     |           |          |
+ application_name | text                     |           |          |
+ client_addr      | inet                     |           |          |
+ client_hostname  | text                     |           |          |
+ client_port      | integer                  |           |          |
+ backend_start    | timestamp with time zone |           |          |
+ backend_xmin     | xid                      |           |          |
+ state            | text                     |           |          |
+ sent_lsn         | pg_lsn                   |           |          |
+ write_lsn        | pg_lsn                   |           |          |
+ flush_lsn        | pg_lsn                   |           |          |
+ replay_lsn       | pg_lsn                   |           |          |
+ write_lag        | interval                 |           |          |
+ flush_lag        | interval                 |           |          |
+ replay_lag       | interval                 |           |          |
+ sync_priority    | integer                  |           |          |
+ sync_state       | text                     |           |          |
+ reply_time       | timestamp with time zone |           |          |</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  C["current_wal_lsn<br>(마스터가 쓴 위치)"] --> S["sent_lsn<br>보냈다"]
+  S --> W["write_lsn<br>리플리카 OS 캐시"]
+  W --> F["flush_lsn<br>리플리카 디스크"]
+  F --> R["replay_lsn<br>공유 버퍼에 적용"]
+      </pre>
+    </div>
+    <div class="figure-cap"><b>어느 화살표가 벌어졌는지가 원인을 가리킨다</b> &mdash; <code>current</code>↔<code>sent</code>는 네트워크/발송, <code>write</code>↔<code>flush</code>는 리플리카 디스크 쓰기, <code>flush</code>↔<code>replay</code>는 복구 적용 지연이다. 마지막 구간이 벌어졌다면 리플리카에서 도는 긴 쿼리와의 충돌을 의심한다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">시간과 용량을 한 화면에 <span class="badge b-blue">보강</span></p>
+      <div class="code">
+        <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div><span class="code-spacer"></span></div>
+<pre><code class="language-sql">select application_name, state, sync_state,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn))   as sent_gap,
+       pg_size_pretty(pg_wal_lsn_diff(sent_lsn,  flush_lsn))             as flush_gap,
+       pg_size_pretty(pg_wal_lsn_diff(flush_lsn, replay_lsn))            as replay_gap,
+       write_lag, flush_lag, replay_lag
+from   pg_stat_replication;</code></pre>
+      </div>
+      <p><code>_lag</code> 컬럼(시간)만 보면 트래픽이 없을 때 0으로 보여 안심하게 되고, LSN 차이(용량)만 보면 얼마나 오래 밀렸는지 알 수 없다. 두 축을 같이 봐야 한다. 그리고 <code>pg_stat_replication</code>은 <b>마스터에서만</b> 조회할 수 있다는 점도 기억해둔다. 리플리카 쪽 시선이 필요하면 <code>pg_stat_wal_receiver</code>를 본다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>지연은 <code>_lag</code>(시간)와 LSN 차이(용량) 두 축으로 함께 본다.</li>
+      <li>sent / write / flush / replay 중 어느 구간이 벌어졌는지가 원인을 좁혀준다.</li>
+      <li><code>replay</code>만 밀린다면 리플리카에서 도는 긴 쿼리와의 충돌을 먼저 의심한다.</li>
+      <li>이 뷰는 마스터 전용이다. 리플리카에서는 <code>pg_stat_wal_receiver</code>를 쓴다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-7-7" data-spy>
+  <header class="item-head">
+    <div class="item-num">7-7</div>
+    <h3>작업 진행 상황 모니터링</h3>
+    <p class="item-tagline">&ldquo;이거 언제 끝나요&rdquo;에 답할 수 있게 해주는 뷰들. <code>phase</code> 컬럼 하나가 절반이다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    진행률은 <code>blks_done / blks_total</code>이지만, 정말 봐야 할 것은 <code>phase</code>다. <b>어느 단계에서 멈춰 있는가</b>가 남은 시간을 결정한다.
+  </div>
+
+  <h4>작업 진행 상황 모니터링</h4>
+  <ul>
+    <li>PostgreSQL은 <code>progress</code> 뷰들로 인덱스 생성, Vacuum 등의 진행 상황을 실시간 모니터링할 수 있게 해준다.</li>
+    <li>대용량 작업의 완료 시점을 예측하거나 작업이 정상적으로 수행되는지 확인하는 데 유용하다.</li>
+  </ul>
+
+  <h4>인덱스 진행 상황 모니터링</h4>
+  <ul>
+    <li><code>pg_stat_progress_create_index</code> 뷰로 인덱스 생성 작업의 현재 상태를 실시간 확인한다.</li>
+    <li><code>phase</code> 컬럼으로 단계별 진행률을 볼 수 있다.
+      <ul>
+        <li><code>scanning table</code></li>
+        <li><code>sorting live tuples</code></li>
+        <li><code>loading tuples in tree</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# \d pg_stat_progress_create_index;
+        View "pg_catalog.pg_stat_progress_create_index"
+       Column       |  Type   | Collation | Nullable | Default
+--------------------+---------+-----------+----------+---------
+ pid                | integer |           |          |
+ datid              | oid     |           |          |
+ datname            | name    |           |          |
+ relid              | oid     |           |          |
+ index_relid        | oid     |           |          |
+ command            | text    |           |          |
+ phase              | text    |           |          |
+ lockers_total      | bigint  |           |          |
+ lockers_done       | bigint  |           |          |
+ current_locker_pid | bigint  |           |          |
+ blocks_total       | bigint  |           |          |
+ blocks_done        | bigint  |           |          |
+ tuples_total       | bigint  |           |          |
+ tuples_done        | bigint  |           |          |
+ partitions_total   | bigint  |           |          |
+ partitions_done    | bigint  |           |          |</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">CIC가 안 끝날 때 봐야 할 컬럼은 따로 있다 <span class="badge b-blue">보강</span></p>
+      <p><code>blocks_done</code>이 멈춰 있고 <code>lockers_total</code>/<code>lockers_done</code>/<code>current_locker_pid</code>에 값이 있다면, 인덱스 생성이 <b>느린 것이 아니라 기다리는 중</b>이다. <code>current_locker_pid</code>가 가리키는 세션이 <a href="#item-2-2">2-2</a>에서 말한 &ldquo;대상 테이블과 무관한 장기 트랜잭션&rdquo;의 정체다. 그 PID를 <a href="#item-7-3">7-3</a>의 <code>pg_stat_activity</code>에 넣어 확인한다.</p>
+    </div>
+  </div>
+
+  <h4>Vacuum 진행 상황 모니터링</h4>
+  <ul>
+    <li>수동 및 Autovacuum 작업의 진행 상황은 <code>pg_stat_progress_vacuum</code> 뷰로 실시간 확인한다.</li>
+    <li>대용량 테이블의 Vacuum은 <b>인덱스 정리 단계</b>에서 특히 오래 걸린다.</li>
+    <li>진행률뿐 아니라 <code>maintenance_work_mem</code> 값이 적절한지도 판단할 수 있다.</li>
+    <li>실무에서 매우 유용한 모니터링 도구다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# \d pg_stat_progress_vacuum;
+            View "pg_catalog.pg_stat_progress_vacuum"
+        Column        |  Type   | Collation | Nullable | Default
+----------------------+---------+-----------+----------+---------
+ pid                  | integer |           |          |
+ datid                | oid     |           |          |
+ datname              | name    |           |          |
+ relid                | oid     |           |          |
+ phase                | text    |           |          |
+ heap_blks_total      | bigint  |           |          |
+ heap_blks_scanned    | bigint  |           |          |
+ heap_blks_vacuumed   | bigint  |           |          |
+ index_vacuum_count   | bigint  |           |          |
+ max_dead_tuple_bytes | bigint  |           |          |
+ dead_tuple_bytes     | bigint  |           |          |
+ num_dead_item_ids    | bigint  |           |          |
+ indexes_total        | bigint  |           |          |
+ indexes_processed    | bigint  |           |          |</code></pre>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title"><code>index_vacuum_count</code>가 <code>maintenance_work_mem</code>을 말해준다 <span class="badge b-blue">보강</span></p>
+      <p>Vacuum은 죽은 튜플의 위치를 메모리에 모았다가 가득 차면 <b>인덱스를 한 바퀴 돌고</b> 비운 뒤 다시 모은다. 그래서 <code>index_vacuum_count</code>가 1보다 크다는 것은 <b>메모리가 부족해 인덱스를 여러 번 훑었다</b>는 뜻이고, 이것이 대용량 테이블 Vacuum이 느려지는 대표적인 이유다. <code>maintenance_work_mem</code>(기본 64MB)을 키우면 이 횟수가 줄어든다. PostgreSQL 17부터는 <b>Vacuum의 메모리가 1GB로 묶여 있던 제약도 사라져</b> 큰 값을 주는 것이 실제로 의미가 있어졌다. <code>max_dead_tuple_bytes</code>와 <code>dead_tuple_bytes</code>를 나란히 보면 지금 얼마나 찼는지 알 수 있다.</p>
+    </div>
+  </div>
+
+  <h4>Vacuum Full 진행 상황 모니터링</h4>
+  <ul>
+    <li><code>pg_stat_progress_cluster</code> 뷰로 확인한다.</li>
+    <li>이런 작업은 락 경합 때문에 일반적으로 정기 점검처럼 서비스 중단이 가능한 시점에 수행한다.</li>
+    <li>그래서 <b>제한된 시간 내에 완료 가능한지</b> 판단하기 위해 현재 수행 단계와 전체 진행률을 모니터링하는 것이 중요하다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# \d pg_stat_progress_cluster;
+           View "pg_catalog.pg_stat_progress_cluster"
+       Column        |  Type   | Collation | Nullable | Default
+---------------------+---------+-----------+----------+---------
+ pid                 | integer |           |          |
+ datid               | oid     |           |          |
+ datname             | name    |           |          |
+ relid               | oid     |           |          |
+ command             | text    |           |          |
+ phase               | text    |           |          |
+ cluster_index_relid | oid     |           |          |
+ heap_tuples_scanned | bigint  |           |          |
+ heap_tuples_written | bigint  |           |          |
+ heap_blks_total     | bigint  |           |          |
+ heap_blks_scanned   | bigint  |           |          |
+ index_rebuild_count | bigint  |           |          |</code></pre>
+  </div>
+
+  <h4>COPY 진행 상황 모니터링</h4>
+  <ul>
+    <li><code>pg_stat_progress_copy</code> 뷰로 확인한다.</li>
+    <li><code>\copy</code>와 <code>COPY</code> 사이에 큰 차이는 없다.</li>
+    <li>다만 <b><code>bytes_total</code>(처리 대상 파일의 전체 크기)은 <code>COPY</code>에서만</b> 확인할 수 있다.</li>
+  </ul>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-sql">postgres=# \d pg_stat_progress_copy;
+           View "pg_catalog.pg_stat_progress_copy"
+      Column      |  Type   | Collation | Nullable | Default
+------------------+---------+-----------+----------+---------
+ pid              | integer |           |          |
+ datid            | oid     |           |          |
+ datname          | name    |           |          |
+ relid            | oid     |           |          |
+ command          | text    |           |          |
+ type             | text    |           |          |
+ bytes_processed  | bigint  |           |          |
+ bytes_total      | bigint  |           |          |
+ tuples_processed | bigint  |           |          |
+ tuples_excluded  | bigint  |           |          |
+ tuples_skipped   | bigint  |           |          |</code></pre>
+  </div>
+
+  <p><code>bytes_total</code>이 <code>COPY</code>에서만 채워지는 이유는 <a href="#item-6-1">6-1</a>에서 본 차이 그대로다. <code>COPY</code>는 서버가 서버의 파일을 열기 때문에 크기를 알 수 있지만, <code>\copy</code>는 클라이언트가 스트림으로 흘려보내므로 서버가 전체 크기를 알 방법이 없다. 참고로 <code>tuples_skipped</code>는 <a href="#item-6-1">6-1</a>의 <code>on_error ignore</code>로 건너뛴 레코드 수를 보여준다.</p>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>인덱스 / Vacuum / Vacuum Full(cluster) / COPY 각각에 progress 뷰가 있다.</li>
+      <li>진행률보다 <code>phase</code>가 먼저다. 어느 단계에 있는지가 남은 시간을 결정한다.</li>
+      <li>CIC가 안 끝나면 <code>current_locker_pid</code>를 본다. 느린 게 아니라 기다리는 중일 수 있다.</li>
+      <li><code>index_vacuum_count &gt; 1</code>은 <code>maintenance_work_mem</code> 부족 신호다.</li>
+    </ul>
+  </div>
+</article>

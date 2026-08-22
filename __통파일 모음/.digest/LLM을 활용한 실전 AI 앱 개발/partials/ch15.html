@@ -1,0 +1,851 @@
+<article class="item" id="item-15-1" data-spy>
+  <header class="item-head">
+    <div class="item-num">15-1</div>
+    <h3>에이전트란</h3>
+    <p class="item-tagline">감각으로 보고, 두뇌로 판단하고, 도구로 행동한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>LLM 은 텍스트만 생성할 수 있다.</b> 그래서 에이전트가 바깥 세상에 영향을 미치려면 반드시 <b>도구</b>가 필요하다 — 이 제약이 에이전트 설계의 출발점이다.
+  </div>
+
+  <h4>에이전트란</h4>
+  <ul>
+    <li><b>알아서 생각하고 행동하는 시스템</b>을 에이전트라고 부른다.</li>
+    <li>에이전트는 <b>LLM 과 RAG 를 하나의 구성요소로</b> 사용한다. 지금까지 배운 것들이 부품이 되는 셈이다.</li>
+    <li>철학에서는 더 넓은 범위로 <b>행동을 할 수 있는 능력이 있는 개체</b>를 뜻한다.</li>
+  </ul>
+
+  <h4>에이전트의 구성요소</h4>
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart LR
+  ENV["외부 환경 / 사용자 요청"] --> S["감각<br>인식"]
+  S --> B["두뇌<br>기억 확인 / 계획 / 추론"]
+  MEM["기억<br>대화 / 지난 행동"] <--> B
+  B --> A["행동<br>도구 선택 / 실행"]
+  A --> ENV
+  A -.->|"복잡하면 여러 번 반복"| S
+      </pre>
+    </div>
+    <div class="figure-cap"><b>감각 → 두뇌 → 행동의 순환</b> — 한 바퀴로 끝날 수도 있고, 복잡한 문제라면 여러 번 돈다.</div>
+  </div>
+
+  <ol class="steps">
+    <li><div class="step-title">감각으로 인식한다</div><p><b>감각</b>을 통해 외부 환경과 사용자의 요청을 인식한다.</p></li>
+    <li><div class="step-title">두뇌로 판단한다</div><p><b>두뇌</b>로 가지고 있는 지식이나 지금까지의 기억을 확인하고, 계획을 세우거나 추론을 통해 다음에 어떤 행동을 할지 의사결정한다.</p></li>
+    <li><div class="step-title">도구로 행동한다</div><p>문제를 해결하기 위해 취할 수 있는 적절한 도구를 선택해 <b>행동</b>한다.</p></li>
+  </ol>
+
+  <p>이 과정은 한 번에 수행될 수도 있고, 복잡한 경우 <b>여러 번 반복</b>될 수도 있다.</p>
+
+  <h4>에이전트의 두뇌</h4>
+  <ul>
+    <li>에이전트의 핵심은 <b>인식하고 판단하는 두뇌</b>다.</li>
+    <li>어떤 행동을 취할지 결정할 때, 지금까지 수행했던 <b>사용자와의 대화나 행동을 저장한 기억</b>을 확인한다.</li>
+    <li>목표 달성을 위해 작업을 세분화하는 <b>계획 세우기</b> 단계를 거치고, 바로 다음에 어떤 행동이 필요한지 결정해 행동 단계로 넘어간다.</li>
+    <li><b>LLM 은 이 과정에 필요한 모든 능력을 갖추고 있다</b> — 이해, 추론, 계획, 그리고 그것을 텍스트로 표현하는 능력.</li>
+  </ul>
+
+  <h4>에이전트의 감각</h4>
+  <ul>
+    <li>LLM 은 기본적으로 텍스트만 이해할 수 있었지만, <b>멀티 모달 LLM</b>(<a href="#ch14">14장</a>)을 통해 사진/영상 등 다양한 정보를 다룰 수 있게 됐다.</li>
+    <li>활용할 수 있는 데이터 유형이 많아질수록 <b>훨씬 풍부한 정보를 처리하고 다양한 상황에 대응</b>할 수 있다.</li>
+    <li>비디오/오디오 멀티 모달인 <b>Video-LLaVA</b> 는 동영상을 분석할 때 오디오와 비디오 정보를 각각의 인코더에 전달하고, 그 결과를 LLM 으로 분석한다.</li>
+  </ul>
+
+  <h4>에이전트의 행동</h4>
+  <p>LLM 은 <b>텍스트만 생성</b>할 수 있다. 따라서 외부에 영향을 미치는 행동을 하려면 <b>LLM 이 사용할 수 있는 도구를 제공해야</b> 한다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>도구 예시</th><th>에이전트가 얻는 능력</th></tr></thead>
+      <tbody>
+        <tr><td>검색 API</td><td>학습 시점 이후의 최신 정보 획득</td></tr>
+        <tr><td>DALL-E / Stable Diffusion</td><td>이미지 생성</td></tr>
+        <tr><td>코드 실행 환경</td><td>계산/데이터 처리/파일 생성 (<a href="#item-15-4">15-4</a> 의 실습)</td></tr>
+        <tr><td>벡터 DB 검색 (RAG)</td><td>사내 문서 등 비공개 지식 활용</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">"도구를 쓴다"의 실제 의미 <span class="badge b-blue">보강</span></p>
+      <p>LLM 이 도구를 직접 실행하는 것이 아니다. LLM 이 하는 일은 <b>"이 함수를 이 인자로 호출해 달라"는 구조화된 텍스트를 생성</b>하는 것뿐이고, 실제 실행은 <b>바깥의 프로그램</b>이 한다. 그래서 <a href="#item-15-3">15-3</a> 에서 에이전트의 대표적 실패 원인으로 <b>"요청한 출력 형식으로 응답하지 않은 경우"</b> 가 꼽힌다 — 형식이 깨지면 바깥 프로그램이 파싱하지 못해 아무 행동도 일어나지 않는다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>에이전트 = 알아서 생각하고 행동하는 시스템. LLM 과 RAG 를 <b>부품으로</b> 쓴다.</li>
+      <li>구성요소는 <b>감각 / 두뇌 / 행동</b>이며, 필요하면 여러 번 순환한다.</li>
+      <li>두뇌는 <b>기억 확인 → 계획 → 다음 행동 결정</b>을 담당하고, LLM 이 이 능력을 제공한다.</li>
+      <li>멀티 모달 LLM 이 감각의 폭을 넓혔다.</li>
+      <li>LLM 은 텍스트만 만든다 → <b>도구</b>가 있어야 바깥에 영향을 준다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15-2" data-spy>
+  <header class="item-head">
+    <div class="item-num">15-2</div>
+    <h3>에이전트 시스템의 형태</h3>
+    <p class="item-tagline">혼자 다 하거나, 사람과 주고받거나, 여럿이 나눠 맡거나.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    <b>구체적인 프로필을 부여하는 것만으로 관련 작업의 전문성이 올라간다.</b> 멀티 에이전트가 단일 에이전트보다 나은 결과를 내는 가장 단순한 이유다.
+  </div>
+
+  <h4>단일 에이전트</h4>
+  <ul>
+    <li><b>AutoGPT</b> 는 입력받은 프롬프트만으로 모든 결정을 내린다.</li>
+    <li>프롬프트에는 <b>목표 / 제약사항 / 활용 가능한 도구</b> 등이 들어가고, 그 내용을 바탕으로 다음에 수행할 도구를 선택한다.</li>
+    <li><b>장점</b>: 모든 과정을 스스로 처리해 편리하고, 범용적인 프롬프트로 동작하므로 다양한 작업에 쓸 수 있다.</li>
+    <li><b>단점</b>: 그만큼 작업 도중 <b>길을 잃을 가능성도 크다</b>. 내부에서 쓰는 LLM 의 성능에 크게 좌우된다.</li>
+    <li>아직까지는 <b>목표가 명확하고 작업의 크기가 작은 경우에만</b> 선택적으로 활용하는 것이 좋다.</li>
+  </ul>
+
+  <h4>사용자와 에이전트의 상호작용</h4>
+  <ul>
+    <li>대표적인 예시가 <b>ChatGPT</b> 다.</li>
+    <li>요청과 응답 사이에서 사용자가 피드백을 주고, 이 과정을 반복해 점차 목표에 도달하는 코드를 만들어 간다.</li>
+    <li>다만 이 방식은 <b>사용자의 개입이 여전히 많이 필요하다</b>. 에이전트를 쓰면 직접 도구를 사용하므로 ChatGPT 보다 개입이 덜 필요하다.</li>
+    <li>반대로 <b>전문 도메인에서는 LLM 의 전문성이 사람보다 떨어질 수 있어</b> 사용자 개입이 오히려 중요한 경우도 있다.</li>
+  </ul>
+
+  <div class="figure">
+    <div class="figure-body">
+      <pre class="mermaid">
+flowchart TB
+  A["단일 에이전트<br>AutoGPT"] -->|"개입 적음 / 길 잃기 쉬움"| X["자율성 축"]
+  B["사용자 상호작용<br>ChatGPT"] -->|"개입 많음 / 통제 쉬움"| X
+  C["멀티 에이전트<br>프로필 분담"] -->|"개입 적음 / 상호 검증"| X
+      </pre>
+    </div>
+    <div class="figure-cap"><b>세 형태는 자율성과 통제 사이 어디에 설 것인가의 선택이다</b> — 도메인 전문성이 낮은 영역일수록 사람의 개입이 필요하다.</div>
+  </div>
+
+  <h4>멀티 에이전트</h4>
+  <ul>
+    <li>단일 에이전트와 달리 <b>각 에이전트마다 서로 다른 프로필</b>을 주고 작업을 수행한다.</li>
+    <li>LLM 에 <b>구체적인 프로필을 부여하는 것만으로도</b> 관련 작업의 전문성이 높아져 결과 품질이 올라간다.</li>
+    <li>에이전트 간 협력을 통해 작업의 품질이 더 향상될 수 있다.</li>
+  </ul>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>대화 형태</th><th>진행 방식</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr><td><b>수평형 대화</b></td><td>여러 에이전트가 다 함께 대화를 나누며 문제를 해결한다</td><td>모두가 모든 발언을 본다</td></tr>
+        <tr><td><b>위계형 대화</b></td><td>대화를 주도하는 <b>매니저</b>가 상황에 따라 작업할 에이전트를 선택한다</td><td>발언 순서를 매니저가 통제한다</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">15-4 코드에서 이 둘을 구분하는 방법 <span class="badge b-blue">보강</span></p>
+      <p>다음 절의 AutoGen 실습에서 <code>autogen.GroupChat(...)</code> 의 <code>speaker_selection_method</code> 인자가 정확히 이 선택이다. <code>"round_robin"</code> 은 정해진 순서로 돌아가며 발언하는 <b>수평형</b>에 가깝고, <code>"auto"</code> 는 <code>GroupChatManager</code> 가 <b>다음 발언자를 LLM 으로 고르는 위계형</b>이다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><b>단일 에이전트</b>(AutoGPT): 범용적이고 편하지만 길을 잃기 쉽다. 작고 명확한 작업에 쓴다.</li>
+      <li><b>사용자 상호작용</b>(ChatGPT): 통제하기 쉽지만 개입이 많이 필요하다. 전문 도메인에서는 오히려 장점.</li>
+      <li><b>멀티 에이전트</b>: 서로 다른 <b>프로필</b>을 부여해 전문성과 품질을 높인다.</li>
+      <li>대화 형태는 <b>수평형</b>(다 함께) / <b>위계형</b>(매니저가 선택)으로 나뉜다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15-3" data-spy>
+  <header class="item-head">
+    <div class="item-num">15-3</div>
+    <h3>에이전트 평가하기</h3>
+    <p class="item-tagline">사람이 채점하거나, 사람과 구분되는지 보거나, 벤치마크로 재거나.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    에이전트가 실패하는 대표적인 이유는 <b>추론 실패</b>와 <b>출력 형식 위반</b>이다. 후자는 능력의 문제가 아닌데도 작업 전체를 무산시킨다.
+  </div>
+
+  <h4>왜 평가인가</h4>
+  <p>모든 AI 제품 개발에서 성능 평가는 가장 핵심적인 부분 중 하나다. 크게 두 갈래로 나뉜다.</p>
+  <ul>
+    <li><b>결과를 사람이 직접 평가</b>하는 방식 — 두 에이전트의 결과에 사람이 각각 점수를 매기는 것이 일반적인 사람 평가 방식이다.</li>
+    <li><b>사람의 결과와 비교해 구분할 수 있는지</b> 확인하는 방식.</li>
+  </ul>
+
+  <h5>튜링 테스트</h5>
+  <p>에이전트와 사람의 결과물을 구분할 수 있는지 확인하는 평가 방식을 <b>튜링 테스트</b>라 한다. 에이전트의 결과물을 사람의 것이라고 판단하거나 구분할 수 없다면, <b>사람과 동등한 지능적 행동이 가능하다</b>고 말할 수 있다.</p>
+
+  <h4>벤치마크 데이터셋을 활용한 객관적 평가</h4>
+
+  <h5>에이전트를 평가하는 네 가지 기준</h5>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>기준</th><th>무엇을 보는가</th></tr></thead>
+      <tbody>
+        <tr><td><b>유용성</b></td><td>작업을 자동으로 수행할 때의 <b>작업 성공률</b> 같은 기준</td></tr>
+        <tr><td><b>사회성</b></td><td>언어를 얼마나 숙련되게 쓰는지, 협력/협상이 뛰어난지, 부여된 역할에 얼마나 부합하게 행동하는지</td></tr>
+        <tr><td><b>가치관</b></td><td>거짓말을 지어내지 않고 신뢰할 수 있는 정확한 정보를 전달하는지, 차별적 편향이 있는지</td></tr>
+        <tr><td><b>진화 능력</b></td><td>상황에 맞춰 <b>스스로 발전</b>할 수 있는지 — 지속적 학습, 스스로 목표를 설정하고 달성하는 능력</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>이 중에서는 아직까지 <b>목표한 작업을 얼마나 성공적으로 수행하는지를 평가하는 유용성</b>을 중심으로 연구가 활발히 진행되고 있다.</p>
+
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">원문 교정 <span class="badge b-red">원문 교정</span></p>
+      <p>노트에는 <code>유요성</code> 으로 적혀 있는데 <b>유용성</b>(有用性)의 오타다. 이 정리본에서는 바로잡았다.</p>
+    </div>
+  </div>
+
+  <h5>AgentBench</h5>
+  <ul>
+    <li>칭화대에서 만든 <b>LLM 에이전트 평가 데이터셋</b>이다.</li>
+    <li>하나의 작업으로 평가하는 것이 아니라 <b>8개의 작업으로 평가</b>하기 때문에, <b>일반화 성능</b>을 확인할 수 있다는 장점이 있다.</li>
+    <li>평가 결과, <b>오픈소스 LLM 의 일반화 능력이 상용 LLM 에 미치지 못한다</b>는 결과가 나왔다.</li>
+  </ul>
+
+  <h4>높은 점수와 낮은 점수의 차이</h4>
+  <p>에이전트가 실패하는 대표적인 경우는 두 가지다.</p>
+  <ul>
+    <li><b>대화가 여러 턴에 걸쳐 진행되면서 추론과 의사결정 능력이 떨어지는 경우</b></li>
+    <li><b>요청한 출력 형식으로 응답하지 않은 경우</b></li>
+  </ul>
+
+  <p>LLM 에이전트는 <b>텍스트 입출력으로 작업을 진행</b>하므로, 출력이 원하는 형식으로 나오지 않으면 그 자체로 실패가 된다.</p>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">두 번째 실패는 공학으로 줄일 수 있다 <span class="badge b-blue">보강</span></p>
+      <p>추론 실패는 모델 능력의 문제지만, <b>출력 형식 위반은 대체로 해결 가능한 문제</b>다. <a href="#item-6-2">6-2</a> 에서 GPT-4 평가에 <code>response_format: {"type": "json_object"}</code> 를 강제한 것이 그 예다. 요즘은 <b>구조화된 출력</b>(structured output)이나 <b>함수 호출</b>(function calling)로 스키마 자체를 모델에 강제할 수 있어, 이 유형의 실패는 크게 줄었다. 벤치마크 점수의 상당 부분이 <b>모델의 지능이 아니라 출력 파싱 성공률</b>이었다는 뜻이기도 하다.</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>평가는 <b>사람이 채점</b>하거나 <b>사람과 구분되는지</b>(튜링 테스트) 보는 방식으로 나뉜다.</li>
+      <li>객관적 기준 네 가지: <b>유용성 / 사회성 / 가치관 / 진화 능력</b>. 현재는 유용성 중심.</li>
+      <li><b>AgentBench</b>: 8개 작업으로 <b>일반화 성능</b>을 잰다. 오픈소스가 상용에 아직 못 미친다.</li>
+      <li>실패 원인 두 가지: <b>멀티 턴에서의 추론 저하</b>, <b>출력 형식 위반</b>.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-15-4" data-spy>
+  <header class="item-head">
+    <div class="item-num">15-4</div>
+    <h3>에이전트 구현</h3>
+    <p class="item-tagline">AutoGen — 에러를 읽고, 패키지를 깔고, 다시 시도한다.</p>
+  </header>
+
+  <div class="keypoint">
+    <span class="kp-label">핵심</span>
+    이 절의 실습이 보여주는 것은 <b>에이전트가 실패에서 회복하는 장면</b>이다. 코드가 에러를 내면 에러 메시지를 읽고 원인을 파악해 스스로 고친다 — 사람의 개입 없이.
+  </div>
+
+  <h4>LLM 컨피그 설정</h4>
+  <p>AutoGen 은 사용할 모델 목록을 JSON 파일로 관리하고, <code>filter_dict</code> 로 필요한 모델만 골라 쓴다. 에이전트마다 다른 모델을 배정하기 위한 구조다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">OAI_CONFIG_LIST.json</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-json">[
+  { "model": "gpt-4-turbo-preview", "api_key": "" },
+  { "model": "gpt-4o",              "api_key": "" },
+  { "model": "dall-e-3",            "api_key": "" }
+]</code></pre>
+  </div>
+
+  <h4>에이전트 실행 — 코드를 짜고 실행하는 에이전트</h4>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">basic_agent.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import json, os
+import autogen
+from autogen import AssistantAgent, UserProxyAgent
+
+openai_api_key = ""
+os.environ["OPENAI_API_KEY"] = openai_api_key
+
+with open('OAI_CONFIG_LIST.json', 'w') as f:
+    config_list = [
+        {"model": "gpt-4-turbo-preview", "api_key": openai_api_key},
+        {"model": "gpt-4o",              "api_key": openai_api_key},
+        {"model": "dall-e-3",            "api_key": openai_api_key},
+    ]
+    json.dump(config_list, f)
+
+config_list = autogen.config_list_from_json(
+    "OAI_CONFIG_LIST.json",
+    file_location=".",
+    filter_dict={"model": ["gpt-4-turbo-preview"]},
+)
+
+llm_config = {"config_list": config_list, "temperature": 0}
+
+assistant = AssistantAgent("assistant", llm_config=llm_config)
+
+# UserProxyAgent 를 통해 명령이나 피드백을 전달한다
+user_proxy = UserProxyAgent(
+    "user_proxy",
+    # 응답이 TERMINATE 로 끝나면 대화를 종료한다
+    is_termination_msg=lambda x: x.get("content", "")
+        and x.get("content", "").rstrip().endswith("TERMINATE"),
+
+    # NEVER 로 두면 사람의 추가 피드백 없이 알아서 처리한다
+    human_input_mode="NEVER",
+
+    # 생성된 코드를 이 디렉터리에서 실제로 실행한다
+    code_execution_config={"work_dir": "coding", "use_docker": False},
+)
+
+response = user_proxy.initiate_chat(assistant, message="""
+    삼성전자의 지난 3개월 주식 가격 그래프를 그려서 samsung_stock_price.png 파일로 저장해줘.
+    plotly 라이브러리를 사용하고 그래프 아래를 투명한 녹색으로 채워줘
+    값을 잘 확인할 수 있도록 y축은 구간 최솟값에서 시작하도록 해줘
+    이미지 비율은 보기 좋게 적절히 설정해줘
+""")
+
+print(response)</code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>설정</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><code>AssistantAgent</code></td><td>LLM 을 써서 <b>코드를 작성</b>하는 쪽</td></tr>
+        <tr><td><code>UserProxyAgent</code></td><td>사람을 대신해 <b>코드를 실행하고 결과를 돌려주는</b> 쪽</td></tr>
+        <tr><td><code>human_input_mode="NEVER"</code></td><td>사람에게 묻지 않고 자동 진행</td></tr>
+        <tr><td><code>code_execution_config</code></td><td>코드를 실제로 실행할 작업 디렉터리와 도커 사용 여부</td></tr>
+        <tr><td><code>is_termination_msg</code></td><td>어떤 응답을 종료 신호로 볼지 (여기서는 <code>TERMINATE</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>실행 결과 — 세 번의 시도</h4>
+  <p>노트에 기록된 전체 로그는 길지만, 흐름은 <b>세 번의 왕복</b>으로 요약된다.</p>
+
+  <ol class="steps">
+    <li>
+      <div class="step-title">라운드 1 — 계획을 세우고 패키지를 설치한다</div>
+      <p>어시스턴트가 <code>FinanceDataReader</code> 로 주가를 받고 <code>plotly</code> 로 그린다는 계획을 세운 뒤, 설치 명령을 셸 코드 블록으로 내놓는다. user_proxy 가 실행한다 → <b>exitcode 0, 성공</b>.</p>
+    </li>
+    <li>
+      <div class="step-title">라운드 2 — 코드를 실행했다가 에러를 만난다</div>
+      <p>어시스턴트가 <code>plot_samsung_stock.py</code> 를 작성하고, user_proxy 가 실행한다 → <b>exitcode 1, 실패</b>.</p>
+    </li>
+    <li>
+      <div class="step-title">라운드 3 — 에러를 읽고 스스로 고친다</div>
+      <p>어시스턴트가 에러 메시지를 읽고 원인이 <code>kaleido</code> 누락임을 파악해 설치 명령을 내놓는다. 설치 후 스크립트를 다시 실행하도록 안내하고 <code>TERMINATE</code> 로 대화를 끝낸다.</p>
+    </li>
+  </ol>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">terminal — 라운드 2 의 실패</span>
+      <span class="code-tag bad">exitcode 1</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-bash">Traceback (most recent call last):
+  File "plot_samsung_stock.py", line 34, in &lt;module&gt;
+    fig.write_image("samsung_stock_price.png")
+  ...
+ValueError:
+Image export using the "kaleido" engine requires the Kaleido package,
+which can be installed using pip:
+
+    $ pip install --upgrade kaleido</code></pre>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">여기가 에이전트다운 부분</p>
+      <p>사람이 아무 말도 하지 않았는데(<code>human_input_mode="NEVER"</code>), 에이전트가 <b>실행 결과의 에러 메시지를 입력으로 받아</b> 다음 행동을 결정했다. <a href="#item-15-1">15-1</a> 의 <b>감각 → 두뇌 → 행동</b> 순환이 실제로 도는 장면이다. <code>plotly</code> 가 이미지 파일을 쓰려면 <code>kaleido</code> 가 필요하다는 것은 프롬프트 어디에도 없던 정보다.</p>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">coding/plot_samsung_stock.py</span>
+      <span class="code-tag good">에이전트가 작성한 최종 코드</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python"># filename: plot_samsung_stock.py
+import FinanceDataReader as fdr
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+
+# 삼성전자의 주식 코드는 '005930'
+stock_code = '005930'
+
+# 오늘 날짜와 3개월 전 날짜 계산
+end_date = datetime.today()
+start_date = end_date - timedelta(days=90)
+
+df = fdr.DataReader(stock_code, start_date, end_date)
+
+fig = go.Figure()
+
+# 주식 가격 데이터 추가 (종가 기준) — 아래를 투명한 녹색으로 채운다
+fig.add_trace(go.Scatter(
+    x=df.index, y=df['Close'], name='Close',
+    fill='tozeroy', fillcolor='rgba(0,255,0,0.2)',
+))
+
+# y축은 구간의 최솟값에서 시작하도록 설정
+fig.update_yaxes(range=[df['Close'].min(), df['Close'].max()])
+
+fig.update_layout(
+    title='Samsung Stock Price Last 3 Months',
+    xaxis_title='Date',
+    yaxis_title='Stock Price (KRW)',
+    autosize=False, width=800, height=600,
+)
+
+fig.write_image("samsung_stock_price.png")</code></pre>
+  </div>
+
+  <p>요청했던 네 가지 조건 — <b>plotly 사용 / 아래를 투명한 녹색으로 / y축을 구간 최솟값부터 / 적절한 이미지 비율</b> — 이 각각 <code>fillcolor='rgba(0,255,0,0.2)'</code>, <code>update_yaxes(range=[...])</code>, <code>width=800, height=600</code> 으로 옮겨졌다.</p>
+
+  <h4>RAG 에이전트</h4>
+  <p>에이전트도 LLM 을 활용하므로, <b>관련 정보가 프롬프트에 들어갔는지에 따라 성능이 크게 달라진다</b>. <code>gpt-4-turbo-preview</code> 는 AutoGen 자체를 모르기 때문에, 이 차이를 확인하기 좋은 소재가 된다.</p>
+
+  <h5>외부 문서를 첨부한 경우</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">rag_agent.py</span>
+      <span class="code-tag good">README 를 제공</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
+from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
+
+assistant = RetrieveAssistantAgent(
+    name="assistant",
+    system_message="You are a helpful assistant.",
+    llm_config=llm_config,
+)
+
+# gpt-4-turbo-preview 는 AutoGen 을 모르므로 README 를 검색 소스로 제공한다
+ragproxyagent = RetrieveUserProxyAgent(
+    name="ragproxyagent",
+    retrieve_config={
+        "task": "qa",
+        "docs_path": "https://raw.githubusercontent.com/microsoft/autogen/main/README.md",
+        "collection_name": "default-sentence-transformers",
+    },
+)
+
+assistant.reset()
+response = ragproxyagent.initiate_chat(assistant, problem="AutoGen이 뭐야?")
+
+'''
+assistant (to ragproxyagent):
+
+AutoGen은 자율적으로 행동하거나 인간과 협력할 수 있는 멀티 에이전트 AI
+애플리케이션을 만드는 프레임워크입니다.
+'''
+print(response)</code></pre>
+  </div>
+
+  <h5>외부 문서 없이</h5>
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">norag_agent.py</span>
+      <span class="code-tag bad">환각</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">assistant.reset()
+userproxyagent = autogen.UserProxyAgent(name="userproxyagent")
+response = userproxyagent.initiate_chat(assistant, message="Autogen이 뭐야?")
+
+'''
+"Autogen"이라는 용어는 다양한 맥락에서 사용될 수 있지만, 일반적으로 자동 생성을
+의미하는 용어입니다. 컴퓨터 과학이나 프로그래밍에서는 코드나 문서, 설정 파일 등을
+자동으로 생성하는 도구나 프로세스를 가리키는 데 사용될 수 있습니다.
+...
+정확한 맥락이나 사용 예를 알려주시면 더 구체적인 정보를 제공할 수 있을 것입니다.
+'''
+print(response)</code></pre>
+  </div>
+
+  <p>일반적인 단어 뜻풀이로 빠져버린다. <b>외부 정보가 없으면 제대로 된 답변을 하지 못한다</b>.</p>
+
+  <h4>에이전트끼리 대화하기 — 그룹 채팅</h4>
+  <p>Admin(사용자 역할) / Senior_Python_Engineer / Product_Manager 세 프로필을 만들고, RAG 를 쓰는 버전과 안 쓰는 버전을 비교한다. <a href="#item-15-2">15-2</a> 에서 본 <b>프로필 부여</b>가 코드로 구현되는 지점이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">group_agents.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import autogen
+from autogen import AssistantAgent
+from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
+
+def termination_msg(x):
+    return isinstance(x, dict) and "TERMINATE" == str(x.get("content", ""))[-9:].upper()
+
+# RAG 를 사용하지 않는 사용자 역할 에이전트
+user = autogen.UserProxyAgent(
+    name="Admin",
+    is_termination_msg=termination_msg,
+    human_input_mode="NEVER",
+    system_message="The boss who ask questions and give tasks.",
+    code_execution_config=False,
+    default_auto_reply="Reply `TERMINATE` if the task is done.",
+)
+
+# RAG 를 사용하는 사용자 역할 에이전트
+user_rag = RetrieveUserProxyAgent(
+    name="Admin_RAG",
+    is_termination_msg=termination_msg,
+    system_message="Assistant who has extra content retrieval power for solving difficult problems.",
+    human_input_mode="NEVER",
+    max_consecutive_auto_reply=3,
+    code_execution_config=False,
+    retrieve_config={
+        "task": "code",
+        "docs_path": "https://github.com/microsoft/autogen/blob/main/README.md",
+        "chunk_token_size": 1000,
+        "collection_name": "groupchat-rag",
+    },
+)
+
+# 프로그래머 역할
+coder = AssistantAgent(
+    name="Senior_Python_Engineer",
+    is_termination_msg=termination_msg,
+    system_message="You are a senior python engineer. Reply `TERMINATE` in the end when everything is done.",
+    llm_config=llm_config,
+)
+
+# 프로덕트 매니저 역할
+pm = autogen.AssistantAgent(
+    name="Product_Manager",
+    is_termination_msg=termination_msg,
+    system_message="You are a product manager. Reply `TERMINATE` in the end when everything is done.",
+    llm_config=llm_config,
+)
+
+PROBLEM = "AutoGen Studio는 무엇이고 AutoGen Studio로 어떤 제품을 만들 수 있을까?"
+
+def _reset_agents():
+    user.reset(); user_rag.reset(); coder.reset(); pm.reset()</code></pre>
+  </div>
+
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag bad">RAG 없음 — speaker_selection: auto</span><span class="code-spacer"></span></div>
+<pre><code class="language-python">def norag_chat():
+    _reset_agents()
+    groupchat = autogen.GroupChat(
+        agents=[user, coder, pm],
+        messages=[],
+        max_round=12,
+        speaker_selection_method="auto",
+        allow_repeat_speaker=False,
+    )
+    manager = autogen.GroupChatManager(
+        groupchat=groupchat, llm_config=llm_config)
+
+    user.initiate_chat(manager, message=PROBLEM)
+
+norag_chat()</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag good">RAG 사용 — speaker_selection: round_robin</span><span class="code-spacer"></span></div>
+<pre><code class="language-python">def rag_chat():
+    _reset_agents()
+    groupchat = autogen.GroupChat(
+        agents=[user_rag, coder, pm],
+        messages=[],
+        max_round=12,
+        speaker_selection_method="round_robin",
+    )
+    manager = autogen.GroupChatManager(
+        groupchat=groupchat, llm_config=llm_config)
+
+    user_rag.initiate_chat(manager, problem=PROBLEM)
+
+rag_chat()</code></pre>
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="ic">×</div>
+    <div>
+      <p class="callout-title">RAG 없이 — 존재하지 않는 제품이라고 단정한다</p>
+      <p>Product_Manager 의 응답: <i>"AutoGen Studio는 <b>가상의 제품</b>이므로, 실제로 존재하는 소프트웨어나 서비스에 대한 설명을 제공할 수 없습니다. 그러나 이 질문에 대답하기 위해 <b>가상의 시나리오를 설정</b>해보겠습니다."</i> 이후 웹 애플리케이션/모바일 앱/게임 개발 등 그럴듯한 다섯 가지 용도를 지어낸다. 실재하는 제품을 <b>없다고 단정하고 소설을 쓴</b> 셈이다.</p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">RAG 를 붙이면 — 정확한 정보를 말한다</p>
+      <p>Senior_Python_Engineer 의 응답: <i>"AutoGen Studio는 마이크로소프트에서 개발한 프로그래밍 프레임워크로, 특히 <b>다중 에이전트 워크플로우를 프로토타이핑하고 실행할 수 있는 노코드(no-code) GUI 환경</b>을 제공합니다."</i> 이어서 다중 에이전트 워크플로우, AI 기반 애플리케이션, 프로토타입 개발, 교육/학습 도구라는 <b>근거 있는</b> 활용처를 제시한다.</p>
+      <p>같은 모델, 같은 프롬프트, 같은 프로필이다. 차이는 <b>프롬프트에 README 가 들어갔는가</b> 하나뿐이다 — <a href="#item-9-1">9-1</a> 에서 배운 RAG 의 가치가 에이전트에서도 그대로 성립한다.</p>
+    </div>
+  </div>
+
+  <h4>멀티 모달 에이전트</h4>
+  <p>멀티 모달 모델을 활용하면 <b>텍스트와 이미지 입력을 함께 처리하는 에이전트</b>를 구현할 수 있다.</p>
+
+  <h5>텍스트로 이미지 생성하기 — DALLEAgent</h5>
+  <p>AutoGen 에 없는 에이전트는 <code>ConversableAgent</code> 를 상속해 직접 만든다. 핵심은 <code>register_reply</code> 로 <b>"메시지를 받았을 때 어떻게 응답할지"</b> 를 갈아끼우는 부분이다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">dalle_agent.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">import os
+import autogen
+import matplotlib.pyplot as plt
+from openai import OpenAI
+from autogen import Agent, ConversableAgent, UserProxyAgent
+from autogen.agentchat.contrib.img_utils import _to_pil, get_image_data
+
+config_list_4o = autogen.config_list_from_json(
+    "OAI_CONFIG_LIST.json", filter_dict={"model": ["gpt-4o"]},
+)
+config_list_dalle = autogen.config_list_from_json(
+    "OAI_CONFIG_LIST.json", filter_dict={"model": ["dall-e-3"]},
+)
+
+def dalle_call(client, prompt, model="dall-e-3", size="1024x1024",
+               quality="standard", n=1) -&gt; str:
+    response = client.images.generate(
+        model=model, prompt=prompt, size=size, quality=quality, n=n)
+    image_url = response.data[0].url
+    return get_image_data(image_url)
+
+class DALLEAgent(ConversableAgent):
+    def __init__(self, name, llm_config: dict, **kwargs):
+        super().__init__(name, llm_config=llm_config, **kwargs)
+
+        try:
+            config_list = llm_config["config_list"]
+            api_key = config_list[0]["api_key"]
+        except Exception as e:
+            print("Unable to fetch API Key, because", e)
+            api_key = os.getenv("OPENAI_API_KEY")
+
+        self.client = OpenAI(api_key=api_key)
+
+        # 이 에이전트가 메시지를 받으면 generate_dalle_reply 로 응답하게 한다
+        self.register_reply([Agent, None], DALLEAgent.generate_dalle_reply)
+
+    def generate_dalle_reply(self, messages, sender, config):
+        client = self.client if config is None else config
+        if client is None:
+            return False, None
+        if messages is None:
+            messages = self._oai_messages[sender]
+
+        prompt = messages[-1]["content"]
+        img_data = dalle_call(client=self.client, prompt=prompt)
+        plt.imshow(_to_pil(img_data))
+        plt.axis("off")
+        plt.show()
+        return True, 'result.jpg'
+
+# 이미지 생성 에이전트를 인스턴스화
+painter = DALLEAgent(name="Painter", llm_config={"config_list": config_list_dalle})
+
+user_proxy = UserProxyAgent(
+    name="User_proxy", system_message="A human admin.",
+    human_input_mode="NEVER", max_consecutive_auto_reply=0,
+)
+
+user_proxy.initiate_chat(
+    painter,
+    message="피시방에서 게임을 하고있는 학생을 애니메이션 느낌으로 그려줘",
+)</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 250" width="460" role="img" aria-label="생성된 이미지 설명 — 파란 조명의 PC방에서 헤드폰을 쓴 학생이 키보드를 치는 애니메이션풍 그림">
+        <rect x="10" y="12" width="440" height="196" rx="10" class="dg-fill-bg dg-stroke"/>
+        <text x="30" y="40" class="dg-text dg-mono" font-size="12">생성 결과 — DALL-E 3</text>
+
+        <text x="30" y="70" class="dg-text-sub" font-size="12">화면비</text>
+        <text x="130" y="70" class="dg-text" font-size="12">1:1 정사각 (1024×1024)</text>
+        <text x="30" y="94" class="dg-text-sub" font-size="12">화풍</text>
+        <text x="130" y="94" class="dg-text" font-size="12">셀 셰이딩 애니메이션풍, 굵은 윤곽선</text>
+        <text x="30" y="118" class="dg-text-sub" font-size="12">주제</text>
+        <text x="130" y="118" class="dg-text" font-size="12">헤드폰을 쓴 학생이 키보드를 치는 옆모습</text>
+        <text x="30" y="142" class="dg-text-sub" font-size="12">배경</text>
+        <text x="130" y="142" class="dg-text" font-size="12">모니터가 일렬로 늘어선 PC방, 천장 형광등</text>
+        <text x="30" y="166" class="dg-text-sub" font-size="12">조명</text>
+        <text x="130" y="166" class="dg-text" font-size="12">청색 주광 + 붉은 반사광의 강한 대비</text>
+        <text x="30" y="190" class="dg-text-sub" font-size="12">요청 반영</text>
+        <text x="130" y="190" class="dg-text" font-size="12">피시방 / 게임 / 학생 / 애니메이션 느낌 모두 충족</text>
+
+        <line x1="118" y1="56" x2="118" y2="198" class="dg-stroke" stroke-dasharray="3 3"/>
+        <text x="230" y="232" class="dg-text-sub" font-size="11" text-anchor="middle">원본 이미지는 노트의 gen_img 스크린샷을 판독해 옮겼다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>한 문장의 한국어 프롬프트가 그대로 그림이 됐다</b> — 별도의 번역이나 프롬프트 보정 없이 DALL-E 3 이 요소를 모두 반영했다.</div>
+  </div>
+
+  <h5>이미지를 보고 비슷한 이미지 그리기 — 3인 그룹 채팅</h5>
+  <p>이번에는 <b>이미지를 설명하는 에이전트</b>와 <b>그리는 에이전트</b>를 그룹 채팅에 함께 넣는다. 사용자가 이미지 URL 을 주면, 설명 에이전트가 특징을 뽑아 화가 에이전트에게 넘기는 구조다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">multimodal_group.py</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code class="language-python">from autogen.agentchat.contrib.multimodal_conversable_agent import MultimodalConversableAgent
+
+# DALLEAgent 정의와 painter 인스턴스화는 위와 동일
+
+image_agent = MultimodalConversableAgent(
+    name="image-explainer",
+    system_message="Explane input image for painter to create similar image.",
+    max_consecutive_auto_reply=10,
+    llm_config={"config_list": config_list_4o, "temperature": 0.5, "max_tokens": 1500},
+)
+
+user_proxy = autogen.UserProxyAgent(
+    name="User_proxy",
+    system_message="A human admin.",
+    human_input_mode="NEVER",
+    max_consecutive_auto_reply=0,
+    code_execution_config=False,
+)
+
+groupchat = autogen.GroupChat(
+    agents=[user_proxy, image_agent, painter], messages=[], max_round=12)
+manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
+
+user_proxy.initiate_chat(
+    manager,
+    message="""아래 이미지랑 비슷한 이미지를 만들어줘.
+&lt;img https://i.namu.wiki/i/NWmuIT7JeiXWGXp4yiyJ61_R39fx5CBzos0_OJXo6dmDRQ-wkPE8oVjjj2-Sgc0j5Dt0pT7Aj-upAulruh1QpA.webp&gt;.""",
+)</code></pre>
+  </div>
+
+  <p><code>MultimodalConversableAgent</code> 는 메시지 안의 <code>&lt;img ...&gt;</code> 태그를 인식해 이미지를 <code>gpt-4o</code> 에 함께 전달한다. 이 에이전트가 내놓은 설명은 다음과 같다.</p>
+
+  <div class="code">
+    <div class="code-head">
+      <div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">image-explainer (to chat_manager)</span>
+      <span class="code-spacer"></span>
+    </div>
+<pre><code>이 이미지를 기반으로 비슷한 이미지를 만들기 위해 다음 요소를 고려하세요:
+
+1. **캐릭터 디자인**: 큰 눈과 밝은 색상의 머리카락, 귀여운 스타일의 캐릭터를 그립니다.
+2. **색상 팔레트**: 핑크, 보라, 파랑 계열의 밝고 화려한 색상을 사용합니다.
+3. **의상 디테일**: 화려한 장식이 있는 판타지 스타일의 의상을 디자인합니다.
+4. **포즈**: 활기차고 역동적인 포즈를 사용합니다.
+5. **배경**: 별과 같은 패턴이 있는 밝고 에너지 넘치는 배경을 추가합니다.
+
+이러한 요소를 활용하여 비슷한 느낌의 이미지를 창작할 수 있습니다.</code></pre>
+  </div>
+
+  <div class="figure">
+    <div class="figure-body">
+      <svg viewBox="0 0 460 250" width="460" role="img" aria-label="원본과 생성 이미지의 비교 — 다섯 가지 요소가 모두 재현되었고 추출된 색상 팔레트가 함께 표시된다">
+        <text x="30" y="30" class="dg-text dg-mono" font-size="12">원본 대비 생성 결과</text>
+
+        <text x="30" y="58" class="dg-text-sub" font-size="12">캐릭터</text>
+        <text x="150" y="58" class="dg-text" font-size="12">큰 눈 / 분홍 머리 / 양갈래 번헤어 <b>재현</b></text>
+        <text x="30" y="82" class="dg-text-sub" font-size="12">색상</text>
+        <text x="150" y="82" class="dg-text" font-size="12">핑크 / 보라 / 하늘색 파스텔 <b>재현</b></text>
+        <text x="30" y="106" class="dg-text-sub" font-size="12">의상</text>
+        <text x="150" y="106" class="dg-text" font-size="12">보석 장식 판타지 드레스 <b>재현</b></text>
+        <text x="30" y="130" class="dg-text-sub" font-size="12">포즈</text>
+        <text x="150" y="130" class="dg-text" font-size="12">팔을 펼친 역동적 자세 <b>재현</b></text>
+        <text x="30" y="154" class="dg-text-sub" font-size="12">배경</text>
+        <text x="150" y="154" class="dg-text" font-size="12">별/반짝임 패턴의 밝은 배경 <b>재현</b></text>
+
+        <text x="30" y="192" class="dg-text-sub dg-mono" font-size="11">추출된 팔레트</text>
+        <circle cx="150" cy="188" r="11" fill="#f6e7c8"/>
+        <circle cx="178" cy="188" r="11" fill="#3d7fd6"/>
+        <circle cx="206" cy="188" r="11" fill="#7fb7ea"/>
+        <circle cx="234" cy="188" r="11" fill="#f2a8c8"/>
+        <circle cx="262" cy="188" r="11" fill="#ef5f9b"/>
+        <circle cx="290" cy="188" r="11" fill="#2f5fae"/>
+        <circle cx="318" cy="188" r="11" fill="#f5d0e3"/>
+        <circle cx="346" cy="188" r="11" fill="#b98fd4"/>
+        <circle cx="374" cy="188" r="11" fill="#8fb8e8"/>
+
+        <text x="230" y="230" class="dg-text-sub" font-size="11" text-anchor="middle">설명 에이전트가 뽑은 5개 요소가 그림에 모두 반영됐다</text>
+      </svg>
+    </div>
+    <div class="figure-cap"><b>두 에이전트의 협업이 성립한 증거</b> — image-explainer 가 텍스트로 옮긴 다섯 요소를 Painter 가 하나도 빠뜨리지 않고 그려냈다.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="ic">i</div>
+    <div>
+      <p class="callout-title">14장의 구조가 두 에이전트로 나뉘어 있다 <span class="badge b-blue">보강</span></p>
+      <p>이 파이프라인은 <a href="#item-14-1">14-1</a> 의 멀티 모달 구조를 <b>에이전트 단위로 쪼갠 것</b>이다. <code>image-explainer</code>(gpt-4o)가 <b>모달리티 인코더 + 입력 프로젝터 + LLM</b> 역할을, <code>Painter</code>(dall-e-3)가 <b>출력 프로젝터 + 모달리티 생성기</b> 역할을 한다. 다만 둘 사이를 잇는 것이 학습된 프로젝터가 아니라 <b>사람이 읽을 수 있는 텍스트</b>라는 점이 다르다 — 그래서 중간 산출물을 눈으로 확인하고 디버깅할 수 있지만, <a href="#item-12-5">12-5</a> 에서 봤듯 <b>텍스트로 옮기는 과정에서 정보가 손실</b>된다.</p>
+    </div>
+  </div>
+
+  <div class="callout update">
+    <div class="ic">↑</div>
+    <div>
+      <p class="callout-title">AutoGen 은 두 갈래로 갈라졌다 <span class="badge b-purple">최신 반영</span></p>
+      <p>이 절의 코드는 AutoGen <b>v0.2</b> API 다. 이후 프로젝트가 분화했다.</p>
+      <ul>
+        <li><b>Microsoft AutoGen v0.4+</b> — 비동기/이벤트 주도 액터 모델로 <b>전면 재작성</b>됐다. <code>autogen-agentchat</code> / <code>autogen-core</code> / <code>autogen-ext</code> 로 패키지가 나뉘며, v0.2 코드와 호환되지 않는다.</li>
+        <li><b>AG2</b> — 커뮤니티 포크가 <code>pyautogen</code> / <code>autogen</code> PyPI 패키지명을 이어받았다. v0.2 계열 API 와 <code>RetrieveUserProxyAgent</code> 같은 <code>contrib</code> 에이전트를 계속 유지한다.</li>
+      </ul>
+      <p>따라서 <code>pip install autogen</code> 으로 설치되는 것이 어느 쪽인지 확인해야 하며, 위 코드를 그대로 돌리려면 <b>AG2</b> 계열이 맞다. 근거: <a href="https://microsoft.github.io/autogen/stable//user-guide/agentchat-user-guide/migration-guide.html">AutoGen v0.2 → v0.4 마이그레이션 가이드</a></p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li><code>AssistantAgent</code>(코드 작성) + <code>UserProxyAgent</code>(코드 실행) 조합이 AutoGen 의 기본 단위다.</li>
+      <li>실습의 핵심 장면은 <b>에러 메시지를 읽고 스스로 패키지를 설치해 회복</b>하는 부분이다.</li>
+      <li>모르는 주제에 대해 에이전트는 <b>없는 제품이라고 단정하고 지어낸다</b> — RAG 를 붙이면 정확해진다.</li>
+      <li><code>speaker_selection_method</code> 가 <b>수평형(round_robin)</b> 과 <b>위계형(auto)</b> 을 가른다.</li>
+      <li><code>ConversableAgent</code> 를 상속하고 <code>register_reply</code> 를 등록하면 커스텀 에이전트를 만들 수 있다.</li>
+      <li>설명 에이전트 + 화가 에이전트 = 14장의 멀티 모달 구조를 텍스트로 이어붙인 형태.</li>
+    </ul>
+  </div>
+</article>

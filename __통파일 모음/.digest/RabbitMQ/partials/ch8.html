@@ -1,0 +1,155 @@
+<article class="item" id="item-33" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 33</div>
+    <h3>개념 대응표</h3>
+    <p class="item-tagline">단어를 바꿔 끼우는 표. 다만 일대일 대응이 아닌 칸을 눈여겨본다.</p>
+  </header>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>BullMQ</th><th>RabbitMQ</th><th>주의</th></tr></thead>
+      <tbody>
+        <tr><td><code>Queue</code> (생산자 핸들)</td><td>Channel + Exchange</td><td>발행 대상이 큐가 아니라 exchange다</td></tr>
+        <tr><td>큐 이름</td><td>exchange + routing key</td><td>목적지가 아니라 <b>의도</b>를 적는다</td></tr>
+        <tr><td><code>Worker</code></td><td>Consumer (<code>basic.consume</code>)</td><td>동시 실행 제어는 prefetch로</td></tr>
+        <tr><td><code>Job</code></td><td>Message</td><td>메시지에는 상태도 결과도 없다</td></tr>
+        <tr><td><code>job.data</code></td><td><code>msg.content</code> (Buffer)</td><td>직렬화/역직렬화는 내 몫</td></tr>
+        <tr><td><code>job.id</code></td><td><code>properties.messageId</code></td><td>중복 제거를 자동으로 해주지 않는다</td></tr>
+        <tr><td><code>job.attemptsMade</code></td><td><code>x-delivery-count</code> 헤더</td><td>quorum queue에서만</td></tr>
+        <tr><td>잡 완료</td><td><code>ch.ack(msg)</code></td><td>ack 후 메시지는 사라진다</td></tr>
+        <tr><td>잡 실패</td><td><code>ch.nack(msg, false, false)</code></td><td>DLX가 없으면 그냥 폐기</td></tr>
+        <tr><td><code>failed</code> 셋</td><td>Dead Letter Queue</td><td>진짜 큐라서 재투입이 자연스럽다</td></tr>
+        <tr><td><code>completed</code> 셋</td><td class="t-no">없음</td><td>필요하면 애플리케이션 DB에 남긴다</td></tr>
+        <tr><td><code>concurrency</code></td><td><code>ch.prefetch(n)</code></td><td>정확히 같지는 않다 (ITEM 12)</td></tr>
+        <tr><td><code>attempts</code></td><td><code>x-delivery-limit</code></td><td>큐 단위 설정</td></tr>
+        <tr><td><code>backoff</code></td><td><code>x-delayed-retry-*</code> (4.3+)</td><td>지수가 아니라 <b>선형</b></td></tr>
+        <tr><td><code>delay</code></td><td class="t-no">없음. TTL+DLX로 구현</td><td>단계별 지연 큐를 만든다</td></tr>
+        <tr><td><code>priority</code></td><td><code>properties.priority</code> 0~31</td><td>quorum은 선언 없이 사용 가능</td></tr>
+        <tr><td>Redis</td><td>브로커 자체 저장소</td><td>운영 대상이 하나 늘어난다</td></tr>
+        <tr><td>없음</td><td>Exchange / Binding</td><td class="t-ok">RabbitMQ가 얻는 것</td></tr>
+        <tr><td>없음</td><td>Publisher Confirms</td><td class="t-ok">RabbitMQ가 얻는 것</td></tr>
+        <tr><td>없음</td><td>Stream</td><td class="t-ok">RabbitMQ가 얻는 것</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>어휘의 대응보다 <b>없음</b>이라고 적힌 칸이 중요하다. 거기가 직접 만들어야 할 부분이다.</li>
+      <li>BullMQ가 잡 관리에서 앞서고, RabbitMQ가 라우팅과 전달 보장에서 앞선다.</li>
+    </ul>
+  </div>
+</article>
+
+<article class="item" id="item-34" data-spy>
+  <header class="item-head">
+    <div class="item-num">ITEM 34</div>
+    <h3>BullMQ 기능별 RabbitMQ 구현법</h3>
+    <p class="item-tagline">"이거 BullMQ에선 한 줄이었는데"를 만날 때 펴 보는 장.</p>
+  </header>
+
+  <h4>1. 재시도 3회 + 백오프</h4>
+  <div class="code-compare">
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">BullMQ</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">await queue.add('pay', data, {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 2000 },
+});</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+        <span class="code-tag">RabbitMQ 4.3</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 큐를 선언할 때 한 번만
+arguments: {
+  'x-queue-type': 'quorum',
+  'x-delivery-limit': 3,
+  'x-delayed-retry-type': 'all',
+  'x-delayed-retry-min': 2000,
+  'x-delayed-retry-max': 60000,
+  'x-dead-letter-exchange': 'app.dlx',
+}</code></pre>
+    </div>
+  </div>
+
+  <h4>2. 5분 뒤 실행</h4>
+  <p>
+    TTL 300초짜리 지연 큐를 만들고 DLX를 업무 exchange로 지정한 뒤 그 큐로 발행한다(ITEM 23).
+    지연 값이 여러 개면 <b>값마다 큐를 따로</b> 만든다. 일 단위 이상이면 DB + 스케줄러로 뺀다.
+  </p>
+
+  <h4>3. 레이트 리밋 (외부 API 초당 10회)</h4>
+  <p>
+    브로커에는 없다. 컨슈머 쪽에서 만든다. 가장 단순한 방법은 <b>prefetch를 낮추고 처리에 인위적 간격</b>을
+    두는 것이고, 정확한 제어가 필요하면 Redis 기반 토큰 버킷을 컨슈머 앞에 두거나
+    <b>이 구간만 BullMQ를 유지</b>하는 게 현실적이다.
+  </p>
+
+  <h4>4. 크론 / 반복 작업</h4>
+  <p>
+    RabbitMQ에 스케줄러는 없다. 쿠버네티스 CronJob, 애플리케이션 내 스케줄러, 또는 BullMQ의 repeatable job이
+    <b>메시지를 발행</b>하게 한다. 브로커는 배달만 한다.
+  </p>
+
+  <h4>5. 잡 결과 받아오기 (RPC)</h4>
+  <div class="code">
+    <div class="code-head"><div class="code-dots"><i></i><i></i><i></i></div>
+      <span class="code-file">rpc.ts</span><span class="code-spacer"></span></div>
+<pre><code class="language-typescript">// 요청자: 응답 전용 임시 큐를 만들고 replyTo/correlationId 로 짝을 맞춘다
+const { queue: replyTo } = await ch.assertQueue('', { exclusive: true });
+const correlationId = randomUUID();
+
+await ch.consume(replyTo, (msg) => {
+  if (msg?.properties.correlationId === correlationId) resolve(msg.content);
+}, { noAck: true });
+
+ch.sendToQueue('rpc.calc', payload, { replyTo, correlationId });</code></pre>
+  </div>
+  <div class="callout warn">
+    <div class="ic">!</div>
+    <div>
+      <p class="callout-title">RPC는 최후의 수단</p>
+      <p>
+        메시지 브로커로 동기 요청-응답을 흉내 내면 브로커 장애가 곧 API 장애가 되고, 타임아웃과 응답 큐 정리를
+        전부 직접 관리해야 한다. 정말 응답이 필요하면 HTTP/gRPC를 쓰고, 브로커는 비동기 흐름에 쓰는 게 낫다.
+      </p>
+    </div>
+  </div>
+
+  <h4>6. 진행률 표시</h4>
+  <p>
+    대응물이 없다. 컨슈머가 애플리케이션 DB나 Redis에 진행률을 쓰고, 프런트가 그걸 폴링하거나 SSE로 받는다.
+    브로커를 경유시키지 않는다.
+  </p>
+
+  <h4>7. 부모-자식 작업 (Flow)</h4>
+  <p>
+    없다. 여러 단계를 엮어야 하면 <b>각 단계가 다음 단계 이벤트를 발행</b>하는 코레오그래피로 풀거나,
+    상태를 들고 있는 오케스트레이터(사가) 서비스를 둔다. 이 지점은 BullMQ가 확실히 편하다.
+  </p>
+
+  <div class="callout success">
+    <div class="ic">✓</div>
+    <div>
+      <p class="callout-title">마지막 조언</p>
+      <p>
+        RabbitMQ를 <b>BullMQ 대체재로 보면 계속 불편하다.</b> 잡 관리 도구가 아니라
+        <b>서비스 사이의 배관</b>으로 보는 순간 설계가 자연스러워진다. 배관은 라우팅과 유실 방지에 집중하고,
+        잡 관리가 필요한 자리에는 여전히 BullMQ를 써도 된다. 두 개를 겹쳐 쓰는 건 타협이 아니라
+        각자 잘하는 일을 시키는 것이다.
+      </p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <p class="summary-title">정리</p>
+    <ul>
+      <li>재시도/백오프/우선순위/DLQ는 RabbitMQ 4.3에서 브로커 설정으로 해결된다.</li>
+      <li>지연, 레이트 리밋, 크론, 진행률, 잡 의존성은 <b>내가 만들거나 다른 도구로</b> 푼다.</li>
+      <li>RPC는 가능하지만 권장하지 않는다.</li>
+      <li>브로커는 배관, 잡 관리는 별개 층. 이 구분이 설계의 출발점이다.</li>
+    </ul>
+  </div>
+</article>
