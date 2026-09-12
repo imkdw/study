@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>RSS 샘플 피드</title>
+    <link>https://example.com/</link>
+    <item>
+      <title>첫 번째 글</title>
+      <link>https://example.com/posts/1</link>
+      <guid isPermaLink="false">rss-guid-1</guid>
+      <pubDate>Wed, 01 Jan 2025 09:00:00 GMT</pubDate>
+      <dc:creator>홍길동</dc:creator>
+      <content:encoded><![CDATA[<p>첫 번째 글의 본문입니다.</p>]]></content:encoded>
+      <description>첫 번째 글 요약</description>
+    </item>
+    <item>
+      <title>두 번째 글</title>
+      <link>https://example.com/posts/2</link>
+      <guid isPermaLink="false">rss-guid-2</guid>
+      <pubDate>Thu, 02 Jan 2025 09:00:00 GMT</pubDate>
+      <dc:creator>김철수</dc:creator>
+      <description>두 번째 글 요약 (본문 없음)</description>
+    </item>
+  </channel>
+</rss>

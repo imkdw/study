@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.rss-wiki/
+*.db
+*.db-wal
+*.db-shm
+.pnpm-store/

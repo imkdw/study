@@ -1,0 +1,25 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "JSON Feed 샘플",
+  "home_page_url": "https://example.com/",
+  "items": [
+    {
+      "id": "json-guid-1",
+      "url": "https://example.com/json/1",
+      "title": "JSON 첫 번째 글",
+      "authors": [{ "name": "최유진" }],
+      "date_published": "2025-01-06T09:00:00Z",
+      "content_html": "<p>JSON 첫 번째 글 본문</p>",
+      "summary": "JSON 첫 번째 글 요약"
+    },
+    {
+      "id": "json-guid-2",
+      "url": "https://example.com/json/2",
+      "title": "JSON 두 번째 글",
+      "author": { "name": "정하늘" },
+      "date_published": "2025-01-07T09:00:00Z",
+      "content_text": "JSON 두 번째 글 본문 (텍스트)",
+      "summary": "JSON 두 번째 글 요약"
+    }
+  ]
+}

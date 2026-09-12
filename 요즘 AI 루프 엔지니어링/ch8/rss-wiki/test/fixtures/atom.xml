@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom 샘플 피드</title>
+  <id>https://example.com/atom</id>
+  <entry>
+    <title>Atom 첫 번째 글</title>
+    <id>atom-guid-1</id>
+    <link rel="alternate" href="https://example.com/atom/1"/>
+    <link rel="self" href="https://example.com/atom/1/self"/>
+    <author><name>이영희</name></author>
+    <published>2025-01-04T09:00:00Z</published>
+    <updated>2025-01-04T10:00:00Z</updated>
+    <content type="html">&lt;p&gt;Atom 첫 번째 글 본문&lt;/p&gt;</content>
+    <summary>Atom 첫 번째 글 요약</summary>
+  </entry>
+  <entry>
+    <title>Atom 두 번째 글</title>
+    <id>atom-guid-2</id>
+    <link rel="alternate" href="https://example.com/atom/2"/>
+    <author><name>박민수</name></author>
+    <updated>2025-01-05T10:00:00Z</updated>
+    <summary>Atom 두 번째 글 요약 (본문 없음)</summary>
+  </entry>
+</feed>

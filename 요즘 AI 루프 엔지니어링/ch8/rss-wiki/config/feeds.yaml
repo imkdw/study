@@ -1,0 +1,13 @@
+feeds:
+  - url: https://simonwillison.net/atom/everything/
+    name: Simon Willison's Weblog
+    seed_categories: [llm]
+    enabled: true
+  - url: https://blog.cloudflare.com/rss/
+    name: Cloudflare Blog
+    seed_categories: [infra, security]
+    enabled: true
+  - url: https://www.postgresql.org/news.rss
+    name: PostgreSQL News
+    seed_categories: [database]
+    enabled: true

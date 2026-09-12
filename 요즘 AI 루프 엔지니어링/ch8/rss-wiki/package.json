@@ -1,0 +1,28 @@
+{
+  "name": "rss-wiki",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "RSS 리더에 LLM을 붙여 주제별 누적 위키를 만드는 도구",
+  "bin": {
+    "rss-wiki": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "cli": "node --experimental-strip-types src/cli.ts"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.0.0",
+    "marked": "^15.0.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10"
+  }
+}

@@ -1,0 +1,51 @@
+schedule: "0 7 * * *"
+timezone: Asia/Seoul
+
+collect:
+  backfill_limit: 20
+  max_articles_per_run: 200
+  fetch_timeout_ms: 10000
+
+extract:
+  rss_content_min_length: 1000
+  fetch_timeout_ms: 10000
+  rate_limit_per_domain_rps: 1
+  max_content_chars: 50000
+
+dedupe:
+  title_similarity_threshold: 0.85
+  strip_query_params: [utm_source, utm_medium, utm_campaign, utm_term, utm_content, fbclid, ref, ref_src]
+
+llm:
+  runner: claude-cli
+  claude_bin: claude
+  summarize_model: claude-haiku-4-5
+  rewrite_model: claude-sonnet-5
+  concurrency: 4
+  rewrite_concurrency: 2
+  call_timeout_ms: 120000
+  backoff_on_rate_limit_ms: [5000, 20000, 60000]
+  daily_budget_usd: 0.5
+  language: ko
+
+server:
+  port: 4321
+  host: 127.0.0.1
+  enable_manual_run: true
+  stale_job_timeout_ms: 60000
+
+categories:
+  seeds: [llm, infra, frontend, database, career, security]
+  promote_after: 3
+  low_confidence_threshold: 0.5
+
+compose:
+  timeline_limit: 30
+  rewrite_every_days: 7
+  rewrite_after_n_items: 10
+
+retry:
+  max_attempts: 3
+  backoff_ms: [60000, 300000, 1500000]
+  feed_unhealthy_after: 5
+  feed_disable_after: 20

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>단일 아이템 피드</title>
+    <link>https://example.com/</link>
+    <item>
+      <title>유일한 글</title>
+      <link>https://example.com/posts/only</link>
+      <guid isPermaLink="false">rss-single-guid</guid>
+      <pubDate>Fri, 03 Jan 2025 09:00:00 GMT</pubDate>
+      <description>유일한 글 요약</description>
+    </item>
+  </channel>
+</rss>
