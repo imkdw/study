@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+
+# macOS
+.DS_Store
+
+# 별도 저장소 (imkdw/task-keeper)
+요즘 AI 루프 엔지니어링/ch3/skills-example/task-keeper/
