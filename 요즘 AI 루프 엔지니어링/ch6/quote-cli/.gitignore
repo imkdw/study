@@ -1,0 +1,4 @@
+# SQLite 데이터베이스 (quotes.json 을 시드로 실행 시 생성된다)
+quotes.db
+quotes.db-wal
+quotes.db-shm
