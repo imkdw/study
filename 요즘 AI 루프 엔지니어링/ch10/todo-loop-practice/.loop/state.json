@@ -1,0 +1,26 @@
+{
+  "tasks": {
+    "CALC-001": {
+      "status": "needs_human",
+      "attempts": 2,
+      "reason": "이전 실행이 중단되어 변경을 되돌렸습니다."
+    },
+    "CALC-002": {
+      "status": "needs_human",
+      "attempts": 2,
+      "reason": "TODO[CALC-002] 주석이 남아 있습니다."
+    },
+    "CALC-003": {
+      "status": "needs_human",
+      "attempts": 2,
+      "reason": "TODO[CALC-003] 주석이 남아 있습니다."
+    },
+    "CALC-004": {
+      "status": "pending",
+      "attempts": 0,
+      "reason": ""
+    }
+  },
+  "calls": 6,
+  "active": null
+}

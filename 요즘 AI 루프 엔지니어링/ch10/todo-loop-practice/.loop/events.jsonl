@@ -1,0 +1,13 @@
+{"time": "2026-09-18T07:05:55.172416+00:00", "event": "reset", "discovered": 4}
+{"time": "2026-09-18T07:12:11.617010+00:00", "event": "claimed", "attempt": 1, "worker": "manual", "task_id": "CALC-001"}
+{"time": "2026-09-18T07:12:28.537720+00:00", "event": "retry", "reason": "TODO[CALC-001] 주석이 남아 있습니다.", "task_id": "CALC-001"}
+{"time": "2026-09-18T07:12:48.562539+00:00", "event": "claimed", "attempt": 2, "worker": "manual", "task_id": "CALC-001"}
+{"time": "2026-09-18T07:12:54.035321+00:00", "event": "recovered", "task_id": "CALC-001"}
+{"time": "2026-09-18T07:12:54.036111+00:00", "event": "claimed", "attempt": 1, "worker": "manual", "task_id": "CALC-002"}
+{"time": "2026-09-18T07:12:57.873144+00:00", "event": "retry", "reason": "TODO[CALC-002] 주석이 남아 있습니다.", "task_id": "CALC-002"}
+{"time": "2026-09-18T07:12:59.349761+00:00", "event": "claimed", "attempt": 2, "worker": "manual", "task_id": "CALC-002"}
+{"time": "2026-09-18T07:13:00.301288+00:00", "event": "needs_human", "reason": "TODO[CALC-002] 주석이 남아 있습니다.", "task_id": "CALC-002"}
+{"time": "2026-09-18T07:13:00.607936+00:00", "event": "claimed", "attempt": 1, "worker": "manual", "task_id": "CALC-003"}
+{"time": "2026-09-18T07:13:01.084440+00:00", "event": "retry", "reason": "TODO[CALC-003] 주석이 남아 있습니다.", "task_id": "CALC-003"}
+{"time": "2026-09-18T07:13:01.658164+00:00", "event": "claimed", "attempt": 2, "worker": "manual", "task_id": "CALC-003"}
+{"time": "2026-09-18T07:13:02.009899+00:00", "event": "needs_human", "reason": "TODO[CALC-003] 주석이 남아 있습니다.", "task_id": "CALC-003"}
