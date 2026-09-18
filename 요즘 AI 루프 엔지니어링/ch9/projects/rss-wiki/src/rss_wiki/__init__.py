@@ -1,2 +1,3 @@
-def main() -> None:
-    print("Hello from rss-wiki!")
+from rss_wiki.cli import main
+
+__all__ = ["main"]

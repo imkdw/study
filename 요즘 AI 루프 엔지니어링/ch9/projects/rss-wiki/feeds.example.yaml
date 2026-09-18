@@ -1,0 +1,12 @@
+# rss-wiki 설정 예시. 실제 사용 시 feeds.yaml로 복사해 편집한다.
+
+feeds:
+  - url: https://example.com/feed.xml
+    name: Example Blog
+  - url: https://another-example.com/rss
+
+# 위키 산출물 폴더. 생략하면 "wiki" (feeds.yaml 기준 상대 경로).
+wiki_dir: wiki
+
+# SQLite 상태 파일 경로. 생략하면 "data/rss-wiki.db" (feeds.yaml 기준 상대 경로).
+db_path: data/rss-wiki.db

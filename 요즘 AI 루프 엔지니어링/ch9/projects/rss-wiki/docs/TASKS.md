@@ -1,0 +1,1051 @@
+# rss-wiki TASKS
+
+상태 표기: `[ ]` 미완료, `[x]` 완료, `BLOCKED(n회째)` 막힘 기록.
+
+## 이번 사이클 선정
+
+- **선정 없음. 미완료 항목이 0개다.** T11b가 PASS 12/12로 닫히면서 M1~M5의 모든 항목이 `[x]`가 됐고, Planner가 PRD.md를 처음부터 다시 읽어 각 요구를 실제 코드와 대조한 결과 대응하지 않는 요구가 하나도 없었다(대조 결과는 PLAN.md "현재 상태"에 모듈/상수 단위로 적었다). 새 항목을 억지로 만들지 않고 `docs/DONE`을 만들어 루프를 닫는다. 남은 일은 PLAN.md "종료 이후" 절의 사람 손 작업 셋(커밋 → 실제 피드로 한 번 실행 → 거기서 나온 것만 항목화)이다.
+- (T11b REVIEW 메모 1/2/3, 정보, 항목화하지 않음) 세 건 모두 평가자가 "새 항목을 만들지 말 것"을 권고한 정보성 메모다. (1) `오류: ` 접두사를 어느 테스트도 고정하지 않지만 사람이 읽는 장식이고 실제 실행으로 확인된다. (2) `run --help`에 `help=`가 없어 두 인자의 뜻이 README에만 있다 — 다음에 `cli.py`를 만질 일이 생기면 `help=` 두 줄이 가장 값싼 개선이다. (3) `--max-summaries`에 음수/0을 주면 조용히 0건으로 끝나지만 `pipeline.py:199-200`의 입구 가드가 SQLite `LIMIT -1` 문제를 정확히 막고 있어 버그가 아니다.
+- (T11a REVIEW 메모 2, 프로세스, 계속 유효) **뮤테이션 보고의 `N passed`는 실제 출력에서 그대로 옮긴다.** 뮤테이션마다 명령 출력의 마지막 요약 줄을 그대로 복사해 붙인다. T11b에서 10건 모두 IMPL 기록과 한 글자도 다르지 않아 이 규칙이 지켜졌음이 확인됐다.
+- (T11a REVIEW 메모 3, 프로세스, 계속 유효) **TASKS 문구와 다르게 구현/작성한 부분은 크기와 무관하게 IMPL.md "자체 결정" 절에 한 줄을 남긴다.** PRD 합의값(예: `--max-summaries` 기본 `20`, 출력 여섯 줄 문구)은 **테스트에 리터럴로 적고 구현 상수에서 가져오지 않는다**(T6e REVIEW 메모 1).
+- (T10c REVIEW 메모 3, 프로세스, 계속 유효) 선정된 항목 중 **착수하지 못한 것이 있으면 IMPL.md에 "미착수: {항목}, 사유" 한 줄을 남긴다.** 계획과 보고가 어긋나면 다음 planner가 기준선을 잘못 잡는다.
+- (T10c REVIEW 메모 1, 정보, 보류) `_tag_names`의 "이름 오름차순" 계약은 어느 테스트로도 고정돼 있지 않다. `src/rss_wiki/wiki.py:231`의 `sorted(names)`를 `sorted(names, reverse=True)`로 바꿔도 세 파일 42 passed로 생존한다. 평가자 권고대로 항목을 더하지 않는다 — 관찰 가능한 차이는 slug가 충돌하는 태그 쌍에서 어느 쪽이 `-2`를 받는지뿐이고, `write_tag_pages`와 `write_index`가 같은 함수를 써서 링크는 여전히 자기일관적이다. 나중에 태그 페이지 이름을 리터럴로 고정할 일이 생기면 그때 `-2`가 붙는 쪽을 함께 적는다.
+- (T10b REVIEW 메모 4, 정보, 보류) `pipeline.write_wiki`의 `write` → `write_tags` → `write_index_file` 호출 순서는 어느 테스트도 고정하지 않는다. 평가자 권고대로 항목을 더하지 않는다 — 세 쓰기 경로가 서로 다른 파일을 만들어 관찰 가능한 차이가 없다. 나중에 인덱스가 실제 파일 존재를 읽는 식으로 바뀌면 그때 다시 본다.
+- (T10a2 REVIEW 메모 3, 정보, 보류 유지) `render_tag_page(tag, [], {})`(글 0개) 경우는 어느 테스트도 부르지 않는다. `write_tag_pages`가 태그별로 글을 걸러 넘기므로 정상 경로에서 빈 목록이 생기지 않고, `render_index`의 0개 경우는 (n)이 덮는다.
+- (T10a REVIEW 메모 5, 정보, **T10b 결정에 반영**) 반환값 세기와 낡은 주제 페이지는 PLAN의 자체 결정 2건으로 답했다. 반환값은 글 파일 수 그대로 두고(T9c (a)/(d) 계약 보존), 낡은 주제 페이지는 지우지 않는다(PRD 4.5에 반영). 삭제 동작은 되돌릴 수 없어 자체 결정으로 넣지 않는다.
+- (T9c REVIEW 메모 3, 필수 방향, 닫힘) 주제 페이지/인덱스의 최신순 정렬은 `sort_articles`로 렌더 단계에서 명시 정렬하고 `"garbage"`/naive에서 예외를 내지 않는다. T10a (e)(f)(g)와 뮤테이션 (1)(2)(3)으로 고정됐다. T10b도 정렬을 새로 구현하지 않고 이 함수만 쓴다.
+- (T9a REVIEW 메모 4 / T8c REVIEW 메모 2, 프로세스, 계속 유효) shasum "작업 전"은 **편집을 시작하기 전에** 잰다. 이번 사이클의 T11b가 고치는 src는 `cli.py` 하나이므로 나머지 8개(`config.py`, `db.py`, `extract.py`, `fetch.py`, `pipeline.py`, `summarize.py`, `timeutil.py`, `wiki.py`)가 무변경 대상이다. `cli.py`는 `_run`이 통째로 새로 써지므로 shasum 비교 대상이 아니고, 기존 동작 중 유지해야 하는 것(`main([])` → usage + 1, `bogus` → `SystemExit(2)`)은 기존 테스트 3개가 그대로 통과하는 것으로 보인다.
+- (T10a REVIEW 메모 6, 프로세스, 계속 유효) 임시 복사본 뮤테이션을 `PYTHONPATH=<복사본>/src` 없이 돌리면 editable 설치가 원본 `src`를 잡아 **전부 거짓 생존**한다. 평가자가 T10a에서 6건 전부 `14 passed`로 통과하는 것을 직접 관찰했다. 공통 규칙의 "복사본 로드를 `__file__`로 먼저 확인"은 형식이 아니라 실제 방어물이다.
+- (T9b REVIEW 메모 4, 프로세스) 뮤테이션이 생존했을 때와 그 때문에 테스트를 보강했을 때는 그 사실을 IMPL.md에 그대로 적는다. T9b에서 (1)번 생존을 숨기지 않고 보고한 것이 평가의 신뢰 근거가 됐다.
+- (T8c REVIEW 메모 3, 프로세스) 뮤테이션 결과는 어떤 `-k` 범위로 돌렸는지까지 IMPL.md에 적는다. 좁혀서 돌린 실패 개수와 전체로 돌린 개수가 다를 수 있고, 범위가 없으면 평가자 재현값과 어긋나 보인다.
+- (T8b REVIEW 메모 2, 프로세스, 계속 유효) acceptance의 개수 기준선은 "기존 n개 포함 m개 이상" 대신 "신규 k개가 각각 별도 테스트로 존재"로 적는다. 기준선을 쓸 때는 작성 시점에 `pytest --collect-only -q`로 확인한 값만 쓴다.
+- (T10b REVIEW 메모 5, 프로세스) 개수 기준선에는 **어느 명령의 출력인지**까지 붙여 적는다. T10b acceptance의 "그대로 19"는 명령이 세 파일 묶음이라 실제로는 39였고(`test_wiki_pages.py` 단독은 19), 둘 다 맞는 값인데 문구만 어긋나 보였다.
+- (T10b REVIEW 메모 6, 프로세스) "기존 (a)~(g)는 건드리지 않는다" 대신 "기존 테스트의 로직/이름/기대 의미를 바꾸지 않는다(새 동작이 강제하는 개수 보정은 허용, IMPL에 기록)"로 적는다. T10b에서 새 기본 동작이 기존 테스트의 산출물 개수를 바꿔 생성자가 불필요하게 망설였다.
+- (T8b REVIEW 메모 5 / T8c REVIEW 메모 5) `given_up_feeds`의 CLI 노출과 README 안내 한 줄은 T11에 적었다. 지금은 사람에게 보여 주는 곳이 없다.
+- (T8a REVIEW 메모 1, 계속 유효) `save_summary`의 INSERT 순서는 요구하지 않는다. "한 트랜잭션 + 예외 시 rollback"만 남긴다. 순서는 DB 최종 상태로 관찰되지 않아 고정하면 테스트가 구현 내부 구조에 묶인다.
+- (T7c REVIEW 메모 4) T11 루프가 `ClaudeUnavailableError`를 삼키지 않는지는 T11 항목에 적었다.
+- (T7b2 REVIEW 메모 2) README의 `claude` 전제는 T11에 붙어 있다. T8b가 만지는 README 부분은 포기 해제 절뿐이라 겹치지 않는다.
+- (T7b REVIEW 메모 6) 뮤테이션은 TASKS 문구 그대로 적용해 기록한다. 문구가 모호해 해석이 필요하면 적용한 실제 diff 한 줄을 IMPL.md에 함께 적는다.
+- (T7b REVIEW 메모 5) README의 `claude` 설치/로그인 전제는 T11에 붙였다.
+- (T6f REVIEW 메모 2, T6b REVIEW 메모 4) nbsp 보류 유지. 태그 정규화는 T7a에서 `"a\xa0b"` → `"a-b"`로 고정됐다. 요약 입력 본문의 nbsp는 이번에도 건드리지 않는다.
+- (T6f REVIEW 메모 1, 선택) 저장된 평문 본문을 재시도 때 feed_content로 쓰는 경로 테스트는 T7c에 붙였다.
+- (T6e REVIEW 메모 1) 테스트 파라미터나 기대 목록을 구현 상수(`_BLOCK_TAGS`, 상태 집합 등)에서 가져오지 않는다. 테스트 안에 고정 기대값을 적고, 필요하면 상수와의 일치를 별도 스냅샷 테스트로 둔다. T6b (j)의 상태 값도 문자열 리터럴로 적는다.
+- (T6e REVIEW 메모 2) `extract.py`의 `_BLOCK_TAGS`를 바꾸는 항목은 touch에 `tests/test_extract.py`를 넣고 `_EXPECTED_BLOCK_TAGS`를 함께 고친다.
+- (T6d REVIEW 메모 3) JOURNAL 줄 시각은 기록 직전에 `date -Iseconds`로 얻은 실제 값을 쓴다. 추정 시각이나 반올림한 시각을 쓰지 않는다.
+- (T6d/T6e REVIEW 메모) `\xa0`(nbsp) 정규화는 계속 보류. T7에서 요약 입력 품질 문제가 보이면 다시 검토한다.
+- 공통 규칙(T5c REVIEW 메모 1, T6 REVIEW 메모 5): untracked 파일은 `git diff`로 증빙하지 않는다. 손대지 않는 src 파일은 작업 전후 `shasum`을 IMPL.md에 남기고, 뮤테이션은 임시 복사본에서만 한다. 복사본 src를 `PYTHONPATH` 앞에 두고 `python -c "import rss_wiki.extract as m; print(m.__file__)"`로 복사본 로드를 확인한다. editable 설치라 확인 없이 복사하면 원본을 로드하고, 복사본 디렉터리에서 `uv run pytest` shim을 써도 원본을 로드하므로 복사본의 가상환경 python으로 `python -m pytest`를 직접 실행한다.
+- T5c REVIEW 메모 2(선택)는 T8에 붙였다.
+- 보고 수치(테스트 수, grep 건수)는 실제 명령 출력 그대로 적는다(T4c REVIEW 메모 4, 계속 유효).
+- JOURNAL 기록은 모든 줄을 `- {ISO8601} {역할}: {요약}` 형식으로 쓴다(T4b3 REVIEW 메모 4). 직전 generator 줄(T4b3)에 `- ` 접두가 빠져 있었다.
+
+## M1. 프로젝트 기반
+
+- [x] T1. 의존성과 CLI 골격
+  - 내용: `pyproject.toml`에 feedparser, httpx, trafilatura, PyYAML 추가, 개발 의존성 그룹에 pytest 추가. `src/rss_wiki/cli.py`에 argparse 파서와 `run` 서브커맨드(지금은 "not implemented" 안내 후 종료 코드 0) 작성. `rss_wiki:main`이 `cli.main`을 호출하도록 연결.
+  - acceptance:
+    - `uv run rss-wiki --help` 종료 코드 0, 출력에 `run` 포함
+    - `uv run rss-wiki run --help` 종료 코드 0
+    - `uv run rss-wiki` (서브커맨드 없음) 종료 코드 0이 아니며 사용법 출력
+    - `uv run pytest tests/test_cli.py` 통과
+  - touch: `pyproject.toml`, `uv.lock`, `src/rss_wiki/__init__.py`, `src/rss_wiki/cli.py`, `tests/test_cli.py`
+
+- [x] T1b. CLI 테스트 보강, 디스패치 정리, README (T1 REVIEW 메모 2/3/4)
+  - 내용:
+    - `cli.py`: 서브커맨드 디스패치를 `set_defaults(func=...)` 방식으로 바꿔 도달 불가 `return 1`(`cli.py:26`)을 없앤다. `run` 서브파서에 `description` 지정. 동작(서브커맨드 없음 → usage + 1, `run` → "not implemented" + 0)은 유지.
+    - `tests/test_cli.py`: in-process 테스트 추가. `from rss_wiki import main`으로 `main(["run"])` 반환값 0과 capsys 출력 "not implemented" 검증, `main([])` 반환값 1, `main(["bogus"])`가 `SystemExit` 코드 2. 기존 서브프로세스 테스트 1개는 `rss_wiki` 스크립트 진입점(`uv run rss-wiki --help` 또는 `python -c "import rss_wiki; ..."`)을 거치도록 바꾼다.
+    - `README.md`: 설치(`uv sync`), 실행(`uv run rss-wiki run`), 테스트(`uv run pytest`) 세 줄 이상.
+  - acceptance:
+    - `uv run pytest tests/test_cli.py` 통과, 위 in-process 3경우가 각각 별도 테스트로 존재
+    - `uv run rss-wiki run --help` 종료 코드 0, 출력에 description 문구 포함
+    - `uv run rss-wiki bogus` 종료 코드 2
+    - `README.md` 가 비어 있지 않고 `uv sync`, `uv run rss-wiki run` 문자열 포함
+  - touch: `src/rss_wiki/cli.py`, `tests/test_cli.py`, `README.md`
+
+- [x] T2. `feeds.yaml` 로더
+  - 내용: `src/rss_wiki/config.py`에 `load_config(path) -> Config` 작성.
+    - `Config.feeds`: `FeedConfig(url: str, name: str | None)` 목록.
+    - `Config.wiki_dir`, `Config.db_path`: `pathlib.Path`. 최상위 키 `wiki_dir`, `db_path`가 없으면 `wiki`, `data/rss-wiki.db`. 상대 경로는 `feeds.yaml`이 있는 디렉터리 기준으로 절대 경로화한다. 절대 경로와 `~`는 그대로(`~`는 expanduser) 쓴다.
+    - `feeds` 키 누락, 항목의 `url` 누락/빈 문자열, 같은 URL 중복, `wiki_dir`/`db_path`가 문자열이 아님은 `ConfigError`. 파일 없음도 `ConfigError`. 알 수 없는 최상위 키는 무시.
+    - 저장소 루트에 예시 `feeds.example.yaml` 추가(`wiki_dir`, `db_path` 주석 포함).
+  - acceptance:
+    - `uv run pytest tests/test_config.py` 통과
+    - 테스트가 다음을 각각 검증: 정상 로드, `name` 생략 시 `None`, `url` 누락 오류, 중복 URL 오류, 파일 없음 오류, 경로 키 생략 시 기본값이 설정 파일 디렉터리 기준 절대 경로, 상대 경로 키가 설정 파일 디렉터리 기준으로 해석됨
+    - `uv run python -c "from rss_wiki.config import load_config; print(load_config('feeds.example.yaml'))"` 종료 코드 0
+  - touch: `src/rss_wiki/config.py`, `tests/test_config.py`, `feeds.example.yaml`
+
+- [x] T2b. 설정 로더 테스트 보강과 url 공백 처리 (T2 REVIEW 메모 1/2)
+  - 내용:
+    - `config.py`: `url`이 문자열이면 앞뒤 공백을 `strip()` 한 값을 쓴다. strip 후 빈 문자열이면 `ConfigError`. 중복 검사와 `FeedConfig.url`은 strip된 값 기준. (자체 결정: 공백 섞인 URL이 T4 식별 키/중복 검사를 어긋나게 하지 않도록)
+    - 필요하면 피드 검증을 `_parse_feeds(raw, config_path)` 같은 보조 함수로 분리한다(동작 변경 없음).
+    - `tests/test_config.py`: 기존 오류 테스트(`url` 누락, 중복 URL, 파일 없음)에 `match=` 추가. 새 테스트: `feeds` 키 누락, `url: ''`, `url: '   '`(공백만), 앞뒤 공백 url이 strip되어 로드되고 strip 후 중복이면 오류, `wiki_dir` 비문자열, `db_path` 비문자열, 절대 경로 `db_path`가 그대로 유지, `wiki_dir: ~/w`가 `Path.home()` 기준으로 풀림(monkeypatch로 `HOME` 지정), 알 수 없는 최상위 키 무시. 각 경우는 별도 테스트(파라미터화 허용). 모든 오류 테스트는 `match=`로 원인을 구분한다.
+  - acceptance:
+    - `uv run pytest tests/test_config.py` 통과, 위 새 경우가 각각 테스트로 존재
+    - `uv run pytest` 전체 통과 (기존 11개 포함)
+    - `grep -n "pytest.raises(ConfigError)$\|pytest.raises(ConfigError):" tests/test_config.py` 결과 없음 (match 없는 raises가 남지 않음)
+  - touch: `src/rss_wiki/config.py`, `tests/test_config.py`
+
+- [x] T3. SQLite 스키마
+  - 내용: `src/rss_wiki/db.py`에 `connect(path) -> sqlite3.Connection`과 스키마 생성. 상위 디렉터리가 없으면 만든다. `PRAGMA foreign_keys = ON`. PRD 5절의 `feeds`(url 유일, name, last_fetched_at, consecutive_failures 기본 0, last_error), `articles`(feed_id 참조, key, title, link, published_at, content, status, failure_count 기본 0, last_error, 수집 시각 created_at), `summaries`(article_id 유일 참조, summary_lines, key_points, created_at), `tags`(name 유일), `article_tags`((article_id, tag_id) 기본 키). `articles`는 (feed_id, key) 유일, status는 pending / summarized / failed / given_up CHECK 제약, 기본값 pending. 목록 필드(summary_lines, key_points)는 JSON 문자열로 저장. 두 번 호출해도 안전(IF NOT EXISTS). 이번 항목은 스키마와 연결만 만들고 조회/저장 함수는 T4 이후에 추가한다.
+  - acceptance:
+    - `uv run pytest tests/test_db.py` 통과. 테스트가 각각 검증: 없는 하위 디렉터리 임시 경로에 DB 파일 생성, 테이블 5개 존재, 같은 (feed_id, key) 중복 삽입 시 `sqlite3.IntegrityError`, status에 허용 외 값 삽입 시 `IntegrityError`, 없는 feed_id 참조 삽입 시 `IntegrityError`, 같은 경로로 `connect` 재호출 무오류
+    - `uv run pytest` 전체 통과
+  - touch: `src/rss_wiki/db.py`, `tests/test_db.py`
+
+- [x] T3b. DB 테스트 정리 (T3 REVIEW 메모 2)
+  - 내용: `tests/test_db.py`만 고친다. `db.py` 스키마와 `created_at` 기본값은 시각 형식 합의 전이므로 건드리지 않는다.
+    - 연결을 `yield` 후 `close()` 하는 `conn` fixture(또는 `contextlib.closing`)로 바꿔 모든 테스트가 연결을 닫는다.
+    - 기존 `IntegrityError` 테스트 3개에 `match=` 추가: 중복 (feed_id, key) → `"UNIQUE"`, 잘못된 status → `"CHECK"`, 없는 feed_id → `"FOREIGN KEY"`.
+    - 재호출 테스트: 첫 연결에서 피드 1행 삽입/커밋/종료 후 같은 경로로 `connect` 재호출, 행이 그대로 있고 `PRAGMA foreign_keys`가 1인지 확인.
+    - 새 테스트: 글 삽입 시 기본값 `status='pending'`, `failure_count=0`, `created_at` 비어 있지 않음(형식은 검증하지 않음). `feeds.url` 중복 → `"UNIQUE"`. 같은 article_id로 `summaries` 두 번 삽입 → `"UNIQUE"`. 없는 article_id 참조 `summaries` → `"FOREIGN KEY"`. 없는 tag_id 참조 `article_tags` → `"FOREIGN KEY"`. 같은 (article_id, tag_id) 두 번 → `"UNIQUE"`.
+  - acceptance:
+    - `uv run pytest tests/test_db.py -W error::ResourceWarning` 통과 (경고가 오류로 바뀌어도 통과)
+    - `grep -n "pytest.raises(sqlite3.IntegrityError)" tests/test_db.py` 결과 없음 (모든 raises에 `match=` 있음)
+    - 위 새 경우가 각각 별도 테스트(파라미터화 허용)로 존재
+    - `uv run pytest` 전체 통과 (기존 27개 포함)
+  - touch: `tests/test_db.py`
+
+- [x] T2c. 설정 로더 오류 메시지 구분과 남은 분기 테스트 (T2b REVIEW 메모 1/5)
+  - 내용:
+    - `config.py`: url 누락(키 없음 또는 `None`)은 기존 "feeds 항목에 url이 없습니다", 문자열이 아닌 url(`url: 5`)은 새 메시지 "url은 문자열이어야 합니다: {item!r}", strip 후 빈 문자열은 "url이 비어 있습니다: {item!r}"로 나눈다. 그 외 동작 변경 없음.
+    - `tests/test_config.py`: 모든 `match=`를 메시지 고유 부분으로 좁힌다(`"url이 없습니다"`, `"url은 문자열이어야"`, `"url이 비어 있습니다"`, `"중복된 피드 url"`, `"feeds 키가 없습니다"`, `"wiki_dir은 문자열이어야"`, `"db_path는 문자열이어야"`, `"설정 파일을 찾을 수 없습니다"`). 새 테스트: `feeds`가 목록 아님 → `"feeds는 목록이어야"`, 항목이 매핑 아님 → `"feeds 항목은 매핑이어야"`, `name` 비문자열 → `"name은 문자열이어야"`, YAML 파싱 오류 → `"파싱할 수 없습니다"`, 최상위가 매핑 아님 → `"형식이 올바르지 않습니다"`, `url: 5` → `"url은 문자열이어야"`.
+  - acceptance:
+    - `uv run pytest tests/test_config.py` 통과, 위 새 경우 6개가 각각 테스트로 존재
+    - `grep -nE 'match="(url|feeds)"' tests/test_config.py` 결과 없음 (느슨한 패턴이 남지 않음)
+    - `uv run pytest` 전체 통과
+  - touch: `src/rss_wiki/config.py`, `tests/test_config.py`
+
+- [x] T3c. 시각 헬퍼와 스키마 시각 기본값 제거 (T3b REVIEW 메모 2/3/4, PRD 5절 시각 형식)
+  - 내용:
+    - 새 `src/rss_wiki/timeutil.py`: `now_iso() -> str`은 `datetime.now().astimezone().isoformat(timespec="seconds")`. `struct_time_to_iso(value: time.struct_time | None) -> str | None`은 feedparser의 `*_parsed`(UTC)를 `datetime(*value[:6], tzinfo=UTC).astimezone()`로 로컬 변환해 같은 형식 문자열로 반환, `None`이면 `None`.
+    - `src/rss_wiki/db.py`: `articles.created_at`, `summaries.created_at`의 `DEFAULT CURRENT_TIMESTAMP`를 지우고 `NOT NULL`은 유지(앱이 `now_iso()` 값을 넣는다). 스키마 생성 뒤 `PRAGMA user_version = 1`을 기록한다. 아직 배포된 DB가 없으므로 마이그레이션 코드는 만들지 않는다.
+    - `pyproject.toml`: `[tool.pytest.ini_options]`에 `filterwarnings = ["error"]` 추가 (경고가 테스트 실패가 되도록).
+    - `tests/test_db.py`: 글/요약 삽입에 `created_at`을 넘기도록 수정. 기본값 테스트는 `status`/`failure_count`만 본다. 새 테스트: `created_at` 없이 글 삽입 → `IntegrityError` `match="NOT NULL"`, `PRAGMA user_version == 1`, 없는 article_id 참조 `article_tags` → `match="FOREIGN KEY"`. 삽입 id는 하드코딩 `1` 대신 `cursor.lastrowid`로 받는다.
+    - 새 `tests/test_timeutil.py`: `monkeypatch.setenv("TZ", "Asia/Seoul")` 후 `time.tzset()`(테스트 끝에 원래 TZ로 되돌리고 다시 `tzset`)로 고정. UTC `2026-09-17 15:13:02` struct_time → `"2026-09-18T00:13:02+09:00"`, `None` → `None`, `now_iso()`가 `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00$`에 맞음.
+  - acceptance:
+    - `uv run pytest` 전체 통과 (T2c 포함 기존 테스트 전부, `filterwarnings = ["error"]` 적용 상태)
+    - `grep -n CURRENT_TIMESTAMP src/rss_wiki/db.py` 결과 없음
+    - `uv run pytest tests/test_timeutil.py -v`에 위 3경우가 각각 별도 테스트로 존재
+    - `uv run python -c "from rss_wiki.timeutil import now_iso; print(now_iso())"` 종료 코드 0, 출력에 `+` 또는 `-` 오프셋 포함
+  - 메모(T2c REVIEW 메모 3): 현재 39개 테스트는 `-W error`로 통과가 확인됐다. `filterwarnings = ["error"]` 적용 뒤 실패가 나면 새 코드(연결 미종료, TZ 복원 누락 등) 쪽에서 원인을 찾는다. `tests/test_timeutil.py`의 TZ 변경은 fixture 정리 단계에서 반드시 되돌려 다른 테스트에 새지 않게 한다.
+  - touch: `src/rss_wiki/timeutil.py`, `src/rss_wiki/db.py`, `pyproject.toml`, `tests/test_db.py`, `tests/test_timeutil.py`
+
+- [x] T3d. `user_version` 하향 방지, 윤초 처리, DB/시각 테스트 정리 (T3c REVIEW 메모 1~4)
+  - 내용:
+    - `src/rss_wiki/db.py`: 모듈 상수 `SCHEMA_VERSION = 1`과 `class SchemaVersionError(Exception)` 추가. `connect`는 연결 후 `PRAGMA user_version`을 먼저 읽는다. 값이 `SCHEMA_VERSION`보다 크면 연결을 닫고 `SchemaVersionError("DB 스키마 버전 {현재}이 코드 버전 {SCHEMA_VERSION}보다 높습니다: {path}")`를 던진다. 그 외에는 기존대로 스키마를 만들고 `user_version`을 `SCHEMA_VERSION`으로 기록한다(마이그레이션 코드는 아직 없음).
+    - `src/rss_wiki/timeutil.py`: `struct_time_to_iso`가 초 필드를 `min(value.tm_sec, 59)`로 잘라 윤초(60, 61)에서 `ValueError`를 내지 않게 한다.
+    - `tests/test_db.py`: feed_id/tag_id 하드코딩 `1`(REVIEW 기준 `test_db.py:50`, `57`, `68`, `81`, `118`, `144`, `176`, `206`, `197`, `212`, `219`)을 삽입한 `cursor.lastrowid`로 바꾼다. 새 테스트: `summaries`에 `created_at` 없이 삽입 → `IntegrityError` `match="NOT NULL"`. 파일 DB의 `user_version`을 2로 올리고 닫은 뒤 `connect` 재호출 → `SchemaVersionError` `match="스키마 버전"`, 이후 같은 파일을 `sqlite3`로 직접 열어 `user_version`이 여전히 2인지 확인.
+    - `tests/test_timeutil.py`: 새 테스트 두 개. (a) `TZ=UTC`로 고정하면 `now_iso()`가 `+00:00`으로 끝남. (b) 서울 TZ에서 UTC `2026-09-17 15:13:60` struct_time(`time.struct_time((2026, 9, 17, 15, 13, 60, 3, 260, 0))`) → `"2026-09-18T00:13:59+09:00"`. 기존 TZ fixture를 TZ 값을 받는 형태로 일반화해도 된다(복원 보장 유지).
+  - acceptance:
+    - `uv run pytest` 전체 통과 (`filterwarnings = ["error"]` 상태, 기존 45개 포함)
+    - `uv run pytest tests/test_db.py -k "not_null or schema_version or version" -v`에 `summaries` NOT NULL 테스트와 버전 하향 방지 테스트가 각각 존재하고 통과
+    - `uv run pytest tests/test_timeutil.py -v`에 UTC 오프셋 테스트와 윤초 테스트가 각각 별도로 존재하고 통과 (총 5개 이상)
+    - `grep -nE "\(1, |, 1\)|feed_id = 1|tag_id = 1" tests/test_db.py` 결과에 feed_id/tag_id 하드코딩이 남지 않음 (값 `1`이 id가 아닌 다른 의미로 쓰인 줄만 허용, IMPL.md에 해당 줄 설명)
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/timeutil.py`, `tests/test_db.py`, `tests/test_timeutil.py`
+
+## M2. 수집
+
+- [x] T4a. 피드 파싱과 항목 정규화 (DB/HTTP 무관, T3d REVIEW 메모 1/4)
+  - 선행: T3d의 윤초 처리(완료, PASS).
+  - 내용 (TZ fixture 통합, T3d REVIEW 메모 4):
+    - 새 `tests/conftest.py`에 TZ를 지정해 `time.tzset()` 하고 끝에 원래 TZ로 복원(`finally`)하는 헬퍼 하나(예: `set_tz(name)` 컨텍스트 매니저)와 이를 쓰는 fixture `seoul_tz`, `utc_tz`를 둔다.
+    - `tests/test_timeutil.py`의 두 fixture 정의를 지우고 conftest 것을 쓴다. 테스트 5개의 이름과 기대값은 그대로.
+  - 내용: 새 `src/rss_wiki/fetch.py`.
+    - `@dataclass(frozen=True) FeedEntry(key: str, title: str | None, link: str | None, published_at: str | None, content: str | None)`, `@dataclass(frozen=True) ParsedFeed(title: str | None, entries: list[FeedEntry])`, `class FeedParseError(Exception)`.
+    - `parse_feed(data: bytes) -> ParsedFeed`: `feedparser.parse(data)`. `bozo`가 참이고 항목이 0개면 `FeedParseError("피드를 파싱할 수 없습니다: {bozo_exception}")`. 항목이 있으면 `bozo`여도 진행한다.
+    - 식별 키: `entry.get("id")`(RSS `guid`와 Atom `id`를 feedparser가 `id`로 넘김)를 strip해 비어 있지 않으면 사용, 아니면 strip한 `link`, 둘 다 없으면 그 항목은 건너뛴다.
+    - `published_at`: `published_parsed`, 없으면 `updated_parsed`를 `struct_time_to_iso`로 변환, 둘 다 없으면 `None`.
+    - `content`: `entry.content`가 있으면 첫 요소의 `value`, 없으면 `summary`, 둘 다 없으면 `None`.
+    - 항목 순서는 피드 순서를 그대로 유지한다(최근 10개 선별은 T4b에서).
+    - 피드 제목은 `parsed.feed.get("title")`.
+  - acceptance:
+    - `uv run pytest tests/test_fetch.py -v` 통과. 인라인 XML 바이트로 각각 별도 테스트: RSS 2.0 정상(`guid` → key, `pubDate` → 서울 TZ 고정 시 `+09:00` 문자열, `description` → content), Atom 정상(`id` → key, `updated`만 있을 때 `published_at`, `<content>` → content), `guid` 없는 항목은 `link`가 key, `guid`/`link` 모두 없는 항목 제외, 발행일 없는 항목 `published_at is None`, `content:encoded`가 `description`보다 우선, 피드 순서 유지, 깨진 입력(`b"not xml"`) → `FeedParseError` `match="파싱할 수 없습니다"`
+    - `uv run pytest` 전체 통과 (`filterwarnings = ["error"]` 상태, 기존 49개 포함)
+    - `uv run pytest tests/test_timeutil.py -v` 5 passed (fixture 이동 후에도 그대로)
+    - `grep -n "def seoul_tz\|def utc_tz" tests/test_timeutil.py tests/test_fetch.py` 결과 없음 (TZ fixture 정의는 `tests/conftest.py`에만 있음)
+    - `TZ=UTC uv run pytest -q` 전체 통과 (fixture 복원이 실행 환경 TZ에 의존하지 않음)
+    - `grep -nE "import (httpx|sqlite3)|from rss_wiki(\.db| import db)" src/rss_wiki/fetch.py` 결과 없음 (이번 항목은 DB/HTTP를 쓰지 않음)
+  - 메모: feedparser가 테스트 중 경고(DeprecationWarning 등)를 내면 `filterwarnings = ["error"]` 때문에 실패한다. 전역 설정을 끄지 말고, 원인이 라이브러리 내부로 확인되면 `pyproject.toml`에 해당 경고만 좁혀 `ignore` 항목을 추가하고 IMPL.md에 근거를 적는다(이 경우 `pyproject.toml` touch 허용). `test_fetch.py`의 서울 TZ 고정은 conftest의 `seoul_tz`를 쓴다.
+  - touch: `src/rss_wiki/fetch.py`, `tests/test_fetch.py`, `tests/conftest.py`, `tests/test_timeutil.py`, (조건부) `pyproject.toml`
+
+- [x] T4a2. 피드 파싱 보정: 빈 응답/HTML 거절, URL 아닌 link 제거, 누락 분기 테스트 (T4a REVIEW 메모 1/2/3)
+  - 내용 (`src/rss_wiki/fetch.py`):
+    - 오류 조건 확장 (자체 결정, PRD 7절 "피드 파싱 실패는 연속 실패 증가"에 맞추기 위해): 항목이 0개이고 (`parsed.bozo`가 참 또는 `parsed.version`이 빈 문자열)이면 `FeedParseError`. bozo 원인이 있으면 기존 메시지 `"피드를 파싱할 수 없습니다: {bozo_exception}"`, 원인 없이 version만 비었으면 `"피드를 파싱할 수 없습니다: RSS/Atom 형식이 아닙니다"`. 항목이 1개 이상이면 bozo여도 진행(기존 유지). 항목 0개인 정상 RSS/Atom(`version`이 있음)은 오류가 아니다.
+    - `FeedEntry.link` (자체 결정): strip한 `link`가 `http://` 또는 `https://`로 시작할 때만 그 값을 쓰고, 아니면 `None`. `guidislink`로 guid가 link에 들어간 `urn:uuid:...` 값이 여기서 걸러진다. 식별 키 규칙(`_entry_key`)은 바꾸지 않는다(guid 우선, 없으면 strip한 link 원문).
+  - 내용 (`tests/test_fetch.py`, 각각 별도 테스트):
+    - `b""` → `FeedParseError` `match="파싱할 수 없습니다"`
+    - `b"<html><body><p>hello</p></body></html>"` → `FeedParseError` `match="파싱할 수 없습니다"`
+    - 항목 0개인 정상 RSS 2.0(`<channel><title>t</title></channel>`) → 오류 없이 `entries == []`, `title == "t"`
+    - 닫는 태그가 빠졌지만 항목 1개가 있는 RSS → 오류 없이 항목 1개
+    - `<guid>   </guid>`(공백뿐)과 `<link>`가 있는 항목 → key가 strip한 link
+    - Atom 항목에 `published`와 `updated`가 둘 다 있으면 `published_at`이 `published` 값(서울 TZ `seoul_tz` fixture)
+    - `<link>` 없이 `<guid>urn:uuid:1</guid>`만 있는 RSS 항목 → key `"urn:uuid:1"`, `link is None`
+    - 기존 Atom 정상 테스트에 피드 `title` 확인 한 줄 추가
+  - acceptance:
+    - `uv run pytest tests/test_fetch.py -v` 통과, 위 새 경우 7개가 각각 별도 테스트로 존재 (기존 8개 포함 15개 이상)
+    - `uv run pytest` 전체 통과 (`filterwarnings = ["error"]` 상태, 기존 57개 포함)
+    - `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import (httpx|sqlite3)|from rss_wiki(\.db| import db)" src/rss_wiki/fetch.py` 결과 없음
+  - touch: `src/rss_wiki/fetch.py`, `tests/test_fetch.py`
+
+- [x] T4b. `skipped_keys` 스키마 v2와 새 글 등록 (PRD 4.2/5절 합의 B, T3d REVIEW 메모 2/3, T4a REVIEW 메모 4)
+  - 선행: T4a PASS, T4a2 PASS(모두 충족, 현재 전체 64 passed). `fetch.py`는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/db.py`):
+    - `SCHEMA`에 `skipped_keys (feed_id INTEGER NOT NULL REFERENCES feeds (id), key TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (feed_id, key))` 추가, `SCHEMA_VERSION = 2`. 배포된 DB가 없으므로 버전 1 DB는 `CREATE TABLE IF NOT EXISTS`로 테이블이 더해지고 2로 기록되는 것으로 충분하다(마이그레이션 코드 없음).
+    - `FIRST_RUN_LIMIT = 10` 모듈 상수.
+    - `get_or_create_feed(conn, url: str, name: str | None) -> int`: `feeds.url`로 찾아 id 반환, 없으면 삽입. 있는데 `name`이 다르면 갱신한다.
+    - `register_entries(conn, feed_id: int, entries: Sequence[EntryLike], now: str) -> int`: 새로 `articles`에 넣은 행 수를 반환. `EntryLike`는 `key`, `title`, `link`, `published_at`, `content` 속성을 가진 `typing.Protocol`로 `db.py`에 둔다(`fetch.py`를 import하지 않기 위해).
+      - 새 글 = 해당 feed_id의 `articles.key`와 `skipped_keys.key` 어디에도 없는 키. 같은 호출 안에서 key가 중복되면 첫 번째만 쓴다.
+      - 첫 수집 = 해당 feed_id의 `articles`와 `skipped_keys`가 모두 비어 있음. 이때 새 글을 `published_at` 내림차순으로 정렬해(비교는 `datetime.fromisoformat`, `None`은 뒤로, 같은 값은 피드 순서 유지) 앞 `FIRST_RUN_LIMIT`개만 `articles`에 넣고 나머지 키는 `skipped_keys`에 넣는다.
+      - 첫 수집이 아니면 새 글 전부를 `articles`에 넣는다(상한 없음).
+      - `articles.created_at`과 `skipped_keys.created_at`은 인자 `now`. 커밋은 함수 끝에서 한 번.
+  - 내용 (`tests/test_db.py`, REVIEW 메모 반영):
+    - `test_connect_sets_user_version`은 `SCHEMA_VERSION`을 import해 비교한다(`tests/test_db.py:42`).
+    - 버전 거절 테스트(`tests/test_db.py:272-289`)는 `PRAGMA user_version = SCHEMA_VERSION + 1`을 쓴다. 새 테스트: 테이블 없는 새 파일을 `sqlite3`로 직접 만들어 `user_version`만 `SCHEMA_VERSION + 1`로 올리고 `connect` → `SchemaVersionError`, 그 뒤 `sqlite_master`에 `feeds` 테이블이 없음.
+    - 새 테스트: `user_version` 1이고 `skipped_keys`가 없는 DB(버전 1 스키마를 직접 만들거나 `DROP TABLE skipped_keys` 후 `user_version = 1`)를 `connect` → `skipped_keys` 존재, `user_version == 2`. 같은 (feed_id, key) `skipped_keys` 두 번 → `IntegrityError` `match="UNIQUE"`. 테이블 목록 테스트는 6개로 갱신.
+  - 내용 (새 `tests/test_register.py`, 엔트리는 테스트 안 간단한 dataclass로 만든다):
+    - `get_or_create_feed` 두 번 호출 시 같은 id, name 변경 반영
+    - 첫 수집 15개(발행일 서로 다름, 피드 순서는 섞음) → 반환 10, `articles` 10행이 발행일 최신 10개, `skipped_keys` 5행
+    - 첫 수집 후 같은 15개 + 새 키 2개로 다시 호출 → 반환 2, `skipped_keys` 키가 다시 등록되지 않음
+    - 첫 수집 7개 → 반환 7, `skipped_keys` 0행
+    - 발행일 `None` 섞인 첫 수집 12개 → `None` 항목이 먼저 제외됨
+    - 같은 호출 안 key 중복 → 한 번만 등록
+    - 다른 피드의 같은 key는 서로 영향 없음
+    - 저장된 `created_at`이 인자 `now`와 같음
+  - acceptance:
+    - `uv run pytest tests/test_db.py tests/test_register.py -v` 통과, 위 경우가 각각 별도 테스트로 존재
+    - `uv run pytest` 전체 통과 (`filterwarnings = ["error"]` 상태), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -n "user_version == 1\|user_version = 2" tests/test_db.py` 결과 없음
+    - `grep -nE "import httpx|from rss_wiki(\.fetch| import fetch)" src/rss_wiki/db.py` 결과 없음
+  - touch: `src/rss_wiki/db.py`, `tests/test_db.py`, `tests/test_register.py`
+
+- [x] T4b2. `register_entries` 원자성, 등록 테스트 보강, `published_at` 계약 (T4b REVIEW 메모 1/2/3)
+  - 선행: T4b PASS(충족). `fetch.py`는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/db.py`):
+    - `register_entries`의 조회부터 INSERT까지를 `try: ... conn.commit() except BaseException: conn.rollback(); raise`로 감싼다(또는 `with conn:`). 예외가 나면 이 호출이 넣은 행이 하나도 남지 않고 `conn.in_transaction`이 거짓이어야 한다.
+    - `EntryLike.published_at` 계약 (자체 결정): Protocol에 주석으로 "로컬 오프셋 포함 ISO8601 문자열 또는 None"을 적는다. 첫 수집 정렬에서 `datetime.fromisoformat`이 실패(`ValueError`)하거나 오프셋 없는(naive) 값은 오류로 멈추지 않고 `None`과 같이 발행일 없는 쪽(뒤)으로 보낸다. 저장 값은 받은 문자열 그대로 둔다. 근거: 발행일 하나가 이상하다고 피드 전체 등록이 멈추면 PRD 7절 "한 항목 실패가 전체를 멈추지 않는다"에 어긋난다.
+  - 내용 (`tests/test_register.py`, 각각 별도 테스트):
+    - (a) 첫 수집 15개에서 `skipped_keys.created_at`이 모두 `NOW`
+    - (b) 같은 `published_at` 12개 → 피드 순서 앞 10개가 `articles`, 뒤 2개 키가 `skipped_keys`
+    - (c) `+00:00`/`+09:00` 혼합 발행일 12개 → 절대 시각 기준 가장 오래된 2개가 `skipped_keys`
+    - (d) 기존 재호출 테스트에 새 키 2개가 `articles`에 키로 존재하는지 확인 추가
+    - (e) 없는 `feed_id`로 호출 → `IntegrityError` `match="FOREIGN KEY"`, 이후 `articles`/`skipped_keys` 0행, `conn.in_transaction is False`
+    - (g) `published_at="garbage"` 1개 + 정상 발행일 11개 첫 수집 → 오류 없이 반환 10, `garbage` 항목 키가 `skipped_keys`
+    - (h) 오프셋 없는 `"2026-09-18T00:00:00"` 1개 + 정상 11개 첫 수집 → 오류 없이 그 항목 키가 `skipped_keys`
+  - acceptance:
+    - `uv run pytest tests/test_register.py -v` 통과, 위 (a)~(e), (g), (h)가 각각 별도 테스트로 존재 (기존 8개 포함 15개 이상)
+    - `uv run pytest -q` 전체 통과 (`filterwarnings = ["error"]` 상태, 기존 75개 포함), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -n "rollback\|with conn" src/rss_wiki/db.py` 결과 있음
+    - `grep -nE "import httpx|from rss_wiki(\.fetch| import fetch)" src/rss_wiki/db.py` 결과 없음
+    - IMPL.md에 적은 테스트 개수가 `pytest --collect-only -q tests/test_register.py` 결과와 같음 (T4b REVIEW 개수 불일치 메모)
+  - touch: `src/rss_wiki/db.py`, `tests/test_register.py`
+
+- [x] T4b3. 등록 테스트 보강: 부분 삽입 롤백, 정확한 집합 단언, 원본 저장 (T4b2 REVIEW 메모 1/2)
+  - 선행: T4b2 PASS(충족). `src/` 는 건드리지 않는다(테스트만).
+  - 내용 (`tests/test_register.py`, 각각 별도 테스트 또는 기존 테스트 단언 교체):
+    - (a) 부분 삽입 롤백: 정상 발행일 항목 4개 뒤에 `title=["bad"]`(바인딩 불가) 항목 1개를 둔 첫 수집 → `sqlite3.ProgrammingError`(또는 `sqlite3.InterfaceError`, 실제 예외 클래스를 IMPL.md에 기록) 전파, 이후 `articles`/`skipped_keys` 0행, `conn.in_transaction is False`. 기존 없는 `feed_id` 롤백 테스트는 그대로 둔다.
+    - (b) 롤백 뒤 같은 연결로 정상 항목 13개 재호출 → 반환 10, `skipped_keys` 3행(첫 수집 판정 유지).
+    - (c) garbage 테스트와 naive 테스트의 `in` 단언을 `skipped_keys` 키 집합 전체에 대한 `==` 단언(예: `{"key-0", "garbage"}`, 실제 픽스처 키 이름에 맞춤)으로 바꾼다.
+    - (d) 첫 수집 뒤 두 번째 호출에서 `published_at="garbage"` 항목과 naive `"2026-09-18T00:00:00"` 항목 등록 → `articles.published_at`이 각각 원본 문자열 그대로.
+  - acceptance:
+    - `uv run pytest tests/test_register.py -v` 통과, (a)(b)(d)가 각각 별도 테스트로 존재 (기존 15개 포함 18개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "assert \"?[a-z-]+\"? in .*skipped" tests/test_register.py` 결과에 garbage/naive 테스트 줄이 남지 않음
+    - IMPL.md에 적은 테스트 개수가 `uv run pytest --collect-only -q tests/test_register.py` 결과와 같음
+  - touch: `tests/test_register.py`
+
+- [x] T4c. 피드 HTTP 요청과 link 절대화 (T4a2 REVIEW 메모 1/2, T4b REVIEW 메모 4)
+  - 선행: T4b PASS(충족). `db.py`는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/fetch.py`):
+    - `parse_feed(data: bytes, base_url: str | None = None)`: link를 strip 후 `base_url`이 있으면 `urllib.parse.urljoin(base_url, link)`로 절대화하고, 스킴 검사는 `urlsplit(link).scheme.lower() in {"http", "https"}`로 대소문자 무관하게 한다(자체 결정). 통과한 link 값은 절대화된 문자열 그대로 둔다. `_entry_key`는 원문 그대로(기존 키와 어긋나지 않게).
+    - `class FeedFetchError(Exception)`, 상수 `FETCH_TIMEOUT = 30.0`초, `USER_AGENT = "rss-wiki"` (자체 결정).
+    - `fetch_feed(url: str, client: httpx.Client | None = None) -> ParsedFeed`: `client`가 없으면 `httpx.Client(timeout=FETCH_TIMEOUT, follow_redirects=True, headers={"User-Agent": USER_AGENT})`를 만들어 쓰고 닫는다. 응답 상태가 2xx가 아니면 `FeedFetchError("피드 요청 실패: HTTP {status} {url}")`, `httpx.HTTPError`(타임아웃/연결 오류 포함)는 `FeedFetchError("피드 요청 실패: {예외 클래스 이름}: {메시지} {url}")`로 바꾼다(`from` 체인 유지). 성공하면 `parse_feed(response.content, base_url=str(response.url))`. `FeedParseError`는 그대로 올린다.
+  - 내용 (`tests/test_fetch.py`, 각각 별도 테스트, 네트워크 없이 `httpx.MockTransport`로 만든 `httpx.Client` 주입):
+    - 상대 link `/posts/1` + `base_url="https://example.com/feed.xml"` → `link == "https://example.com/posts/1"`, guid 없는 그 항목의 key는 원문 `"/posts/1"`
+    - 상대 link + `base_url` 없음 → `link is None`
+    - `HTTPS://example.com/a` → `link`가 `None`이 아님
+    - `ftp://example.com/a` → `link is None`
+    - 앞뒤 공백 있는 https link → strip된 값
+    - `b""`/HTML 테스트의 `match=`를 `"RSS/Atom 형식이 아닙니다"`로 좁히고, `b"not xml"` 테스트는 `"RSS/Atom 형식이 아닙니다"`가 메시지에 없음을 확인
+    - `fetch_feed` 200 + RSS 바이트 → 항목 파싱, 상대 link가 요청 URL 기준으로 절대화
+    - 리다이렉트(301 → 200) 뒤 상대 link가 최종 URL 기준으로 절대화
+    - 404 → `FeedFetchError` `match="HTTP 404"`
+    - 전송 계층이 `httpx.ConnectTimeout`을 던짐 → `FeedFetchError` `match="ConnectTimeout"`
+    - 200 + HTML → `FeedParseError` `match="RSS/Atom 형식이 아닙니다"`
+  - acceptance:
+    - `uv run pytest tests/test_fetch.py -v` 통과, 위 경우가 각각 별도 테스트로 존재 (기존 15개 포함 25개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import sqlite3|from rss_wiki(\.db| import db)" src/rss_wiki/fetch.py` 결과 없음
+    - `grep -n "MockTransport" tests/test_fetch.py` 결과 있음, 테스트 실행 중 실제 네트워크 접근 없음
+  - touch: `src/rss_wiki/fetch.py`, `tests/test_fetch.py`
+
+- [x] T4c2. `fetch_feed` URL 오류 변환과 기본 client 경로 테스트 (T4c REVIEW 메모 1/2/3/4)
+  - 선행: T4c PASS(충족). `db.py`, `config.py`는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/fetch.py`):
+    - (자체 결정) URL 형식 오류는 설정 검증이 아니라 `fetch_feed`에서 피드 단위 실패로 바꾼다. 근거: PRD 7절 "한 항목의 실패가 전체 실행을 멈추지 않는다". `config.py`에서 막으면 url 오타 하나로 실행 전체가 멈춘다.
+    - `client.get(url)`의 `except`를 `(httpx.HTTPError, httpx.InvalidURL)`로 넓혀 같은 메시지 형식 `"피드 요청 실패: {예외 클래스 이름}: {메시지} {url}"`과 `from exc` 체인을 유지한다.
+    - `_entry_link`의 스킴 비교에서 불필요한 `.lower()`는 제거해도 된다(`urlsplit`이 이미 소문자화). 제거 여부는 IMPL.md에 적는다.
+  - 내용 (`tests/test_fetch.py`, 각각 별도 테스트):
+    - (a) 기본 client로 `fetch_feed("http://[::1")` → `FeedFetchError` `match="InvalidURL"`, `__cause__`가 `httpx.InvalidURL`. 네트워크 도달 전 실패하므로 client 주입 없이 실행한다.
+    - (b) 기본 client 경로: `monkeypatch`로 `rss_wiki.fetch.httpx.Client`를 원래 `httpx.Client`를 감싼 팩토리로 바꿔 생성 kwargs를 기록하고 `transport=httpx.MockTransport(handler)`를 덧붙인다. handler는 첫 요청에 301(`Location` 상대 경로), 다음 요청에 RSS 200을 돌려주고 모든 요청 헤더를 기록한다. 단언: 반환 항목 파싱됨, 기록된 kwargs의 `timeout == FETCH_TIMEOUT`, 모든 요청의 `User-Agent == USER_AGENT`, 요청이 2회(리다이렉트 추종), 함수 종료 후 생성된 client의 `is_closed is True`.
+    - (c) 주입 client는 `fetch_feed` 뒤에도 `is_closed is False`.
+    - (d) 대문자 스킴 테스트(`tests/test_fetch.py:293`)의 `is not None` 단언을 실제 값 `==` 단언으로 바꾼다(실제 반환 문자열을 확인해 기대값으로 적는다).
+    - (e) 404 테스트에 메시지의 요청 URL 포함 단언을 더한다.
+  - acceptance:
+    - `uv run pytest tests/test_fetch.py -v` 통과, (a)(b)(c)가 각각 별도 테스트로 존재 (기존 25개 포함 28개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.fetch import fetch_feed, FeedFetchError
+try: fetch_feed('http://[::1')
+except FeedFetchError as e: print('ok', e)"` 출력이 `ok`로 시작하고 종료 코드 0
+    - 뮤테이션 확인: 기본 client 생성부의 `follow_redirects=True`를 `False`로 바꾸거나 `headers=` 인자를 지우면 (b)가 실패함을 IMPL.md에 실행 결과로 기록(확인 뒤 원복)
+    - IMPL.md의 모든 개수/건수(테스트 수, grep 건수)는 실제 명령 출력 그대로 적는다(T4c REVIEW 메모 4)
+    - `grep -nE "import sqlite3|from rss_wiki(\.db| import db)" src/rss_wiki/fetch.py` 결과 없음
+  - touch: `src/rss_wiki/fetch.py`, `tests/test_fetch.py`
+
+- [x] T5. 수집 단계 조율: 피드 성공/실패 기록과 설정에서 빠진 피드 제외 (T4b2 REVIEW 메모 3, T4b3 REVIEW 메모 2, T4c2 REVIEW 메모 1/2/3)
+  - 선행: T4c2 PASS 11/12(충족). `config.py`는 건드리지 않는다. `given_up` 피드 건너뛰기는 T8 몫이라 이번에는 만들지 않는다.
+  - 내용 (`tests/test_fetch.py`, REVIEW 메모 1):
+    - (a) 기본 client 경로 테스트(`test_fetch_feed_default_client_config_and_redirect_and_close`)의 301 `Location`을 상대 경로 `final/feed.xml`로 바꾸고, 반환 항목 link 기대값을 실제 결과(`https://example.com/final/posts/1` 형태, 실제 요청 URL에 맞춤)로 맞춘다. 두 번째 요청 URL도 단언한다.
+  - 내용 (`src/rss_wiki/db.py`):
+    - `record_feed_success(conn, feed_id: int, now: str) -> None`: `last_fetched_at = now`, `consecutive_failures = 0`, `last_error = NULL`, 커밋.
+    - `record_feed_failure(conn, feed_id: int, error: str) -> None`: `consecutive_failures = consecutive_failures + 1`, `last_error = error`, 커밋. `last_fetched_at`은 바꾸지 않는다(자체 결정: 마지막 성공 수집 시각으로 쓴다).
+    - `get_or_create_feed`: 기존 행이 있고 인자 `name`이 `None`이면 이름을 덮어쓰지 않는다(자체 결정: 수집 실패 경로에서 피드 title로 채운 이름이 지워지지 않게). 새 행 삽입은 기존대로 `None` 허용.
+    - `register_entries` docstring에 "예외 시 연결 전체를 rollback 하므로 호출 전에 커밋되지 않은 작업을 두지 않는다"를 적는다(T4b2 REVIEW 메모 3).
+  - 내용 (새 `src/rss_wiki/pipeline.py`):
+    - `@dataclass(frozen=True) CollectResult(new_articles: int, failed_feeds: int)`.
+    - `collect(conn, feeds: Sequence[FeedConfig], *, fetch: Callable[[str], ParsedFeed] = fetch_feed, now: Callable[[], str] = now_iso) -> CollectResult`. 설정 순서대로 피드마다:
+      1. `parsed = fetch(feed.url)`. `FeedFetchError`/`FeedParseError`면 `get_or_create_feed(conn, feed.url, feed.name)` 후 `record_feed_failure(conn, feed_id, str(exc))`, 실패 수 +1, 다음 피드.
+      2. `feed_id = get_or_create_feed(conn, feed.url, feed.name or parsed.title)`.
+      3. `register_entries(conn, feed_id, parsed.entries, now())`. `sqlite3.Error`면 `record_feed_failure`, 실패 수 +1, 다음 피드.
+      4. `record_feed_success(conn, feed_id, 같은 now 값)`, 새 글 수 누적.
+    - 그 밖의 예외(`RuntimeError` 등)는 잡지 않고 올린다. DB의 피드 중 인자 `feeds`에 없는 것은 조회도 갱신도 하지 않는다(PRD 4.1).
+  - 내용 (새 `tests/test_pipeline.py`, 가짜 fetch 함수와 고정 `now`를 주입, 네트워크/`httpx` 없음, 각각 별도 테스트. REVIEW 메모 3에 따라 잘못된 URL은 MockTransport가 아니라 가짜 fetch에서 `FeedFetchError`를 직접 던져 만든다):
+    - (b) 피드 2개 성공 → `new_articles` 합계, 두 피드 `last_fetched_at == NOW`, `consecutive_failures == 0`
+    - (c) 피드 A `FeedFetchError`, 피드 B 성공 → `failed_feeds == 1`, B 글 등록됨, A `consecutive_failures == 1`, `last_error`에 예외 메시지 포함, A `last_fetched_at is None`
+    - (d) A 실패 두 번 연속 → 2, 이후 성공 → 0, `last_error is None`
+    - (e) `FeedParseError`도 (c)와 같이 기록
+    - (f) 등록 중 `sqlite3.Error`(엔트리 `title=["bad"]`) → 해당 피드 실패 기록, `articles`/`skipped_keys`에 그 피드 행 0, 다른 피드는 정상 등록, `collect` 뒤 `conn.in_transaction is False`
+    - (g) 파일 DB에서 (f)를 돌린 뒤 연결을 닫고 다시 열어도 실패 기록(`consecutive_failures == 1`)이 남아 있음 (롤백이 실패 기록을 지우지 않음)
+    - (h) 설정에서 빠진 피드: 먼저 피드 A, B로 수집한 뒤 설정 [A]만으로 다시 수집 → 가짜 fetch 호출 URL 기록에 B 없음, B의 `articles` 행 수/`last_fetched_at`/`consecutive_failures` 불변
+    - (i) 두 번째 수집에서 이미 등록된 글은 다시 세지 않음(`new_articles`가 새 키 수와 같음)
+    - (j) 이름: 설정 `name` 없음 → `feeds.name == parsed.title`, 그 뒤 fetch 실패 → 이름 유지. 설정 `name` 있음 → 설정 값 우선
+    - (k) 가짜 fetch가 `RuntimeError` → `collect`가 그대로 올림
+  - 내용 (`tests/test_register.py`): `get_or_create_feed(conn, url, None)`이 기존 이름을 지우지 않는 테스트 1개.
+  - acceptance:
+    - `uv run pytest tests/test_pipeline.py -v` 통과, (b)~(k)가 각각 별도 테스트로 존재 (10개 이상)
+    - `uv run pytest tests/test_fetch.py -v` 통과, 기본 client 테스트의 handler가 상대 `Location`을 돌려줌(`grep -n "final/feed.xml" tests/test_fetch.py` 결과에 `https://`가 붙지 않은 줄 있음)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import httpx|^import feedparser" src/rss_wiki/pipeline.py` 결과 없음, `grep -nE "from rss_wiki(\.fetch| import fetch|\.pipeline)" src/rss_wiki/db.py` 결과 없음
+    - 뮤테이션 확인(임시 복사본 또는 확인 뒤 원복): `collect`의 `except` 대상에서 `sqlite3.Error`를 빼면 (f)가 실패, `record_feed_success`의 `consecutive_failures = 0`을 지우면 (d)가 실패. 실행 결과를 IMPL.md에 실제 출력으로 기록
+    - IMPL.md에 TASKS 시나리오와 다르게 구현한 부분이 있으면 전부 "자체 결정" 절에 적고, 없을 때만 "자체 결정: 없음"이라 쓴다(T4c2 REVIEW 메모 2). 모든 개수/건수는 실제 명령 출력 그대로
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/pipeline.py`, `tests/test_pipeline.py`, `tests/test_register.py`, `tests/test_fetch.py`
+
+- [x] T5b. (T5c로 흡수) 등록 테스트 단언 정리 (T4b3 REVIEW 메모 1)
+
+- [x] T5c. 수집 테스트 보강: now 1회 사용, 새 글 0개 성공 기록, 등록 단언 정리 (T5 REVIEW 메모 1/2, T5b 흡수, 테스트만)
+  - 선행: T5 PASS 11/12(충족). `src/`는 건드리지 않는다. 테스트가 기존 구현에서 실패하면 구현을 고치지 말고 IMPL.md에 원인을 적고 멈춘다.
+  - 내용 (`tests/test_pipeline.py`, 각각 별도 테스트 또는 기존 테스트 단언 추가):
+    - (a) 호출마다 다른 값을 돌려주는 `now`(예: `iter(["2026-09-18T00:00:01+09:00", "2026-09-18T00:00:02+09:00", ...])`를 감싼 함수)를 주입한 피드 1개 성공 수집 → 그 피드 `articles.created_at` 전부와 `feeds.last_fetched_at`이 같은 값, `now` 호출 횟수가 피드 수와 같음.
+    - (b) 피드 1개를 NOW1로 수집한 뒤 fetch 실패 1회(`consecutive_failures == 1`), 이어서 같은 엔트리를 NOW2로 재수집(새 글 0개) → `result.new_articles == 0`, `last_fetched_at == NOW2`, `consecutive_failures == 0`, `last_error is None`.
+    - (c) 기존 (c) 테스트(`test_collect_one_feed_fetch_error_records_failure_other_succeeds`)에 B의 `articles` 행 수 `== 2`와 B `last_fetched_at == NOW`, `consecutive_failures == 0` 단언 추가.
+  - 내용 (`tests/test_register.py`, 옛 T5b):
+    - 롤백 뒤 재호출 테스트는 `skipped_keys` 키 집합 전체를 `==`로 단언(실제 픽스처 키 이름에 맞춤).
+    - 두 번째 수집 원본 저장 테스트는 반환값 `== 2`와 `skipped_keys` 행 수 불변을 단언.
+    - 두 롤백 테스트의 실패 준비 코드는 헬퍼 하나로 묶는다(테스트 이름과 개수 유지).
+  - acceptance:
+    - `uv run pytest tests/test_pipeline.py -v` 통과, (a)(b)가 각각 별도 테스트로 존재 (기존 11개 포함 13개 이상)
+    - `uv run pytest tests/test_register.py -v` 통과, 개수 19개 이상(줄지 않음)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - 뮤테이션 확인(임시 복사본 또는 확인 뒤 원복): `pipeline.py`의 `record_feed_success(conn, feed_id, now_value)`를 `now()`로 바꾸면 (a) 실패, `record_feed_success` 호출을 `if new_count:` 안으로 옮기면 (b) 실패. 실행 결과를 IMPL.md에 실제 출력으로 기록
+    - `git diff --stat -- src/` 결과 없음 (이번 항목에서 src 무변경)
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `tests/test_pipeline.py`, `tests/test_register.py`
+
+## M3. 본문 추출과 요약
+
+- [x] T6. 본문 추출 순수 함수와 원문 HTTP 요청 (DB/pipeline 연결은 T6b)
+  - 선행: T5c PASS 11/12(충족). `db.py`, `pipeline.py`, `fetch.py`, `config.py`, `timeutil.py`, `cli.py`는 건드리지 않는다.
+  - 내용 (새 `src/rss_wiki/extract.py`):
+    - 상수: `MIN_BODY_LENGTH = 200` (자체 결정: PRD 4.3 "본문이 너무 짧으면"의 기준, strip 후 글자 수), `SUMMARY_INPUT_LIMIT = 20_000` (PRD 4.3 합의), `ARTICLE_FETCH_TIMEOUT = 30.0`, `USER_AGENT`는 `rss_wiki.fetch.USER_AGENT`를 재사용한다.
+    - `class ArticleFetchError(Exception)`.
+    - `fetch_article_html(url: str, client: httpx.Client | None = None) -> str`: `fetch_feed`와 같은 방식(기본 client는 타임아웃/리다이렉트 추종/UA, 만들었으면 닫음). 비 2xx, `httpx.HTTPError`, `httpx.InvalidURL`은 `ArticleFetchError("원문 요청 실패: ...")`(`from exc`). 성공하면 `response.text`.
+    - `extract_text(html: str, url: str | None = None) -> str | None`: `trafilatura.extract(html, url=url)` 결과를 strip, 비었거나 `None`이면 `None`.
+    - `html_to_text(fragment: str) -> str | None` (자체 결정: 피드 content는 HTML 조각일 수 있어 표준 라이브러리 `html.parser`로 태그 제거, `html.unescape`, 연속 공백/빈 줄 정리): 결과가 비면 `None`.
+    - `choose_body(extracted: str | None, feed_content: str | None) -> str | None`: `extracted`가 strip 후 `MIN_BODY_LENGTH` 이상이면 그것, 아니면 `html_to_text(feed_content)`가 비어 있지 않으면 그것(길이 무관), 아니면 `extracted`가 비어 있지 않으면 그것, 모두 없으면 `None`(요약 실패 대상, PRD 4.3).
+    - `truncate_for_summary(text: str, limit: int = SUMMARY_INPUT_LIMIT) -> str`: 앞 `limit`자.
+  - 내용 (새 `tests/test_extract.py`, 네트워크 없음, 각각 별도 테스트):
+    - `extract_text`: 제목/본문 문단 여러 개가 있는 인라인 HTML → 본문 문장 포함, 네비게이션 문구가 결과에 없음(실제 결과를 확인해 기대값을 정함). 빈 문자열/본문 없는 HTML → `None`.
+    - `html_to_text`: `<p>a &amp; b</p><p>c</p>` → 태그 없음, `a & b`와 `c` 포함. 공백뿐 → `None`.
+    - `choose_body`: 긴 추출문(≥200) 우선 / 짧은 추출문 + 피드 content → 피드 content 텍스트 / 추출 `None` + 피드 content → 피드 content / 짧은 추출문 + 피드 content `None` → 짧은 추출문 / 둘 다 `None` → `None` / 경계 199자와 200자.
+    - `truncate_for_summary`: 20,001자 → 20,000자, 짧은 문자열 그대로, 한글 문자열도 글자 수 기준.
+    - `fetch_article_html`: MockTransport 200 → 본문 문자열, 404 → `ArticleFetchError` `match="HTTP 404"`, `httpx.ConnectTimeout` → `match="ConnectTimeout"`, 기본 client로 `"http://[::1"` → `match="InvalidURL"`, 주입 client는 호출 뒤 `is_closed is False`.
+  - acceptance:
+    - `uv run pytest tests/test_extract.py -v` 통과, 위 경우가 각각 별도 테스트로 존재 (15개 이상)
+    - `uv run pytest -q` 전체 통과(`filterwarnings = ["error"]` 상태), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import sqlite3|from rss_wiki(\.db|\.pipeline| import (db|pipeline))" src/rss_wiki/extract.py` 결과 없음
+    - `uv run python -c "from rss_wiki.extract import truncate_for_summary, SUMMARY_INPUT_LIMIT; assert len(truncate_for_summary('가'*30000)) == SUMMARY_INPUT_LIMIT == 20000"` 종료 코드 0
+    - 기존 src 무변경 증빙(T5c REVIEW 메모 1): 작업 시작 전과 끝에 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/timeutil.py`를 실행해 두 출력을 IMPL.md에 그대로 붙이고, 두 출력이 같아야 한다. `git diff`는 증빙으로 쓰지 않는다
+    - 뮤테이션 확인(임시 복사본에서만, 원본 src 수정 금지, 복사본 로드는 `__file__` 출력으로 확인): `choose_body`의 `>= MIN_BODY_LENGTH`를 `> MIN_BODY_LENGTH`로 바꾸면 경계 200자 테스트 실패, `fetch_article_html`의 기본 client 생성에서 `follow_redirects=True`를 지우거나 만든 client를 닫지 않으면 기본 client 테스트가 실패. 결과를 IMPL.md에 실제 출력으로 기록. 이를 위해 `tests/test_extract.py`에 T4c2 (b)와 같은 방식의 기본 client 테스트 1개(monkeypatch로 `rss_wiki.extract.httpx.Client` 감싸기, 301 상대 `Location` 뒤 200, `timeout == ARTICLE_FETCH_TIMEOUT`, `User-Agent == USER_AGENT`, 요청 2회, 종료 후 `is_closed is True`)를 추가한다
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - 메모: trafilatura가 테스트 중 경고를 내면 T4a 메모와 같이 원인이 라이브러리 내부로 확인될 때만 `pyproject.toml`에 해당 경고만 좁혀 `ignore`를 추가하고 IMPL.md에 근거를 적는다(이 경우 `pyproject.toml` touch 허용).
+  - touch: `src/rss_wiki/extract.py`, `tests/test_extract.py`, (조건부) `pyproject.toml`
+
+- [x] T6c. 본문 텍스트화 보정: 블록 경계 줄바꿈, script/style 제외, 공백 경계, 실패 원인 테스트 (T6 REVIEW 메모 1~4)
+  - 선행: T6 PASS 9/12(충족). `extract.py` 외 src(`cli.py`, `config.py`, `db.py`, `fetch.py`, `pipeline.py`, `timeutil.py`)는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/extract.py`):
+    - `_TextExtractor` (메모 1, 자체 결정: 블록 태그 목록과 정규화 규칙):
+      - 블록 태그 `p`, `div`, `li`, `ul`, `ol`, `h1`~`h6`, `blockquote`, `pre`, `tr`, `table`의 시작과 끝, 그리고 `br` 시작에서 `"\n"`을 넣는다.
+      - `script`/`style` 안의 데이터는 버린다(시작/끝 태그로 깊이를 센다).
+    - `html_to_text` 정규화 순서: `[ \t]+` → `" "`, 각 줄 앞뒤 공백 제거(`" *\n *"` → `"\n"`), `\n{3,}` → `"\n\n"`(빈 줄 여러 개는 빈 줄 하나), 전체 strip, 비면 `None`. 엔티티는 `HTMLParser`의 `convert_charrefs` 기본값으로 풀린다.
+    - `choose_body` (메모 2): 마지막 폴백을 `extracted.strip()` 기준으로 바꿔 공백뿐이면 `None`, 아니면 strip한 값을 돌려준다. 첫 분기(`>= MIN_BODY_LENGTH`)는 기존대로 strip 후 길이로 판정한다.
+    - docstring (메모 4): 공개 함수 5개에 짧은 docstring. `choose_body`에는 폴백 순서(긴 추출문 → 피드 content 텍스트 → 짧은 추출문 → `None`)와 `MIN_BODY_LENGTH = 200`이 PRD 4.3 "너무 짧으면"의 자체 결정 기준임을 적는다.
+  - 내용 (`tests/test_extract.py`, 각각 별도 테스트, 텍스트 단언은 전부 전체 문자열 `==`):
+    - (a) 기존 `test_html_to_text_strips_tags_and_unescapes_entities`를 `html_to_text("<p>a &amp; b</p><p>c</p>") == "a & b\n\nc"`로 교체
+    - (b) `html_to_text("a<br>b") == "a\nb"`
+    - (c) `html_to_text("<p>hi</p><script>var x=1;</script><style>p{}</style><p>there</p>") == "hi\n\nthere"`
+    - (d) 공백 압축: `html_to_text("a    \t b") == "a b"`
+    - (e) 빈 줄 정리: `html_to_text("a\n\n\n\nb") == "a\n\nb"`
+    - (f) 줄 앞뒤 공백: `html_to_text("<div>  a  </div><div> b </div>") == "a\n\nb"`
+    - (g) `choose_body("   ", None) is None`
+    - (h) `choose_body("x" * 199 + " ", "<p>feed</p>") == "feed"` (strip 전 200자, strip 후 199자)
+    - (i) `choose_body("  short  ", None) == "short"`
+    - (j) `extract_text` strip: `monkeypatch.setattr("rss_wiki.extract.trafilatura.extract", lambda *a, **k: "  body  \n")` → `"body"`, 반환 `"   "` → `None` (별도 테스트 2개 또는 파라미터화)
+    - (k) (메모 3) `follow_redirects` 없는 주입 client + MockTransport 301 → `ArticleFetchError` `match="HTTP 301"`
+    - (l) (메모 3) 기존 ConnectTimeout/InvalidURL 테스트에 `exc_info.value.__cause__`가 각각 `httpx.ConnectTimeout`/`httpx.InvalidURL` 인스턴스라는 단언 추가
+    - 위 기대값이 정규화 규칙과 어긋나면 규칙이 아니라 기대값을 IMPL.md "자체 결정" 절에 근거와 함께 적고 실제 출력으로 맞춘다. 단 (a)(b)(c)의 단어 경계(줄바꿈으로 분리)와 script/style 제외는 바꿀 수 없다.
+  - acceptance:
+    - `uv run pytest tests/test_extract.py -v` 통과, (b)~(k)가 각각 별도 테스트로 존재 (기존 21개 포함 31개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.extract import html_to_text as h; assert h('<p>first para.</p><p>second para.</p>') == 'first para.\n\nsecond para.'; assert 'var' not in h('<p>hi</p><script>var x=1;</script>')"` 종료 코드 0
+    - `grep -nE "import sqlite3|from rss_wiki(\.db|\.pipeline| import (db|pipeline))" src/rss_wiki/extract.py` 결과 없음
+    - 나머지 src 6개 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, `./.venv/bin/python -m pytest tests/test_extract.py`): 각 변경이 1개 이상 테스트를 실패시킴을 IMPL.md에 실제 출력으로 기록. (1) `[ \t]+` 치환 제거 (2) `\n{3,}` 치환 제거 (3) `choose_body` 첫 분기의 `.strip()` 제거 (4) `extract_text`의 `.strip()` 제거 (5) 2xx 판정을 `< 400`으로 완화 (6) `fetch_article_html`의 `from exc` 제거 (7) `br` 줄바꿈 제거 (8) script/style 제외 제거
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/extract.py`, `tests/test_extract.py`
+
+- [x] T6d. 텍스트화 꼬리 유실 수정과 블록 태그 확장 (T6c REVIEW 메모 1~4)
+  - 선행: T6c PASS 10/12(충족). `extract.py` 외 src(`cli.py`, `config.py`, `db.py`, `fetch.py`, `pipeline.py`, `timeutil.py`)는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/extract.py`):
+    - (메모 1, 필수) `html_to_text`에서 `parser.feed(fragment)` 뒤 `parser.close()`를 호출한 다음 `get_text()`를 부른다. `&`가 든 평문 꼬리(`R&D`, `Q&A`)가 버퍼에 남아 사라지던 결함 수정.
+    - (메모 3, 자체 결정: 목록 밖 태그의 단어 붙음이 요약 입력 품질을 떨어뜨리므로 넓힌다) `_BLOCK_TAGS`에 `td`, `th`, `section`, `article`, `header`, `footer`, `figure`, `figcaption`, `hr`, `dt`, `dd`를 추가한다. `handle_startendtag`는 `br`뿐 아니라 `_BLOCK_TAGS`에 든 태그(`<hr/>` 등)에도 `"\n"`을 넣는다.
+    - (메모 4, 자체 결정) 정규화 첫 단계로 `\r\n?` → `"\n"`을 넣는다. 이후 순서는 T6c 그대로(`[ \t]+`, `" *\n *"`, `\n{3,}`, strip). `\xa0`(nbsp)는 이번에도 정규화하지 않는다.
+  - 내용 (`tests/test_extract.py`, 각각 별도 테스트 또는 파라미터화 케이스, 텍스트 단언은 전부 전체 문자열 `==`):
+    - (a) `html_to_text("summary: R&D") == "summary: R&D"`
+    - (b) `html_to_text("<p>x</p>Q&A") == "x\nQ&A"`
+    - (c) `choose_body(None, "AT&T, Q&A") == "AT&T, Q&A"` (폴백 경로에서 유실 없음)
+    - (d) self-closing: `html_to_text("a<br/>b") == "a\nb"`, `html_to_text("a<hr/>b") == "a\nb"`
+    - (e) 목록/제목: `html_to_text("<ul><li>a</li><li>b</li></ul>") == "a\n\nb"`, `html_to_text("<h2>t</h2>x") == "t\nx"`
+    - (f) 대문자 script: `html_to_text("<SCRIPT>x</SCRIPT>ok") == "ok"`
+    - (g) 새 블록 태그: `<tr><td>a</td><td>b</td></tr>` → `"a\n\nb"`, `<section>a</section><section>b</section>` → `"a\n\nb"`, `a<hr>b` → `"a\nb"`, `<dt>k</dt><dd>v</dd>` → `"k\n\nv"`
+    - (h) CRLF: `html_to_text("a\r\n\r\n\r\nb") == "a\n\nb"`, `html_to_text("a\r\nb") == "a\nb"`
+    - 위 기대값이 실제 출력과 다르면 규칙이 아니라 기대값을 IMPL.md "자체 결정" 절에 근거와 함께 적고 맞춘다. 단 (a)(b)(c)의 꼬리 보존과 (g)의 단어 분리(두 값 사이에 줄바꿈)는 바꿀 수 없다.
+  - acceptance:
+    - `uv run pytest tests/test_extract.py -v` 통과, (a)~(h)가 테스트로 존재 (기존 32개 포함 40개 이상, 파라미터화 케이스 포함 개수)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.extract import html_to_text as h; assert h('summary: R&D') == 'summary: R&D'; assert h('<p>x</p>Q&A') == 'x\nQ&A'; assert h('<tr><td>a</td><td>b</td></tr>') == 'a\n\nb'"` 종료 코드 0
+    - `grep -n "parser.close()" src/rss_wiki/extract.py` 결과 있음
+    - `grep -nE "import sqlite3|from rss_wiki(\.db|\.pipeline| import (db|pipeline))" src/rss_wiki/extract.py` 결과 없음
+    - 나머지 src 6개 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, 복사본 venv python으로 `-m pytest tests/test_extract.py`): 각 변경이 1개 이상 테스트를 실패시킴을 IMPL.md에 실제 출력으로 기록. (1) `parser.close()` 제거 (2) `handle_startendtag`의 줄바꿈 제거 (3) `_BLOCK_TAGS`에서 `li` 제거 (4) `_BLOCK_TAGS`에서 `td` 제거 (5) `\r\n?` 치환 제거. script 끝 태그에서 `_skip_depth`를 0으로 리셋하는 변경은 `HTMLParser`가 script 안을 CDATA로 읽어 동치일 수 있으므로 필수가 아니다(실행했다면 결과와 판단을 적는다)
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/extract.py`, `tests/test_extract.py`
+
+- [x] T6e. 텍스트화 테스트 보강: 단독 CR, 블록 태그 전수 (T6d REVIEW 메모 1/2, 테스트만)
+  - 선행: T6d PASS 11/12(충족). `src/`는 건드리지 않는다. 테스트가 현재 구현에서 실패하면 구현을 고치지 말고 IMPL.md에 원인을 적고 멈춘다.
+  - 내용 (`tests/test_extract.py`, 텍스트 단언은 전체 문자열 `==`):
+    - (a) 단독 CR: `html_to_text("a\rb") == "a\nb"`, `html_to_text("a\r\r\r\rb") == "a\n\nb"` (별도 테스트 또는 기존 CRLF 파라미터화에 케이스 추가)
+    - (b) 블록 태그 전수: `from rss_wiki.extract import _BLOCK_TAGS`로 `@pytest.mark.parametrize("tag", sorted(_BLOCK_TAGS - {"hr"}))`, `html_to_text(f"<{tag}>a</{tag}><{tag}>b</{tag}>") == "a\n\nb"`. `hr`은 기존 테스트(`a<hr>b`, `a<hr/>b`)로 덮여 있으므로 제외한다. 실제 출력이 `"a\n\nb"`가 아닌 태그가 있으면 기대값을 태그별로 나누지 말고 IMPL.md에 출력과 원인을 적고 멈춘다.
+  - acceptance:
+    - `uv run pytest tests/test_extract.py -v` 통과, (a)(b)가 존재 (기존 46개 포함 70개 이상, 파라미터화 케이스 포함 개수)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - src 무변경: 작업 전후 `shasum src/rss_wiki/*.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, 복사본 venv python으로 `-m pytest tests/test_extract.py`): (1) `r"\r\n?"` → `r"\r\n"` (2) `_BLOCK_TAGS`에서 `th` 제거 (3) `_BLOCK_TAGS`에서 `figcaption` 제거. 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록
+  - touch: `tests/test_extract.py`
+
+- [x] T6b. 추출 단계 조율: 글 하나의 본문 준비와 DB 저장 (PRD 4.3, 7절 본문 추출 실패)
+  - 선행: T6d PASS 11/12, T6e PASS 12/12(모두 충족). `fetch.py`, `config.py`, `timeutil.py`, `cli.py`, `extract.py`는 건드리지 않는다.
+  - 범위: 글 하나 단위의 함수와 DB 함수까지만 만든다. 여러 글을 도는 루프와 `--max-summaries` 상한 적용은 요약과 함께 T11에서 연결한다(원문 요청을 요약할 글에만 하기 위해). `given_up` 전환은 T8 몫이라 이번에는 만들지 않는다.
+  - 내용 (`src/rss_wiki/db.py`):
+    - `@dataclass(frozen=True) PendingArticle(id: int, link: str | None, content: str | None)`.
+    - `list_pending_articles(conn, limit: int) -> list[PendingArticle]`: `status IN ('pending', 'failed')`인 글을 `id` 오름차순으로 최대 `limit`개. `summarized`/`given_up`은 제외(PRD 7절 "다음 실행에서 실패 항목을 다시 시도").
+    - `save_article_body(conn, article_id: int, body: str) -> None`: `articles.content = body`, 커밋. `status`/`failure_count`/`last_error`는 바꾸지 않는다(요약 성공 전이라서).
+    - `record_article_failure(conn, article_id: int, error: str) -> None`: `status = 'failed'`, `failure_count = failure_count + 1`, `last_error = error`, 커밋.
+  - 내용 (`src/rss_wiki/pipeline.py`):
+    - `prepare_body(conn, article: PendingArticle, *, fetch_html: Callable[[str], str] = fetch_article_html, extract: Callable[[str, str | None], str | None] = extract_text) -> str | None`:
+      1. `article.link`가 있으면 `html = fetch_html(link)` 후 `extracted = extract(html, link)`. `ArticleFetchError`면 `extracted = None`으로 진행(PRD 7절 "본문 추출 실패: 피드 content로 대체"). link가 `None`이면 요청하지 않고 `extracted = None`.
+      2. `body = choose_body(extracted, article.content)`.
+      3. `body`가 있으면 `save_article_body(conn, article.id, body)` 후 `body` 반환(자르지 않은 전체, PRD 4.3 "DB에는 원문 전체"). 20,000자 자르기는 요약 호출부(T7) 몫.
+      4. 없으면 `record_article_failure(conn, article.id, "본문 없음: 원문 추출과 피드 content 모두 비어 있음")` 후 `None`. 원문 요청 실패 원인이 있었으면 메시지 끝에 `(원문 요청 실패: ...)`로 덧붙인다.
+    - `ArticleFetchError` 외 예외(`RuntimeError` 등)는 잡지 않는다.
+    - (자체 결정) 재시도 시 `articles.content`에는 직전 실행이 저장한 본문(평문)이 들어 있고 이것이 다음 실행의 `feed_content`로 쓰인다. `html_to_text`가 평문에서 거의 같은 값을 돌려주므로 스키마를 늘리지 않는다. 이 전제를 `prepare_body` docstring에 적는다.
+  - 내용 (새 `tests/test_prepare_body.py`, 가짜 `fetch_html`/`extract` 주입, 네트워크/trafilatura 없음, 각각 별도 테스트. 글은 `register_entries`로 넣고 `list_pending_articles`로 꺼낸다):
+    - (a) 추출문 200자 이상 → 반환값과 `articles.content`가 추출문, `status == 'pending'`, `failure_count == 0`
+    - (b) 추출문 짧음 + 피드 content `"<p>feed &amp; x</p>"` → `"feed & x"`가 저장됨
+    - (c) `fetch_html`이 `ArticleFetchError` + 피드 content 있음 → 피드 content 텍스트 저장, 실패 기록 없음
+    - (d) `link is None` → `fetch_html` 호출 0회, 피드 content 텍스트 저장
+    - (e) 추출 `None` + 피드 content `None` → `None`, `status == 'failed'`, `failure_count == 1`, `last_error`에 `"본문 없음"` 포함
+    - (f) (e)를 두 번 → `failure_count == 2`, `status == 'failed'`(given_up 전환 없음)
+    - (g) `ArticleFetchError` + 피드 content `None` → 실패 기록, `last_error`에 `"원문 요청 실패"` 포함
+    - (h) 추출문 25,000자 → `articles.content` 길이 25,000(자르지 않음)
+    - (i) `fetch_html`이 `RuntimeError` → 그대로 올림, 해당 글 `content`/`failure_count` 불변
+    - (j) `list_pending_articles`: `pending`/`failed`/`summarized`/`given_up` 글 섞음(상태는 UPDATE로 설정) → `pending`/`failed`만 `id` 오름차순, `limit=1`이면 1개
+  - acceptance:
+    - `uv run pytest tests/test_prepare_body.py -v` 통과, (a)~(j)가 각각 별도 테스트로 존재 (10개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import httpx|import trafilatura" src/rss_wiki/pipeline.py` 결과 없음, `grep -nE "from rss_wiki(\.extract|\.pipeline|\.fetch)" src/rss_wiki/db.py` 결과 없음
+    - 손대지 않는 src 5개 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본): (1) `prepare_body`의 `except ArticleFetchError`를 지우면 (c) 실패 (2) `save_article_body`에 전달하는 값을 `truncate_for_summary(body)`로 바꾸면 (h) 실패 (3) `list_pending_articles`의 조건에서 `'failed'`를 빼면 (j) 실패 (4) `record_article_failure`의 `failure_count + 1`을 `1`로 바꾸면 (f) 실패. 실제 출력을 IMPL.md에 기록
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/pipeline.py`, `tests/test_prepare_body.py`
+
+- [x] T6f. 본문 준비 테스트 보강: 재시도 성공 시 상태 불변, 콜러블 인자 단언, 실패 메시지 부정 단언 (T6b REVIEW 메모 1/2/3, 테스트만)
+  - 선행: T6b PASS 11/12(충족). `src/`는 건드리지 않는다. 테스트가 현재 구현에서 실패하면 구현을 고치지 말고 IMPL.md에 원인을 적고 멈춘다.
+  - 내용 (`tests/test_prepare_body.py`, 기대 상태 값은 문자열 리터럴로 적는다):
+    - (a) (메모 2) 기존 `test_prepare_body_long_extracted_text_saved`를 확장한다. 가짜 `fetch_html`은 받은 URL을 기록하고 고유 문자열(예: `"<html>unique-marker</html>"`)을 돌려준다. 가짜 `extract`는 받은 `(html, url)`을 기록한다. 단언: `fetch_html` 호출 기록 `== ["https://x.example.com/1"]`, `extract` 호출 기록 `== [("<html>unique-marker</html>", "https://x.example.com/1")]`.
+    - (b) (메모 1) 새 테스트: 글 하나를 등록한 뒤 `record_article_failure(conn, id, "이전 실패")`로 `failed`/`failure_count 1`/`last_error "이전 실패"` 상태로 만든다. `list_pending_articles`로 다시 꺼내 추출문 250자로 `prepare_body` → 반환값과 `content`가 추출문, `(status, failure_count, last_error) == ("failed", 1, "이전 실패")`.
+    - (c) (메모 3) 기존 `test_prepare_body_no_body_records_failure`에 `"원문 요청 실패" not in last_error` 단언을 더한다.
+  - acceptance:
+    - `uv run pytest tests/test_prepare_body.py -v` 통과, (b)가 별도 테스트로 존재 (기존 10개 포함 11개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - src 무변경: 작업 전후 `shasum src/rss_wiki/*.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, 복사본 venv python으로 `-m pytest tests/test_prepare_body.py`): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `save_article_body` SQL에 `status = 'pending'` 추가 (2) `save_article_body` SQL에 `failure_count = 0` 추가 (3) `prepare_body`에서 `fetch_html("https://wrong")` (4) `extract(html, None)` (5) `extract("", article.link)` (6) 실패 메시지에 `(원문 요청 실패: ...)`를 조건 없이 덧붙임
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `tests/test_prepare_body.py`
+
+- [x] T7a. 요약 프롬프트 생성, 출력 JSON 검증, 태그 정규화 (순수 함수, `claude` 호출 없음)
+  - 선행: T6b PASS, T6f PASS 12/12(모두 충족). 기존 src는 건드리지 않는다. `summarize.py`는 DB와 subprocess를 모른다(기존 태그 목록은 인자로 받고, 호출은 T7b).
+  - 내용 (새 `src/rss_wiki/summarize.py`):
+    - `@dataclass(frozen=True) SummaryResult(summary: list[str], key_points: list[str], tags: list[str])`, `class SummaryFormatError(Exception)`.
+    - `normalize_tag(tag: str) -> str`: strip → 소문자화 → 내부 공백 연속(`\s+`)을 `-` 하나로 치환 (PRD 4.4 합의).
+    - `build_prompt(body: str, existing_tags: Sequence[str]) -> str`: 본문은 `extract.truncate_for_summary`로 자른 값을 넣는다(PRD 4.3). 프롬프트에 (1) 원문 언어와 무관하게 한국어로 작성 (2) JSON 객체 하나만 출력, 키 `summary`(문자열 정확히 3개), `key_points`(문자열 목록), `tags`(문자열 목록) (3) 기존 태그 목록(쉼표 구분, 비었으면 "(없음)")을 우선 재사용하고 새 태그도 허용 을 적는다.
+    - `parse_summary_output(text: str) -> SummaryResult` (자체 결정: 모델이 코드 펜스를 붙이는 경우를 흔한 형태로 보고 허용한다): strip한 텍스트가 ```` ```json ````/```` ``` ```` 펜스 하나로 감싸져 있으면 안쪽만 쓴다. `json.loads` 실패, 최상위가 객체 아님, `summary`가 비어 있지 않은 문자열 정확히 3개가 아님, `key_points`가 비어 있지 않은 문자열 1개 이상의 목록이 아님, `tags`가 문자열 목록이 아님이면 `SummaryFormatError`(메시지에 어느 필드인지 포함, JSON 오류는 `from exc`). 각 문자열은 strip해 저장. `tags`는 `normalize_tag` 적용 후 빈 값 제거, 순서 유지 중복 제거(자체 결정: 태그 0개 허용). 알 수 없는 키는 무시.
+  - 내용 (새 `tests/test_summarize.py`, 각각 별도 테스트 또는 파라미터화 케이스, 기대값은 리터럴):
+    - `normalize_tag`: `"  Machine Learning "` → `"machine-learning"`, `"a \t b"` → `"a-b"`, `"a\xa0b"` → `"a-b"`, `"Python"` → `"python"`
+    - `build_prompt`: 기존 태그 `["python", "rust"]`가 프롬프트에 포함, 빈 목록이면 `"(없음)"` 포함, `"한국어"`와 `"summary"`/`"key_points"`/`"tags"` 포함, 본문 `"가" * 25000` → 프롬프트 안 `"가"` 개수가 20,000
+    - `parse_summary_output` 정상: 순수 JSON, ```` ```json ```` 펜스, 앞뒤 공백 → 같은 `SummaryResult`. 태그 `["Machine Learning", "machine-learning", " "]` → `["machine-learning"]`
+    - 오류(`SummaryFormatError`, `match=`로 필드 구분): JSON 아님(`__cause__`가 `json.JSONDecodeError`), 최상위 목록, `summary` 누락, `summary` 2개, `summary` 4개, `summary`에 빈 문자열, `summary`에 숫자, `key_points` 빈 목록, `key_points` 문자열(목록 아님), `tags` 누락, `tags`에 숫자
+  - acceptance:
+    - `uv run pytest tests/test_summarize.py -v` 통과, 위 경우가 각각 존재 (20개 이상, 파라미터화 케이스 포함)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import (sqlite3|subprocess)|from rss_wiki(\.db|\.pipeline)" src/rss_wiki/summarize.py` 결과 없음
+    - `uv run python -c "from rss_wiki.summarize import normalize_tag; assert normalize_tag('  Machine  Learning ') == 'machine-learning'"` 종료 코드 0
+    - 기존 src 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `summary` 개수 검사를 `>= 3`으로 완화 (2) `truncate_for_summary` 호출 제거 (3) 태그 중복 제거 삭제 (4) `.lower()` 제거 (5) JSON 오류의 `from exc` 제거
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/summarize.py`, `tests/test_summarize.py`
+
+- [x] T7b. `claude` 사전 확인과 `claude -p` 호출, 요약 테스트 보강 (PRD 4.4 호출 옵션 합의, 7절 `claude` 없음/로그인 안 됨, T7a REVIEW 메모 1~5)
+  - 선행: T7a PASS 10/12(충족). `summarize.py` 외 src는 건드리지 않는다. DB 저장과 `record_article_failure` 연결은 T7c 몫이라 이번에는 `db.py`/`pipeline.py`를 import하지 않는다.
+  - 내용 (메모 절, `tests/test_summarize.py`, 기대값은 리터럴):
+    - (m1) 정상 파싱 테스트 1개 추가: `summary` `["  첫 줄 ", "둘째 줄", " 셋째 줄"]`, `key_points` `[" 포인트 "]` → `summary == ["첫 줄", "둘째 줄", "셋째 줄"]`, `key_points == ["포인트"]`
+    - (m2) `key_points`에 `["", "x"]`, `["   ", "x"]` → `SummaryFormatError` `match="key_points"`. `summary`에 `["   ", "b", "c"]` → `match="summary"`. 각각 별도 케이스(파라미터화 허용)
+    - (m3) `build_prompt` 결과에 `"재사용"`과 `"새 태그"`가 포함됨을 단언
+    - (m5) `summary` 2개/4개 테스트의 `match=`를 `"summary.*3"`으로 좁힌다(문구 전체에는 결합하지 않음)
+  - 내용 (메모 절, `src/rss_wiki/summarize.py`):
+    - (m4) 공개 함수(`normalize_tag`, `build_prompt`, `parse_summary_output`, 이번에 추가하는 함수)에 짧은 docstring. `parse_summary_output`에는 코드 펜스 허용과 태그 0개 허용이 자체 결정임을 적는다.
+  - 내용 (호출 절, `src/rss_wiki/summarize.py`):
+    - 예외 계층: `class SummaryError(Exception)`를 두고 기존 `SummaryFormatError`와 새 `SummaryCallError`가 이를 상속한다. T7c는 `SummaryError` 하나로 글 실패를 잡는다. 사전 확인 실패용 `class ClaudeUnavailableError(Exception)`는 `SummaryError`를 상속하지 않는다(글 실패 횟수를 올리지 않음, PRD 7절).
+    - 상수: `CLAUDE_COMMAND = "claude"`, `CLAUDE_TIMEOUT = 180.0`(PRD 4.4 합의), `PREFLIGHT_TIMEOUT = 60.0`(자체 결정).
+    - `call_claude(prompt: str, *, run: Callable[..., subprocess.CompletedProcess[str]] | None = None, timeout: float = CLAUDE_TIMEOUT) -> str`: `run`이 `None`이면 호출 시점에 `subprocess.run`을 쓴다(monkeypatch가 먹히도록). 인자 `[CLAUDE_COMMAND, "-p"]`, `input=prompt`(자체 결정: 20,000자 본문을 argv 대신 stdin으로), `capture_output=True`, `text=True`, `timeout=timeout`, `check=False`. `--model`은 넘기지 않는다. `FileNotFoundError`/`OSError` → `SummaryCallError("claude 실행 실패: ...")`, `subprocess.TimeoutExpired` → `SummaryCallError("claude 호출 타임아웃: 180초")` 형식, 종료 코드 0 아님 → `SummaryCallError("claude 종료 코드 {code}: {stderr 앞 500자}")`. 모두 `from exc` 유지(종료 코드 오류는 원인 예외 없음). 성공하면 `stdout`.
+    - `summarize_body(body: str, existing_tags: Sequence[str], *, run=None) -> SummaryResult`: `build_prompt` → `call_claude` → `parse_summary_output`. 예외는 그대로 올린다.
+    - `check_claude(*, run=None, which: Callable[[str], str | None] | None = None) -> None` (자체 결정: 로그인 여부를 확인할 안정적인 CLI 하위 명령을 가정하지 않고, 짧은 프롬프트 한 번을 실제로 호출해 확인한다. 실행당 1회, 요약할 글이 있을 때만 부르는 것은 T11 몫): `which`가 `None`이면 `shutil.which`. `which(CLAUDE_COMMAND)`가 `None`이면 `ClaudeUnavailableError("claude 명령을 찾을 수 없습니다. Claude Code를 설치하세요")`. 이어서 `call_claude("OK라고만 답하라.", run=run, timeout=PREFLIGHT_TIMEOUT)`가 `SummaryCallError`를 내면 `ClaudeUnavailableError("claude 사전 확인 실패(로그인 여부를 확인하세요): {원인}")` `from exc`. 응답 내용은 검사하지 않는다.
+  - 내용 (호출 절, `tests/test_summarize.py`, 가짜 `run`/`which` 주입, 실제 `claude` 실행 없음, 각각 별도 테스트):
+    - (a) 가짜 `run`이 `CompletedProcess(args, 0, stdout="out", stderr="")` → `call_claude("p", run=fake) == "out"`, 기록된 인자 `== ["claude", "-p"]`, kwargs의 `input == "p"`, `timeout == 180.0`, `capture_output is True`, `text is True`
+    - (b) 기본 `run` 경로: `monkeypatch.setattr("rss_wiki.summarize.subprocess.run", fake)` 후 `call_claude("p")` → fake가 1회 호출됨
+    - (c) 인자 어디에도 `"--model"`이 없음
+    - (d) 종료 코드 1, stderr `"not logged in"` → `SummaryCallError` `match="종료 코드 1"`, 메시지에 `"not logged in"` 포함
+    - (e) stderr 1,000자 → 메시지에 stderr 부분이 500자까지만 들어감(`"x" * 501`이 메시지에 없음)
+    - (f) `subprocess.TimeoutExpired` → `SummaryCallError` `match="타임아웃"`, `__cause__`가 `TimeoutExpired`
+    - (g) `FileNotFoundError` → `SummaryCallError` `match="실행 실패"`, `__cause__`가 `FileNotFoundError`
+    - (h) `summarize_body`: 가짜 `run`이 유효 JSON → `SummaryResult`, 가짜가 받은 `input`에 기존 태그 `"python"` 포함
+    - (i) `summarize_body`: 가짜 `run`이 `"not json"` → `SummaryFormatError`, `SummaryError`의 인스턴스
+    - (j) `SummaryCallError`가 `SummaryError`의 인스턴스, `ClaudeUnavailableError`는 아님
+    - (k) `check_claude`: `which`가 `None` 반환 → `ClaudeUnavailableError` `match="찾을 수 없습니다"`, `run` 호출 0회
+    - (l) `check_claude`: `which` 경로 있음 + `run` 종료 코드 1 → `ClaudeUnavailableError` `match="사전 확인 실패"`, `__cause__`가 `SummaryCallError`, 기록된 `timeout == 60.0`
+    - (m) `check_claude`: `which` 경로 있음 + `run` 종료 코드 0 → 예외 없음
+  - acceptance:
+    - `uv run pytest tests/test_summarize.py -v` 통과, (m1)(m2)(m3)과 (a)~(m)이 존재 (기존 25개 포함 42개 이상, 파라미터화 케이스 포함)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import sqlite3|from rss_wiki(\.db|\.pipeline)" src/rss_wiki/summarize.py` 결과 없음
+    - `grep -c '"""' src/rss_wiki/summarize.py` 결과가 8 이상(공개 함수 docstring 4개 이상)
+    - `uv run python -c "import rss_wiki.summarize as s; assert s.CLAUDE_TIMEOUT == 180.0; assert issubclass(s.SummaryFormatError, s.SummaryError); assert not issubclass(s.ClaudeUnavailableError, s.SummaryError)"` 종료 코드 0
+    - 손대지 않는 src 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `summary`/`key_points` 저장 시 `.strip()` 제거(빈 문자열 검사는 strip 기준 유지) (2) 빈 문자열 검사를 `summary`에만 적용 (3) 프롬프트의 재사용 안내 문장 삭제 (4) `timeout=` 인자 제거 (5) `returncode != 0` 검사 제거 (6) `TimeoutExpired`의 `from exc` 제거 (7) `check_claude`의 `which` 검사 제거 (8) `SummaryCallError`의 부모를 `Exception`으로
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/summarize.py`, `tests/test_summarize.py`
+
+- [x] T7b2. 호출 테스트 보강과 출력 디코딩 실패 감싸기 (T7b REVIEW 메모 1~4)
+  - 선행: T7b PASS 10/12(충족). `summarize.py` 외 src는 건드리지 않는다.
+  - 내용 (`src/rss_wiki/summarize.py`):
+    - (메모 4, 자체 결정: 감싼다) `call_claude`의 `run(...)` 호출에서 `UnicodeDecodeError`를 잡아 `SummaryCallError(f"claude 출력 디코딩 실패: {exc}")` `from exc`로 바꾼다. 근거: `text=True`의 디코딩 실패가 `SummaryError` 밖으로 새면 T7c에서 글 하나의 실패가 실행 전체를 멈춘다(PRD 7절). `call_claude` docstring에 한 줄 적는다. 그 밖의 동작은 바꾸지 않는다.
+  - 내용 (`tests/test_summarize.py`, 기대값은 리터럴, 각각 별도 테스트 또는 기존 테스트에 단언 추가):
+    - (a) (메모 1) 기존 (a) 테스트에 `kwargs["check"] is False` 단언을 추가하고, `timeout` 비교를 상수 `CLAUDE_TIMEOUT`이 아닌 리터럴 `180.0`으로 바꾼다.
+    - (b) (메모 2) `monkeypatch.setattr("rss_wiki.summarize.shutil.which", lambda c: None)` 후 `check_claude(run=fake)`(`which` 인자 없음) → `ClaudeUnavailableError` `match="찾을 수 없습니다"`, fake 호출 0회.
+    - (c) (메모 2) `monkeypatch.setattr("rss_wiki.summarize.shutil.which", lambda c: "/usr/local/bin/claude")` 후 `check_claude(run=fake_ok)` → 예외 없음, fake 1회 호출.
+    - (d) (메모 2) 가짜 `run`이 `PermissionError("denied")` → `SummaryCallError` `match="실행 실패"`, `__cause__`가 `PermissionError`.
+    - (e) (메모 3) 기존 stderr 1,000자 테스트에 `"x" * 500`이 메시지에 들어 있다는 하한 단언 추가.
+    - (f) (메모 3) 기존 타임아웃 테스트에 `"180초" in str(exc)`와 `"180.0" not in str(exc)` 단언 추가.
+    - (g) (메모 4) 가짜 `run`이 `UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")` → `SummaryCallError` `match="디코딩 실패"`, `__cause__`가 `UnicodeDecodeError`, `SummaryError`의 인스턴스.
+  - acceptance:
+    - `uv run pytest tests/test_summarize.py -v` 통과, (b)(c)(d)(g)가 각각 별도 테스트로 존재 (기존 43개 포함 47개 이상)
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -n "CLAUDE_TIMEOUT" tests/test_summarize.py` 결과에 (a)의 timeout 비교 줄이 없음
+    - 손대지 않는 src 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `check=False` → `check=True` (2) `CLAUDE_TIMEOUT = 18.0` (3) `check_claude`의 `which = shutil.which`를 `which = lambda _c: "/x"`로 (4) `except (FileNotFoundError, OSError)` → `except FileNotFoundError` (5) `result.stderr[:500]` → `result.stderr[:50]` (6) `{timeout:g}초` → `{timeout}초` (7) `UnicodeDecodeError` 처리 제거
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/summarize.py`, `tests/test_summarize.py`
+
+- [x] T7c. 요약 저장과 글 하나 요약 조율 (PRD 4.4 태그 재사용, 5절 `summaries`/`tags`/`article_tags`, 7절 `claude` 실패는 글 실패, T6f REVIEW 메모 1)
+  - 선행: T7b PASS 10/12(충족). T7b2와 touch가 겹치지 않아 T7b2 결과와 무관하게 진행할 수 있다. `cli.py`, `config.py`, `extract.py`, `fetch.py`, `timeutil.py`, `summarize.py`는 건드리지 않는다.
+  - 범위: 글 하나 단위까지만. 여러 글 루프, `--max-summaries`, 실행당 1회 `check_claude`는 T11. `given_up` 전환과 성공 시 `failure_count` 초기화는 T8.
+  - 내용 (`src/rss_wiki/db.py`, `summarize.py`를 import하지 않는다):
+    - `list_tag_names(conn) -> list[str]`: `tags.name`을 이름 오름차순으로 전부(자체 결정: 프롬프트가 실행마다 같도록 정렬).
+    - `save_summary(conn, article_id: int, summary_lines: Sequence[str], key_points: Sequence[str], tags: Sequence[str], now: str) -> None`: 한 트랜잭션에서 이 순서로 (1) 태그마다 `INSERT OR IGNORE INTO tags (name)` 후 id 조회, `INSERT OR IGNORE INTO article_tags` (2) `summaries`에 `summary_lines`/`key_points`를 `json.dumps(list(...), ensure_ascii=False)`(자체 결정: DB를 직접 열어도 한글이 읽히게), `created_at = now`로 INSERT (태그 뒤에 두어 (l)이 부분 삽입 롤백을 재현하게 한다) (3) `articles`의 `status = 'summarized'`, `last_error = NULL`(`failure_count`는 그대로, T8 몫) → 끝에서 커밋 한 번. 예외 시 `rollback` 후 다시 올린다(`register_entries`와 같은 방식). 태그는 이미 정규화된 값이라 가정하고 여기서 다시 정규화하지 않는다.
+  - 내용 (`src/rss_wiki/pipeline.py`):
+    - `summarize_article(conn, article: PendingArticle, *, fetch_html=fetch_article_html, extract=extract_text, summarize: Callable[[str, Sequence[str]], SummaryResult] = summarize_body, now: Callable[[], str] = now_iso) -> bool`:
+      1. `body = prepare_body(conn, article, fetch_html=fetch_html, extract=extract)`. `None`이면 `False`(실패 기록은 `prepare_body`가 이미 함).
+      2. `tags = list_tag_names(conn)`.
+      3. `result = summarize(body, tags)`. `SummaryError`면 `record_article_failure(conn, article.id, str(exc))` 후 `False`.
+      4. `save_summary(conn, article.id, result.summary, result.key_points, result.tags, now())` 후 `True`.
+    - `ClaudeUnavailableError`와 그 밖의 예외(`RuntimeError` 등)는 잡지 않는다. docstring에 이 경계와 "글 실패 기록은 `SummaryError`만"을 적는다.
+  - 내용 (새 `tests/test_summarize_article.py`, 가짜 `fetch_html`/`extract`/`summarize`와 고정 `now` 주입, 실제 `claude`/네트워크 없음, 글은 `register_entries`로 넣고 `list_pending_articles`로 꺼낸다, 상태 기대값은 문자열 리터럴, 각각 별도 테스트):
+    - (a) 성공: 추출문 250자, 가짜 `summarize`가 `SummaryResult(["첫 줄", "둘째 줄", "셋째 줄"], ["포인트"], ["python", "ai"])` → 반환 `True`, `summaries` 1행의 `json.loads(summary_lines) == ["첫 줄", "둘째 줄", "셋째 줄"]`, `json.loads(key_points) == ["포인트"]`, `created_at == NOW`, 글의 `(status, last_error) == ("summarized", None)`, 글에 연결된 태그 이름 집합 `== {"python", "ai"}`
+    - (b) 한글 원문 저장: (a)의 `summary_lines` 원본 문자열에 `"첫 줄"`이 그대로 들어 있음(`\uc` 이스케이프 아님)
+    - (c) 기존 태그 전달: 글 1을 태그 `["rust", "ai"]`로 성공시킨 뒤 글 2를 요약 → 글 2의 가짜 `summarize`가 받은 태그 인자 `== ["ai", "rust"]`, 받은 본문이 글 2의 추출문
+    - (d) 태그 공유: 글 1 `["ai"]`, 글 2 `["ai", "ml"]` → `tags` 2행, `article_tags` 3행
+    - (e) 태그 0개: `tags=[]` → `True`, `summaries` 1행, 그 글의 `article_tags` 0행, `status == "summarized"`
+    - (f) `SummaryFormatError("tags 필드가 문자열 목록이 아니다")` → `False`, `(status, failure_count) == ("failed", 1)`, `last_error`에 `"tags 필드"` 포함, `summaries` 0행, `articles.content`는 추출문(본문 저장은 유지)
+    - (g) `SummaryCallError("claude 종료 코드 1: x")` → (f)와 같이 기록, `last_error`에 `"종료 코드 1"` 포함
+    - (h) `ClaudeUnavailableError` → 그대로 올림, `(status, failure_count, last_error) == ("pending", 0, None)`, `summaries` 0행
+    - (i) 가짜 `summarize`가 `RuntimeError` → 그대로 올림, `failure_count == 0`
+    - (j) 본문 없음(추출 `None`, 피드 content `None`) → `False`, 가짜 `summarize` 호출 0회, `failure_count == 1`
+    - (k) (T6f REVIEW 메모 1) 재시도 평문 경로: 피드 content `None`인 글을 추출문 250자 + `SummaryCallError`로 실패시킨 뒤 `list_pending_articles`로 다시 꺼내 `fetch_html`이 `ArticleFetchError`를 내게 하면 두 번째 가짜 `summarize`가 받은 본문 `==` 첫 실행 추출문, 반환 `True`
+    - (l) `save_summary` 원자성: 글에 대해 `summaries` 행을 미리 직접 INSERT해 둔 뒤 `save_summary(..., tags=["new-tag"], ...)` → `sqlite3.IntegrityError` `match="UNIQUE"`, 이후 `tags`에 `"new-tag"` 없음, 글 `status == "pending"`, `conn.in_transaction is False`
+    - (m) `list_tag_names`: 태그 `"b"`, `"a"`, `"c"`를 넣으면 `["a", "b", "c"]`, 빈 DB는 `[]`
+  - 내용 (`tests/test_summarize.py`, T7b2 REVIEW 메모 1, 테스트만):
+    - (n) 가짜 `which`가 받은 인자를 목록에 기록하고 `"/usr/local/bin/claude"`를 반환하게 해 `check_claude(run=fake_ok, which=fake_which)` → 기록 `== ["claude"]`(리터럴). 기존 (b)(c)의 `monkeypatch` 람다도 인자를 기록해 `"claude"`를 단언해도 된다.
+  - acceptance:
+    - `uv run pytest tests/test_summarize_article.py -v` 통과, (a)~(m)이 각각 별도 테스트로 존재 (13개 이상)
+    - `uv run pytest tests/test_summarize.py -q` 통과 (기존 47개 포함 48개 이상), (n)이 별도 테스트로 존재
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "from rss_wiki(\.summarize|\.pipeline|\.extract|\.fetch)" src/rss_wiki/db.py` 결과 없음, `grep -nE "import (httpx|trafilatura|subprocess)" src/rss_wiki/pipeline.py` 결과 없음
+    - 손대지 않는 src 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `summarize_article`의 `except SummaryError`를 제거 (2) `except SummaryError`를 `except Exception`으로 (3) `save_summary`에서 `status = 'summarized'` UPDATE 제거 (4) `save_summary`의 `rollback` 제거(예외는 그대로 올림) (5) `summarize(body, tags)`를 `summarize(body, [])`로 (6) `ensure_ascii=False` 제거 (7) `list_tag_names`의 `ORDER BY name` 제거하고 `ORDER BY id DESC`로 (8) `summarize.py` 복사본에서 `check_claude`의 `which(CLAUDE_COMMAND)`를 `which("nope")`로 ((n)이 잡아야 함, 원본 `summarize.py`는 무변경)
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/pipeline.py`, `tests/test_summarize_article.py`, `tests/test_summarize.py`
+- [x] T8a. 글 포기(`given_up`) 전환과 요약 성공 시 실패 횟수 초기화 (PRD 7절 N=3 고정, T7c REVIEW 메모 1/2/3)
+  - 선행: T7c PASS 11/12(충족). `cli.py`, `config.py`, `extract.py`, `fetch.py`, `pipeline.py`, `summarize.py`, `timeutil.py`는 건드리지 않는다. 피드 쪽 포기(연속 실패 피드 건너뛰기)는 T8b 몫이라 이번에는 만들지 않는다.
+  - 범위: `db.py`의 두 UPDATE(`record_article_failure`, `save_summary`)와 테스트, README 한 문단까지만. 스키마는 바꾸지 않는다(`articles.status`의 `given_up`은 이미 CHECK 제약에 있고 `list_pending_articles`가 이미 제외한다).
+  - 내용 (`src/rss_wiki/db.py`):
+    - 모듈 상수 `GIVE_UP_THRESHOLD = 3` (PRD 7절 합의: 코드 상수, 설정으로 바꾸지 않음). `FIRST_RUN_LIMIT` 옆에 둔다.
+    - `record_article_failure`(`db.py:262-268`): UPDATE 하나 안에서 `failure_count = failure_count + 1`과 함께 `status = CASE WHEN failure_count + 1 >= {GIVE_UP_THRESHOLD} THEN 'given_up' ELSE 'failed' END`를 쓴다(SQLite는 SET 식을 갱신 전 값으로 평가하므로 두 곳의 `failure_count`는 같은 옛 값이다). `last_error`는 기존대로 인자 값. 임계값은 파라미터 바인딩으로 넘긴다. docstring에 "3회째 실패에서 `given_up`이 되고 `list_pending_articles`가 더 꺼내지 않는다(PRD 7절)"를 적는다.
+    - `save_summary`의 `articles` UPDATE(`db.py:313-316`)에 `failure_count = 0`을 더한다(PRD 7절 "다음 실행에서 다시 시도"의 연속 실패 의미. `last_error = NULL`은 기존대로 유지). 트랜잭션 구조와 INSERT 순서(태그 → `summaries` → 상태)는 바꾸지 않는다.
+  - 내용 (`tests/test_prepare_body.py`, 각각 별도 테스트, 상태 기대값은 문자열 리터럴, 임계값도 리터럴 `3`으로 적는다):
+    - (a) 본문 없음(추출 `None` + 피드 content `None`) 글을 `list_pending_articles` → `prepare_body`로 3회 실패 → 1회째 `(status, failure_count) == ("failed", 1)`, 2회째 `("failed", 2)`, 3회째 `("given_up", 3)`.
+    - (b) (a) 직후 `list_pending_articles(conn, 10)`에 그 글 id가 없음. 같은 DB의 다른 `pending` 글은 그대로 나옴.
+    - (c) `record_article_failure`를 직접 3회 호출 → `("given_up", 3)`, `last_error`가 마지막 인자 값. 4회 호출하면 `("given_up", 4)`(상태가 `failed`로 되돌아가지 않음).
+  - 내용 (`tests/test_summarize_article.py`, 각각 별도 테스트 또는 기존 테스트 확장):
+    - (d) (REVIEW 메모 1/2) 기존 (k) 재시도 성공 테스트에 이어, 실패 1회(`SummaryCallError`) 뒤 재시도 성공 시 `(status, failure_count, last_error) == ("summarized", 0, None)`을 단언한다. 기존 (k)에 단언을 더해도 되고 별도 테스트로 만들어도 된다.
+    - (e) (REVIEW 메모 3) 기존 (l) 원자성 테스트를 순서까지 고정하게 바꾼다. 태그 `"old-tag"` 1개를 미리 넣어 두고 `summaries` 행도 미리 직접 INSERT한 뒤 `save_summary(..., tags=["new-tag"], ...)` → `sqlite3.IntegrityError` `match="UNIQUE"`, 이후 `tags` 전체 행 수 `== 1`이고 이름 집합 `== {"old-tag"}`, 그 글의 `article_tags` 0행, `status == "pending"`, `conn.in_transaction is False`.
+  - 내용 (`README.md`): "포기한 글 다시 시도하기" 짧은 절 하나. 연속 3회 실패하면 글이 `given_up`이 되어 더 시도하지 않는다는 설명과, 해제는 DB를 직접 여는 방법(`sqlite3 data/rss-wiki.db "UPDATE articles SET status='pending', failure_count=0 WHERE status='given_up'"`)이라는 점을 적는다. 기존 README 내용은 지우지 않는다.
+  - acceptance:
+    - `uv run pytest tests/test_prepare_body.py -v` 통과, (a)(b)(c)가 각각 별도 테스트로 존재 (기존 11개 포함 14개 이상)
+    - `uv run pytest tests/test_summarize_article.py -v` 통과, (d)(e)가 반영됨 (기존 13개 포함 13개 이상)
+    - `uv run pytest -q` 전체 통과 (기존 258개 포함), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.db import GIVE_UP_THRESHOLD; assert GIVE_UP_THRESHOLD == 3"` 종료 코드 0
+    - `grep -n "given_up" README.md` 결과 있음
+    - 손대지 않는 src 7개 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `>= GIVE_UP_THRESHOLD`를 `> GIVE_UP_THRESHOLD`로 (2) `status` CASE 식을 지우고 항상 `'failed'`로 (3) `save_summary`에서 `failure_count = 0` 제거 (4) `save_summary`에서 `last_error = NULL` 제거 (5) `save_summary`의 `summaries` INSERT 블록을 태그 루프 앞으로 이동
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/db.py`, `tests/test_prepare_body.py`, `tests/test_summarize_article.py`, `README.md`
+
+- [x] T8b. 피드 연속 실패 포기와 집계 (PRD 7절, T5 REVIEW 메모 3, T5c REVIEW 메모 2, T8a REVIEW 메모 4)
+  - 선행: T8a PASS 11/12(충족). `cli.py`, `config.py`, `extract.py`, `fetch.py`, `summarize.py`, `timeutil.py`는 건드리지 않는다.
+  - 범위: 피드 쪽 포기만. 스키마는 늘리지 않는다(피드에는 `status` 컬럼이 없고 `consecutive_failures`로 충분하다, 자체 결정, 되돌리기 쉬움). 요약 루프와 CLI 출력은 T11 몫이라 이번에는 만들지 않는다.
+  - 내용 (`src/rss_wiki/db.py`):
+    - `get_feed_failures(conn, url: str) -> int | None`: `SELECT consecutive_failures FROM feeds WHERE url = ?`. 행이 없으면 `None`(아직 등록되지 않은 피드). 행을 만들지 않는 조회 전용 함수라는 점을 docstring에 적는다. `GIVE_UP_THRESHOLD`는 이미 있으므로 새 상수를 만들지 않는다.
+  - 내용 (`src/rss_wiki/pipeline.py`):
+    - `CollectResult`에 `given_up_feeds: int` 필드를 더한다(기본값 없이 세 번째 필드). `collect`의 반환도 키워드로 채운다.
+    - `collect`의 피드 루프 첫머리에서 `failures = get_feed_failures(conn, feed.url)`를 부르고, `failures is not None and failures >= GIVE_UP_THRESHOLD`면 fetch 없이 `given_up_feeds += 1` 후 `continue`. 이 피드의 `consecutive_failures`/`last_fetched_at`/`last_error`는 건드리지 않는다.
+    - `collect` docstring: (1) 포기 피드는 fetch 없이 건너뛰고 `given_up_feeds`로 센다, (2) `FeedFetchError`/`FeedParseError`/`register_entries`의 `sqlite3.Error`만 피드 단위 실패다, (3) 실패 기록 경로 자체(`get_feed_failures`/`get_or_create_feed`/`record_feed_failure`/`record_feed_success`)에서 난 `sqlite3.Error`는 DB 장애로 보고 잡지 않고 실행 전체 실패로 올린다(자체 결정, T5 REVIEW 메모 3).
+  - 내용 (`tests/test_pipeline.py`, 임계값은 리터럴 `3`으로 적고 구현 상수에서 가져오지 않는다, 각각 별도 테스트):
+    - (a) `consecutive_failures = 3`으로 직접 UPDATE한 피드 → 가짜 fetch 호출 0회, `given_up_feeds == 1`, `failed_feeds == 0`, `new_articles == 0`, 그 피드의 `consecutive_failures`가 3 그대로이고 `last_fetched_at`이 여전히 `None`
+    - (b) `consecutive_failures = 2`인 피드 → fetch 호출 1회, 성공 시 `consecutive_failures == 0`, `given_up_feeds == 0`
+    - (c) 자연 전환: 가짜 fetch가 항상 `FeedFetchError`인 피드 하나로 `collect`를 4회 실행 → fetch 호출 누적 3회, 1~3회째는 `failed_feeds == 1`/`given_up_feeds == 0`, 4회째는 `failed_feeds == 0`/`given_up_feeds == 1`, `consecutive_failures == 3`
+    - (d) 포기 피드 A와 정상 피드 B를 같은 `collect` 호출에 넣으면 B는 그대로 수집됨(`new_articles`가 B의 새 글 수, `given_up_feeds == 1`, fetch는 B만 받음)
+    - (e) 실패 기록 경로의 `sqlite3.Error` 전파: `monkeypatch`로 `rss_wiki.pipeline.record_feed_failure`가 `sqlite3.OperationalError("disk I/O error")`를 내게 하고 가짜 fetch가 `FeedFetchError`를 내는 피드로 `collect` → `pytest.raises(sqlite3.OperationalError)`로 그대로 올라옴(피드 단위 실패로 삼켜지지 않음)
+    - (f) (T5c REVIEW 메모 2) 기존 now 1회 사용 테스트(`test_pipeline.py:317` 부근)를 피드 2개로 넓힌다. 가짜 now가 호출마다 다른 값을 돌려주게 해 호출 횟수 `== 2`, 피드 A의 `articles.created_at`과 `feeds.last_fetched_at`이 첫 값, 피드 B는 둘째 값
+    - (g) 기존 `result == CollectResult(new_articles=5, failed_feeds=0)` 단언(`test_pipeline.py:54`)에 `given_up_feeds=0`을 더한다(필드 추가로 깨지는 유일한 기존 단언).
+  - 내용 (`README.md`): "포기한 글 다시 시도하기" 절 제목을 "포기한 글/피드 다시 시도하기"로 바꾸고, 기존 글 해제 명령 아래에 피드도 연속 3회 실패하면 건너뛴다는 설명과 해제 명령 `sqlite3 data/rss-wiki.db "UPDATE feeds SET consecutive_failures = 0"`를 잇는다. 기존 내용은 지우지 않는다.
+  - acceptance:
+    - `uv run pytest tests/test_pipeline.py -v` 통과, (a)~(e)가 각각 별도 테스트로 존재 (기존 15개 포함 20개 이상)
+    - `uv run pytest -q` 전체 통과 (기존 261개 포함), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.pipeline import CollectResult; print(CollectResult(new_articles=0, failed_feeds=0, given_up_feeds=0))"` 종료 코드 0
+    - `uv run pytest tests/test_db.py -v` 통과, `get_feed_failures` 테스트 2개(등록되지 않은 url → `None`, `consecutive_failures = 2`인 url → `2`)가 각각 별도 테스트로 존재
+    - `grep -n "consecutive_failures" README.md` 결과 있음
+    - 손대지 않는 src 6개 무변경: 작업 전후 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py` 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `>= GIVE_UP_THRESHOLD`를 `> GIVE_UP_THRESHOLD`로 (2) 건너뛰기의 `continue`를 지워 포기 피드도 fetch 하도록 (3) `given_up_feeds += 1` 제거 (4) 피드 루프 전체를 `try/except sqlite3.Error: failed_feeds += 1; continue`로 감싸기 ((e)가 잡아야 함) (5) `now_value = now()`를 루프 밖으로 빼 실행당 1회만 부르기 ((f)가 잡아야 함)
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/pipeline.py`, `tests/test_db.py`, `tests/test_pipeline.py`, `README.md`
+
+## M4. 위키 생성
+
+- [x] T8c. `get_feed_failures` 조회 전용 계약과 포기 피드 불변 단언 (T8b REVIEW 메모 1, 테스트만)
+  - 선행: T8b PASS 11/12(충족). `src/`는 한 줄도 건드리지 않는다. 뮤테이션 확인용 복사본만 고친다.
+  - 내용 (`tests/test_db.py`):
+    - `test_get_feed_failures_unregistered_url_returns_none`(`test_db.py:414` 부근)에 단언을 더한다. `get_feed_failures(conn, "https://example.com/none")` 호출 뒤 `conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0] == 0`. 조회 전용 함수가 피드 행을 만들지 않는다는 계약을 고정한다.
+  - 내용 (`tests/test_pipeline.py`):
+    - 포기 피드 건너뛰기 테스트(T8b의 (a), `test_pipeline.py:416` 부근)의 DB 단언을 `SELECT consecutive_failures, last_fetched_at, last_error FROM feeds WHERE url = ?` 한 번으로 바꾸고 `(3, None, None)`을 단언한다. 임계값은 리터럴 `3`으로 적는다(구현 상수에서 가져오지 않는다).
+  - acceptance:
+    - `uv run pytest tests/test_db.py tests/test_pipeline.py -v` 통과. `test_db.py`와 `test_pipeline.py`의 수집 개수가 작업 전과 같음(22개, 18개. 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적고 종료 시 값과 비교)
+    - `uv run pytest -q` 전체 통과 (직전 사이클 268개), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -n "SELECT COUNT(\*) FROM feeds" tests/test_db.py` 결과 있음
+    - src 8개 무변경: 작업 시작 직후와 종료 시 각각 `shasum src/rss_wiki/*.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록. (1) `db.py` 복사본의 `get_feed_failures`가 행이 없을 때 `INSERT INTO feeds (url) VALUES (?)`를 하고 그대로 `None`을 반환 (2) `pipeline.py` 복사본의 건너뛰기 분기에서 `record_feed_failure(conn, feed_id, "given up")`도 부르도록 추가
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `tests/test_db.py`, `tests/test_pipeline.py`
+
+- [x] T9a. `wiki.py` 순수 함수: slug, 파일 이름 배정, 글 마크다운 렌더 (PRD 4.5)
+  - 선행: T8c PASS 12/12(충족, M3 마감). DB와 파일 시스템을 쓰지 않는 층만 만든다. 파일 쓰기와 `db.py` 조회 함수는 T9b, 태그 페이지와 `index.md`는 T10 몫이라 이번에는 만들지 않는다. 기존 `src/` 8개 파일은 건드리지 않는다.
+  - 내용 (새 `src/rss_wiki/wiki.py`):
+    - `@dataclass(frozen=True) WikiArticle`: `id: int`, `title: str | None`, `link: str | None`, `feed_name: str`, `published_at: str | None`, `created_at: str`, `summary_lines: list[str]`, `key_points: list[str]`, `tags: list[str]`. (자체 결정) 입력 dataclass를 `wiki.py`가 정의한다. `db.py`가 `wiki.py`를 import 하지 않게 하려는 것이고, T9b에서 DB 행을 이 타입으로 옮기는 일은 `pipeline.py`가 맡는다.
+    - `slugify(text: str) -> str`: 한글(`가-힣`)/영문/숫자만 남기고 나머지 문자는 `-`로 바꾼다. 영문은 소문자화(자체 결정). 연속된 `-`는 하나로 줄이고 앞뒤 `-`는 없앤다. 그 뒤 최대 80자로 자르고 다시 앞뒤 `-`를 없앤다. 결과가 비면 `"untitled"`(자체 결정).
+    - `article_date(article: WikiArticle) -> str`: `published_at`이 있으면 그 문자열의 앞 10자, 없으면 `created_at`의 앞 10자(PRD 5절: 저장 값이 이미 로컬 오프셋 ISO8601이므로 다시 변환하지 않는다).
+    - `assign_filenames(articles: Sequence[WikiArticle]) -> dict[int, str]`: 한 피드 폴더 안의 글들을 받아 글 id → 파일 이름을 돌려준다. 이름은 `f"{article_date}-{slug}.md"`. 같은 이름이 겹치면 `id` 오름차순으로 먼저 온 쪽이 접미사 없는 이름을 갖고, 다음부터 `-2`, `-3`을 `.md` 앞에 붙인다. 입력 순서와 무관하게 같은 입력 집합이면 같은 결과가 나와야 한다(PRD 4.5 "같은 DB로 다시 만들면 같은 이름").
+    - `feed_dirname(feed_name: str) -> str`: `slugify(feed_name)`.
+    - `render_article(article: WikiArticle) -> str`: frontmatter(`---` 사이)에 `title`, `link`, `feed`, `published_at`, `created_at`, `tags` 6개 키를 이 순서로 넣고, 본문에 `## 3줄 요약`(`summary_lines`를 `-` 목록), `## 핵심 포인트`(`key_points`를 `-` 목록), `## 원문`(`link`가 있으면 그 링크 한 줄, 없으면 "원문 링크 없음")을 쓴다. 문자열 값은 `json.dumps(value, ensure_ascii=False)`로 감싸고 `None`은 `null`, 태그는 flow 목록으로 쓴다(자체 결정: JSON은 YAML 1.2의 부분집합이라 따옴표/콜론이 든 제목도 그대로 파싱된다). 마지막 줄은 개행으로 끝낸다.
+    - 공개 함수 5개에 docstring을 적는다.
+  - 내용 (새 `tests/test_wiki.py`, 각각 별도 테스트, 기대값은 테스트 안에 리터럴로 적는다):
+    - (a) `slugify("파이썬 3.13 Release!")` → `"파이썬-3-13-release"`
+    - (b) `slugify("--  a  b --")` → `"a-b"` (연속 구분자 압축과 앞뒤 `-` 제거)
+    - (c) 영문 100자 입력 → 길이가 정확히 80이고 `endswith("-")`가 거짓
+    - (d) `slugify("!!!")` → `"untitled"`
+    - (e) `article_date`: `published_at="2026-09-18T00:13:02+09:00"` → `"2026-09-18"`. `published_at=None`이고 `created_at="2026-09-19T10:00:00+09:00"` → `"2026-09-19"`
+    - (f) `assign_filenames`에 글 하나 → `{id: "2026-09-18-hello.md"}`
+    - (g) 같은 날짜/제목 글 3개(id 3, 1, 2 순서로 입력) → `{1: "...-x.md", 2: "...-x-2.md", 3: "...-x-3.md"}`. 같은 3개를 id 1, 2, 3 순서로 다시 넣어도 결과가 같음(한 테스트 안에서 두 순서를 모두 단언)
+    - (h) 날짜가 다르면 같은 제목이어도 접미사가 붙지 않음
+    - (i) `render_article` 결과를 `yaml.safe_load`로 파싱(frontmatter 부분만 잘라서)해 6개 키의 값이 원본과 같음. 본문에 3줄 요약 3줄, 핵심 포인트 2줄, 원문 링크가 각각 들어 있음
+    - (j) 제목에 `"`와 `:`가 든 글(`'그는 "예: 아니오"라고 했다'`)도 (i)와 같은 방식으로 파싱되고 `title` 값이 원문과 정확히 같음
+    - (k) `link=None`, `tags=[]`, `key_points=[]`인 글도 렌더되고 frontmatter가 파싱되며 `link`가 `None`, 본문에 "원문 링크 없음"이 있음
+    - (l) `feed_dirname("Simon Willison's Weblog")` → `"simon-willison-s-weblog"` (실제 반환값을 확인해 기대값으로 적는다)
+  - acceptance:
+    - `uv run pytest tests/test_wiki.py -v` 통과, (a)~(l) 12개가 각각 별도 테스트로 존재
+    - `uv run pytest -q` 전체 통과, `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import (sqlite3|httpx|trafilatura)|from rss_wiki(\.db| import db)|open\(|write_text|mkdir" src/rss_wiki/wiki.py` 결과 없음 (DB/파일 시스템/네트워크를 쓰지 않음)
+    - `uv run python -c "from rss_wiki.wiki import slugify; print(slugify('파이썬 3.13 Release!'))"` 종료 코드 0, 출력 `파이썬-3-13-release`
+    - 손대지 않는 src 8개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음 (T8c REVIEW 메모 2)
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고, 돌린 `-k` 범위(또는 전체)를 함께 적는다(T8c REVIEW 메모 3). (1) `slugify`의 80자 자르기 제거 (2) 충돌 접미사를 2가 아니라 1부터 시작해 첫 파일도 `-1`이 붙게 (3) `assign_filenames`의 id 오름차순 정렬 제거(입력 순서 그대로 배정) (4) `article_date`에서 `created_at`을 `published_at`보다 먼저 보게 (5) frontmatter 값의 `json.dumps` 감싸기 제거(값을 그대로 씀) (6) `slugify`의 연속 `-` 압축 제거
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/wiki.py`, `tests/test_wiki.py`
+
+- [x] T9a2. 파일 이름 중복 수정과 렌더 계약 단언 (T9a REVIEW 메모 1/2, 둘 다 필수) — PASS 12/12
+  - 선행: T9a PASS 10/12(충족). `src/rss_wiki/wiki.py`와 `tests/test_wiki.py`만 건드린다. T9b의 파일 쓰기는 이 항목이 끝난 뒤에 얹는다.
+  - 내용 (`src/rss_wiki/wiki.py`, `assign_filenames`만 고친다):
+    - 충돌 카운터를 접미사 붙이기 전의 base(`counts[base]`)가 아니라 **이미 배정된 최종 이름 집합**으로 옮긴다. 즉 `name = f"{base}.md"`로 시작해 `while name in used: count += 1; name = f"{base}-{count}.md"`(첫 접미사는 `2`)를 돌리고 배정 후 `used.add(name)` 한다. 정렬은 그대로 글 id 오름차순.
+    - 근거: 지금은 slug 자체가 `x-2`인 글이 다른 글의 충돌 회피 이름과 겹쳐 서로 다른 글 두 개가 같은 파일 이름을 받는다. 반환 dict는 글 id가 키라 값이 덮이지 않아 조용히 통과하고, T9b가 이 이름으로 파일을 쓰면 뒤에 쓰는 글이 앞 글의 파일을 덮어쓴다(PRD 4.5 "글마다 파일 하나" 위반).
+    - `render_article`과 나머지 함수는 한 줄도 바꾸지 않는다. 이 항목의 다른 절반은 테스트 단언만 더하는 일이다.
+  - 내용 (`tests/test_wiki.py`, 기대값은 테스트 안에 리터럴로 적는다):
+    - (m) 새 테스트. 같은 날짜(`published_at="2026-09-18T00:00:00+09:00"`), 제목이 `"X"`(id 1), `"X"`(id 2), `"X 2"`(id 3)인 글 3개 → `{1: "2026-09-18-x.md", 2: "2026-09-18-x-2.md", 3: "2026-09-18-x-2-2.md"}`이고 `len(set(result.values())) == 3`. 같은 3개를 id 역순으로 넣어도 결과가 같음(한 테스트 안에서 두 순서 모두 단언).
+    - (n) frontmatter 키 순서 단언. 렌더 결과의 첫 `---`와 다음 `---` 사이 각 줄에서 `:` 앞 토큰을 뽑아 `["title", "link", "feed", "published_at", "created_at", "tags"]`와 `==` 비교한다. 기존 (i)의 `yaml.safe_load` dict 비교는 그대로 두고 **별도 단언으로** 얹는다(dict 비교는 순서를 관찰하지 못한다).
+    - (o) `render_article(...).endswith("\n")`.
+    - (p) `"## 3줄 요약"`, `"## 핵심 포인트"`, `"## 원문"` 세 문자열이 렌더 결과에 각각 정확히 1회(`markdown.count(...) == 1`).
+    - (n)(o)(p)는 기존 (i) 테스트에 얹거나 새 테스트 1개로 묶는다(새 함수는 최대 1개).
+  - acceptance:
+    - `uv run pytest tests/test_wiki.py -v` 통과. (m)이 별도 테스트로 존재하고, (n)(o)(p) 단언이 `grep`으로 확인된다
+    - `uv run pytest -q` 전체 통과 (직전 사이클 기준선 280, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.wiki import WikiArticle, assign_filenames as f; mk=lambda i,t: WikiArticle(id=i, title=t, link=None, feed_name='f', published_at='2026-09-18T00:00:00+09:00', created_at='2026-09-18T00:00:00+09:00', summary_lines=[], key_points=[], tags=[]); r=f([mk(1,'X'), mk(2,'X'), mk(3,'X 2')]); print(sorted(r.values())); assert len(set(r.values()))==3"` 종료 코드 0
+    - 세 단언이 각각 테스트 코드에 있음: `grep -c endswith tests/test_wiki.py` 1 이상, `grep -c '## 3줄 요약' tests/test_wiki.py` 1 이상, `grep -c '"title", "link", "feed"' tests/test_wiki.py` 1 이상 (세 출력을 IMPL.md에 적는다)
+    - `grep -n "counts" src/rss_wiki/wiki.py` 결과 없음 (base 카운터가 남지 않음)
+    - 손대지 않는 src 8개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음 (T9b도 하면 `db.py`는 이 목록에서 빠지며, 그 경우 IMPL.md에 항목별로 어느 목록을 썼는지 적는다)
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 돌린 `-k` 범위(또는 전체)를 함께 적는다. (1) 충돌 회피를 고치기 전 코드로 되돌림(base 카운터만 세기) (2) `used.add(name)` 제거 (3) frontmatter 키 순서를 `feed`, `link`, `title`로 뒤집기 (4) `render_article` 마지막 `lines.append("")` 제거 (5) `## 3줄 요약`을 `## SUMMARY`로 바꾸기
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/wiki.py`, `tests/test_wiki.py`
+
+- [x] T9b. 요약 완료 글 조회와 피드별 폴더에 글 파일 쓰기 (PRD 4.5, T9a2 선행) — PASS 11/12
+  - 선행: T9a2 PASS 12/12(충족, 파일 이름 유일성이 닫혔다). `pipeline` 연결과 태그 주제 페이지/`index.md`는 T9c/T10 몫이라 이번에는 만들지 않는다. `cli.py`, `config.py`, `extract.py`, `fetch.py`, `pipeline.py`, `summarize.py`, `timeutil.py`는 건드리지 않는다. `wiki.py`에서 이번에 손대는 곳은 모듈 docstring과 새 `write_article_files` 둘뿐이고 **`render_article`을 비롯한 기존 함수는 한 줄도 바꾸지 않는다**((s)는 단언만 더하는 일이다).
+  - 내용 (`src/rss_wiki/db.py`):
+    - `@dataclass(frozen=True) SummarizedArticle`: `id: int`, `feed_id: int`, `feed_name: str | None`, `feed_url: str`, `title: str | None`, `link: str | None`, `published_at: str | None`, `created_at: str`, `summary_lines: list[str]`, `key_points: list[str]`, `tags: list[str]`. (자체 결정) 피드 이름과 URL을 둘 다 담고 이름이 비었을 때의 대체값은 정하지 않는다 — 표시용 대체는 T9c의 `pipeline`이 맡는다. `db.py`는 `wiki.py`를 import 하지 않는다(`PendingArticle`과 같은 방향).
+    - `list_summarized_articles(conn) -> list[SummarizedArticle]`: `articles`를 `summaries`(`article_id`)와 `feeds`(`feed_id`)에 JOIN 하고 `status = 'summarized'`만 `a.id` 오름차순으로 돌려준다. 태그는 글마다 따로 묻지 않고 `article_tags`/`tags`를 한 번 더 조회해 글 id별로 모으며 태그 이름 오름차순(`ORDER BY t.name ASC`)으로 넣는다. 태그가 없는 글은 `tags == []`.
+    - `summary_lines`/`key_points`는 `json.loads`로 디코딩한다. 컬럼이 `NULL`이면 `[]`(스키마가 `NOT NULL`이 아니다). 그 밖의 파싱 오류는 잡지 않는다(우리가 쓴 값이라 깨지면 버그다, 자체 결정).
+  - 내용 (`src/rss_wiki/wiki.py`):
+    - 모듈 docstring을 파일 쓰기가 포함된 층으로 고친다(T9a의 "파일 시스템을 모른다"는 이 항목부터 해제된다). 새 import는 `pathlib.Path`뿐이고 `sqlite3`/`httpx`/`trafilatura`/`rss_wiki.db`는 계속 import 하지 않는다.
+    - `write_article_files(wiki_dir: Path, articles: Sequence[WikiArticle]) -> dict[int, Path]`: 글을 `feed_dirname(article.feed_name)` 기준으로 묶고, 묶음마다 `assign_filenames`로 이름을 배정한다(같은 폴더 안에서만 충돌을 피하면 된다). 폴더는 `(wiki_dir / dirname).mkdir(parents=True, exist_ok=True)`로 만들고 `render_article` 결과를 `write_text(markdown, encoding="utf-8", newline="\n")`으로 쓴다(자체 결정: 플랫폼 기본 개행에 결과가 흔들리지 않게). 반환은 글 id → 쓴 파일 경로.
+    - 이미 있는 같은 이름 파일은 덮어쓴다(DB가 원천, PRD 5절). 위키 폴더의 다른 파일은 지우지 않는다(PRD 4.1 "이미 만든 위키 파일은 지우지 않는다").
+    - 두 공개 함수에 docstring을 적는다.
+  - 내용 (새 `tests/test_list_summarized.py`, 각각 별도 테스트, 기대값은 리터럴로 적는다):
+    - (a) `summarized` 글 1개 → `id`/`feed_id`/`feed_name`/`feed_url`/`title`/`link`/`published_at`/`created_at`이 삽입값과 같고 `summary_lines == ["a", "b", "c"]`, `key_points == ["k1", "k2"]`(JSON 문자열이 아니라 리스트)
+    - (b) `pending`/`failed`/`given_up` 글은 결과에 없음(파라미터화 허용)
+    - (c) 태그를 이름 오름차순이 아닌 순서로 붙인 글 → `tags`가 이름 오름차순(예: `["ai", "python", "rust"]`). 같은 결과에 태그 0개 글이 `tags == []`로 함께 있음
+    - (d) 글 3개를 id 역순으로 삽입해도 결과가 `id` 오름차순
+    - (e) `summary_lines`/`key_points`를 `NULL`로 넣은 글 → 둘 다 `[]`
+    - (f) 피드 2개(하나는 `feeds.name`이 `NULL`) → 각 글이 자기 피드의 `feed_name`/`feed_url`을 갖고 `NULL` 쪽은 `feed_name is None`
+  - 내용 (새 `tests/test_wiki_write.py`, 각각 별도 테스트, `tmp_path` 사용):
+    - (g) 같은 피드 글 2개 → 없던 `wiki_dir` 하위 경로까지 만들어지고 `wiki_dir/<feed_dirname>/`에 파일 2개, 각 내용이 `render_article(article)`과 문자열로 같음
+    - (h) 피드 이름이 다른 글 2개 → 폴더 2개에 각각 파일 1개
+    - (i) 같은 날짜/제목 글 2개 → 파일 2개가 남고 이름이 서로 다름(뒤 글이 앞 글을 덮지 않음)
+    - (j) 같은 입력으로 두 번 호출 → 폴더 안 파일 이름 집합과 내용이 그대로(재실행 안정성, PRD 4.5)
+    - (k) 미리 만들어 둔 `wiki_dir/<feed_dirname>/old.md`가 호출 뒤에도 그대로 있음(PRD 4.1)
+    - (l) 한글 제목/피드 이름 글 → 반환 `Path`가 실제로 존재하고, `read_text(encoding="utf-8")`에 제목이 그대로 있고 `read_bytes()`에 `b"\r"`이 없음
+  - 내용 (`tests/test_wiki.py`에 단언 추가, T9a2 REVIEW 메모 2 / 필수):
+    - (s) `render_article`의 절 순서와 절-내용 대응을 고정한다. `summary_lines`가 3줄, `key_points`가 2줄인 글을 렌더해 결과를 `"## "`로 `split` 한 뒤:
+      - 절 제목 목록이 `["3줄 요약", "핵심 포인트", "원문"]`과 `==` (각 조각의 첫 줄을 쓴다. `split("## ")`의 앞 조각은 frontmatter라 버린다)
+      - 첫 절 블록에 `summary_lines` 3줄이 각각 있고 `key_points` 2줄은 **없다**
+      - 둘째 절 블록에 `key_points` 2줄이 각각 있고 `summary_lines` 3줄은 **없다**
+    - 기대값은 테스트 안에 리터럴로 적는다. 기존 (i)/(n)(o)(p) 단언은 그대로 두고 **별도 테스트 1개**로 얹는다(새 함수는 최대 1개). 세 목록 줄은 서로 구별되는 문자열을 쓴다(예: `summary_lines=["s1", "s2", "s3"]`, `key_points=["k1", "k2"]`).
+    - 근거: 지금은 절 아래 내용을 맞바꾸거나 절 순서를 뒤섞어도 테스트가 전부 통과한다(T9a2 REVIEW의 평가자 뮤테이션 C/D 생존). T9b가 이 렌더 결과를 실제 파일로 쓰기 시작하면 잘못된 절 배치가 그대로 위키에 남는다.
+  - acceptance:
+    - `uv run pytest tests/test_list_summarized.py tests/test_wiki_write.py -v` 통과, (a)~(l) 12개가 각각 별도 테스트로 존재
+    - `uv run pytest tests/test_wiki.py -v` 통과, (s)가 별도 테스트로 존재하고 수집 개수가 14개(직전 사이클 13 + 1)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 281**, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -nE "import (sqlite3|httpx|trafilatura)|from rss_wiki(\.db| import db)" src/rss_wiki/wiki.py` 결과 없음. **T9a의 `open\(|write_text|mkdir` 금지는 이 항목에서 해제된다**(파일 쓰기가 이번 요구다)
+    - `grep -nE "import httpx|from rss_wiki(\.(fetch|wiki|pipeline)| import (fetch|wiki|pipeline))" src/rss_wiki/db.py` 결과 없음
+    - `uv run python -c "import pathlib, tempfile; from rss_wiki.wiki import WikiArticle, write_article_files as w; d=pathlib.Path(tempfile.mkdtemp())/'wiki'; a=WikiArticle(id=1, title='첫 글', link='https://example.com/a', feed_name='My Feed', published_at='2026-09-18T00:00:00+09:00', created_at='2026-09-18T01:00:00+09:00', summary_lines=['a'], key_points=['k'], tags=['ai']); print(w(d, [a])[1].relative_to(d))"` 종료 코드 0, 출력이 `my-feed/2026-09-18-첫-글.md`
+    - 손대지 않는 src 7개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. (1) `list_summarized_articles`의 `WHERE status = 'summarized'` 제거 (2) 태그 조회의 `ORDER BY t.name ASC` 제거 (3) `summary_lines`/`key_points`의 `json.loads` 제거(컬럼 문자열을 그대로 담기) (4) `write_article_files`의 `mkdir` 호출 제거 (5) `write_article_files`가 `assign_filenames` 대신 `f"{article_date(a)}-{slugify(a.title or '')}.md"`를 직접 계산 (6) `write_article_files`가 쓰기 전에 피드 폴더를 `shutil.rmtree(..., ignore_errors=True)`로 비우기 (7) `render_article`이 `## 3줄 요약` 절에 `key_points`를, `## 핵심 포인트` 절에 `summary_lines`를 렌더(두 목록 맞바꿈) (8) `render_article`의 절 순서를 `## 원문` → `## 핵심 포인트` → `## 3줄 요약`으로 바꿈. (7)(8)은 (s)가 닫는 구멍이라 원본 `wiki.py`가 아니라 복사본에서만 한다
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/wiki.py`, `tests/test_list_summarized.py`, `tests/test_wiki_write.py`, `tests/test_wiki.py`
+
+- [x] T9c. `pipeline`이 요약 완료 글을 위키 파일로 쓰는 조율 단계 (PRD 4.5, T9b REVIEW 메모 1/2)
+  - 선행: T9b PASS 11/12(충족). 태그 주제 페이지와 `index.md`는 T10, CLI 연결은 T11 몫이라 이번에는 만들지 않는다. `cli.py`, `config.py`, `db.py`, `extract.py`, `fetch.py`, `summarize.py`, `timeutil.py`, `wiki.py`는 한 줄도 건드리지 않는다(이번에 고치는 src는 `pipeline.py` 하나다).
+  - 내용 (`src/rss_wiki/pipeline.py`):
+    - `write_wiki(conn: sqlite3.Connection, wiki_dir: Path, *, list_articles: Callable[[sqlite3.Connection], Sequence[SummarizedArticle]] = list_summarized_articles, write: Callable[[Path, Sequence[WikiArticle]], dict[int, Path]] = write_article_files) -> int`를 더한다. `list_articles(conn)`로 요약 완료 글을 읽어 `WikiArticle`로 옮기고 `write(wiki_dir, articles)`를 한 번 불러 **쓴 파일 수**(반환 dict의 길이)를 돌려준다. 두 콜러블을 인자로 주입받는 것은 `collect`/`prepare_body`와 같은 방향이다.
+    - 변환 규칙: `id`/`title`/`link`/`published_at`/`created_at`/`summary_lines`/`key_points`/`tags`는 그대로 옮긴다. `feed_name`은 `article.feed_name or article.feed_url`로 정한다(자체 결정, falsy 기준. `None`만 거르면 `""`가 `slugify("")` → `untitled` 폴더로 뭉쳐 서로 다른 피드가 섞인다). `feed_id`는 `WikiArticle`에 없으므로 버린다.
+    - 목록 순서에 의존하지 않는다(이름 배정과 충돌 회피는 `assign_filenames`가 글 id 기준으로 한다). docstring에 (1) falsy 대체 규칙과 근거, (2) 순서 무의존을 적는다.
+    - `pipeline.py`의 import에 `pathlib.Path`, `db.SummarizedArticle`/`list_summarized_articles`, `wiki.WikiArticle`/`write_article_files`가 더해진다. `pipeline`이 `db`와 `wiki`를 둘 다 아는 유일한 모듈이다(설계대로).
+  - 내용 (새 `tests/test_write_wiki.py`, 각각 별도 테스트, 기대값은 테스트 안에 리터럴로 적는다):
+    - (a) 가짜 `list_articles`가 `SummarizedArticle` 2개를 돌려주고 가짜 `write`가 받은 인자를 기록 → 넘어간 `WikiArticle` 2개의 `id`/`title`/`link`/`feed_name`/`published_at`/`created_at`/`summary_lines`/`key_points`/`tags`가 원본과 같고(세 목록은 서로 구별되는 값으로), 반환값이 가짜 `write`가 돌려준 dict의 길이와 같음
+    - (b) `feed_name=None`인 글 → 넘어간 `WikiArticle.feed_name == feed_url`(예: `"https://example.com/feed.xml"`)
+    - (c) `feed_name=""`인 글 → 넘어간 `WikiArticle.feed_name == feed_url` (falsy 기준 고정)
+    - (d) 가짜 `list_articles`가 빈 목록 → `write`가 빈 목록으로 한 번 불리고 반환 0
+    - (e) 가짜 `write`가 받은 첫 인자가 호출에 넘긴 `wiki_dir`와 같은 객체(하위 폴더를 덧붙이지 않음)
+    - (f) 통합: 진짜 `connect`로 만든 임시 DB에 피드 2개(하나는 `feeds.name`이 `NULL`)와 `summarized` 글 2개(요약/태그 포함)를 넣고 `write_wiki(conn, tmp_path / "wiki")` 호출(주입 없이 기본값 사용) → 반환 2, 이름 있는 피드 글은 `<slugify(피드 이름)>/` 폴더에, `NULL` 피드 글은 `<slugify(피드 url)>/` 폴더에 파일이 실제로 존재하고 `read_text(encoding="utf-8")`에 제목과 요약 줄이 들어 있음. 두 폴더 이름은 리터럴로 적는다
+    - (g) 순서 무의존: 가짜 `list_articles`가 같은 글 3개를 id 오름차순으로 돌려줄 때와 역순으로 돌려줄 때, 진짜 `write_article_files`로 쓴 결과(파일 경로 집합과 각 파일 내용)가 같음. 글 3개 중 둘은 같은 날짜/제목으로 충돌시켜 이름 배정까지 비교한다. 근거: `list_summarized_articles`의 `ORDER BY a.id ASC`는 rowid 스캔 때문에 뮤테이션으로 죽일 수 없으므로, 소비자가 순서에 기대지 않는다는 쪽을 고정한다(T9b REVIEW 메모 1)
+  - acceptance:
+    - `uv run pytest tests/test_write_wiki.py -v` 통과, (a)~(g) 7개가 각각 별도 테스트로 존재
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 296**, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "import pathlib, tempfile, sqlite3; from rss_wiki.pipeline import write_wiki; print(write_wiki.__doc__ is not None)"` 종료 코드 0, 출력 `True`
+    - `grep -n "ORDER BY a.id ASC" src/rss_wiki/db.py` 결과 있음 (T9b REVIEW 메모 1의 방어물이 코드에 남아 있음)
+    - `grep -nE "import (httpx|trafilatura)" src/rss_wiki/pipeline.py` 결과 없음
+    - 손대지 않는 src 8개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py src/rss_wiki/wiki.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. (1) `feed_name or feed_url` 대체를 지우고 `article.feed_name`을 그대로 넘김 (2) 반환값을 쓴 파일 수 대신 상수 `0`으로 (3) `write`에 `wiki_dir` 대신 `wiki_dir / "articles"`를 넘김 (4) `summary_lines`와 `key_points`를 맞바꿔 `WikiArticle`에 넣음 (5) `tags`를 빈 목록으로 넘김
+    - 참고 뮤테이션(죽지 않는 것이 정상, IMPL.md에 결과와 근거를 적는다): `db.py` 복사본에서 `list_summarized_articles`의 `ORDER BY a.id ASC` 제거 → 전체 통과(생존). `articles.id`가 rowid 별칭이고 계획이 `SCAN a`라 결과가 이미 id 오름차순으로 나오기 때문이며, 소비자 쪽 방어는 (g)가 맡는다
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/pipeline.py`, `tests/test_write_wiki.py`
+
+- [x] T10a. 주제 페이지/인덱스의 순수 층: 경로 계산, 최신순 정렬, 태그 파일 이름, 렌더 2개 (PRD 4.5, T9c REVIEW 메모 1/2/3)
+  - 선행: T9c PASS 11/12(충족). 파일 쓰기(`write_tag_pages`/`write_index`)와 `pipeline.write_wiki` 확장은 T10b 몫이라 이번에는 만들지 않는다. `cli.py`, `config.py`, `db.py`, `extract.py`, `fetch.py`, `pipeline.py`, `summarize.py`, `timeutil.py`는 한 줄도 건드리지 않는다(이번에 고치는 src는 `wiki.py` 하나다). `wiki.py`에서 기존 함수 중 손대는 곳은 `write_article_files`의 내부 한 군데뿐이고(`article_relpaths` 재사용, 동작 불변) `slugify`/`article_date`/`assign_filenames`/`feed_dirname`/`render_article`은 한 줄도 바꾸지 않는다.
+  - 내용 (`src/rss_wiki/wiki.py`):
+    - `TAGS_DIRNAME = "tags"`, `INDEX_RECENT_LIMIT = 20` 모듈 상수(PRD 4.5 자체 결정).
+    - `article_relpaths(articles: Sequence[WikiArticle]) -> dict[int, str]`: 글 id → 위키 루트 기준 상대 경로 문자열 `f"{feed_dirname(a.feed_name)}/{name}"`. 그룹화와 이름 배정 규칙은 지금 `write_article_files`가 하는 것과 같다(피드 폴더로 묶고 묶음마다 `assign_filenames`). 구분자는 플랫폼과 무관하게 `/`를 쓴다(자체 결정: 마크다운 링크에 그대로 들어간다).
+    - `write_article_files`가 이 함수를 써서 경로를 정하도록 바꾼다. **동작은 바뀌지 않는다** — 기존 테스트 (g)~(l)이 그대로 통과해야 한다. 근거: 주제 페이지와 인덱스의 링크가 실제로 쓰인 파일 이름과 어긋나지 않도록 계산을 한 곳에 둔다.
+    - `sort_articles(articles: Sequence[WikiArticle]) -> list[WikiArticle]`: 최신순(새 글이 앞). 기준 시각은 `published_at`을 `datetime.fromisoformat`으로 파싱한 값이고, `None`이거나 `ValueError`이거나 `tzinfo is None`(naive)이면 `created_at`을 같은 방식으로 파싱한다. 둘 다 쓸 수 없으면 "시각 없음"으로 보고 맨 뒤에 둔다. 같은 시각끼리와 시각 없는 것들끼리는 `id` 오름차순. **예외를 밖으로 내지 않는다**(T4b2 계약상 `published_at`에 `"garbage"`/naive가 저장될 수 있다).
+    - `assign_tag_filenames(tags: Sequence[str]) -> dict[str, str]`: 태그 이름 오름차순으로 돌며 `f"{slugify(tag)}.md"`를 배정하고, 이미 배정된 이름과 겹치면 `assign_filenames`와 같은 방식으로 `-2`/`-3`을 붙인다(예: `a+b`와 `a-b`가 둘 다 `a-b`로 slug 되는 경우). 같은 태그 집합이면 입력 순서와 무관하게 같은 결과.
+    - `render_tag_page(tag: str, articles: Sequence[WikiArticle], relpaths: Mapping[int, str]) -> str`: 첫 줄 `# 태그: {tag}`, 빈 줄, 그다음 `sort_articles` 순서로 `- [{title}](../{relpaths[a.id]}) — {article_date(a)}` 한 줄씩, 끝 개행. `title`이 falsy면 `(제목 없음)`을 쓴다. 링크에 `../`를 붙이는 것은 주제 페이지가 `tags/` 안에 있기 때문이며 docstring에 적는다. `relpaths`에 없는 글은 건너뛰지 않고 `KeyError`로 터뜨린다(우리가 만든 입력이라 어긋나면 버그다, 자체 결정).
+    - `render_index(articles: Sequence[WikiArticle], relpaths: Mapping[int, str], tag_filenames: Mapping[str, str]) -> str`: 첫 줄 `# RSS Wiki`, 그다음 피드 이름 오름차순으로 `## {feed_name}` 절을 만들고 그 피드 글을 `sort_articles` 순서로 최대 `INDEX_RECENT_LIMIT`개까지 `- [{title}]({relpaths[a.id]}) — {article_date(a)}`로 나열한다. 마지막에 `## 태그` 절을 두고 `tag_filenames`를 태그 이름 오름차순으로 `- [{tag}]({TAGS_DIRNAME}/{filename})`로 나열한다. 글이 0개여도 태그가 0개여도 예외 없이 제목과 절을 낸다. 끝 개행.
+    - 새 공개 함수 5개 모두에 docstring을 적는다. `sqlite3`/`httpx`/`trafilatura`/`rss_wiki.db`는 계속 import 하지 않는다(새 import는 `datetime`과 `typing.Mapping` 정도).
+  - 내용 (새 `tests/test_wiki_pages.py`, 각각 별도 테스트, 기대값은 테스트 안에 리터럴로 적는다):
+    - (a) `article_relpaths`: 피드가 서로 다른 글 2개 → `{1: "my-feed/2026-09-18-a.md", 2: "other-feed/2026-09-18-b.md"}` 꼴로 폴더가 갈림
+    - (b) `article_relpaths`: 같은 피드/같은 날짜/같은 제목 글 2개 → 경로 2개가 서로 다르고(뒤 글에 `-2`), 입력 순서를 뒤집어도 결과 dict가 같음
+    - (c) `sort_articles`: `published_at`이 서로 다른 글 3개 → 최신이 앞
+    - (d) `sort_articles`: `published_at is None`인 글은 `created_at` 기준 자리에 들어감(다른 글 사이에 끼는 경우로 확인)
+    - (e) `sort_articles`: `published_at="garbage"` 글과 naive `"2026-09-18T00:00:00"` 글 → 예외 없이 각자의 `created_at` 기준 자리
+    - (f) `sort_articles`: `published_at`/`created_at`이 둘 다 파싱 불가한 글 2개 → 예외 없이 맨 뒤에 `id` 오름차순으로
+    - (g) `sort_articles`: 같은 절대 시각을 `+09:00`과 `+00:00`으로 적은 두 글(예: `2026-09-18T09:00:00+09:00`과 `2026-09-18T00:00:00+00:00`) → 문자열이 아니라 절대 시각으로 비교되어 `id` 오름차순 동률 규칙이 적용됨
+    - (h) `assign_tag_filenames`: 태그 `["python", "ai", "rust"]` → `{"ai": "ai.md", "python": "python.md", "rust": "rust.md"}`
+    - (i) `assign_tag_filenames`: slug가 겹치는 태그 2개(`"a+b"`, `"a-b"`) → 이름 2개가 서로 다르고 입력 순서를 뒤집어도 같은 결과
+    - (j) `render_tag_page`: 글 2개 → 첫 줄이 `# 태그: python`, 링크가 `../my-feed/...md`로 시작, 줄 순서가 최신순, 결과가 `"\n"`으로 끝남
+    - (k) `render_tag_page`: `title=None`인 글 → 그 줄에 `(제목 없음)`이 들어가고 링크는 정상(T9c REVIEW 메모 1)
+    - (l) `render_index`: 피드 2개(이름 `"b feed"`, `"a feed"`)와 태그 2개 → `## a feed` 절이 `## b feed` 절보다 앞, 각 절에 자기 피드 글만 최신순으로 있고, `## 태그` 절에 `tags/ai.md`/`tags/python.md` 링크가 이름 오름차순으로 있음
+    - (m) `render_index`: 한 피드에 글 21개 → 그 절의 목록 줄이 20개(`INDEX_RECENT_LIMIT`, 기대값은 리터럴 `20`)이고 가장 오래된 1개가 빠짐
+    - (n) `render_index`: 글 0개 / 태그 0개 → 예외 없이 `# RSS Wiki`와 `## 태그`가 있고 결과가 `"\n"`으로 끝남
+  - 내용 (`tests/test_write_wiki.py`에 단언 1줄 추가, T9c REVIEW 메모 2):
+    - 순서 무의존 테스트 (g)의 스냅샷 비교 앞에 `assert len(<오름차순 스냅샷>) == 3`을 넣어 양쪽이 0개일 때 공허하게 통과하지 않게 한다. 다른 줄은 건드리지 않는다.
+  - acceptance:
+    - `uv run pytest tests/test_wiki_pages.py -v` 통과, (a)~(n) 14개가 각각 별도 테스트로 존재
+    - `uv run pytest tests/test_wiki.py tests/test_wiki_write.py -v` 통과, 수집 개수가 작업 전과 같음(`write_article_files` 리팩터가 동작을 바꾸지 않았다는 증거로 IMPL.md에 작업 전/후 개수를 함께 적는다)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 303**, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.wiki import WikiArticle, article_relpaths, render_tag_page; a=WikiArticle(id=1, title='첫 글', link='https://example.com/a', feed_name='My Feed', published_at='2026-09-18T00:00:00+09:00', created_at='2026-09-18T01:00:00+09:00', summary_lines=['s'], key_points=['k'], tags=['ai']); print(render_tag_page('ai', [a], article_relpaths([a])).splitlines()[2])"` 종료 코드 0, 출력이 `- [첫 글](../my-feed/2026-09-18-첫-글.md) — 2026-09-18`
+    - `uv run python -c "from rss_wiki.wiki import WikiArticle, sort_articles; a=WikiArticle(id=1, title='t', link=None, feed_name='f', published_at='garbage', created_at='nonsense', summary_lines=[], key_points=[], tags=[]); print(len(sort_articles([a])))"` 종료 코드 0, 출력 `1` (정렬이 파싱 불가 입력에서 터지지 않음)
+    - `grep -nE "import (sqlite3|httpx|trafilatura)|from rss_wiki(\.db| import db)" src/rss_wiki/wiki.py` 결과 없음
+    - `grep -n "TAGS_DIRNAME\|INDEX_RECENT_LIMIT" src/rss_wiki/wiki.py` 결과 있음 (숫자/폴더 이름이 리터럴로 흩어지지 않음)
+    - 손대지 않는 src 8개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. (1) `sort_articles`의 최신순을 오름차순으로 뒤집기 (2) `sort_articles`에서 시각 없는 글을 맨 뒤 대신 맨 앞으로 (3) `sort_articles`가 `published_at`만 보고 `created_at` 대체를 하지 않음(파싱 실패는 시각 없음 처리) (4) `assign_tag_filenames`의 충돌 회피를 없애 같은 이름을 두 태그에 배정 (5) `render_tag_page`의 링크에서 `../` 접두 제거 (6) `render_index`의 `INDEX_RECENT_LIMIT` 자르기 제거
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/wiki.py`, `tests/test_wiki_pages.py`, `tests/test_write_wiki.py`
+
+- [x] T10a2. 두 렌더 함수의 계약을 관찰 가능하게 (T10a REVIEW 메모 1/2/3 필수 + 메모 4, 테스트만)
+  - 선행: T10a PASS 11/12(충족). **`src/` 는 한 줄도 건드리지 않는다.** 고치는 파일은 `tests/test_wiki_pages.py` 하나다. 구현은 이미 세 요구대로 동작함이 REVIEW 시나리오 S4/S5/S6로 확인됐으므로, 이번 항목은 그 동작을 테스트가 보게 만드는 것만 한다. 기존 테스트 (a)~(n) 14개의 이름과 기대값은 (l)에 단언 한 줄을 더하는 것 말고는 바꾸지 않는다.
+  - 내용 (`tests/test_wiki_pages.py`, (o)~(s)는 각각 별도 테스트, 기대값은 테스트 안에 리터럴로 적는다):
+    - (o) `render_tag_page` 결과 **전체**를 리터럴 문자열과 비교한다. 글 1개(`id=1`, `title="new"`, `feed_name="My Feed"`, `published_at="2026-09-18T00:00:00+09:00"`)로 `render_tag_page("python", [a], article_relpaths([a]))`를 부르고 결과가 `"# 태그: python\n\n- [new](../my-feed/2026-09-18-new.md) — 2026-09-18\n"`과 같음. 첫 줄/빈 줄/줄 모양/날짜 접미/끝 개행이 한 단언에 모두 들어간다.
+    - (p) `render_index` 결과 **전체**를 리터럴 문자열과 비교한다. 피드 1개에 글 1개, 태그 1개(`tag_filenames={"ai": "ai.md"}`)로 부르고 결과가 `"# RSS Wiki\n\n## My Feed\n\n- [new](my-feed/2026-09-18-new.md) — 2026-09-18\n\n## 태그\n\n- [ai](tags/ai.md)\n"`과 같음(구현의 실제 빈 줄 배치는 `wiki.py:177-192`를 Read해 그대로 적는다. 리터럴이 현재 출력과 다르면 **테스트를 출력에 맞추지 말고** 어느 쪽이 TASKS 문구에 맞는지 판단해 IMPL.md에 적는다). 절 순서(피드 절 → `## 태그`)와 날짜 접미가 함께 고정된다.
+    - (q) `render_index`: `title=None`인 글 1개 → 그 목록 줄이 `"- [(제목 없음)](my-feed/2026-09-18-untitled.md) — 2026-09-18"`과 **줄 전체로** 같음(T10a REVIEW 메모 4).
+    - (r) `render_tag_page`: `relpaths`가 빈 매핑 → `pytest.raises(KeyError)`. 글은 태그에 속하는 정상 글 1개다.
+    - (s) `render_index`: `relpaths`가 빈 매핑 → `pytest.raises(KeyError)`. `tag_filenames`는 빈 매핑이어도 된다.
+    - 기존 (l)에 단언 1줄 추가: `assert [line for line in result.splitlines() if line.startswith("## ")][-1] == "## 태그"`. (l)은 피드 절이 2개라 절이 앞으로 옮겨지면 확실히 깨진다. 다른 줄은 건드리지 않는다.
+  - acceptance:
+    - `uv run pytest tests/test_wiki_pages.py -v` 통과, (o)~(s) 5개가 각각 별도 테스트로 존재 (기존 14개 포함 19개)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 317**, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -c "pytest.raises(KeyError)" tests/test_wiki_pages.py` 결과 2 이상
+    - src 9개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py src/rss_wiki/wiki.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, `PYTHONPATH`로 복사본 로드를 먼저 확인): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. (1) `render_tag_page` 목록 줄에서 ` — {article_date(article)}` 접미 제거 (2) `render_index` 목록 줄에서 같은 접미 제거 (3) `render_index`의 `## 태그` 절을 피드 절보다 앞으로 옮김 (4) `render_index`의 falsy 제목 대체를 지우고 `title = article.title` (5) `render_tag_page`가 `relpaths`에 없는 글을 `continue`로 건너뜀 (6) `render_index`가 `relpaths`에 없는 글을 `continue`로 건너뜀
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `tests/test_wiki_pages.py`
+
+- [x] T10b. 주제 페이지/인덱스 파일 쓰기와 `pipeline.write_wiki` 확장 (PRD 4.5 마지막 두 산출물)
+  - 선행: T10a2 PASS 12/12(충족, 뮤테이션 14/14 사망으로 렌더 계약이 리터럴로 고정됨). CLI 연결은 T11 몫이라 이번에도 `cli.py`는 건드리지 않는다. 고치는 src는 `wiki.py`와 `pipeline.py` 둘이고 `cli.py`/`config.py`/`db.py`/`extract.py`/`fetch.py`/`summarize.py`/`timeutil.py`는 한 줄도 건드리지 않는다. `wiki.py`의 기존 함수 11개는 한 줄도 바꾸지 않고 새 함수 2개만 더한다(정렬/경로/이름 배정/렌더를 새로 구현하지 않고 T10a 함수를 부른다).
+  - 내용 (`src/rss_wiki/wiki.py`):
+    - 비공개 헬퍼 `_tag_names(articles: Sequence[WikiArticle]) -> list[str]`: 글들의 `tags`를 모아 중복을 없애고 이름 오름차순 목록으로 돌려준다. 두 새 함수가 같은 헬퍼를 쓴다.
+    - `write_tag_pages(wiki_dir: Path, articles: Sequence[WikiArticle]) -> dict[str, Path]`: `relpaths = article_relpaths(articles)`와 `names = assign_tag_filenames(_tag_names(articles))`를 구하고, 태그마다 그 태그가 붙은 글만 골라 `render_tag_page(tag, 고른 글, relpaths)`를 `wiki_dir / TAGS_DIRNAME / names[tag]`에 UTF-8 / `newline="\n"`으로 쓴다. 폴더는 `mkdir(parents=True, exist_ok=True)`. 반환값은 태그 이름 → 실제로 쓴 파일 경로. 태그가 하나도 없으면 빈 dict를 돌려주고 `tags/` 폴더를 만들지 않는다(빈 목록에서 폴더를 만들지 않는 `write_article_files`와 같은 방향, T9b 시나리오). 기존 파일은 덮어쓰지만 `tags/` 안의 다른 파일은 지우지 않는다(자체 결정, PRD 4.5에 반영 — 근거를 docstring에 적는다).
+    - `write_index(wiki_dir: Path, articles: Sequence[WikiArticle]) -> Path`: `render_index(articles, article_relpaths(articles), assign_tag_filenames(_tag_names(articles)))`를 `wiki_dir / "index.md"`에 같은 방식으로 쓰고 그 경로를 돌려준다. 파일 이름은 모듈 상수 `INDEX_FILENAME = "index.md"`로 둔다(`TAGS_DIRNAME`과 같은 방향, 리터럴이 흩어지지 않게). 글이 0개여도 `index.md`를 만든다.
+    - 두 함수가 태그 파일 이름을 **각자** `assign_tag_filenames`로 구한다(자체 결정). 한쪽 결과를 다른 쪽에 넘기지 않는다. 같은 태그 집합에서 결정적이므로(T10a (i)) 두 결과는 구조적으로 일치하고, 전달 경로가 없어 어긋날 자리가 없다. 근거를 `write_index` docstring에 적는다.
+    - 새 공개 함수 2개 모두에 docstring을 적는다. `sqlite3`/`httpx`/`trafilatura`/`rss_wiki.db`는 계속 import 하지 않는다.
+  - 내용 (`src/rss_wiki/pipeline.py`):
+    - `write_wiki`에 키워드 인자 두 개를 더한다. `write_tags: Callable[[Path, Sequence[WikiArticle]], dict[str, Path]] = write_tag_pages`, `write_index_file: Callable[[Path, Sequence[WikiArticle]], Path] = write_index`. 글 파일을 쓴 **뒤에** 같은 `wiki_dir`와 같은 `WikiArticle` 목록으로 두 콜러블을 각각 한 번 부른다.
+    - 반환값은 **글 파일 수 그대로** 둔다(자체 결정, 근거는 PLAN에 적었다: PRD 4.6 출력 항목에 파일 수가 없고, T9c (a)/(d) 계약을 이유 없이 깨지 않으며, 매 실행 재생성이라 세어도 정보가 없다). docstring의 "쓴 파일 수"를 "쓴 글 파일 수"로 고치고 주제 페이지/인덱스도 함께 재생성한다는 한 줄을 더한다.
+    - import에 `wiki.write_tag_pages`/`write_index`가 더해진다. `db`/`wiki`를 둘 다 아는 모듈은 계속 `pipeline` 하나다.
+  - 내용 (새 `tests/test_wiki_write_pages.py`, 각각 별도 테스트, 기대 파일 이름은 리터럴로 적는다):
+    - (a) `write_tag_pages`: 태그가 서로 다른 글 2개(`tags=["ai"]`, `tags=["python"]`) → 반환 dict가 `{"ai": ..., "python": ...}`이고 `tmp_path / "tags" / "ai.md"`와 `.../python.md`가 실제로 존재하며 각 내용이 `render_tag_page`를 직접 부른 결과와 같음
+    - (b) `write_tag_pages`: 한 글에 태그 2개 → 두 페이지 모두 그 글의 링크 줄을 담음
+    - (c) `write_tag_pages`: slug가 겹치는 태그 `"a+b"`/`"a-b"` → 파일 2개가 서로 다른 이름으로 존재하고 반환 dict의 값 2개도 서로 다름
+    - (d) `write_tag_pages`: 모든 글의 `tags`가 빈 목록 → 반환 `{}`이고 `(tmp_path / "tags").exists() is False`
+    - (e) `write_tag_pages`: 링크가 실제 파일로 이어짐 — 같은 글 목록을 `write_article_files`로도 쓴 뒤, 주제 페이지 본문의 `](../` 링크를 뽑아 `(tmp_path / "tags" / 링크).resolve().exists()`가 모두 참
+    - (f) `write_tag_pages`: 미리 만들어 둔 `tags/keep.md`가 호출 뒤에도 그대로 있음(낡은 주제 페이지를 지우지 않는다는 자체 결정)
+    - (g) `write_index`: 글 2개 → 반환값이 `tmp_path / "index.md"`이고 파일 내용이 `render_index`를 직접 부른 결과와 같음
+    - (h) `write_index`와 `write_tag_pages`의 태그 파일 이름이 일치 — slug 충돌 태그 `"a+b"`/`"a-b"`가 붙은 글로 둘을 모두 부르고, 인덱스의 `](tags/` 링크 2개가 가리키는 파일이 모두 실제로 존재함(이 항목의 핵심 크로스체크)
+    - (i) `write_index`: 글 0개 → 예외 없이 `index.md`가 생기고 내용에 `# RSS Wiki`와 `## 태그`가 있음
+    - (j) 순서 무의존: 같은 글 3개(둘은 같은 날짜/제목으로 충돌)를 오름차순으로 넘길 때와 역순으로 넘길 때, 두 함수가 만든 파일 경로 집합과 각 파일 내용이 같음. 스냅샷 비교 앞에 개수 단언을 넣어 공허 통과를 막는다(T9c REVIEW 메모 2와 같은 이유)
+    - (k) 인코딩/개행: 한글 태그(`"한국어"`)와 한글 제목 글로 부르고 `read_text(encoding="utf-8")`가 태그 이름을 담으며 `read_bytes()`에 `b"\r\n"`이 없음
+  - 내용 (`tests/test_write_wiki.py`에 테스트 3개 추가, 기존 (a)~(g)는 건드리지 않는다):
+    - (h) 가짜 `write`/`write_tags`/`write_index_file`을 주입 → 세 콜러블이 각각 정확히 한 번 불리고, `write_tags`/`write_index_file`이 받은 첫 인자가 호출에 넘긴 `wiki_dir`와 같은 객체이며 둘째 인자가 `write`가 받은 것과 같은 `WikiArticle` 목록
+    - (i) 반환값이 여전히 `write`가 돌려준 dict의 길이임(`write_tags`가 3개를 돌려주고 `write_index_file`이 경로를 돌려주더라도 영향 없음, 자체 결정 고정)
+    - (j) 통합: 진짜 `connect`로 만든 임시 DB에 피드 1개와 태그가 붙은 `summarized` 글 2개를 넣고 주입 없이 `write_wiki(conn, tmp_path / "wiki")` → 글 파일 2개와 `wiki/tags/*.md`와 `wiki/index.md`가 모두 실제로 존재하고, `index.md` 본문의 마크다운 링크 전부가 `wiki/` 기준으로 존재하는 파일을 가리킴(끊긴 링크 0개)
+  - 내용 (`tests/test_wiki_pages.py`, T10a2 REVIEW 메모 2, 두 줄만 고친다): 기존 (r)(s)의 `pytest.raises(KeyError)`에 `match=` 를 붙여 잡히는 예외를 `relpaths[article.id]` 하나로 좁힌다. 글 id를 `7` 같은 고유 값으로 두고 `match=r"7"`처럼 id가 메시지에 나타나는지로 구분한다(패턴은 실제 `KeyError` 문자열을 확인해 적는다). 두 테스트의 이름/나머지 단언은 바꾸지 않는다. 근거: PLAN 37행의 "오류 테스트는 `match=`로 원인을 구분한다"이고, 이번 항목이 `wiki.py`에 새 dict 접근(`names[tag]`, `relpaths`)을 더하므로 맨 `raises`는 다른 원인의 `KeyError`도 통과시킨다.
+  - acceptance:
+    - `uv run pytest tests/test_wiki_write_pages.py -v` 통과, (a)~(k) 11개가 각각 별도 테스트로 존재
+    - `uv run pytest tests/test_write_wiki.py -v` 통과, (h)(i)(j) 3개가 각각 별도 테스트로 존재 (기존 7개 포함 10개)
+    - `uv run pytest tests/test_wiki.py tests/test_wiki_write.py tests/test_wiki_pages.py -v` 통과, 수집 개수가 작업 전과 같음(`match=` 추가는 기존 테스트 2개의 단언만 좁히므로 개수는 그대로 19여야 한다. 새 함수 추가가 기존 계약을 건드리지 않았다는 증거로 IMPL.md에 작업 전/후 개수를 적는다)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 322**, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -n "pytest.raises(KeyError" tests/test_wiki_pages.py` 결과 2건이고 둘 다 `match=`를 포함
+    - `uv run python -c "import tempfile, pathlib; from rss_wiki.wiki import WikiArticle, write_tag_pages, write_index; d=pathlib.Path(tempfile.mkdtemp()); a=WikiArticle(id=1, title='첫 글', link='https://example.com/a', feed_name='My Feed', published_at='2026-09-18T00:00:00+09:00', created_at='2026-09-18T01:00:00+09:00', summary_lines=['s'], key_points=['k'], tags=['ai']); print(sorted(p.name for p in write_tag_pages(d, [a]).values())); print(write_index(d, [a]).name)"` 종료 코드 0, 출력이 `['ai.md']`와 `index.md`
+    - `grep -n "INDEX_FILENAME\|TAGS_DIRNAME" src/rss_wiki/wiki.py` 결과 있음 (파일 이름/폴더 이름이 리터럴로 흩어지지 않음)
+    - `grep -nE "import (sqlite3|httpx|trafilatura)|from rss_wiki(\.db| import db)" src/rss_wiki/wiki.py` 결과 없음
+    - `grep -nE "import (httpx|trafilatura)" src/rss_wiki/pipeline.py` 결과 없음
+    - 손대지 않는 src 7개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, `PYTHONPATH`로 복사본 로드를 먼저 확인, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. (1) `write_tag_pages`가 `TAGS_DIRNAME` 폴더 대신 위키 루트에 씀 (2) `write_tag_pages`가 태그별로 글을 거르지 않고 매번 전체 글을 `render_tag_page`에 넘김 (3) `write_tag_pages`가 `assign_tag_filenames` 대신 `f"{slugify(tag)}.md"`를 직접 씀(충돌 회피 없음) (4) `write_index`가 `index.md` 대신 `INDEX.md`에 씀 (5) `write_index`가 태그 이름 매핑 자리에 빈 dict를 넘김 (6) `write_tag_pages`가 쓰기 전에 `tags/` 안 `*.md`를 모두 지움 (7) `pipeline.write_wiki`가 `write_tags`를 부르지 않음 (8) `pipeline.write_wiki`가 `write_index_file`을 부르지 않음
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/wiki.py`, `src/rss_wiki/pipeline.py`, `tests/test_wiki_write_pages.py`, `tests/test_write_wiki.py`, `tests/test_wiki_pages.py`
+
+- [x] T10c. 태그 페이지 링크의 충돌 케이스와 태그 공유 시 파일 이름을 리터럴로 고정 (T10b REVIEW 메모 1/2 둘 다 필수, 테스트만)
+  - 선행: T10b PASS 11/12(충족). **`src/` 는 한 줄도 건드리지 않는다.** 고치는 파일은 `tests/test_wiki_write_pages.py` 하나다. 구현은 두 경우 모두 이미 옳게 동작함이 평가자 재현으로 확인됐으므로(충돌 시 `ai` → `2026-09-18-x.md` / `python` → `2026-09-18-x-2.md`, 태그 공유 시 `ai.md`), 이번 항목은 그 동작을 테스트가 보게 만드는 것만 한다. 기존 (a)~(k) 11개의 이름/로직/기대 의미는 바꾸지 않는다.
+  - 내용 (`tests/test_wiki_write_pages.py`, (l)(m)은 각각 별도 테스트, 기대값은 테스트 안에 리터럴로 적는다):
+    - (l) 글 파일 이름이 충돌해도 태그 페이지 링크가 **그 글의 파일**을 가리킨다. 같은 `feed_name="My Feed"` / 같은 `published_at="2026-09-18T00:00:00+09:00"` / 같은 `title="x"`인 글 2개(`id=1`은 `tags=["ai"]`, `id=2`는 `tags=["python"]`)로 `write_article_files(tmp_path, articles)`와 `write_tag_pages(tmp_path, articles)`를 부른다. 그 뒤 `ai` 페이지 본문에 `"- [x](../my-feed/2026-09-18-x.md) — 2026-09-18"`이 **줄 전체로** 있고, `python` 페이지 본문에 `"- [x](../my-feed/2026-09-18-x-2.md) — 2026-09-18"`이 줄 전체로 있음을 단언한다(두 리터럴이 서로 다른 파일을 가리키는 것이 이 테스트의 요점이다). 링크가 가리키는 파일 2개가 실제로 존재함도 함께 단언한다. 이름 배정은 글 id 오름차순이므로 `id=1` → `x.md`, `id=2` → `x-2.md`다.
+    - (m) 글 2개가 한 태그를 공유하면 파일 이름에 `-2`가 붙지 않는다. `tags=["ai"]`인 글 2개(`id=1`, `id=2`, 제목은 서로 다르게)로 `write_tag_pages(tmp_path, articles)`를 부르고 `result["ai"].name == "ai.md"`, `(tmp_path / "tags" / "ai.md").exists() is True`, `(tmp_path / "tags" / "ai-2.md").exists() is False`, `sorted(p.name for p in (tmp_path / "tags").iterdir()) == ["ai.md"]`를 단언한다. 그 한 페이지가 글 2개의 링크 줄을 모두 담는지도 확인한다(목록 줄 개수 2).
+  - acceptance:
+    - `uv run pytest tests/test_wiki_write_pages.py -v` 통과, (l)(m) 2개가 각각 별도 테스트로 존재 (이 명령의 수집 개수는 기존 11 + 2 = 13)
+    - `uv run pytest tests/test_wiki.py tests/test_wiki_write.py tests/test_wiki_pages.py tests/test_write_wiki.py -v` 통과, **이 명령의** 수집 개수가 작업 전과 같음(기존 테스트를 건드리지 않았다는 증거로 작업 전/후 개수를 IMPL.md에 적는다)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 336**, 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `grep -n "2026-09-18-x-2.md\|ai-2.md" tests/test_wiki_write_pages.py` 결과 있음 (충돌 이름이 리터럴로 적혀 있음)
+    - src 9개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py src/rss_wiki/wiki.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, `PYTHONPATH`로 복사본 로드를 먼저 확인, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. 이 2건은 직전 사이클에 **생존한** 뮤테이션이므로 사망 확인이 이 항목의 닫힘 근거다. (1) `wiki.py`의 `write_tag_pages`에서 `render_tag_page(tag, tagged, relpaths)`의 셋째 인자를 `article_relpaths(tagged)`로 바꿈(태그별 부분집합으로 경로 재계산) (2) `wiki.py`의 `_tag_names`에서 중복 제거와 정렬을 없애고 글 순서대로 태그를 그대로 이어 붙인 목록을 돌려줌(예: `names: list[str] = []` 에 `names.extend(article.tags)`)
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `tests/test_wiki_write_pages.py`
+
+## M5. 통합
+
+- [x] T11a. 요약 루프: 실행당 상한, `check_claude` 1회, 성공/실패/포기 집계 (PRD 4.4 상한, 7절, T7c REVIEW 메모 4, T8a REVIEW 메모 3)
+  - 선행: T10c PASS 11/12로 M4 마감(충족). 고치는 src는 `db.py`와 `pipeline.py` 둘이고 `cli.py`/`config.py`/`extract.py`/`fetch.py`/`summarize.py`/`timeutil.py`/`wiki.py`는 한 줄도 건드리지 않는다. `cli.py` 연결은 T11b 몫이다. `pipeline.py`의 기존 공개 함수 4개(`collect`/`prepare_body`/`summarize_article`/`write_wiki`)와 `db.py`의 기존 함수는 한 줄도 바꾸지 않고 새것만 더한다.
+  - 내용 (`src/rss_wiki/db.py`):
+    - `count_given_up_articles(conn) -> int`: `SELECT COUNT(*) FROM articles WHERE status = 'given_up'`의 값을 돌려준다. 조회 전용이다(행을 만들거나 고치지 않는다, `get_feed_failures`와 같은 방향). 상태 문자열은 리터럴로 적고 기존 상태 집합 상수에서 가져오지 않는다(T6e REVIEW 메모 1). docstring을 적는다.
+  - 내용 (`src/rss_wiki/pipeline.py`):
+    - `@dataclass(frozen=True) SummarizeResult(succeeded: int, failed: int, given_up: int)`.
+    - `summarize_pending(conn, *, max_summaries: int, list_articles: Callable[[sqlite3.Connection, int], Sequence[PendingArticle]] = list_pending_articles, summarize_one: Callable[..., bool] = summarize_article, check: Callable[[], None] = check_claude) -> SummarizeResult`:
+      - `max_summaries <= 0`이면 `list_articles`도 `check`도 부르지 않고 `SummarizeResult(0, 0, 0)`을 돌려준다(자체 결정: SQLite의 `LIMIT -1`은 상한 없음이라 음수를 그대로 넘기면 PRD 4.4의 상한이 조용히 사라진다. 근거를 docstring에 적는다).
+      - `articles = list_articles(conn, max_summaries)`를 **한 번만** 부른다. 루프 안에서 다시 조회하지 않는다(자체 결정: `record_article_failure`가 3회째에 `given_up`으로 바꾸므로 다음 실행에서 자연히 빠지고, 재조회는 상한 계산을 두 곳으로 갈라 놓는다. 근거를 docstring에 적는다).
+      - 목록이 비어 있으면 `check`를 부르지 않고 `SummarizeResult(0, 0, 0)`을 돌려준다(자체 결정: 요약할 글이 없는 실행에서 사전 확인이 짧은 프롬프트 1회를 소모하면 구독 한도를 이유 없이 쓴다. `summarize.check_claude` docstring이 이 결정을 T11 몫으로 남겨 뒀다).
+      - 목록이 1개 이상이면 루프 **전에** `check()`를 정확히 1회 부른다. 이 호출의 예외(`ClaudeUnavailableError`)는 잡지 않는다.
+      - `before = count_given_up_articles(conn)`를 `check()` 뒤 루프 전에 재고, 글마다 `summarize_one(conn, article)`을 불러 `True`는 `succeeded`, `False`는 `failed`로 센다. 루프가 끝나면 `after = count_given_up_articles(conn)`를 재고 `given_up = after - before`로 돌려준다(자체 결정: 이번 실행에서 포기로 넘어간 글 수. `CollectResult.given_up_feeds`가 이미 실행당 델타이고 PRD 4.6의 출력 네 항목이 모두 "이번 실행" 기준이라 누적값과 섞으면 읽을 수 없다. 근거를 docstring에 적는다).
+      - `summarize_one`이 올리는 `ClaudeUnavailableError`와 그 밖의 예외는 잡지 않고 그대로 올린다(`except Exception`을 쓰지 않는다). PRD 7절: `claude` 자체 실패는 글 실패가 아니다.
+      - import에 `count_given_up_articles`/`list_pending_articles`(이미 있음)와 `summarize.check_claude`가 더해진다. `db`를 아는 모듈은 계속 `pipeline`이다.
+  - 내용 (새 `tests/test_summarize_pending.py`, 각각 별도 테스트, 가짜 콜러블은 호출 인자와 순서를 리스트에 기록한다):
+    - (a) pending 글 3개를 전부 성공시키는 가짜 `summarize_one` → `SummarizeResult(3, 0, 0)`, `check` 호출 1회
+    - (b) `max_summaries=2`로 부르면 `list_articles`가 받은 둘째 인자가 `2`(리터럴)
+    - (c) 성공 1개 + 실패 1개(가짜가 `False` 반환) → `succeeded == 1`, `failed == 1`
+    - (d) 목록이 빈 경우 → `SummarizeResult(0, 0, 0)`이고 `check`와 `summarize_one`이 한 번도 불리지 않음
+    - (e) `max_summaries=0` → `SummarizeResult(0, 0, 0)`이고 `list_articles`/`check`/`summarize_one`이 한 번도 불리지 않음
+    - (f) `max_summaries=-1` → (e)와 같음(음수가 "상한 없음"으로 새지 않음을 별도로 고정)
+    - (g) `check`가 `ClaudeUnavailableError`를 내면 그 예외가 `pytest.raises(ClaudeUnavailableError)`로 올라오고 `summarize_one`이 한 번도 불리지 않음
+    - (h) 둘째 글에서 `summarize_one`이 `ClaudeUnavailableError`를 내면 예외가 올라오고 `summarize_one` 호출이 정확히 2회(셋째 글은 처리되지 않음)
+    - (i) 호출 순서: 기록 리스트의 첫 항목이 `"check"`이고 `"check"`의 개수가 1(글이 3개여도 글마다 부르지 않음)
+    - (j) 통합: 진짜 `db.connect`로 만든 임시 DB에 피드 1개와 글 1개(`link=None`, `content`는 `choose_body`가 본문으로 받아들일 평문, `status='pending'`)를 넣는다. `list_articles`는 주입하지 않아 진짜 `list_pending_articles`가 쓰이게 하고, `check`는 아무것도 하지 않는 가짜, `summarize_one`은 `lambda conn, article: summarize_article(conn, article, summarize=fake_summarize)`(가짜 `summarize`는 늘 `SummaryCallError`)로 준다. `summarize_pending`을 4회 부른다. 1회째와 2회째는 `(succeeded, failed, given_up) == (0, 1, 0)`, **3회째는 `(0, 1, 1)`**이고 그때 DB의 `(status, failure_count) == ("given_up", 3)`(임계값은 리터럴 `3`). 4회째는 진짜 조회가 그 글을 더 돌려주지 않아 `SummarizeResult(0, 0, 0)`이고 `check`가 그 호출에서 불리지 않음(총 `check` 호출 3회)
+  - 내용 (`tests/test_db.py`에 테스트 2개 추가, 기존 테스트의 로직/이름/기대 의미는 바꾸지 않는다):
+    - `count_given_up_articles`가 상태별 글(`pending`/`summarized`/`failed`/`given_up` 각 1개)에서 `1`을 돌려주고, `given_up`이 없으면 `0`을 돌려준다
+    - 호출 뒤 `articles` 행 수가 그대로임(조회 전용, `get_feed_failures`의 COUNT 단언과 같은 방향)
+  - acceptance:
+    - `uv run pytest tests/test_summarize_pending.py -v` 통과, (a)~(j) 10개가 각각 별도 테스트로 존재
+    - `uv run pytest tests/test_db.py -v` 통과, 새 테스트 2개가 각각 별도로 존재 (**이 명령의** 작업 전 수집 개수를 IMPL.md에 적고 작업 후가 그 값 + 2)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 338**, T10c가 별도 사이클로 닫혀 확정된 값이다. 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다. 새 테스트 12개가 더해져 350이 예상값), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run python -c "from rss_wiki.pipeline import summarize_pending, SummarizeResult; print(SummarizeResult(1, 2, 3)); print(summarize_pending.__doc__ is not None)"` 종료 코드 0, 출력에 `True` 포함
+    - `grep -n "status = 'given_up'" src/rss_wiki/db.py` 결과 있음
+    - `grep -nE "except Exception|except BaseException" src/rss_wiki/pipeline.py` 결과에 `summarize_pending` 안의 줄이 없음(예외를 삼키지 않음)
+    - `grep -nE "import (httpx|trafilatura)" src/rss_wiki/pipeline.py` 결과 없음
+    - 손대지 않는 src 7개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/cli.py src/rss_wiki/config.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py src/rss_wiki/wiki.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, `PYTHONPATH`로 복사본 로드를 먼저 확인, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 실제 출력으로 기록하고 `-k` 범위(또는 전체)를 함께 적는다. (1) `check()`를 루프 안으로 옮겨 글마다 부름 (2) 목록이 비어 있어도 `check()`를 부름 (3) `list_articles(conn, max_summaries)`의 둘째 인자를 상수 `20`으로 바꿈 (4) `summarize_one`의 반환값을 무시하고 늘 `succeeded`로 셈 (5) `summarize_one` 호출을 `try/except Exception`으로 감싸 `failed`로 셈 (6) `given_up`을 델타 대신 루프 후 `after` 값 그대로 돌려줌 (7) `count_given_up_articles`의 조건을 `status IN ('given_up', 'failed')`로 바꿈 (8) `max_summaries <= 0` 가드를 지움
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 "자체 결정" 절에
+  - touch: `src/rss_wiki/db.py`, `src/rss_wiki/pipeline.py`, `tests/test_summarize_pending.py`, `tests/test_db.py`
+
+- [x] T11b. `rss-wiki run` 전체 연결과 결과 요약 출력 (PRD 4.6 / 4.4 / 7절, T1b/T2/T2c/T7b/T8b/T11a REVIEW 메모)
+  - 선행: T11a PASS 10/12(충족). 고치는 src는 `cli.py` **하나**이고 나머지 8개(`config.py`, `db.py`, `extract.py`, `fetch.py`, `pipeline.py`, `summarize.py`, `timeutil.py`, `wiki.py`)는 한 줄도 건드리지 않는다. `pipeline`/`db`/`config`의 기존 함수 시그니처를 바꾸지 않고 **있는 것만 호출한다**. 새 파이프라인 로직을 `cli.py`에 넣지 않는다(집계와 실패 정책은 이미 `collect`/`summarize_pending`에 있다).
+  - 내용 (`src/rss_wiki/cli.py`):
+    - 모듈 최상단에서 이름을 직접 import 한다: `from rss_wiki.config import ConfigError, load_config`, `from rss_wiki.db import SchemaVersionError, connect`, `from rss_wiki.pipeline import collect, summarize_pending, write_wiki`, `from rss_wiki.summarize import ClaudeUnavailableError`. `_run`은 이 이름들을 **모듈 전역으로** 참조한다(테스트가 `monkeypatch.setattr(cli, "collect", ...)`로 대체할 수 있어야 한다. 함수 안에서 다시 import 하지 않는다).
+    - 모듈 상수 `DEFAULT_CONFIG = "feeds.yaml"`, `DEFAULT_MAX_SUMMARIES = 20`(PRD 4.4 합의값).
+    - `build_parser`: `run` 서브파서에 `--config`(기본 `DEFAULT_CONFIG`)와 `--max-summaries`(`type=int`, 기본 `DEFAULT_MAX_SUMMARIES`, `dest`는 argparse 기본인 `max_summaries`)를 더한다. `help`/`description` 문구는 기존 것을 유지한다.
+    - `main`: `args.command is None`이면 기존대로 usage + `1`. 그 뒤 **디스패치 앞에 `func` 누락 방어**를 넣는다 — `getattr(args, "func", None)`이 `None`이면 `parser.print_usage()` 후 `1`(T1b REVIEW 메모).
+    - `_run(args) -> int`:
+      1. `config = load_config(args.config)`. `ConfigError`는 `print(f"오류: {exc}", file=sys.stderr)` 후 `return 1`.
+      2. `conn = connect(config.db_path)`. `SchemaVersionError`도 같은 모양으로 `return 1`(자체 결정, 근거는 PLAN에 적었다).
+      3. 연결을 얻은 뒤부터는 `try: ... finally: conn.close()`로 감싼다. 성공 경로와 아래 오류 경로 **모두에서** 닫힌다(`filterwarnings = ["error"]` 아래 `ResourceWarning`이 실패가 되므로 형식이 아니라 필요다).
+      4. `collected = collect(conn, config.feeds)`.
+      5. `summarized = summarize_pending(conn, max_summaries=args.max_summaries)`. `ClaudeUnavailableError`는 `print(f"오류: {exc}", file=sys.stderr)` 후 `return 1`(PRD 7절 "명확한 오류로 종료"). 이때 `write_wiki`는 부르지 않는다.
+      6. `write_wiki(conn, config.wiki_dir)`. 요약 성공 수와 무관하게 매 실행 부른다(자체 결정, PRD 4.5 "매 실행 재생성" / PRD 5절 "DB로부터 다시 만들 수 있어야 한다").
+      7. 결과 여섯 줄을 stdout에 출력하고 `return 0`. 줄 모양은 **정확히** 다음이고 순서도 이대로다(자체 결정, 문구는 리터럴로 적는다):
+         `새 글: {collected.new_articles}` / `요약 성공: {summarized.succeeded}` / `요약 실패: {summarized.failed}` / `포기한 글: {summarized.given_up}` / `실패한 피드: {collected.failed_feeds}` / `포기한 피드: {collected.given_up_feeds}`
+      8. `summarized.given_up` 또는 `collected.given_up_feeds`가 0이 아니면 여섯 줄 **뒤에** 안내 한 줄을 더 출력한다: `포기한 항목이 있습니다. README의 "포기한 글/피드 다시 시도하기"를 보세요.` (T8b REVIEW 메모 5). 둘 다 0이면 이 줄은 나오지 않는다.
+      - `except Exception`/`except BaseException`을 쓰지 않는다. 위 세 예외 타입만 이름으로 잡고 `sqlite3.Error` 등 그 밖의 예외는 그대로 올린다(자체 결정).
+  - 내용 (`tests/test_cli.py`, 각각 별도 테스트. 기존 4개의 이름/로직/기대 의미는 바꾸지 않되 `test_run_command_prints_not_implemented`는 동작이 사라지므로 삭제하고 그 자리를 아래 (a)가 대신한다 — 이 교체는 IMPL.md "자체 결정" 절이 아니라 "테스트 보강" 절에 한 줄로 적는다. 가짜는 `monkeypatch.setattr(cli, ...)`로 주입하고 호출 인자/순서를 리스트에 기록한다. 기대 문구와 기본값은 테스트 안에 리터럴로 적고 `cli.DEFAULT_*`에서 가져오지 않는다):
+    - (a) 성공 경로: 가짜 `load_config`/`connect`/`collect`/`summarize_pending`/`write_wiki`로 `main(["run"])` → 반환 `0`이고 stdout에 여섯 줄이 각각 **줄 전체로** 존재(`"새 글: 2"`, `"요약 성공: 1"`, `"요약 실패: 1"`, `"포기한 글: 0"`, `"실패한 피드: 0"`, `"포기한 피드: 0"`), 줄 순서도 이 순서
+    - (b) 기본값: (a)와 같은 호출에서 가짜 `load_config`가 받은 인자가 `"feeds.yaml"`이고 가짜 `summarize_pending`이 받은 `max_summaries`가 `20`
+    - (c) 인자 전달: `main(["run", "--config", "other.yaml", "--max-summaries", "3"])` → `load_config`가 `"other.yaml"`, `summarize_pending`이 `3`을 받음
+    - (d) `load_config`가 `ConfigError("설정 파일을 찾을 수 없습니다: x")`를 냄 → 반환 `1`, stderr에 `"설정 파일을 찾을 수 없습니다"`, `connect`/`collect`가 한 번도 불리지 않음
+    - (e) `connect`가 `SchemaVersionError("DB 스키마 버전")`을 냄 → 반환 `1`, stderr에 `"스키마 버전"`, `collect`가 한 번도 불리지 않음
+    - (f) `summarize_pending`이 `ClaudeUnavailableError("claude 명령을 찾을 수 없습니다")`를 냄 → 반환 `1`, stderr에 메시지가 있고 `write_wiki`가 한 번도 불리지 않으며 가짜 conn의 `close`가 불림
+    - (g) 순서와 인자: 기록 리스트가 `["collect", "summarize_pending", "write_wiki"]` 순이고 각 1회. `collect`가 받은 둘째 인자가 가짜 config의 `feeds`와 같은 객체, `write_wiki`가 받은 둘째 인자가 `config.wiki_dir`과 같은 객체, 세 호출이 받은 첫 인자가 모두 가짜 `connect`가 돌려준 conn과 같은 객체
+    - (h) 성공 경로에서도 conn의 `close`가 정확히 1회 불림
+    - (i) `sqlite3.Error`는 삼키지 않는다 — 가짜 `collect`가 `sqlite3.OperationalError("boom")`을 내면 `pytest.raises(sqlite3.OperationalError)`로 올라오고, 그래도 conn의 `close`는 불림
+    - (j) 포기 안내 줄: 파라미터화로 세 경우. 글 포기 0/피드 포기 0 → 출력에 `"포기한 항목이 있습니다"`가 **없음**. 글 포기 1/피드 포기 0 → 있음. 글 포기 0/피드 포기 1 → 있음
+    - (k) `main(["run", "--help"])` → `SystemExit` 코드 `0`이고 출력에 `"RSS 피드를 수집하고"`(기존 description 문구)가 포함 (T1b REVIEW 메모)
+    - (l) `main([])` → 반환 `1`이고 출력(stdout 또는 stderr)에 `"usage"` 포함 (T1b REVIEW 메모, 기존 `test_no_subcommand_returns_one`은 반환값만 보므로 출력 단언을 이 테스트로 별도 추가)
+    - (m) `func` 누락 방어: `monkeypatch`로 `cli.build_parser`를 `set_defaults(func=...)` 없이 `run` 서브파서만 만드는 함수로 바꾼 뒤 `main(["run"])` → `AttributeError` 없이 반환 `1`
+    - (n) 통합(네트워크/`claude` 호출 없음, 주입 없음): `tmp_path`에 `feeds.yaml`을 쓴다(`feeds: []`, `wiki_dir: wiki`, `db_path: data/rss-wiki.db`). `main(["run", "--config", str(config_path)])` → 반환 `0`, `tmp_path / "data" / "rss-wiki.db"`와 `tmp_path / "wiki" / "index.md"`가 실제로 존재, 출력의 여섯 줄이 전부 `: 0`으로 끝나고 `"포기한 항목이 있습니다"`가 없음. 피드가 0개라 `collect`가 아무것도 하지 않고 pending 글도 0개라 `check_claude`가 불리지 않는다(T11a 자체 결정) — 그래서 이 테스트는 `claude` 설치 여부와 무관하게 통과해야 한다
+  - 내용 (`tests/test_summarize_pending.py`, T11a REVIEW 메모 1, **두 줄만 고친다**): `test_summarize_pending_passes_max_summaries_as_limit`(`tests/test_summarize_pending.py:111-112`)의 `list_call = next(c for c in calls if c[0] == "list_articles")` / `assert list_call[1] == 2`를 `list_calls = [c for c in calls if c[0] == "list_articles"]` / `assert len(list_calls) == 1` / `assert list_calls[0][1] == 2`로 바꾼다. 테스트 이름과 나머지 단언은 바꾸지 않는다(수집 개수 불변). 근거: 루프 앞 재조회 뮤테이션이 현재 생존하고, 진짜 `list_pending_articles`로 두 번 조회하면 첫 조회 이후 상태가 바뀐 글이 빠져 PRD 4.4의 상한 계산이 두 곳으로 갈라진다.
+  - 내용 (`tests/test_config.py`, T2c REVIEW 메모 2, 테스트 1개 추가): `url:`(키는 있고 값이 null) 경우를 `pytest.raises(ConfigError, match="url이 없습니다")`로 추가한다. 기존 `test_load_config_missing_url_raises`(키 자체가 없음)와 별도 테스트로 둔다.
+  - 내용 (`pyproject.toml`, T1b REVIEW 메모): `description = "Add your description here"`를 README 첫 줄 문장(`"RSS 피드를 수집하고 본문을 요약해 마크다운 위키로 만드는 CLI 도구."`)으로 바꾼다. 그 밖의 키는 건드리지 않는다.
+  - 내용 (`README.md`, 기존 절은 지우지 않고 보강):
+    - "설치" 다음에 "설정" 절을 넣는다 — `cp feeds.example.yaml feeds.yaml` 준비 단계와 `wiki_dir`/`db_path` 기본값(`./wiki`, `./data/rss-wiki.db`, `feeds.yaml` 디렉터리 기준), 설정이 잘못되면 한 줄 오류와 종료 코드 1로 끝난다는 점 (T2 REVIEW 메모 3).
+    - "전제" 절: `claude` 명령이 설치되어 있고 로그인돼 있어야 한다. 요약할 글이 **있을 때만** 실행당 사전 확인 1회가 짧은 프롬프트를 실제로 소모한다(T11a 자체 결정). `claude`가 없거나 로그인되지 않으면 글 실패 횟수를 올리지 않고 실행이 종료 코드 1로 끝난다 (T7b REVIEW 메모 5).
+    - "실행" 절에 `--config`/`--max-summaries`(기본 20, 남은 글은 다음 실행에 처리)와 출력 여섯 줄의 의미를 적는다.
+  - acceptance:
+    - `uv run pytest tests/test_cli.py -v` 통과, (a)~(n) 14경우가 각각 별도 테스트로 존재((j)는 파라미터화 3경우로 허용하며 이때 이 명령의 수집 개수는 그만큼 늘어난다). 기존 `test_entry_point_help_exits_zero_and_lists_run` / `test_no_subcommand_returns_one` / `test_unknown_subcommand_exits_with_code_two` 3개가 이름 그대로 남아 통과
+    - `uv run pytest tests/test_summarize_pending.py -v` 통과, **이 명령의** 수집 개수가 작업 전과 같음(작업 전/후 값을 IMPL.md에 적는다. REVIEW 재현값은 11)
+    - `uv run pytest tests/test_config.py -v` 통과, `url:` null 테스트가 별도로 존재 (**이 명령의** 작업 전 수집 개수를 IMPL.md에 적고 작업 후가 그 값 + 1)
+    - `uv run pytest -q` 전체 통과 (**직전 사이클 기준선 351**, REVIEW가 재현해 확정한 값이다. 작업 시작 시 `uv run pytest --collect-only -q`로 실제 값을 재서 IMPL.md에 적는다), `TZ=UTC uv run pytest -q` 전체 통과
+    - `uv run rss-wiki run --help` 종료 코드 0, 출력에 `--config`와 `--max-summaries`가 모두 포함
+    - `uv run rss-wiki run --config /tmp/rss-wiki-nope.yaml` (없는 파일) 종료 코드 **1**이고 stderr 한 줄에 `설정 파일을 찾을 수 없습니다` 포함, 스택 트레이스가 출력되지 않음
+    - 빈 임시 디렉터리에서 `feeds: []`만 적은 `feeds.yaml`로 `uv run rss-wiki run --config <그 파일>` 종료 코드 0이고 같은 디렉터리에 `wiki/index.md`가 생김 (실제 CLI 경로가 도는지 서브프로세스로 한 번 확인. 실행 출력과 `ls` 결과를 IMPL.md에 붙인다)
+    - `grep -n "not implemented" src/rss_wiki/cli.py tests/test_cli.py` 결과 없음
+    - `grep -nE "except Exception|except BaseException" src/rss_wiki/cli.py` 결과 없음
+    - `grep -n "Add your description here" pyproject.toml` 결과 없음
+    - `grep -nE "import (httpx|trafilatura|feedparser|sqlite3)" src/rss_wiki/cli.py` 결과에 `sqlite3` 외의 것이 없음(`sqlite3`는 타입/예외 용도로만 허용하고, 쓰지 않으면 결과가 없어도 된다)
+    - `grep -n "cp feeds.example.yaml\|--max-summaries\|claude" README.md` 결과 있음
+    - 손대지 않는 src 8개 무변경: **첫 편집을 하기 전에** 한 번, 종료 시 한 번 `shasum src/rss_wiki/config.py src/rss_wiki/db.py src/rss_wiki/extract.py src/rss_wiki/fetch.py src/rss_wiki/pipeline.py src/rss_wiki/summarize.py src/rss_wiki/timeutil.py src/rss_wiki/wiki.py`를 재서 두 출력을 IMPL.md에 붙이고 둘이 같음
+    - 뮤테이션(공통 규칙대로 임시 복사본, `PYTHONPATH`로 복사본 로드를 먼저 확인, TASKS 문구 그대로): 각각 1개 이상 실패함을 IMPL.md에 **명령 출력의 마지막 요약 줄 그대로** 기록하고 `-k` 범위(또는 전체)를 함께 적는다(T11a REVIEW 메모 2). (1) `--max-summaries`의 기본값을 `20`에서 `5`로 바꿈 (2) `--config`의 기본값을 `"feeds.yaml"`에서 `"config.yaml"`로 바꿈 (3) `ConfigError`를 잡는 부분에서 `return 1`을 `return 0`으로 바꿈 (4) `ClaudeUnavailableError`를 잡지 않고 `summarize_pending` 호출을 맨 줄로 둠 (5) `write_wiki` 호출을 지움 (6) `ClaudeUnavailableError`를 잡은 뒤에도 `write_wiki`를 부르고 `return 0` (7) `finally: conn.close()`를 지움 (8) 포기 안내 줄을 포기 수와 무관하게 늘 출력함 (9) `summarize_pending(conn, max_summaries=args.max_summaries)`의 인자를 상수 `20`으로 바꿈 (10) `tests/test_summarize_pending.py` 수정분 확인용 — `pipeline.summarize_pending`의 `articles = list_articles(...)` 줄 바로 뒤에 `articles = list_articles(conn, max_summaries)` 한 줄을 더해 두 번 조회하게 함(T11a에서 생존했던 뮤테이션이므로 사망 확인이 이 수정의 닫힘 근거다)
+    - IMPL.md의 모든 개수/건수는 실제 명령 출력 그대로, TASKS와 다르게 한 부분은 크기와 무관하게 "자체 결정" 절에
+  - touch: `src/rss_wiki/cli.py`, `tests/test_cli.py`, `tests/test_summarize_pending.py`, `tests/test_config.py`, `README.md`, `pyproject.toml`
