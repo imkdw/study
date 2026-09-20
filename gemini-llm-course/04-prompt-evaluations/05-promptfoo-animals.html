@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4-5. promptfoo 입문 | Prompt Evaluations</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<nav class="breadcrumb">
+  <a href="../index.html">홈</a><span class="sep">/</span>
+  <span>코스 4. Prompt Evaluations</span><span class="sep">/</span>
+  <span>4-5. promptfoo 입문</span>
+</nav>
+<main>
+<header class="chapter-header">
+  <div class="kicker">Course 4 / Chapter 5</div>
+  <h1>promptfoo 입문</h1>
+  <p class="subtitle">전용 평가 도구로 프롬프트와 모델을 나란히 비교합니다.</p>
+  <p class="source">원본: 05_prompt_foo_code_graded_animals/lesson.ipynb</p>
+</header>
+
+<h2>레슨</h2>
+<p>직접 평가 로직을 짜는 건 금방 번거로워집니다. 오픈소스 도구
+<strong>promptfoo</strong>는 여러 프롬프트/모델/프로바이더를 한 번에 평가하고
+결과를 시각화해 줍니다.</p>
+
+<div class="callout note">
+  <div class="callout-title">Gemini에서 promptfoo</div>
+  <p>원본은 Anthropic 모델(<code>anthropic:messages:...</code>)을 쓰지만,
+  promptfoo는 Google AI Studio provider를 지원합니다.
+  <code>google:gemini-3.6-flash</code> 형태로 지정하고
+  <code>GEMINI_API_KEY</code>(또는 <code>GOOGLE_API_KEY</code>) 환경 변수를
+  설정하면 됩니다.</p>
+</div>
+
+<h3>설치와 초기화</h3>
+<pre><code>npx promptfoo@latest init</code></pre>
+<p><code>promptfooconfig.yaml</code>이 생성됩니다. 여기에 프로바이더, 프롬프트, 테스트를 설정합니다.</p>
+
+<h3>프로바이더 설정</h3>
+<pre><code># promptfooconfig.yaml
+description: "Animal Legs Eval"
+
+providers:
+  - "google:gemini-3.6-flash"</code></pre>
+<pre><code>export GEMINI_API_KEY=your_api_key_here</code></pre>
+
+<h3>프롬프트 지정</h3>
+<p>원본은 Python 함수를 쓰지만, JS 파일도 지원합니다. <code>prompts.js</code>를 만듭니다:</p>
+<pre><code>// prompts.js — 각 함수는 변수를 받아 최종 프롬프트 문자열을 반환
+module.exports = {
+  simplePrompt({ vars }) {
+    return `You will be provided a statement about an animal and your job is to
+determine how many legs that animal has.
+
+Here is the animal statement.
+&lt;animal_statement&gt;${vars.animal_statement}&lt;/animal_statement&gt;
+
+How many legs does the animal have? Please respond with a number`;
+  },
+  betterPrompt({ vars }) {
+    return `You will be provided a statement about an animal and your job is to
+determine how many legs that animal has.
+
+Here is the animal statement.
+&lt;animal_statement&gt;${vars.animal_statement}&lt;/animal_statement&gt;
+
+How many legs does the animal have? Please only respond with a single digit
+like 2 or 9`;
+  },
+};</code></pre>
+
+<pre><code>description: "Animal Legs Eval"
+
+prompts:
+  - file://prompts.js:simplePrompt
+  - file://prompts.js:betterPrompt
+
+providers:
+  - "google:gemini-3.6-flash"</code></pre>
+
+<h3>테스트 케이스 (CSV)</h3>
+<p><code>dataset.csv</code>를 만듭니다. <code>__expected</code> 컬럼은 promptfoo의
+특수 문법으로, 기본적으로 정확 일치를 검사합니다:</p>
+<pre><code>animal_statement,__expected
+"The animal is a human.","2"
+"The animal is a snake.","0"
+"The fox lost a leg, but then magically grew back the leg he lost and a mysterious extra leg on top of that.","5"
+"The animal is a dog.","4"
+"The animal is a cat with two extra legs.","6"
+"The animal is an elephant.","4"
+"The animal is a bird.","2"
+"The animal is a fish.","0"
+"The animal is a spider with two extra legs","10"
+"The animal is an octopus.","8"
+"The animal is an octopus that lost two legs and then regrew three legs.","9"
+"The animal is a two-headed, eight-legged mythical creature.","8"</code></pre>
+
+<pre><code>tests: dataset.csv</code></pre>
+
+<h3>실행과 결과 보기</h3>
+<pre><code>npx promptfoo@latest eval    # 평가 실행
+npx promptfoo@latest view    # 브라우저 대시보드</code></pre>
+<p>각 프롬프트가 컬럼으로 나열되고 테스트별 통과/실패가 한눈에 보입니다.
+<code>simple_prompt</code>은 형식 문제로 전부 실패하고, <code>better_prompt</code>는
+대부분 통과하지만 까다로운 추론 문제에서 실패합니다.</p>
+
+<h3>세 번째 프롬프트 + transform</h3>
+<p>CoT 프롬프트를 추가합니다:</p>
+<pre><code>  chainOfThoughtPrompt({ vars }) {
+    return `...thinking step by step inside of &lt;thinking&gt; tags.
+Then, output your final answer inside of &lt;answer&gt; tags...`;
+  },</code></pre>
+
+<p>이 프롬프트의 출력에는 태그가 섞여 있으므로 <code>&lt;answer&gt;</code> 안의
+값만 뽑는 <strong>transform</strong>이 필요합니다. <code>transform.js</code>:</p>
+<pre><code>// transform.js
+module.exports = (output, context) => {
+  const match = output.match(/&lt;answer&gt;([\s\S]*?)&lt;\/answer&gt;/);
+  return match ? match[1].trim() : output;
+};</code></pre>
+
+<pre><code>defaultTest:
+  options:
+    transform: file://transform.js</code></pre>
+
+<h3>모델 비교</h3>
+<p>프로바이더를 두 개 나열하면 같은 평가를 두 모델로 실행합니다:</p>
+<pre><code>providers:
+  - google:gemini-3.6-flash
+  - google:gemini-2.5-pro</code></pre>
+<p>어느 프롬프트가 좋은지뿐 아니라 <strong>어느 모델+프롬프트 조합</strong>이
+이 태스크에 최적인지 알 수 있습니다.</p>
+
+<div class="callout warn">
+  <div class="callout-title">재미있는 함정</div>
+  <p>원본에서 더 똑똑한 모델(Sonnet)이 오히려 CoT 프롬프트에서 하나를 틀렸습니다.
+  "문어는 엄밀히 다리가 아니라 팔(arms)이다"라고 지나치게 똑똑하게 추론했기 때문입니다.
+  "다리"의 정의를 프롬프트에 명시해야 모든 모델에서 안정적입니다.</p>
+</div>
+
+<h2>연습</h2>
+
+<div class="exercise">
+  <div class="exercise-title">연습 5.1 — 직접 실행</div>
+  <p>위 설정 그대로 promptfoo 평가를 만들어 실행해 보세요.
+  <code>simplePrompt</code>의 실패 원인을 대시보드에서 확인해 보세요.</p>
+</div>
+
+<nav class="prevnext">
+  <a href="04-classification.html"><span class="label">이전</span>4-4. 분류 평가</a>
+  <a class="next" href="06-promptfoo-classification.html"><span class="label">다음</span>4-6. promptfoo 분류 평가</a>
+</nav>
+</main>
+</body>
+</html>

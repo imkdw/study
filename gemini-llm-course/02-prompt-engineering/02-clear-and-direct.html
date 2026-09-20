@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2-2. 명확하고 직접적으로 | Prompt Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<nav class="breadcrumb">
+  <a href="../index.html">홈</a><span class="sep">/</span>
+  <span>코스 2. Prompt Engineering</span><span class="sep">/</span>
+  <span>2-2. 명확하고 직접적으로</span>
+</nav>
+<main>
+<header class="chapter-header">
+  <div class="kicker">Course 2 / Chapter 2</div>
+  <h1>명확하고 직접적으로</h1>
+  <p class="subtitle">모델은 당신이 말한 것 외에는 아무 맥락도 모릅니다.</p>
+  <p class="source">원본: 02_Being_Clear_and_Direct.ipynb</p>
+</header>
+
+<h2>셋업</h2>
+<p>2-0의 공통 <code>getCompletion</code> 헬퍼를 사용합니다 (temperature 0).</p>
+
+<h2>레슨</h2>
+<p><strong>모델은 명확하고 직접적인 지시에 가장 잘 반응합니다.</strong></p>
+<p>모델을 첫 출근한 신입으로 생각하세요. 당신이 문자 그대로 말한 것 외에는
+<strong>아무 맥락도 없습니다</strong>. 사람에게 처음 일을 시키듯,
+원하는 것을 정확하고 솔직하게 설명할수록 응답이 정확해집니다.</p>
+
+<blockquote>
+  <strong>명확한 프롬프팅의 황금률:</strong>
+  프롬프트를 동료에게 보여주고 지시대로 해보라고 하세요.
+  동료가 헷갈리면 모델도 헷갈립니다.
+</blockquote>
+
+<h3>예시: 하이쿠</h3>
+<p>"로봇에 대한 하이쿠를 써줘"라고 하면 "하이쿠를 써드리겠습니다:" 같은 서두가 붙습니다.
+없애고 싶으면? <strong>그냥 요청하세요:</strong></p>
+<pre><code>const PROMPT = "로봇에 대한 하이쿠를 써줘. 서두 없이 바로 시부터 시작해.";
+console.log(await getCompletion(PROMPT));</code></pre>
+
+<h3>예시: 결론 강요하기</h3>
+<p>"역대 최고의 농구 선수는 누구야?"라고 물으면 모델은 여러 이름을 나열하며
+<strong>결론을 피합니다</strong>. 하나를 고르게 하려면 명시합니다:</p>
+<pre><code>const PROMPT =
+  "역대 최고의 농구 선수는 누구야? 의견이 갈리는 건 알지만, " +
+  "무조건 한 명만 골라야 한다면 누구를 고르겠어?";
+console.log(await getCompletion(PROMPT));</code></pre>
+
+<h2>연습</h2>
+
+<div class="exercise">
+  <div class="exercise-title">연습 2.1 — 스페인어</div>
+  <p><code>SYSTEM_PROMPT</code>를 수정해 모델이 <strong>스페인어로</strong> 답하게 하세요.</p>
+  <pre><code>const SYSTEM_PROMPT = "[여기를 수정]";
+const PROMPT = "Hello Gemini, how are you?";
+
+const response = await getCompletion(PROMPT, SYSTEM_PROMPT);
+
+function gradeExercise(text: string) {
+  return text.toLowerCase().includes("hola");
+}
+console.log(response);
+console.log("통과:", gradeExercise(response));</code></pre>
+  <details><summary>힌트 보기</summary>
+  <p>"hola"가 포함되면 통과입니다. 사람에게 말하듯 스페인어로 답하라고 시키세요.</p></details>
+</div>
+
+<div class="exercise">
+  <div class="exercise-title">연습 2.2 — 선수 한 명만</div>
+  <p><code>PROMPT</code>를 수정해 모델이 전혀 망설이지 않고
+  <strong>오직 선수 이름 하나만</strong> — 다른 단어나 구두점 없이 — 답하게 하세요.</p>
+  <pre><code>const PROMPT = "[여기를 수정]";
+
+const response = await getCompletion(PROMPT);
+
+function gradeExercise(text: string) {
+  return text.trim() === "Michael Jordan";
+}
+console.log(response);
+console.log("통과:", gradeExercise(response));</code></pre>
+  <details><summary>힌트 보기</summary>
+  <p>정확히 "Michael Jordan"만 반환해야 합니다. 사람에게 어떻게 부탁하겠어요?
+  "다른 말 없이 이름만 답해", "이름 외에는 아무것도 쓰지 마" 등 여러 접근이 가능합니다.</p></details>
+</div>
+
+<div class="exercise">
+  <div class="exercise-title">연습 2.3 — 긴 이야기</div>
+  <p><code>PROMPT</code>를 수정해 <strong>800단어 이상</strong>의 긴 응답을 얻으세요.</p>
+  <pre><code>const PROMPT = "[여기를 수정]";
+
+const response = await getCompletion(PROMPT);
+
+function gradeExercise(text: string) {
+  return text.trim().split(/\s+/).length >= 800;
+}
+console.log("통과:", gradeExercise(response));</code></pre>
+  <details><summary>힌트 보기</summary>
+  <p>LLM은 단어 수를 잘 세지 못하니 목표보다 넉넉하게 요구하세요.
+  예: "최소 2000단어의 이야기를 써줘".</p></details>
+</div>
+
+<nav class="prevnext">
+  <a href="01-basic-structure.html"><span class="label">이전</span>2-1. 기본 구조</a>
+  <a class="next" href="03-role-prompting.html"><span class="label">다음</span>2-3. 역할 부여</a>
+</nav>
+</main>
+</body>
+</html>

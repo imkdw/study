@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2-9. 복합 프롬프트 설계 | Prompt Engineering</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<nav class="breadcrumb">
+  <a href="../index.html">홈</a><span class="sep">/</span>
+  <span>코스 2. Prompt Engineering</span><span class="sep">/</span>
+  <span>2-9. 복합 프롬프트</span>
+</nav>
+<main>
+<header class="chapter-header">
+  <div class="kicker">Course 2 / Chapter 9</div>
+  <h1>복합 프롬프트를 처음부터 만들기</h1>
+  <p class="subtitle">지금까지 배운 모든 기법을 하나의 구조로 조립합니다.</p>
+  <p class="source">원본: 09_Complex_Prompts_from_Scratch.ipynb</p>
+</header>
+
+<h2>레슨</h2>
+<p>복합 프롬프트를 위한 권장 구조를 배웁니다.
+<strong>모든 프롬프트에 모든 요소가 필요한 건 아닙니다</strong> — 일단 많은 요소를 넣어
+작동하게 만든 뒤, 다듬으면서 줄여나가는 게 보통 좋습니다.
+순서가 중요한 요소도 있고 아닌 것도 있습니다.</p>
+
+<h3>복합 프롬프트의 10가지 요소</h3>
+<table>
+  <tr><th>#</th><th>요소</th><th>설명</th></tr>
+  <tr><td>1</td><td><code>user</code> 역할</td><td>메시지 배열은 항상 user로 시작</td></tr>
+  <tr><td>2</td><td>태스크 맥락</td><td>역할/목표 맥락. 프롬프트 앞쪽에 배치</td></tr>
+  <tr><td>3</td><td>톤 맥락</td><td>필요하면 사용할 어조</td></tr>
+  <tr><td>4</td><td>상세 태스크 설명 + 규칙</td><td>구체적 지시와 규칙. "퇴로"도 여기에. 친구에게 보여줘도 이해될 만큼 명확하게</td></tr>
+  <tr><td>5</td><td>예시</td><td><code>&lt;example&gt;</code> 태그 안의 이상적 응답. 가장 강력한 도구. 엣지 케이스 포함</td></tr>
+  <tr><td>6</td><td>처리할 입력 데이터</td><td>각각의 XML 태그로 감싼 데이터 (위치 유연)</td></tr>
+  <tr><td>7</td><td>즉시 태스크 요청</td><td>"지금 무엇을 해야 하는지" 상기. 긴 프롬프트에서는 끝쪽이 효과적</td></tr>
+  <tr><td>8</td><td>단계별 사고</td><td>다단계 태스크는 "먼저 생각해" 지시. 프롬프트 끝쪽, 즉시 태스크 바로 뒤</td></tr>
+  <tr><td>9</td><td>출력 형식</td><td>원하는 응답 형식. 앞보다 뒤가 나음</td></tr>
+  <tr><td>10</td><td>응답 프라이밍(prefill)</td><td>model 턴에 넣는 시작 문구</td></tr>
+</table>
+
+<h3>예시: 커리어 코치 챗봇</h3>
+<p>"AdAstra Careers의 Joe"라는 역할의 챗봇 프롬프트를 요소별로 조립합니다:</p>
+
+<pre><code>// 입력 변수
+const HISTORY = `Customer: Give me two possible careers for sociology majors.
+
+Joe: Here are two potential careers for sociology majors:
+- Social worker - Sociology provides a strong foundation for understanding human behavior and social systems...
+- Human resources specialist - An understanding of group dynamics and organizational behavior...`;
+
+const QUESTION = "Which of the two careers requires more than a Bachelor's degree?";
+
+// 요소 2: 태스크 맥락
+const TASK_CONTEXT =
+  "You will be acting as an AI career coach named Joe created by the company AdAstra Careers. " +
+  "Your goal is to give career advice to users. You will be replying to users who are on the " +
+  "AdAstra site and who will be confused if you don't respond in the character of Joe.";
+
+// 요소 3: 톤 맥락
+const TONE_CONTEXT = "You should maintain a friendly customer service tone.";
+
+// 요소 4: 상세 설명 + 규칙 (퇴로 포함)
+const TASK_DESCRIPTION = `Here are some important rules for the interaction:
+- Always stay in character, as Joe, an AI from AdAstra Careers
+- If you are unsure how to respond, say "Sorry, I didn't understand that. Could you rephrase your question?"
+- If someone asks something irrelevant, say, "Sorry, I am Joe and I give career advice. Do you have a career question today I can help you with?"`;
+
+// 요소 5: 예시
+const EXAMPLES = `Here is an example of how to respond in a standard interaction:
+&lt;example&gt;
+Customer: Hi, how were you created and what do you do?
+Joe: Hello! My name is Joe, and I was created by AdAstra Careers to give career advice. What can I help you with today?
+&lt;/example&gt;`;
+
+// 요소 6: 입력 데이터
+const INPUT_DATA = `Here is the conversational history prior to the question. It could be empty if there is no history:
+&lt;history&gt;
+${HISTORY}
+&lt;/history&gt;
+
+Here is the user's question:
+&lt;question&gt;
+${QUESTION}
+&lt;/question&gt;`;
+
+// 요소 7: 즉시 태스크
+const IMMEDIATE_TASK = "How do you respond to the user's question?";
+
+// 요소 8: 단계별 사고
+const PRECOGNITION = "Think about your answer first before you respond.";
+
+// 요소 9: 출력 형식
+const OUTPUT_FORMATTING = "Put your response in &lt;response&gt;&lt;/response&gt; tags.";
+
+// 요소 10: 프라이밍
+const PREFILL = "[Joe] &lt;response&gt;";
+
+// 조립 (비어있는 요소는 건너뜀)
+const PROMPT = [
+  TASK_CONTEXT, TONE_CONTEXT, TASK_DESCRIPTION,
+  EXAMPLES, INPUT_DATA, IMMEDIATE_TASK,
+  PRECOGNITION, OUTPUT_FORMATTING,
+].filter(Boolean).join("\n\n");
+
+console.log(await getCompletion(PROMPT, "", PREFILL));</code></pre>
+
+<div class="callout note">
+  <div class="callout-title">순서는 유연하다</div>
+  <p>원본의 법률 예시는 요소 순서를 바꿔도 잘 동작함을 보여줍니다.
+  <strong>프롬프트 엔지니어링은 과학적 시행착오</strong>입니다 — 섞고, 옮기고,
+  무엇이 가장 잘 되는지 실험하세요.</p>
+</div>
+
+<h2>연습</h2>
+
+<div class="exercise">
+  <div class="exercise-title">연습 9.1 — 세무 챗봇</div>
+  <p>세법 문서(<code>TAX_CODE</code> 변수)를 근거로 사용자 질문에 답하는
+  세무사 봇 프롬프트를 10-요소 구조로 직접 작성해 보세요.
+  문서에 답이 없을 때의 퇴로와, 인용 기반 답변을 포함시키세요.</p>
+  <details><summary>정답 예시</summary>
+  <pre><code>const TASK_CONTEXT = "You are a master tax accountant. Your task is to answer user questions using any provided reference documentation.";
+const INPUT_DATA = `Here is the material you should use to answer the user's question:
+&lt;docs&gt;
+${TAX_CODE}
+&lt;/docs&gt;`;
+const TASK_DESCRIPTION = `First, gather quotes in &lt;quotes&gt; tags that are relevant to answering the user's question. If there are no relevant quotes, write "No relevant quotes found". Then answer in &lt;answer&gt; tags, prefacing with "Answer:".`;</code></pre></details>
+</div>
+
+<div class="exercise">
+  <div class="exercise-title">연습 9.2 — 코드봇</div>
+  <p>코드를 읽고 적절할 때 교정 안내를 해주는 <strong>코딩 교육 봇</strong> 프롬프트를 작성하세요.
+  입력은 <code>CODE</code> 변수(아래)입니다:</p>
+  <pre><code>const CODE = `
+# Function to print multiplicative inverses
+def print_multiplicative_inverses(x, n):
+  for i in range(n):
+    print(x / i)
+`;</code></pre>
+  <p>(i가 0일 때 0으로 나누는 버그가 있습니다. 봇이 이를 잡아내야 합니다.)</p>
+</div>
+
+<nav class="prevnext">
+  <a href="08-hallucinations.html"><span class="label">이전</span>2-8. 환각 줄이기</a>
+  <a class="next" href="10-appendix.html"><span class="label">다음</span>2-10. 부록</a>
+</nav>
+</main>
+</body>
+</html>

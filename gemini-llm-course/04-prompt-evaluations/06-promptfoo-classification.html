@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4-6. promptfoo 분류 평가 | Prompt Evaluations</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<nav class="breadcrumb">
+  <a href="../index.html">홈</a><span class="sep">/</span>
+  <span>코스 4. Prompt Evaluations</span><span class="sep">/</span>
+  <span>4-6. 분류 평가</span>
+</nav>
+<main>
+<header class="chapter-header">
+  <div class="kicker">Course 4 / Chapter 6</div>
+  <h1>promptfoo: 분류 평가</h1>
+  <p class="subtitle">내장 assertion으로 멀티라벨 분류를 평가합니다.</p>
+  <p class="source">원본: 06_prompt_foo_code_graded_classification/lesson.ipynb</p>
+</header>
+
+<h2>레슨</h2>
+<p>4-4의 고객 불만 분류 평가를 promptfoo로 옮깁니다.</p>
+
+<h3>프롬프트 준비 (prompts.js)</h3>
+<pre><code>module.exports = {
+  basicPrompt({ vars }) {
+    return `Classify the following customer complaint into one or more of these
+categories: Software Bug, Hardware Malfunction, User Error, Feature Request,
+or Service Outage. Only respond with the classification.
+
+Complaint: ${vars.complaint}
+
+Classification:`;
+  },
+
+  improvedPrompt({ vars }) {
+    return `You are an AI assistant specializing in customer support issue
+classification. Your task is to analyze customer complaints and categorize them
+into one or more of the following categories:
+
+1. Software Bug: Issues related to software not functioning as intended.
+2. Hardware Malfunction: Problems with physical devices or components.
+3. User Error: Difficulties arising from user misunderstanding or misuse.
+4. Feature Request: Suggestions for new functionalities or improvements.
+5. Service Outage: System-wide issues affecting service availability.
+
+Important Guidelines:
+- A complaint may fall into multiple categories. If so, list all that apply
+  but try to prioritize picking a single category when possible.
+
+Examples:
+1. Complaint: "The app crashes when I try to save my progress."
+   Classification: Software Bug
+2. Complaint: "My keyboard isn't working after I spilled coffee on it."
+   Classification: Hardware Malfunction
+3. Complaint: "I can't find the login button on your website."
+   Classification: User Error
+4. Complaint: "It would be great if your app had a dark mode."
+   Classification: Feature Request
+5. Complaint: "None of your services are loading for me or my colleagues."
+   Classification: Service Outage
+6. Complaint: "The app is acting buggy on my phone and it seems like your
+   website is down, so I'm completely stuck!"
+   Classification: Software Bug, Service Outage
+
+Now, please classify the following customer complaint:
+
+&lt;complaint&gt;${vars.complaint}&lt;/complaint&gt;
+
+Only respond with the appropriate categories and nothing else.
+Classification:`;
+  },
+};</code></pre>
+
+<h3>내장 assertions</h3>
+<p>정확 일치로는 부족합니다. 모델이 카테고리 순서를 바꿔 출력할 수 있으니까요.
+promptfoo의 내장 assertion을 활용합니다:</p>
+<table>
+  <tr><th>Assertion</th><th>의미</th></tr>
+  <tr><td><code>contains</code></td><td>출력이 부분 문자열을 포함</td></tr>
+  <tr><td><code>contains-all</code></td><td>나열된 문자열을 모두 포함</td></tr>
+  <tr><td><code>contains-any</code></td><td>나열된 문자열 중 하나 이상 포함</td></tr>
+  <tr><td><code>equals</code></td><td>정확히 일치</td></tr>
+  <tr><td><code>icontains</code> 등</td><td>대소문자 무시 버전</td></tr>
+  <tr><td><code>regex</code></td><td>정규식 매칭</td></tr>
+  <tr><td><code>contains-json</code></td><td>유효한 JSON 포함</td></tr>
+</table>
+
+<h3>테스트 CSV</h3>
+<p><code>__expected</code> 컬럼에 <code>contains-all:</code> 접두어를 붙입니다:</p>
+<pre><code>complaint,__expected
+The app crashes every time I try to upload a photo,contains-all:Software Bug
+My printer isn't recognized by my computer,contains-all:Hardware Malfunction
+I can't figure out how to change my password,contains-all:User Error
+The website is completely down I can't access any pages,contains-all:Service Outage
+It would be great if the app had a dark mode option,contains-all:Feature Request
+"The app is crashing and my phone is overheating","contains-all:Software Bug,Hardware Malfunction"
+"I think I installed something incorrectly now my computer won't start at all","contains-all:User Error,Hardware Malfunction"
+"Your service is down and I urgently need a feature to batch process files","contains-all:Service Outage,Feature Request"
+The graphics card is making weird noises,contains-all:Hardware Malfunction
+The cloud storage isn't syncing and I can't access my files from other devices,"contains-all:Software Bug,Service Outage"</code></pre>
+
+<h3>최종 설정</h3>
+<pre><code>description: "Complaint Classification Eval"
+
+prompts:
+  - file://prompts.js:basicPrompt
+  - file://prompts.js:improvedPrompt
+
+providers:
+  - "google:gemini-3.6-flash"
+
+tests: dataset.csv</code></pre>
+
+<pre><code>npx promptfoo@latest eval</code></pre>
+
+<p>예시가 포함된 <code>improvedPrompt</code>가 더 좋은 결과를 냅니다 —
+예시가 멀티라벨 상황을 모델에게 보여주기 때문입니다.</p>
+
+<div class="callout note">
+  <div class="callout-title">contains-all의 한계</div>
+  <p><code>contains-all</code>은 "없는 카테고리를 출력하면" 잡지 못합니다.
+  예: 정답이 <code>["Software Bug"]</code>인데 모델이
+  "Software Bug, Feature Request"를 출력해도 통과합니다.
+  더 엄격한 검사가 필요하면 다음 레슨의 커스텀 grader를 사용하세요.</p>
+</div>
+
+<h2>연습</h2>
+
+<div class="exercise">
+  <div class="exercise-title">연습 6.1 — 오분류 잡기</div>
+  <p>정답 카테고리 <strong>외의</strong> 카테고리가 출력에 포함되면 실패로 처리하는
+  평가를 설계해 보세요. <code>contains-all</code>만으로 가능한가요?
+  어떤 추가 assertion이나 커스텀 로직이 필요한가요?</p>
+  <details><summary>힌트</summary>
+  <p><code>not-contains</code> 계열 assertion을 정답이 아닌 카테고리 각각에 걸거나,
+  다음 레슨의 커스텀 JS grader에서 정답 집합과 출력 집합을 정확히 비교합니다.</p></details>
+</div>
+
+<nav class="prevnext">
+  <a href="05-promptfoo-animals.html"><span class="label">이전</span>4-5. promptfoo 입문</a>
+  <a class="next" href="07-promptfoo-custom-graders.html"><span class="label">다음</span>4-7. 커스텀 grader</a>
+</nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4-9. 커스텀 모델 채점 | Prompt Evaluations</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<nav class="breadcrumb">
+  <a href="../index.html">홈</a><span class="sep">/</span>
+  <span>코스 4. Prompt Evaluations</span><span class="sep">/</span>
+  <span>4-9. 커스텀 모델 채점</span>
+</nav>
+<main>
+<header class="chapter-header">
+  <div class="kicker">Course 4 / Chapter 9</div>
+  <h1>커스텀 모델 채점 평가</h1>
+  <p class="subtitle">내 grader 안에서 Gemini를 직접 호출해 정교한 루브릭 채점을 구현합니다.</p>
+  <p class="source">원본: 09_custom_model_graded_prompt_foo/lesson.ipynb</p>
+</header>
+
+<h2>레슨</h2>
+<p>태스크: 긴 Wikipedia 문서를 초등학생 수준의 짧은 요약으로 만드는 프롬프트 평가.
+<code>llm-rubric</code>은 단일 기준 판정에는 좋지만, 세부 루브릭(여러 항목 점수화,
+평균 계산)이 필요하면 커스텀 grader 안에서 LLM을 직접 호출합니다.</p>
+
+<h3>프롬프트들 (prompts.js)</h3>
+<pre><code>module.exports = {
+  basicSummarize({ vars }) {
+    return `Summarize this article ${vars.article}`;
+  },
+  betterSummarize({ vars }) {
+    return `Summarize this article for a grade-school audience: ${vars.article}`;
+  },
+  bestSummarize({ vars }) {
+    return `You are tasked with summarizing long wikipedia articles for a
+grade-school audience. Write a short summary, keeping it as concise as possible.
+The summary is intended for a non-technical, grade-school audience.
+This is the article: ${vars.article}`;
+  },
+};</code></pre>
+
+<h3>설정 파일</h3>
+<pre><code>description: 'Summarization Evaluation'
+
+prompts:
+  - file://prompts.js:basicSummarize
+  - file://prompts.js:betterSummarize
+  - file://prompts.js:bestSummarize
+
+providers:
+  - id: google:gemini-3.6-flash
+    label: "Gemini Flash"
+
+tests:
+  - vars:
+      article: file://articles/article1.txt
+  - vars:
+      article: file://articles/article2.txt
+  # ... article3~8
+
+defaultTest:
+  assert:
+    - type: javascript
+      value: file://custom_llm_eval.js</code></pre>
+
+<p><code>article: file://articles/article1.txt</code>처럼 파일에서 변수 값을 읽습니다 —
+긴 문서를 YAML에 인라인하지 않아도 됩니다.</p>
+
+<h3>커스텀 모델 grader (custom_llm_eval.js)</h3>
+<p>grader 안에서 Gemini를 호출해 루브릭 점수를 매깁니다:</p>
+
+<pre><code>// custom_llm_eval.js
+const { GoogleGenAI } = require("@google/genai");
+
+const ai = new GoogleGenAI({});
+
+const RUBRIC = `You are evaluating a summary of a Wikipedia article written for
+a grade-school audience. Score the summary on these criteria (1-5 each):
+
+1. Accuracy: Does the summary contain only facts from the article?
+2. Conciseness: Is it appropriately short?
+3. Readability: Can a grade-school student understand it?
+4. Tone: Is it neutral and encyclopedic?
+
+Return ONLY a JSON object:
+{"accuracy": N, "conciseness": N, "readability": N, "tone": N, "explanation": "..."}
+
+&lt;article&gt;
+{{ARTICLE}}
+&lt;/article&gt;
+
+&lt;summary&gt;
+{{SUMMARY}}
+&lt;/summary&gt;`;
+
+async function llmEval(summary, article) {
+  const res = await ai.models.generateContent({
+    model: "gemini-3.6-flash",
+    contents: RUBRIC.replace("{{ARTICLE}}", article).replace("{{SUMMARY}}", summary),
+    config: { responseMimeType: "application/json", temperature: 0 },
+  });
+  const parsed = JSON.parse(res.text ?? "{}");
+  const scores = [parsed.accuracy, parsed.conciseness, parsed.readability, parsed.tone];
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return { avg, explanation: parsed.explanation ?? "" };
+}
+
+module.exports = async (output, context) => {
+  const article = context.vars.article;
+  const { avg, explanation } = await llmEval(output, article);
+  const threshold = 4.5;
+  return {
+    pass: avg >= threshold,
+    score: avg,
+    reason: explanation,
+  };
+};</code></pre>
+
+<p>구조 정리:</p>
+<ul>
+  <li><code>module.exports</code>가 promptfoo가 호출하는 진입점 (원본의 <code>get_assert</code>에 해당)</li>
+  <li>루브릭 프롬프트로 채점용 Gemini 호출 → JSON 점수 파싱 → 평균 계산</li>
+  <li>임계값(4.5) 이상이면 pass. 점수와 이유를 함께 반환</li>
+</ul>
+
+<pre><code>npx promptfoo@latest eval   # 생성 + 채점 호출이라 시간이 더 걸림
+npx promptfoo@latest view   # 대시보드에서 점수 분포와 이유 확인</code></pre>
+
+<div class="callout note">
+  <div class="callout-title">JSON 강제 응답</div>
+  <p>채점 결과를 JSON으로 받기 위해 <code>responseMimeType: "application/json"</code>을
+  씁니다. 프롬프트에 "ONLY a JSON object"를 명시하는 것과 함께 쓰면 파싱이 안정적입니다.</p>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">비용과 일관성</div>
+  <p>테스트마다 생성 호출 + 채점 호출이 발생합니다. 3개 프롬프트 × 8개 테스트 = 24회 생성,
+  각각 채점 호출까지 48회의 API 호출입니다. 채점 모델의 비결정성을 줄이려면
+  <code>temperature: 0</code>을 설정하세요.</p>
+</div>
+
+<h2>연습</h2>
+
+<div class="exercise">
+  <div class="exercise-title">연습 9.1 — 코스 3 봇 평가</div>
+  <p>코스 3-5의 고객 지원 봇 프롬프트에 이 패턴을 적용해 보세요.
+  "컨텍스트에 없는 정보를 지어냈는가", "거절 조건을 지켰는가"를 채점하는
+  커스텀 모델 grader를 작성합니다.</p>
+</div>
+
+<nav class="prevnext">
+  <a href="08-promptfoo-model-graded.html"><span class="label">이전</span>4-8. 모델 채점</a>
+  <a class="next" href="../05-tool-use/01-overview.html"><span class="label">다음</span>코스 5. Tool Use</a>
+</nav>
+</main>
+</body>
+</html>

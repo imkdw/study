@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5-5. 도구 선택 제어 | Tool Use</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<nav class="breadcrumb">
+  <a href="../index.html">홈</a><span class="sep">/</span>
+  <span>코스 5. Tool Use</span><span class="sep">/</span>
+  <span>5-5. 도구 선택 제어</span>
+</nav>
+<main>
+<header class="chapter-header">
+  <div class="kicker">Course 5 / Chapter 5</div>
+  <h1>도구 선택 제어 (tool choice)</h1>
+  <p class="subtitle">모델이 도구를 쓸지 말지, 어떤 도구를 쓸지를 제어합니다.</p>
+  <p class="source">원본: 05_tool_choice.ipynb</p>
+</header>
+
+<h2>레슨</h2>
+<p>Claude의 <code>tool_choice</code>(auto/any/tool/none)에 해당하는 Gemini 설정은
+<code>toolConfig.functionCallingConfig.mode</code>입니다.</p>
+
+<table>
+  <tr><th>Claude tool_choice</th><th>Gemini mode</th><th>동작</th></tr>
+  <tr><td><code>auto</code></td><td><code>AUTO</code> (기본값)</td><td>모델이 판단 — 도구 호출 또는 텍스트 응답</td></tr>
+  <tr><td><code>any</code></td><td><code>ANY</code></td><td>반드시 함수 호출 (어느 것이든)</td></tr>
+  <tr><td><code>tool</code> (특정 도구)</td><td><code>ANY</code> + <code>allowedFunctionNames</code></td><td>지정한 함수만 허용</td></tr>
+  <tr><td><code>none</code></td><td><code>NONE</code></td><td>함수 호출 금지, 텍스트만</td></tr>
+</table>
+
+<h3>AUTO (기본)</h3>
+<p>도구를 제공해도 모델이 알아서 판단합니다:</p>
+<pre><code>import { FunctionCallingConfigMode } from "@google/genai";
+
+const response = await ai.models.generateContent({
+  model: "gemini-3.6-flash",
+  contents: "What color are emeralds?",   // 계산기 필요 없음
+  config: {
+    tools: [{ functionDeclarations: [calculatorDeclaration] }],
+    // mode 생략 시 AUTO
+  },
+});
+// 보통 functionCalls 없이 텍스트 응답이 옴</code></pre>
+
+<div class="callout warn">
+  <div class="callout-title">프롬프트가 중요하다</div>
+  <p>AUTO 모드에서도 모델이 불필요하게 도구를 호출할 수 있습니다.
+  도구의 <code>description</code>에 "언제 쓰는지"를 명확히 적고,
+  필요하면 system instruction으로 사용 조건을 제한하세요.</p>
+</div>
+
+<h3>ANY — 호출 강제</h3>
+<p>항상 함수 호출을 반환하게 합니다. 구조화 출력 추출에 유용합니다 (5-3 참고):</p>
+<pre><code>const response = await ai.models.generateContent({
+  model: "gemini-3.6-flash",
+  contents: "Multiply 1984135 by 9343116",
+  config: {
+    tools: [{ functionDeclarations: [calculatorDeclaration] }],
+    toolConfig: {
+      functionCallingConfig: { mode: FunctionCallingConfigMode.ANY },
+    },
+  },
+});
+// 반드시 functionCalls가 채워짐</code></pre>
+
+<h3>특정 함수만 허용</h3>
+<p>여러 도구 중 하나만 강제하려면 <code>allowedFunctionNames</code>를 씁니다:</p>
+<pre><code>config: {
+  tools: [{ functionDeclarations: [calculatorDecl, getWeatherDecl] }],
+  toolConfig: {
+    functionCallingConfig: {
+      mode: FunctionCallingConfigMode.ANY,
+      allowedFunctionNames: ["calculator"],   // calculator만 호출 가능
+    },
+  },
+}</code></pre>
+
+<h3>NONE — 도구 비활성화</h3>
+<p>도구 정의는 유지하되 이 요청에서는 호출을 막습니다:</p>
+<pre><code>toolConfig: {
+  functionCallingConfig: { mode: FunctionCallingConfigMode.NONE },
+}</code></pre>
+<p>예: 대화 이력에 도구 맥락이 필요하지만 이번 응답은 텍스트만 받고 싶을 때.</p>
+
+<div class="callout good">
+  <div class="callout-title">선택 가이드</div>
+  <ul>
+    <li><strong>AUTO</strong>: 일반 챗봇, 도구가 "필요하면" 쓰이는 경우</li>
+    <li><strong>ANY</strong>: 구조화 출력 추출, 반드시 행동이 필요한 단계</li>
+    <li><strong>NONE</strong>: 도구 사용이 부적절한 요청 (요약만 필요한 경우 등)</li>
+  </ul>
+</div>
+
+<h2>연습</h2>
+
+<div class="exercise">
+  <div class="exercise-title">연습 5.1 — 모드별 비교</div>
+  <p>같은 프롬프트("What is 42 times 17?")를 AUTO / ANY / NONE 세 모드로
+  각각 실행하고 응답을 비교해 보세요. 어느 모드에서 functionCall이 오는가?</p>
+</div>
+
+<div class="exercise">
+  <div class="exercise-title">연습 5.2 — 날씨 도구 강제</div>
+  <p><code>getWeather</code>와 <code>calculator</code> 두 도구를 등록하고,
+  "서울 날씨 알려줘"라는 질문에 <code>allowedFunctionNames: ["getWeather"]</code>로
+  강제해 보세요.</p>
+</div>
+
+<nav class="prevnext">
+  <a href="04-complete-workflow.html"><span class="label">이전</span>5-4. 전체 워크플로</a>
+  <a class="next" href="06-multi-tool-chatbot.html"><span class="label">다음</span>5-6. 다중 도구 챗봇</a>
+</nav>
+</main>
+</body>
+</html>
