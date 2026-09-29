@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["part1", "part2"]
+  "include": ["part1", "part2", "part3", "part4"]
 }
