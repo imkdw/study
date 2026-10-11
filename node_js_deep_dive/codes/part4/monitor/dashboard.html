@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Node.js 프로세스 모니터</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f3f3f1;
+        --surface: #fcfcfb;
+        --border: #e6e5e1;
+        --grid: #ebeae6;
+        --text-primary: #0b0b0b;
+        --text-secondary: #52514e;
+        --text-muted: #85847e;
+        --series-1: #2a78d6;
+        --series-2: #eb6834;
+        --series-3: #1baf7a;
+        --series-4: #eda100;
+        --status-good: #0ca30c;
+        --control-active: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --page: #111110;
+          --surface: #1a1a19;
+          --border: #2c2c2a;
+          --grid: #2a2a28;
+          --text-primary: #f0efec;
+          --text-secondary: #c3c2b7;
+          --text-muted: #8f8e86;
+          --series-1: #3987e5;
+          --series-2: #d95926;
+          --series-3: #199e70;
+          --series-4: #c98500;
+          --control-active: #33332f;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 20px 24px 40px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-size: 14px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 16px;
+        margin-bottom: 16px;
+      }
+      .toolbar h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .connection {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+      }
+      .dot.on {
+        background: var(--status-good);
+      }
+      .spacer {
+        flex: 1;
+      }
+      .hover-time {
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      .segmented {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 10px;
+        background: var(--border);
+      }
+      .segmented button,
+      .ghost {
+        border: 0;
+        border-radius: 8px;
+        padding: 6px 12px;
+        background: transparent;
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .segmented button[aria-pressed="true"] {
+        background: var(--control-active);
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .ghost {
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .ghost:hover {
+        color: var(--text-primary);
+      }
+
+      .columns {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        gap: 16px;
+        align-items: start;
+      }
+      .process {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+      }
+      .process-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 14px;
+        padding: 4px 4px 0;
+      }
+      .process-head h2 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .process-head .meta {
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      .process-head .state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .card {
+        padding: 14px 16px 10px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        min-width: 0;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .card h3 small {
+        margin-left: 6px;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 400;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        min-height: 20px;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+      .legend .key {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .legend .swatch {
+        width: 10px;
+        height: 3px;
+        border-radius: 2px;
+      }
+      .legend .tick {
+        width: 2px;
+        border-radius: 1px;
+      }
+      .legend b {
+        display: inline-block;
+        min-width: 2.4em;
+        color: var(--text-primary);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 150px;
+        cursor: crosshair;
+      }
+
+      .empty {
+        max-width: 640px;
+        margin: 80px auto;
+        padding: 28px 32px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+      .empty h2 {
+        margin: 0 0 8px;
+        color: var(--text-primary);
+        font-size: 16px;
+      }
+      .empty pre {
+        margin: 12px 0 0;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: var(--page);
+        color: var(--text-primary);
+        font-size: 13px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <h1>Node.js 프로세스 모니터</h1>
+      <span class="connection"><span class="dot" id="connection-dot"></span><span id="connection-text">연결 중</span></span>
+      <span class="spacer"></span>
+      <span class="hover-time" id="hover-time"></span>
+      <div class="segmented" id="window-control" role="group" aria-label="표시 구간">
+        <button data-window="10000">10초</button>
+        <button data-window="30000">30초</button>
+        <button data-window="60000">1분</button>
+        <button data-window="0">전체</button>
+      </div>
+      <button class="ghost" id="clear-button">끝난 프로세스 지우기</button>
+    </div>
+
+    <div class="columns" id="columns"></div>
+
+    <div class="empty" id="empty">
+      <h2>계측 중인 프로세스가 없음</h2>
+      실행 명령 앞에 <code>--import ./monitor/agent.ts</code> 를 붙이면 여기에 바로 나타남
+      <pre>node --import ./monitor/agent.ts upload_server.ts
+node --import ./monitor/agent.ts upload_client.ts</pre>
+    </div>
+
+    <script>
+      const MB = 1024 * 1024;
+
+      /**
+       * 차트 정의. series 의 순서가 곧 색 슬롯이라 순서를 바꾸면 색도 바뀜
+       */
+      const CHARTS = [
+        {
+          id: "memory",
+          title: "메모리",
+          unit: "MB",
+          digits: 1,
+          showGc: true,
+          series: [
+            ["rss", "RSS"],
+            ["heapUsed", "heapUsed"],
+            ["external", "external"],
+            ["arrayBuffers", "arrayBuffers"],
+          ],
+        },
+        {
+          id: "cpu",
+          title: "CPU 점유율",
+          unit: "%",
+          note: "코어 1개 = 100",
+          digits: 0,
+          series: [
+            ["cpuTotal", "합계"],
+            ["cpuUser", "user"],
+            ["cpuSystem", "system"],
+          ],
+        },
+        {
+          id: "loop",
+          title: "이벤트 루프 지연",
+          unit: "ms",
+          digits: 1,
+          series: [
+            ["loopMax", "최대"],
+            ["loopMean", "평균"],
+          ],
+        },
+        {
+          id: "buffer",
+          title: "스트림 버퍼",
+          unit: "KB",
+          digits: 0,
+          series: [
+            ["sockWritable", "소켓 쓰기"],
+            ["sockReadable", "소켓 읽기"],
+            ["fileWritable", "파일 쓰기"],
+            ["fileReadable", "파일 읽기"],
+          ],
+        },
+        {
+          id: "rate",
+          title: "처리량",
+          unit: "MB/s",
+          digits: 0,
+          series: [
+            ["rateNetIn", "소켓 수신"],
+            ["rateNetOut", "소켓 송신"],
+            ["rateDiskRead", "디스크 읽기"],
+            ["rateDiskWrite", "디스크 쓰기"],
+          ],
+        },
+      ];
+      const VALUE_KEYS = CHARTS.flatMap((chart) => chart.series.map(([key]) => key));
+
+      const PLOT = { left: 46, right: 10, top: 6, bottom: 20 };
+
+      /** id -> { info, t: number[], values: { key: number[] }, gc: [], last: 원본 샘플, dom } */
+      const processes = new Map();
+      let windowMs = 0;
+      let hoverTime = null;
+      /** 드래그로 고른 확대 구간. 있으면 표시 구간 버튼보다 우선함 */
+      let zoom = null;
+      let dragStartTime = null;
+      let dirty = true;
+      let theme = readTheme();
+
+      const columnsElement = document.getElementById("columns");
+      const emptyElement = document.getElementById("empty");
+      const hoverTimeElement = document.getElementById("hover-time");
+
+      function readTheme() {
+        const style = getComputedStyle(document.documentElement);
+        const read = (name) => style.getPropertyValue(name).trim();
+        return {
+          surface: read("--surface"),
+          grid: read("--grid"),
+          textPrimary: read("--text-primary"),
+          textMuted: read("--text-muted"),
+          series: [1, 2, 3, 4].map((slot) => read(`--series-${slot}`)),
+        };
+      }
+      matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+        theme = readTheme();
+        dirty = true;
+      });
+
+      function addProcess(info, samples) {
+        const state = {
+          info,
+          t: [],
+          values: Object.fromEntries(VALUE_KEYS.map((key) => [key, []])),
+          gc: [],
+          last: null,
+          peakRss: 0,
+          dom: null,
+        };
+        processes.set(info.id, state);
+        for (const sample of samples) addSample(state, sample);
+        buildColumn(state);
+        emptyElement.hidden = true;
+        dirty = true;
+      }
+
+      function addSample(state, sample) {
+        const previous = state.last;
+        const seconds = previous ? (sample.t - previous.t) / 1000 : 0;
+        const rate = (key) => (seconds > 0 ? (sample[key] - previous[key]) / MB / seconds : 0);
+        const values = state.values;
+
+        state.t.push(sample.t);
+        values.rss.push(sample.rss / MB);
+        values.heapUsed.push(sample.heapUsed / MB);
+        values.external.push(sample.external / MB);
+        values.arrayBuffers.push(sample.arrayBuffers / MB);
+        values.cpuTotal.push(sample.cpuUser + sample.cpuSystem);
+        values.cpuUser.push(sample.cpuUser);
+        values.cpuSystem.push(sample.cpuSystem);
+        values.loopMax.push(sample.loopMax);
+        values.loopMean.push(sample.loopMean);
+        values.sockWritable.push(sample.sockWritable / 1024);
+        values.sockReadable.push(sample.sockReadable / 1024);
+        values.fileWritable.push(sample.fileWritable / 1024);
+        values.fileReadable.push(sample.fileReadable / 1024);
+        values.rateNetIn.push(rate("netIn"));
+        values.rateNetOut.push(rate("netOut"));
+        values.rateDiskRead.push(rate("diskRead"));
+        values.rateDiskWrite.push(rate("diskWrite"));
+
+        for (const gc of sample.gc) state.gc.push(gc);
+        state.peakRss = Math.max(state.peakRss, sample.rss / MB);
+        state.last = sample;
+        dirty = true;
+      }
+
+      function removeProcess(id) {
+        const state = processes.get(id);
+        if (!state) return;
+        state.dom.column.remove();
+        processes.delete(id);
+        emptyElement.hidden = processes.size > 0;
+        dirty = true;
+      }
+
+      function element(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function buildColumn(state) {
+        const column = element("section", "process");
+
+        const head = element("div", "process-head");
+        head.append(element("h2", "", state.info.name));
+        const stateMeta = element("span", "meta state");
+        const stateDot = element("span", "dot");
+        const stateText = element("span");
+        stateMeta.append(stateDot, stateText);
+        const elapsedMeta = element("span", "meta");
+        const peakMeta = element("span", "meta");
+        head.append(
+          stateMeta,
+          element("span", "meta", `pid ${state.info.pid}`),
+          element("span", "meta", `Node ${state.info.node}`),
+          element("span", "meta", `샘플 간격 ${state.info.interval}ms`),
+          elapsedMeta,
+          peakMeta,
+        );
+        column.append(head);
+
+        const charts = CHARTS.map((chart) => {
+          const card = element("div", "card");
+          const title = element("h3", "", chart.title);
+          title.append(element("small", "", chart.note ? `${chart.unit}, ${chart.note}` : chart.unit));
+
+          const legend = element("div", "legend");
+          const readouts = chart.series.map(([, label], index) => {
+            const key = element("span", "key");
+            const swatch = element("span", "swatch");
+            swatch.style.background = `var(--series-${index + 1})`;
+            const value = element("b", "", "-");
+            key.append(swatch, label, value);
+            legend.append(key);
+            return value;
+          });
+
+          let gcReadouts = null;
+          if (chart.showGc) {
+            gcReadouts = ["minor", "major"].map((kind) => {
+              const key = element("span", "key");
+              const tick = element("span", "tick");
+              tick.style.height = kind === "major" ? "12px" : "6px";
+              tick.style.background = kind === "major" ? "var(--text-primary)" : "var(--text-muted)";
+              const value = element("b", "", "0");
+              key.append(tick, `GC ${kind}`, value);
+              legend.append(key);
+              return value;
+            });
+          }
+
+          const canvas = element("canvas");
+          const timeAt = (event) => {
+            const range = timeRange();
+            if (!range) return null;
+            const plotWidth = canvas.clientWidth - PLOT.left - PLOT.right;
+            const ratio = Math.min(1, Math.max(0, (event.offsetX - PLOT.left) / plotWidth));
+            return range.start + ratio * (range.end - range.start);
+          };
+          canvas.addEventListener("mousemove", (event) => {
+            hoverTime = timeAt(event);
+            dirty = true;
+          });
+          canvas.addEventListener("mouseleave", () => {
+            hoverTime = null;
+            dragStartTime = null;
+            dirty = true;
+          });
+          canvas.addEventListener("mousedown", (event) => {
+            dragStartTime = timeAt(event);
+            event.preventDefault();
+          });
+          canvas.addEventListener("mouseup", (event) => {
+            const endTime = timeAt(event);
+            const range = timeRange();
+            if (dragStartTime !== null && endTime !== null) {
+              const start = Math.min(dragStartTime, endTime);
+              const end = Math.max(dragStartTime, endTime);
+              const pixels = ((end - start) / (range.end - range.start)) * canvas.clientWidth;
+              if (pixels > 4) {
+                zoom = { start, end };
+                for (const button of windowButtons) button.setAttribute("aria-pressed", "false");
+              }
+            }
+            dragStartTime = null;
+            dirty = true;
+          });
+          canvas.addEventListener("dblclick", () => selectWindow(windowMs));
+
+          card.append(title, legend, canvas);
+          column.append(card);
+          return { canvas, readouts, gcReadouts };
+        });
+
+        state.dom = { column, stateDot, stateText, elapsedMeta, peakMeta, charts };
+        columnsElement.append(column);
+      }
+
+      /** t 이상인 첫 인덱스 */
+      function lowerBound(times, t) {
+        let low = 0;
+        let high = times.length;
+        while (low < high) {
+          const middle = (low + high) >> 1;
+          if (times[middle] < t) low = middle + 1;
+          else high = middle;
+        }
+        return low;
+      }
+
+      function nearestIndex(times, t) {
+        const index = lowerBound(times, t);
+        if (index === 0) return 0;
+        if (index === times.length) return times.length - 1;
+        return t - times[index - 1] <= times[index] - t ? index - 1 : index;
+      }
+
+      /**
+       * 모든 프로세스가 같은 시간축을 쓰도록 구간을 전역으로 계산함
+       * 끝은 가장 최근 샘플 시각이라 프로세스가 전부 끝나면 화면도 그 자리에 멈춤
+       */
+      function timeRange() {
+        let first = Infinity;
+        let last = -Infinity;
+        for (const state of processes.values()) {
+          if (state.t.length === 0) continue;
+          first = Math.min(first, state.t[0]);
+          last = Math.max(last, state.t[state.t.length - 1]);
+        }
+        if (first === Infinity) return null;
+        if (zoom) return { origin: first, start: zoom.start, end: zoom.end };
+        const start = windowMs > 0 ? Math.max(first, last - windowMs) : first;
+        return { origin: first, start, end: Math.max(last, start + 1000) };
+      }
+
+      function niceStep(rough) {
+        const magnitude = 10 ** Math.floor(Math.log10(rough));
+        const normalized = rough / magnitude;
+        return (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+      }
+
+      function formatValue(value, digits) {
+        return value.toLocaleString("ko-KR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      }
+
+      function formatTick(value) {
+        return value.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+      }
+
+      /**
+       * 한 픽셀 열에 샘플이 여러 개 몰리면 그 열의 최소 / 최대만 세로로 그어서 급등락이 묻히지 않게 함
+       */
+      function drawSeries(context, times, values, from, to, xOf, yOf) {
+        context.beginPath();
+        let column = null;
+        let first, last, low, high;
+        let started = false;
+
+        const flush = () => {
+          if (!started) {
+            context.moveTo(column, yOf(first));
+            started = true;
+          } else {
+            context.lineTo(column, yOf(first));
+          }
+          if (low !== high) {
+            context.lineTo(column, yOf(high));
+            context.lineTo(column, yOf(low));
+            context.lineTo(column, yOf(last));
+          }
+        };
+
+        for (let index = from; index < to; index++) {
+          const x = Math.round(xOf(times[index]));
+          const value = values[index];
+          if (x !== column) {
+            if (column !== null) flush();
+            column = x;
+            first = last = low = high = value;
+          } else {
+            last = value;
+            if (value < low) low = value;
+            if (value > high) high = value;
+          }
+        }
+        if (column !== null) flush();
+        context.stroke();
+      }
+
+      function drawChart(chart, chartDom, state, range, yTop) {
+        const canvas = chartDom.canvas;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const pixelRatio = window.devicePixelRatio || 1;
+        if (canvas.width !== Math.round(width * pixelRatio) || canvas.height !== Math.round(height * pixelRatio)) {
+          canvas.width = Math.round(width * pixelRatio);
+          canvas.height = Math.round(height * pixelRatio);
+        }
+
+        const context = canvas.getContext("2d");
+        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        context.clearRect(0, 0, width, height);
+
+        const plotWidth = width - PLOT.left - PLOT.right;
+        const plotHeight = height - PLOT.top - PLOT.bottom;
+        const plotBottom = PLOT.top + plotHeight;
+        const xOf = (t) => PLOT.left + ((t - range.start) / (range.end - range.start)) * plotWidth;
+        const yOf = (value) => plotBottom - (value / yTop) * plotHeight;
+
+        context.font = '11px "Pretendard Variable", Pretendard, system-ui, sans-serif';
+        context.fillStyle = theme.textMuted;
+        context.strokeStyle = theme.grid;
+        context.lineWidth = 1;
+
+        /** 가로 눈금 */
+        const yStep = yTop / 3;
+        context.textAlign = "right";
+        context.textBaseline = "middle";
+        for (let line = 0; line <= 3; line++) {
+          const y = Math.round(yOf(yStep * line)) + 0.5;
+          context.beginPath();
+          context.moveTo(PLOT.left, y);
+          context.lineTo(width - PLOT.right, y);
+          context.stroke();
+          context.fillText(formatTick(yStep * line), PLOT.left - 8, y);
+        }
+
+        /** 시간 눈금. 첫 샘플부터 흐른 초 */
+        const spanSeconds = (range.end - range.start) / 1000;
+        const xStep = niceStep(spanSeconds / Math.max(2, Math.floor(plotWidth / 90)));
+        const startSeconds = (range.start - range.origin) / 1000;
+        context.textBaseline = "top";
+        for (let tick = Math.ceil(startSeconds / xStep) * xStep; tick <= startSeconds + spanSeconds + 1e-9; tick += xStep) {
+          const x = xOf(range.origin + tick * 1000);
+          context.textAlign = x < PLOT.left + 12 ? "left" : x > width - PLOT.right - 12 ? "right" : "center";
+          context.fillText(`${formatTick(tick)}s`, x, plotBottom + 6);
+        }
+
+        const from = Math.max(0, lowerBound(state.t, range.start) - 1);
+        const to = Math.min(state.t.length, lowerBound(state.t, range.end) + 1);
+
+        context.save();
+        context.beginPath();
+        context.rect(PLOT.left, 0, plotWidth, plotBottom + 1);
+        context.clip();
+
+        /** GC 발생 시점. 바닥에서 올라오는 눈금으로 표시 (major 가 더 길고 진함) */
+        let minorCount = 0;
+        let majorCount = 0;
+        if (chart.showGc) {
+          for (const gc of state.gc) {
+            if (gc.t < range.start || gc.t > range.end) continue;
+            const isMajor = gc.k === "major";
+            if (isMajor) majorCount++;
+            else minorCount++;
+            const x = Math.round(xOf(gc.t)) + 0.5;
+            context.strokeStyle = isMajor ? theme.textPrimary : theme.textMuted;
+            context.lineWidth = isMajor ? 2 : 1;
+            context.beginPath();
+            context.moveTo(x, plotBottom);
+            context.lineTo(x, plotBottom - (isMajor ? 14 : 7));
+            context.stroke();
+          }
+          chartDom.gcReadouts[0].textContent = `${minorCount}회`;
+          chartDom.gcReadouts[1].textContent = `${majorCount}회`;
+        }
+
+        context.lineWidth = 1.75;
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        for (let index = chart.series.length - 1; index >= 0; index--) {
+          context.strokeStyle = theme.series[index];
+          drawSeries(context, state.t, state.values[chart.series[index][0]], from, to, xOf, yOf);
+        }
+        context.restore();
+
+        /** 읽을 샘플. 호버 중이면 커서에 가장 가까운 샘플, 아니면 최신 샘플 */
+        let readIndex = to - 1;
+        let hasReading = to > 0;
+        if (dragStartTime !== null && hoverTime !== null) {
+          const left = xOf(Math.min(dragStartTime, hoverTime));
+          const right = xOf(Math.max(dragStartTime, hoverTime));
+          context.globalAlpha = 0.15;
+          context.fillStyle = theme.textMuted;
+          context.fillRect(left, PLOT.top, right - left, plotHeight);
+          context.globalAlpha = 1;
+        }
+        if (hoverTime !== null && to > 0) {
+          readIndex = nearestIndex(state.t, hoverTime);
+          hasReading = Math.abs(state.t[readIndex] - hoverTime) <= Math.max(500, state.info.interval * 4);
+
+          const x = Math.round(xOf(hoverTime)) + 0.5;
+          context.strokeStyle = theme.textMuted;
+          context.lineWidth = 1;
+          context.beginPath();
+          context.moveTo(x, PLOT.top);
+          context.lineTo(x, plotBottom);
+          context.stroke();
+
+          if (hasReading) {
+            chart.series.forEach(([key], index) => {
+              context.beginPath();
+              context.arc(xOf(state.t[readIndex]), yOf(state.values[key][readIndex]), 3.5, 0, Math.PI * 2);
+              context.fillStyle = theme.series[index];
+              context.fill();
+              context.strokeStyle = theme.surface;
+              context.lineWidth = 2;
+              context.stroke();
+            });
+          }
+        }
+
+        chart.series.forEach(([key], index) => {
+          chartDom.readouts[index].textContent = hasReading ? formatValue(state.values[key][readIndex], chart.digits) : "-";
+        });
+      }
+
+      function render() {
+        requestAnimationFrame(render);
+        if (!dirty) return;
+        dirty = false;
+
+        const range = timeRange();
+        if (!range) return;
+
+        hoverTimeElement.textContent =
+          hoverTime === null
+            ? "드래그로 확대, 더블클릭으로 해제"
+            : `커서 위치 ${formatValue((hoverTime - range.origin) / 1000, 2)}s`;
+
+        /**
+         * 세로축은 프로세스끼리 바로 비교할 수 있게 같은 지표면 같은 눈금을 씀
+         */
+        const yTops = CHARTS.map((chart) => {
+          let peak = 0;
+          for (const state of processes.values()) {
+            const from = Math.max(0, lowerBound(state.t, range.start) - 1);
+            const to = Math.min(state.t.length, lowerBound(state.t, range.end) + 1);
+            for (const [key] of chart.series) {
+              const values = state.values[key];
+              for (let index = from; index < to; index++) {
+                if (values[index] > peak) peak = values[index];
+              }
+            }
+          }
+          const step = niceStep(Math.max(peak, 1e-6) / 3);
+          return step * 3 >= peak ? step * 3 : niceStep(peak / 3 + step) * 3;
+        });
+
+        for (const state of processes.values()) {
+          const dom = state.dom;
+          dom.stateDot.classList.toggle("on", !state.info.ended);
+          dom.stateText.textContent = state.info.ended ? "종료됨" : "실행 중";
+          if (state.t.length > 0) {
+            dom.elapsedMeta.textContent = `계측 ${formatValue((state.t[state.t.length - 1] - state.t[0]) / 1000, 1)}s`;
+            dom.peakMeta.textContent = `최대 RSS ${formatValue(state.peakRss, 1)} MB`;
+          }
+          CHARTS.forEach((chart, index) => drawChart(chart, dom.charts[index], state, range, yTops[index]));
+        }
+      }
+
+      /** 표시 구간 선택 */
+      const windowButtons = [...document.querySelectorAll("#window-control button")];
+      function selectWindow(value) {
+        windowMs = value;
+        zoom = null;
+        for (const button of windowButtons) {
+          button.setAttribute("aria-pressed", String(Number(button.dataset.window) === value));
+        }
+        dirty = true;
+      }
+      for (const button of windowButtons) {
+        button.addEventListener("click", () => selectWindow(Number(button.dataset.window)));
+      }
+      selectWindow(0);
+
+      document.getElementById("clear-button").addEventListener("click", () => fetch("/clear", { method: "POST" }));
+      new ResizeObserver(() => (dirty = true)).observe(columnsElement);
+
+      /** 수집기 연결 */
+      const connectionDot = document.getElementById("connection-dot");
+      const connectionText = document.getElementById("connection-text");
+      const events = new EventSource("/events");
+
+      events.addEventListener("open", () => {
+        connectionDot.classList.add("on");
+        connectionText.textContent = "수집기 연결됨";
+      });
+      events.addEventListener("error", () => {
+        connectionDot.classList.remove("on");
+        connectionText.textContent = "수집기 연결 끊김, 재시도 중";
+      });
+      events.addEventListener("init", (event) => {
+        for (const id of [...processes.keys()]) removeProcess(id);
+        for (const { samples, ...info } of JSON.parse(event.data)) addProcess(info, samples);
+      });
+      events.addEventListener("process", (event) => addProcess(JSON.parse(event.data), []));
+      events.addEventListener("sample", (event) => {
+        const { id, sample } = JSON.parse(event.data);
+        const state = processes.get(id);
+        if (state) addSample(state, sample);
+      });
+      events.addEventListener("end", (event) => {
+        const state = processes.get(JSON.parse(event.data).id);
+        if (state) state.info.ended = true;
+        dirty = true;
+      });
+      events.addEventListener("remove", (event) => removeProcess(JSON.parse(event.data).id));
+
+      requestAnimationFrame(render);
+    </script>
+  </body>
+</html>
