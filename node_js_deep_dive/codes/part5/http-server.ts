@@ -32,15 +32,21 @@ server.on("request", (req, res) => {
   req.on("data", (chunk: Buffer) => chunks.push(chunk));
 
   req.on("end", () => {
-    const rawData = Buffer.concat(chunks).toString("utf-8");
-    const parsedData = JSON.parse(rawData);
+    try {
+      const rawData = Buffer.concat(chunks).toString("utf-8");
+      const parsedData = JSON.parse(rawData);
 
-    res.writeHead(200, { "content-type": "application/json" });
+      res.writeHead(200, { "content-type": "application/json" });
 
-    res.end(
-      JSON.stringify({
-        message: `제목이 '${parsedData.title}'인 포스트가 '${authorName}'님에 의해서 작성됨`,
-      }),
-    );
+      res.end(
+        JSON.stringify({
+          message: `제목이 '${parsedData.title}'인 포스트가 '${authorName}'님에 의해서 작성됨`,
+        }),
+      );
+    } catch (error: any) {
+      console.error(`데이터 파싱 에러. ${error?.message ?? ""}`);
+      res.writeHead(400, { "content-type": "text/plain" });
+      res.end("Bad Request: Invalid Json");
+    }
   });
 });
