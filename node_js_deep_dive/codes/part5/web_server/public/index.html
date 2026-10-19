@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple HTTP</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script src="scripts.js" defer></script>
+  </head>
+  <body>
+    <main class="card">
+      <span class="badge">node:http / port 7821</span>
+      <h1>ㅎㅇ! 순수 노드 웹 서버에서 보넴</h1>
+      <p class="desc">정적 파일 라우팅 원리 하나씩 파헤치기</p>
+
+      <ol class="flow">
+        <li>
+          <span class="step">1</span>
+          <div>
+            <strong>GET /</strong>
+            <span>index.html 을 text/html 로 스트리밍</span>
+          </div>
+        </li>
+        <li>
+          <span class="step">2</span>
+          <div>
+            <strong>GET /style.css</strong>
+            <span>link 태그를 보고 연쇄 요청</span>
+          </div>
+        </li>
+        <li>
+          <span class="step">3</span>
+          <div>
+            <strong>GET /scripts.js</strong>
+            <span>script 태그를 보고 연쇄 요청</span>
+          </div>
+        </li>
+      </ol>
+
+      <div class="counter">
+        <span class="counter-label">누른 횟수</span>
+        <span id="count" class="counter-value">0</span>
+      </div>
+
+      <button id="counter-button" type="button">클릭해보셈</button>
+    </main>
+
+    <main class="card api-card">
+      <span class="badge">API 호출 테스트</span>
+      <h2>서버에 구현된 API 전부 찔러보기</h2>
+      <p class="desc">버튼을 누르면 fetch 로 요청을 보내고 응답 상태와 본문을 아래에 찍는다</p>
+
+      <ul class="api-list">
+        <li class="api">
+          <div class="api-head">
+            <span class="method post">POST</span>
+            <strong>/login</strong>
+            <button class="call" type="button" data-api="login">호출</button>
+          </div>
+          <span class="api-desc">로그인 시도, 지금은 무조건 400 을 돌려준다</span>
+          <pre class="result" data-result="login">아직 호출 안 함</pre>
+        </li>
+
+        <li class="api">
+          <div class="api-head">
+            <span class="method post">POST</span>
+            <strong>/profile-image</strong>
+            <button class="call" type="button" data-api="profile-image">호출</button>
+          </div>
+          <span class="api-desc">고른 이미지를 요청 본문 그대로 보내 storage/profile-image.jpg 로 저장</span>
+          <input id="profile-file" type="file" accept="image/*" />
+          <pre class="result" data-result="profile-image">아직 호출 안 함</pre>
+        </li>
+
+        <li class="api">
+          <div class="api-head">
+            <span class="method put">PUT</span>
+            <strong>/user</strong>
+            <button class="call" type="button" data-api="user">호출</button>
+          </div>
+          <span class="api-desc">사용자 정보 수정, 지금은 401 을 돌려준다</span>
+          <pre class="result" data-result="user">아직 호출 안 함</pre>
+        </li>
+
+        <li class="api">
+          <div class="api-head">
+            <span class="method get">GET</span>
+            <strong>/not-found</strong>
+            <button class="call" type="button" data-api="not-found">호출</button>
+          </div>
+          <span class="api-desc">등록 안 된 경로, 라우터가 404 JSON 을 돌려주는지 확인</span>
+          <pre class="result" data-result="not-found">아직 호출 안 함</pre>
+        </li>
+      </ul>
+
+      <button id="call-all" type="button">전부 호출</button>
+    </main>
+  </body>
+</html>
